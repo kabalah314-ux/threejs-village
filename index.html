@@ -1,0 +1,1263 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Micro World: AI Village — Planeta</title>
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Fredoka:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js" } }</script>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #7cc4ff; }
+  body { font-family: 'Fredoka', system-ui, sans-serif; }
+  #scene { position: fixed; inset: 0; display: block; touch-action: none; cursor: grab; }
+  #scene:active { cursor: grabbing; }
+  .pixel { font-family: 'Press Start 2P', monospace; }
+  #ui { position: fixed; inset: 0; pointer-events: none; }
+  #ui .clickable { pointer-events: auto; }
+  .panel { background: rgba(255,255,255,0.88); backdrop-filter: blur(10px); border: 3px solid #2b2b3d; box-shadow: 0 6px 0 #2b2b3d, 0 14px 30px rgba(0,0,0,0.25); border-radius: 18px; }
+  .btn-game { font-family: 'Fredoka', sans-serif; font-weight: 700; border: 3px solid #2b2b3d; border-radius: 14px; box-shadow: 0 4px 0 #2b2b3d; transition: transform .08s, box-shadow .08s, filter .15s; cursor: pointer; user-select: none; }
+  .btn-game:hover { filter: brightness(1.06); }
+  .btn-game:active { transform: translateY(4px); box-shadow: 0 0 0 #2b2b3d; }
+  .btn-game.active { background: #ffd94a !important; color: #2b2b3d !important; }
+  .btn-game:disabled { opacity: .5; cursor: not-allowed; transform: none; }
+  .token-glow { color: #ffde59; text-shadow: 0 0 6px #ffb300, 0 0 14px #ff9100, 0 2px 0 #7a4a00; animation: tokenPulse 2.2s ease-in-out infinite; }
+  @keyframes tokenPulse { 0%,100% { text-shadow: 0 0 6px #ffb300, 0 0 14px #ff9100, 0 2px 0 #7a4a00; } 50% { text-shadow: 0 0 10px #ffd000, 0 0 26px #ffae00, 0 2px 0 #7a4a00; } }
+  .coin { display:inline-block; animation: coinSpin 3s linear infinite; }
+  @keyframes coinSpin { to { transform: rotateY(360deg); } }
+  @keyframes blink { 0%,100%{opacity:1; transform:translateY(0)} 50%{opacity:.75; transform:translateY(-3px)} }
+  .blink { animation: blink 1s ease-in-out infinite; }
+  @keyframes floatUp { 0%{opacity:0; transform:translate(-50%,10px) scale(.8)} 15%{opacity:1; transform:translate(-50%,0) scale(1.1)} 80%{opacity:1} 100%{opacity:0; transform:translate(-50%,-60px)} }
+  .toast { animation: floatUp 2.4s ease forwards; }
+  @keyframes fadeIn { from{opacity:0; transform:translateY(12px)} to{opacity:1; transform:none} }
+  .fade-in { animation: fadeIn .25s ease-out; }
+  @keyframes popIn { 0%{opacity:0; transform:scale(.85)} 60%{transform:scale(1.03)} 100%{opacity:1; transform:scale(1)} }
+  .pop-in { animation: popIn .3s cubic-bezier(.2,.9,.3,1.2); }
+  .cursor::after { content:'▋'; animation: cur 1s steps(1) infinite; color:#7ef0c0; }
+  @keyframes cur { 50%{opacity:0} }
+  .code-pane { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; line-height: 1.5; }
+  .code-pane .kw { color:#c792ea } .code-pane .str { color:#c3e88d } .code-pane .cm { color:#6b7a90 }
+  .bar { height: 10px; border-radius: 999px; background: #1f2937; overflow: hidden; }
+  .bar > div { height: 100%; width: 0%; background: linear-gradient(90deg,#34d399,#22d3ee,#a78bfa); transition: width .35s ease; }
+  ::-webkit-scrollbar { width: 6px; height: 6px } ::-webkit-scrollbar-thumb { background: rgba(0,0,0,.25); border-radius: 999px }
+  /* ===== Menú de entrada ===== */
+  #menu { position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center; padding: 12px; background: radial-gradient(ellipse at 50% 120%, rgba(255,214,168,.55), transparent 60%), linear-gradient(rgba(20,40,90,.55), rgba(20,40,90,.25)); transition: opacity .6s; }
+  #menu.hide { opacity: 0; pointer-events: none; }
+  .menu-card { background: rgba(255,255,255,.92); backdrop-filter: blur(12px); border: 4px solid #2b2b3d; border-radius: 26px; box-shadow: 0 10px 0 #2b2b3d, 0 30px 80px rgba(0,0,0,.4); }
+  .menu-title { font-family: 'Press Start 2P', monospace; color: #2b2b3d; text-shadow: 3px 3px 0 #ffd94a; line-height: 1.5; }
+  @keyframes floaty { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-6px)} }
+  .floaty { animation: floaty 3s ease-in-out infinite; }
+  .step { background: #fff; border: 3px solid #2b2b3d; border-radius: 16px; box-shadow: 0 4px 0 #2b2b3d; }
+  .btn-play { font-family: 'Press Start 2P', monospace; font-size: 14px; background: linear-gradient(#7dffa8, #22c55e); color: #14352a; border: 4px solid #2b2b3d; border-radius: 18px; box-shadow: 0 6px 0 #2b2b3d, 0 0 30px rgba(125,255,168,.6); padding: 16px 34px; cursor: pointer; transition: transform .08s, box-shadow .08s; }
+  .btn-play:hover { filter: brightness(1.05); } .btn-play:active { transform: translateY(6px); box-shadow: 0 0 0 #2b2b3d; }
+  .btn-play:disabled { opacity: .6; cursor: wait; }
+  /* ===== Controles táctiles ===== */
+  #joystick { position: fixed; left: 22px; bottom: 26px; width: 130px; height: 130px; border-radius: 50%; background: rgba(43,43,61,.28); border: 3px solid rgba(255,255,255,.6); backdrop-filter: blur(4px); display: none; touch-action: none; z-index: 20; }
+  #joyKnob { position: absolute; left: 50%; top: 50%; width: 56px; height: 56px; margin: -28px 0 0 -28px; border-radius: 50%; background: rgba(255,255,255,.92); border: 3px solid #2b2b3d; box-shadow: 0 4px 0 #2b2b3d; }
+  #actionBtn { position: fixed; right: 22px; bottom: 34px; width: 84px; height: 84px; border-radius: 50%; background: #ffd94a; border: 4px solid #2b2b3d; box-shadow: 0 6px 0 #2b2b3d; display: none; align-items: center; justify-content: center; flex-direction: column; font-weight: 700; color: #2b2b3d; font-size: 11px; line-height: 1.1; text-align: center; touch-action: manipulation; z-index: 20; padding: 6px; }
+  #actionBtn:active { transform: translateY(6px); box-shadow: 0 0 0 #2b2b3d; }
+  #actionBtn .pixel { font-size: 18px; margin-bottom: 4px; }
+  body.mobile #joystick { display: block; }
+  body.mobile #hint { display: none; }
+  body.mobile #dialog { bottom: 8px; }
+  body.mobile .desktop-only { display: none !important; }
+  body.mobile #ui button, body.mobile #ui select, body.mobile #ui input { touch-action: manipulation; }
+  @media (max-width: 767px) {
+    #laptopModal .modal-grid { overflow-y: auto; grid-template-rows: auto auto; }
+    #laptopModal .modal-grid > div { min-height: 360px; }
+  }
+  /* Ticker del barco */
+  #ticker { position: fixed; left: 0; right: 0; bottom: 0; background: #0f1220; color: #7ef0c0; border-top: 3px solid #2b2b3d; overflow: hidden; white-space: nowrap; display: none; }
+  #ticker span { display: inline-block; padding-left: 100%; animation: marquee 28s linear infinite; font-family: ui-monospace, monospace; font-size: 13px; line-height: 32px; }
+  @keyframes marquee { to { transform: translateX(-100%); } }
+  .app-card { background: #fff; border: 3px solid #2b2b3d; border-radius: 14px; box-shadow: 0 4px 0 #2b2b3d; }
+  .app-card.owned { background: #e8ffe9; }
+  input.game, select.game { border: 3px solid #2b2b3d; border-radius: 12px; padding: 8px 10px; font-family: 'Fredoka'; font-weight: 600; background: #fff; }
+</style>
+</head>
+<body>
+<!-- ================= MENÚ DE ENTRADA ================= -->
+<div id="menu">
+  <div class="menu-card w-[min(760px,96vw)] max-h-[94vh] overflow-auto p-5 md:p-8 text-center">
+    <div class="floaty text-5xl md:text-6xl mb-3">🌍</div>
+    <h1 class="menu-title text-base md:text-2xl">MICRO WORLD</h1>
+    <div class="text-emerald-600 font-bold text-lg md:text-2xl -mt-1 mb-3">AI Village</div>
+    <p class="text-[#2b2b3d] font-medium text-sm md:text-base max-w-[560px] mx-auto leading-snug">
+      Un planeta diminuto habitado por animales con grandes problemas… y tú eres el único humano con una <b>Laptop de IA</b>.
+      Ayuda a los 7 vecinos creando sus web apps, gana <b class="text-amber-600">$TOKEN</b> y haz evolucionar el mundo.
+    </p>
+
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-3 mt-4 text-left">
+      <div class="step p-3"><div class="text-2xl">🗺️</div><div class="font-bold text-sm text-[#2b2b3d] mt-1">1. Explora</div><div class="text-xs text-slate-600">Camina, nada y da la vuelta al planeta. Haz zoom hasta verlo entero.</div></div>
+      <div class="step p-3"><div class="text-2xl">❗</div><div class="font-bold text-sm text-[#2b2b3d] mt-1">2. Habla</div><div class="text-xs text-slate-600">Busca a los vecinos con un “!” y acepta sus misiones.</div></div>
+      <div class="step p-3"><div class="text-2xl">💻</div><div class="font-bold text-sm text-[#2b2b3d] mt-1">3. Genera con IA</div><div class="text-xs text-slate-600">Abre la laptop, escribe el prompt y crea su web app.</div></div>
+      <div class="step p-3"><div class="text-2xl">🪙</div><div class="font-bold text-sm text-[#2b2b3d] mt-1">4. Gana $TOKEN</div><div class="text-xs text-slate-600">Desbloquea tiendas, skins, el barco mercante, memes y frutas doradas.</div></div>
+    </div>
+
+    <div class="mt-4 step p-3 text-left text-xs md:text-sm text-[#2b2b3d]">
+      <div class="pixel text-[9px] text-slate-500 mb-2">CONTROLES</div>
+      <div id="ctrlDesktop" class="space-y-1 font-medium">
+        <div><kbd class="px-1.5 py-0.5 bg-slate-200 rounded border border-slate-400">W A S D</kbd> mover · <kbd class="px-1.5 py-0.5 bg-slate-200 rounded border border-slate-400">Clic</kbd> en el suelo para caminar · <kbd class="px-1.5 py-0.5 bg-slate-200 rounded border border-slate-400">E</kbd> interactuar</div>
+        <div><kbd class="px-1.5 py-0.5 bg-slate-200 rounded border border-slate-400">Arrastrar</kbd> rotar cámara · <kbd class="px-1.5 py-0.5 bg-slate-200 rounded border border-slate-400">Rueda</kbd> zoom (de tu personaje al planeta entero) · <kbd class="px-1.5 py-0.5 bg-slate-200 rounded border border-slate-400">Esc</kbd> cerrar</div>
+      </div>
+      <div id="ctrlMobile" class="space-y-1 font-medium hidden">
+        <div>🕹️ <b>Joystick</b> (abajo‑izquierda) para moverte · 👆 <b>Toca el suelo</b> para caminar hasta allí</div>
+        <div>🟡 <b>Botón amarillo</b> (abajo‑derecha) para hablar / interactuar cuando aparezca</div>
+        <div>☝️ <b>Arrastra</b> con un dedo para rotar la cámara · 🤏 <b>Pellizca</b> para hacer zoom hasta ver el planeta</div>
+      </div>
+    </div>
+
+    <div class="mt-5 flex flex-col items-center gap-2">
+      <button id="btnPlay" class="btn-play" disabled>⏳ CARGANDO…</button>
+      <div class="text-[11px] text-slate-500">Tanda 1 · 7 misiones · 1 planeta</div>
+    </div>
+  </div>
+</div>
+
+<canvas id="scene"></canvas>
+<!-- Controles táctiles (solo móvil) -->
+<div id="joystick"><div id="joyKnob"></div></div>
+<button id="actionBtn"><span class="pixel">E</span><span id="actionLabel">Hablar</span></button>
+
+<div id="ui">
+  <!-- Barra superior -->
+  <div class="absolute top-0 left-0 right-0 p-3 md:p-4 flex items-start justify-between gap-3">
+    <div class="flex flex-col gap-2 max-w-[46vw] md:max-w-[300px]">
+      <div class="panel px-4 py-2 clickable desktop-only">
+        <div class="pixel text-[10px] md:text-xs text-[#2b2b3d] leading-relaxed">MICRO WORLD</div>
+        <div class="text-sm md:text-base font-bold text-emerald-600 -mt-0.5">AI Village <span class="text-slate-400 font-medium text-xs">planeta</span></div>
+      </div>
+      <div class="panel px-3 md:px-4 py-2 clickable">
+        <div class="flex items-center justify-between gap-2">
+          <div class="pixel text-[8px] md:text-[9px] text-slate-500">MISIONES <span id="missionCount">0/7</span></div>
+          <button id="btnMissions" class="text-xs font-bold text-sky-600 hover:underline">📜</button>
+        </div>
+        <div id="missionText" class="text-xs md:text-sm font-semibold text-[#2b2b3d] mt-1 leading-tight">🐻 Habla con el Oso Panadero</div>
+        <div id="missionList" class="hidden mt-2 space-y-1 max-h-[45vh] overflow-auto"></div>
+      </div>
+    </div>
+    <div class="relative">
+      <div class="clickable rounded-2xl px-3 md:px-5 py-2 md:py-3 border-[3px] border-[#2b2b3d] bg-[#1c1b2e] shadow-[0_6px_0_#2b2b3d,0_0_30px_rgba(255,200,0,.35)]">
+        <div class="pixel text-[8px] md:text-[9px] text-amber-300/80 mb-1 tracking-wide">$TOKEN</div>
+        <div class="pixel text-sm md:text-2xl token-glow"><span class="coin">🪙</span> <span id="tokenValue">0</span></div>
+      </div>
+      <div id="toastArea" class="absolute left-1/2 -bottom-2"></div>
+    </div>
+    <div class="flex flex-col gap-2">
+      <button id="btnPlanet" class="btn-game clickable px-3 md:px-4 py-2 bg-sky-300 text-[#2b2b3d] text-sm">🌍<span class="hidden md:inline"> Modo Planeta</span></button>
+      <button id="btnPlayer" class="btn-game clickable px-3 md:px-4 py-2 bg-emerald-300 text-[#2b2b3d] text-sm active">🎮<span class="hidden md:inline"> Modo Jugador</span></button>
+    </div>
+  </div>
+
+  <div class="absolute bottom-10 left-3 panel px-4 py-3 clickable hidden md:block">
+    <div class="pixel text-[9px] text-slate-500 mb-2">CONTROLES</div>
+    <div class="text-xs text-[#2b2b3d] space-y-1 font-medium">
+      <div><kbd class="px-1.5 py-0.5 bg-slate-200 rounded border border-slate-400">W A S D</kbd> mover · <kbd class="px-1.5 py-0.5 bg-slate-200 rounded border border-slate-400">Clic</kbd> caminar / nadar 🏊</div>
+      <div><kbd class="px-1.5 py-0.5 bg-slate-200 rounded border border-slate-400">E</kbd> interactuar · <kbd class="px-1.5 py-0.5 bg-slate-200 rounded border border-slate-400">Arrastrar</kbd> rotar · <kbd class="px-1.5 py-0.5 bg-slate-200 rounded border border-slate-400">Rueda</kbd> zoom hasta ver el planeta</div>
+    </div>
+  </div>
+
+  <div id="hint" class="absolute bottom-24 left-1/2 -translate-x-1/2 hidden">
+    <div class="blink panel px-4 py-2 text-sm font-bold text-[#2b2b3d] flex items-center gap-2">
+      <span class="pixel text-[10px] bg-[#2b2b3d] text-yellow-300 px-2 py-1 rounded">E</span><span id="hintText"></span>
+    </div>
+  </div>
+
+  <!-- Diálogo NPC -->
+  <div id="dialog" class="absolute bottom-10 left-1/2 -translate-x-1/2 w-[min(680px,94vw)] hidden">
+    <div class="panel p-4 md:p-5 clickable fade-in flex gap-4 items-start">
+      <div id="dialogAvatar" class="shrink-0 w-16 h-16 md:w-20 md:h-20 rounded-2xl bg-amber-200 border-[3px] border-[#2b2b3d] flex items-center justify-center text-4xl md:text-5xl shadow-[0_4px_0_#2b2b3d]">🐻</div>
+      <div class="flex-1 min-w-0">
+        <div id="dialogName" class="pixel text-[10px] text-amber-600 mb-2">OSO PANADERO</div>
+        <p id="dialogText" class="text-[15px] md:text-base text-[#2b2b3d] font-medium leading-snug min-h-[3.2em]"></p>
+        <div id="dialogButtons" class="mt-3 flex flex-wrap gap-2"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL LAPTOP DE IA -->
+  <div id="laptopModal" style="display:none" class="absolute inset-0 items-center justify-center bg-black/50 backdrop-blur-[2px] clickable">
+    <div class="pop-in w-[min(1000px,95vw)] h-[min(660px,92vh)] rounded-2xl border-[3px] border-[#2b2b3d] bg-[#0f1220] shadow-[0_10px_0_#2b2b3d,0_30px_80px_rgba(0,0,0,.6)] flex flex-col overflow-hidden">
+      <div class="flex items-center gap-2 px-4 py-2.5 bg-[#1a1d30] border-b border-white/10">
+        <span class="w-3 h-3 rounded-full bg-red-400"></span><span class="w-3 h-3 rounded-full bg-yellow-400"></span><span class="w-3 h-3 rounded-full bg-green-400"></span>
+        <span class="pixel text-[10px] text-slate-300 ml-3">AI LAPTOP — DevOS v2.0</span>
+        <span class="ml-auto text-xs text-slate-400 font-medium">💻 planet.local · 🔋 100%</span>
+        <button id="btnCloseLaptop" class="ml-3 text-slate-400 hover:text-white text-lg leading-none">✕</button>
+      </div>
+      <div class="modal-grid flex-1 grid grid-cols-1 md:grid-cols-2 min-h-0">
+        <div class="flex flex-col p-4 gap-3 border-r border-white/10 min-h-0">
+          <div class="flex items-center gap-2 text-xs text-slate-400 font-semibold"><span>🎯 Proyecto:</span>
+            <select id="missionSelect" class="bg-[#161a2c] border border-white/10 rounded-lg px-2 py-1 text-slate-200 text-xs flex-1"></select></div>
+          <div class="text-xs text-slate-400 font-semibold">📝 prompt.txt</div>
+          <div class="bg-[#161a2c] border border-white/10 rounded-xl p-3 text-[13px] text-emerald-200 leading-relaxed min-h-[100px]"><span id="promptText" class="cursor"></span></div>
+          <div class="flex items-center gap-2 text-xs text-slate-400 font-medium">
+            <span class="px-2 py-1 rounded bg-white/5 border border-white/10">🧠 modelo: villager-gpt</span><span class="px-2 py-1 rounded bg-white/5 border border-white/10">🎨 estilo: pastel</span></div>
+          <button id="btnGenerate" class="btn-game w-full py-3 bg-gradient-to-r from-fuchsia-400 to-cyan-300 text-[#2b2b3d] text-base" disabled>✨ Generar Web App con IA</button>
+          <div class="bar"><div id="progressBar"></div></div>
+          <div id="stepsLog" class="flex-1 overflow-auto text-[12.5px] text-slate-300 space-y-1 font-medium min-h-0"></div>
+        </div>
+        <div class="flex flex-col min-h-0">
+          <div class="flex text-xs font-semibold border-b border-white/10">
+            <button id="tabCode" class="px-4 py-2 text-cyan-300 border-b-2 border-cyan-300">📄 <span id="codeFile">app.html</span></button>
+            <button id="tabPreview" class="px-4 py-2 text-slate-400 border-b-2 border-transparent">👁️ Vista previa</button></div>
+          <pre id="codePane" class="code-pane flex-1 overflow-auto p-4 text-slate-200 m-0 whitespace-pre-wrap"></pre>
+          <div id="previewPane" class="hidden flex-1 overflow-auto bg-white"></div>
+        </div>
+      </div>
+      <div class="flex items-center justify-between px-4 py-3 bg-[#1a1d30] border-t border-white/10">
+        <div id="laptopStatus" class="text-xs text-slate-400 font-medium"></div>
+        <div class="flex gap-2">
+          <button id="btnCancelLaptop" class="btn-game px-4 py-2 bg-slate-200 text-[#2b2b3d] text-sm">Cerrar</button>
+          <button id="btnDeliver" class="btn-game px-4 py-2 bg-yellow-300 text-[#2b2b3d] text-sm hidden">Entregar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL GENÉRICO DE APPS DESBLOQUEADAS -->
+  <div id="appModal" style="display:none" class="absolute inset-0 items-center justify-center bg-black/45 backdrop-blur-[2px] clickable">
+    <div class="pop-in panel w-[min(860px,95vw)] max-h-[92vh] flex flex-col overflow-hidden">
+      <div class="flex items-center justify-between px-5 py-3 border-b-[3px] border-[#2b2b3d] bg-[#fff6d6]">
+        <div id="appTitle" class="font-bold text-lg text-[#2b2b3d]"></div>
+        <button id="btnCloseApp" class="btn-game px-3 py-1 bg-slate-200 text-[#2b2b3d] text-sm">✕ Cerrar</button>
+      </div>
+      <div id="appBody" class="p-5 overflow-auto"></div>
+    </div>
+  </div>
+</div>
+<div id="ticker"><span id="tickerText"></span></div>
+
+<script type="module">
+import * as THREE from 'three';
+
+/* =========================================================
+   1. CONFIGURACIÓN Y ESTADO
+   ========================================================= */
+const R = 16, SEA = R + 0.55;
+const CFG = { playerSpeed: 5.4, swimFactor: 0.5, interactDist: 3.2, fruitCooldown: 60000, fruitReward: 50 };
+/** Detección de dispositivo táctil → controles y calidad adaptados */
+const IS_MOBILE = matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window;
+if (IS_MOBILE) document.body.classList.add('mobile');
+document.getElementById('ctrlDesktop').classList.toggle('hidden', IS_MOBILE);
+document.getElementById('ctrlMobile').classList.toggle('hidden', !IS_MOBILE);
+const state = {
+  menuOpen: true, joy: { x: 0, y: 0 },
+  mode: 'player', modalOpen: false, keys: {}, moveTarget: null, pendingInteract: null, walkCycle: 0,
+  tokens: 0, tokensShown: 0, camTween: null, dialogPose: null, dialogNpc: null, activeMission: null,
+  missions: {}, owned: new Set(), neonOn: false, neonT: 0, houseLevel: 0, aura: 'none', laptopSkin: 'default',
+  shipUnlocked: false, shipTime: 0, shipDocked: false, farmUnlocked: false, boardUnlocked: false, swimming: false,
+};
+
+/* =========================================================
+   2. MATEMÁTICAS DEL PLANETA
+   ========================================================= */
+const UP_Y = new THREE.Vector3(0, 1, 0);
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const smoothstep = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
+const angleBetween = (a, b) => Math.acos(clamp(a.dot(b), -1, 1));
+const n3 = (x, y, z) => new THREE.Vector3(x, y, z).normalize();
+const lerp = THREE.MathUtils.lerp;
+
+/** Un "sitio" es una meseta plana con su propio marco local (E = este, S = sur) */
+function makeSite(dir, h, r0, r1) {
+  const E = new THREE.Vector3().crossVectors(UP_Y, dir).normalize();
+  const N = new THREE.Vector3().crossVectors(dir, E).normalize();
+  return { dir, h, r0, r1, E, N, S: N.clone().negate() };
+}
+const SITES = {
+  village:  makeSite(n3(0.15, 0.55, 0.82), R + 1.0, 0.5, 0.8),
+  townhall: makeSite(n3(-0.7, 0.3, 0.6), R + 1.1, 0.33, 0.6),
+  workshop: makeSite(n3(0.85, -0.2, 0.45), R + 0.95, 0.33, 0.6),
+  sombra:   makeSite(n3(-0.2, -0.85, 0.4), R + 1.35, 0.3, 0.55),
+  lab:      makeSite(n3(0.3, 0.6, -0.75), R + 1.0, 0.4, 0.65),
+  studio:   makeSite(n3(0.7, -0.6, -0.4), R + 1.0, 0.3, 0.55),
+  port:     makeSite(n3(-0.8, -0.1, -0.55), SEA + 0.4, 0.18, 0.34),
+};
+const V = SITES.village.dir, V_N = SITES.village.N, V_S = SITES.village.S;
+// Canal marítimo frente al puerto para que el barco llegue sin chocar con tierra
+const chanDir = (k) => SITES.port.dir.clone().multiplyScalar(R).addScaledVector(SITES.port.S, k).normalize();
+const CHANNELS = [makeSite(chanDir(8), SEA - 0.9, 0.3, 0.5), makeSite(chanDir(16), SEA - 0.9, 0.3, 0.5), makeSite(chanDir(24), SEA - 0.9, 0.3, 0.5)];
+const TERRAIN_SITES = [SITES.village, SITES.townhall, SITES.workshop, SITES.sombra, SITES.lab, SITES.studio, ...CHANNELS, SITES.port];
+
+function terrainNoise(x, y, z) {
+  let n = Math.sin(x * 3.1 + y * 1.7) * Math.cos(z * 2.3 - x * 1.1);
+  n += 0.5 * Math.sin(x * 6.2 - z * 4.1 + y * 2.9) * Math.cos(y * 5.3 + z * 1.7);
+  n += 0.25 * Math.sin(x * 11 + y * 9 - z * 7) * Math.cos(z * 10 - x * 4);
+  return n;
+}
+function heightAt(dir) {
+  let h = R + 0.7 + terrainNoise(dir.x, dir.y, dir.z) * 0.75;
+  for (const s of TERRAIN_SITES) { const t = 1 - smoothstep(s.r0, s.r1, angleBetween(dir, s.dir)); if (t > 0) h += (s.h - h) * t; }
+  return h;
+}
+const isLand = (dir) => heightAt(dir) > SEA + 0.12;
+const surfaceR = (dir) => Math.max(heightAt(dir), SEA - 0.55); // radio donde "pisa" el jugador (nada en el agua)
+function siteDir(site, x, z) { return site.dir.clone().multiplyScalar(R).addScaledVector(site.E, x).addScaledVector(site.S, z).normalize(); }
+function frameAt(dir, ref) {
+  const up = dir.clone().normalize();
+  let fwd = ref.clone().addScaledVector(up, -ref.dot(up));
+  if (fwd.lengthSq() < 1e-8) fwd = new THREE.Vector3(1, 0, 0).addScaledVector(up, -up.x);
+  fwd.normalize();
+  return { up, fwd, right: new THREE.Vector3().crossVectors(up, fwd).normalize() };
+}
+const _m4 = new THREE.Matrix4();
+function quatFromFrame(f, q = new THREE.Quaternion()) { _m4.makeBasis(f.right, f.up, f.fwd); return q.setFromRotationMatrix(_m4); }
+function tangent(v, up) { const t = v.clone().addScaledVector(up, -v.dot(up)); return t.lengthSq() < 1e-8 ? t.set(0, 0, 0) : t.normalize(); }
+function randomDir() { const u = Math.random() * 2 - 1, th = Math.random() * Math.PI * 2, s = Math.sqrt(1 - u * u); return new THREE.Vector3(s * Math.cos(th), u, s * Math.sin(th)); }
+/** Coloca un objeto (construido con +Y arriba, +Z frente) sobre la superficie */
+function placeOnPlanet(obj, dir, yaw = 0, lift = 0, ref = V_S, radius = null) {
+  const f = frameAt(dir, ref);
+  if (yaw) { f.fwd.applyAxisAngle(f.up, yaw); f.right.crossVectors(f.up, f.fwd); }
+  quatFromFrame(f, obj.quaternion);
+  obj.position.copy(f.up).multiplyScalar((radius ?? heightAt(f.up)) + lift);
+  obj.userData.dir = f.up.clone(); obj.userData.up = obj.userData.dir;
+  return obj;
+}
+const placeAtSite = (obj, site, x, z, yaw = 0, lift = 0, radius = null) => placeOnPlanet(obj, siteDir(site, x, z), yaw, lift, site.S, radius);
+
+/* =========================================================
+   3. RENDERER, ESCENA, CIELO, LUCES
+   ========================================================= */
+const canvas = document.getElementById('scene');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, IS_MOBILE ? 1.5 : 2)); renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled = true; renderer.shadowMap.type = IS_MOBILE ? THREE.PCFShadowMap : THREE.PCFSoftShadowMap;
+renderer.outputColorSpace = THREE.SRGBColorSpace; renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.05;
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.1, 1000);
+
+const sky = new THREE.Mesh(new THREE.SphereGeometry(400, 32, 16), new THREE.ShaderMaterial({
+  side: THREE.BackSide, depthWrite: false,
+  uniforms: { topColor: { value: new THREE.Color(0x2f7fd8) }, midColor: { value: new THREE.Color(0xa9dcff) }, bottomColor: { value: new THREE.Color(0xffd6a8) } },
+  vertexShader: `varying vec3 vPos; void main(){ vPos = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+  fragmentShader: `uniform vec3 topColor, midColor, bottomColor; varying vec3 vPos; void main(){ float h = normalize(vPos).y; vec3 c = h > 0.0 ? mix(midColor, topColor, pow(h, 0.55)) : mix(midColor, bottomColor, pow(-h, 0.7)); gl_FragColor = vec4(c, 1.0); }`
+}));
+scene.add(sky);
+{ const pts = []; for (let i = 0; i < 700; i++) { const d = randomDir(); pts.push(d.x * 380, d.y * 380, d.z * 380); }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
+  scene.add(new THREE.Points(g, new THREE.PointsMaterial({ color: 0xffffff, size: 1.6, transparent: true, opacity: 0.55, sizeAttenuation: false }))); }
+
+const clouds = new THREE.Group();
+const cloudMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, flatShading: true });
+for (let i = 0; i < 18; i++) {
+  const pivot = new THREE.Object3D(); pivot.quaternion.setFromUnitVectors(UP_Y, randomDir()); pivot.rotateY(Math.random() * 6.28);
+  const c = new THREE.Group(); const n = 3 + Math.floor(Math.random() * 3);
+  for (let j = 0; j < n; j++) { const s = 0.8 + Math.random() * 1.2; const m = new THREE.Mesh(new THREE.SphereGeometry(s, 8, 6), cloudMat); m.position.set(j * 1.3 - n * 0.65, Math.random() * 0.4, (Math.random() - 0.5) * 1.2); m.scale.y = 0.6; m.castShadow = true; c.add(m); }
+  c.position.set(0, 0, R + 6 + Math.random() * 4); c.rotation.x = Math.PI / 2; pivot.add(c); pivot.userData.speed = 0.02 + Math.random() * 0.03; clouds.add(pivot);
+}
+scene.add(clouds);
+
+scene.add(new THREE.HemisphereLight(0xcfe9ff, 0x6c8f3c, 0.55), new THREE.AmbientLight(0xfff0dc, 0.55));
+const sun = new THREE.DirectionalLight(0xfff1d6, 2.3);
+sun.castShadow = true; sun.shadow.mapSize.set(IS_MOBILE ? 1024 : 2048, IS_MOBILE ? 1024 : 2048);
+sun.shadow.camera.near = 1; sun.shadow.camera.far = 120; sun.shadow.camera.left = -24; sun.shadow.camera.right = 24; sun.shadow.camera.top = 24; sun.shadow.camera.bottom = -24;
+sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.04; sun.shadow.radius = 4;
+scene.add(sun, sun.target);
+
+/* =========================================================
+   4. HELPERS LOW-POLY
+   ========================================================= */
+const mat = (color, extra = {}) => new THREE.MeshStandardMaterial({ color, roughness: 0.85, metalness: 0, ...extra });
+const glow = (color, emissive, intensity = 1, extra = {}) => new THREE.MeshStandardMaterial({ color, emissive, emissiveIntensity: intensity, roughness: 0.4, ...extra });
+function mesh(geo, material, x = 0, y = 0, z = 0, shadow = true) { const m = new THREE.Mesh(geo, material); m.position.set(x, y, z); m.castShadow = shadow; m.receiveShadow = shadow; return m; }
+const box = (w, h, d, m, x, y, z) => mesh(new THREE.BoxGeometry(w, h, d), m, x, y, z);
+const sphere = (r, m, x, y, z, seg = 16) => mesh(new THREE.SphereGeometry(r, seg, seg), m, x, y, z);
+const cyl = (rt, rb, h, m, x, y, z, seg = 8) => mesh(new THREE.CylinderGeometry(rt, rb, h, seg), m, x, y, z);
+const cone = (r, h, m, x, y, z, seg = 7) => mesh(new THREE.ConeGeometry(r, h, seg), m, x, y, z);
+function textTexture(text, { w = 512, h = 128, bg = '#ffffff', color = '#2b2b3d', font = 'bold 54px Fredoka, Arial', radius = 20 } = {}) {
+  const c = document.createElement('canvas'); c.width = w; c.height = h; const ctx = c.getContext('2d');
+  ctx.fillStyle = bg; ctx.beginPath(); ctx.roundRect(0, 0, w, h, radius); ctx.fill();
+  ctx.fillStyle = color; ctx.font = font; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(text, w / 2, h / 2 + 2);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+}
+function bubbleTexture(symbol, bg) {
+  const c = document.createElement('canvas'); c.width = c.height = 128; const ctx = c.getContext('2d');
+  ctx.fillStyle = '#2b2b3d'; ctx.beginPath(); ctx.arc(64, 64, 60, 0, 6.29); ctx.fill();
+  ctx.fillStyle = bg; ctx.beginPath(); ctx.arc(64, 64, 52, 0, 6.29); ctx.fill();
+  ctx.fillStyle = '#2b2b3d'; ctx.font = 'bold 84px Fredoka, Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(symbol, 64, 70);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+}
+const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+function hl(line) { // resaltado de sintaxis simple
+  const i = line.indexOf('//'); let code = i >= 0 ? line.slice(0, i) : line, cm = i >= 0 ? `<span class="cm">${esc(line.slice(i))}</span>` : '';
+  return esc(code).replace(/("[^"]*")/g, '<span class="str">$1</span>').replace(/\b(const|let|function|async|await|return|import|from|new|if|else|class|export)\b/g, '<span class="kw">$1</span>') + cm;
+}
+
+/* =========================================================
+   5. PLANETA Y OCÉANO
+   ========================================================= */
+const colliders = [];
+const interactables = [];
+function registerInteractable(obj, interact, npcId) { obj.userData.interact = interact; obj.userData.npcId = npcId; obj.traverse(o => { if (o.isMesh || o.isSprite) o.userData.root = obj; }); interactables.push(obj); }
+function colorForHeight(h) {
+  const rel = h - SEA;
+  if (rel < -0.35) return new THREE.Color(0x4f8f8a);
+  if (rel < 0.12) return new THREE.Color(0xeadba3);
+  if (rel < 0.95) return new THREE.Color(Math.random() < 0.5 ? 0x7ccf5a : 0x86d764);
+  if (rel < 1.5) return new THREE.Color(0x5fae48);
+  if (rel < 1.85) return new THREE.Color(0x9c968a);
+  return new THREE.Color(0xf4f7fa);
+}
+const planet = (() => {
+  const geo = new THREE.SphereGeometry(1, IS_MOBILE ? 120 : 160, IS_MOBILE ? 84 : 110).toNonIndexed();
+  const pos = geo.attributes.position, colors = new Float32Array(pos.count * 3), d = new THREE.Vector3();
+  for (let i = 0; i < pos.count; i += 3) {
+    let hc = 0;
+    for (let k = 0; k < 3; k++) { d.set(pos.getX(i + k), pos.getY(i + k), pos.getZ(i + k)).normalize(); const h = heightAt(d); hc += h / 3; pos.setXYZ(i + k, d.x * h, d.y * h, d.z * h); }
+    const c = colorForHeight(hc + (Math.random() - 0.5) * 0.03);
+    for (let k = 0; k < 3; k++) colors.set([c.r, c.g, c.b], (i + k) * 3);
+  }
+  geo.setAttribute('color', new THREE.BufferAttribute(colors, 3)); geo.computeVertexNormals();
+  const m = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9, flatShading: true }));
+  m.receiveShadow = true; m.castShadow = true; return m;
+})();
+scene.add(planet);
+const waterGeo = new THREE.SphereGeometry(1, 84, 60); const waterBase = waterGeo.attributes.position.array.slice();
+const water = new THREE.Mesh(waterGeo, new THREE.MeshStandardMaterial({ color: 0x3fb3e6, roughness: 0.3, metalness: 0.05, transparent: true, opacity: 0.86, flatShading: true }));
+water.receiveShadow = true; scene.add(water);
+
+/* =========================================================
+   6. CONSTRUCTORES: EDIFICIOS, ÁRBOLES, CRIATURAS
+   ========================================================= */
+function makeBuilding({ w = 4, h = 3, d = 3.6, wall = 0xfff1d6, roof = 0xf28cb1, roofType = 'cone', sign = '', signColor = '#c2185b', door = 0x8b5a2b, windowGlow = 0 }) {
+  const g = new THREE.Group(); const wallMat = mat(wall);
+  g.add(box(w, h, d, wallMat, 0, h / 2 - 0.1, 0));
+  let roofMesh;
+  if (roofType === 'cone') { roofMesh = cone(Math.max(w, d) * 0.82, h * 0.6, mat(roof, { flatShading: true }), 0, h - 0.1 + h * 0.3, 0, 4); roofMesh.rotation.y = Math.PI / 4; }
+  else if (roofType === 'dome') roofMesh = mesh(new THREE.SphereGeometry(Math.min(w, d) * 0.6, 16, 10, 0, 6.29, 0, Math.PI / 2), mat(roof), 0, h - 0.1, 0);
+  else roofMesh = box(w + 0.4, 0.3, d + 0.4, mat(roof), 0, h + 0.05, 0);
+  g.add(roofMesh);
+  g.add(box(1, 1.8, 0.15, mat(door), 0, 0.8, d / 2 + 0.03));
+  const winMat = new THREE.MeshStandardMaterial({ color: 0x9fd8ff, emissive: 0xffc46b, emissiveIntensity: windowGlow, roughness: 0.2 });
+  [-1, 1].forEach(s => { g.add(box(0.9, 0.8, 0.1, winMat, s * w * 0.3, 1.75, d / 2 + 0.03)); g.add(box(1, 0.9, 0.04, mat(0xffffff), s * w * 0.3, 1.75, d / 2 + 0.02)); });
+  if (sign) g.add(box(w * 0.8, 0.62, 0.1, new THREE.MeshStandardMaterial({ map: textTexture(sign, { bg: '#fff7e6', color: signColor, font: 'bold 44px Fredoka, Arial' }), roughness: 0.6 }), 0, h - 0.5, d / 2 + 0.08));
+  g.userData = { wallMat, winMat, roofMesh, w, h, d };
+  return g;
+}
+function makeTree(scale = 1, leafColor) {
+  const g = new THREE.Group(); g.add(cyl(0.18, 0.26, 1.2, mat(0x8b5a2b), 0, 0.6, 0, 7));
+  const leaf = mat(leafColor || [0x4caf50, 0x43a047, 0x66bb6a][Math.floor(Math.random() * 3)], { flatShading: true });
+  g.add(cone(1.1, 1.6, leaf, 0, 1.8, 0)); g.add(cone(0.85, 1.4, leaf, 0, 2.7, 0)); g.add(cone(0.55, 1.1, leaf, 0, 3.5, 0));
+  g.scale.setScalar(scale); return g;
+}
+function makePalm() {
+  const g = new THREE.Group(); const t = cyl(0.12, 0.22, 2.6, mat(0xa9773f), 0, 1.3, 0, 6); t.rotation.z = 0.15; g.add(t);
+  for (let i = 0; i < 6; i++) { const l = mesh(new THREE.BoxGeometry(0.35, 0.06, 1.7), mat(0x3fa34d, { flatShading: true }), 0.2, 2.6, 0); l.geometry.translate(0, 0, 0.8); l.rotation.y = i / 6 * 6.28; l.rotation.x = -0.5; g.add(l); }
+  return g;
+}
+/** Criatura genérica estilizada (cuerpo, cabeza, ojos, brazos, pies) + decorador por especie */
+function makeCritter({ fur, belly, ears = 'round', eye = 0x2b2b3d, eyeSize = 0.06, scale = 1, decorate }) {
+  const g = new THREE.Group(); const F = mat(fur), D = mat(eye);
+  const body = sphere(0.62, F, 0, 0.72, 0, 18); body.scale.set(1, 1.05, 0.85); g.add(body);
+  if (belly) { const b = sphere(0.45, mat(belly), 0, 0.7, 0.3, 14); b.scale.set(1, 1.1, 0.6); g.add(b); }
+  g.add(sphere(0.55, F, 0, 1.62, 0, 18));
+  if (ears === 'round') { g.add(sphere(0.17, F, -0.4, 2.02, 0, 10)); g.add(sphere(0.17, F, 0.4, 2.02, 0, 10)); }
+  if (ears === 'pointy') [-1, 1].forEach(s => { const e = cone(0.16, 0.42, F, s * 0.35, 2.15, 0, 6); e.rotation.z = -s * 0.3; g.add(e); });
+  if (ears === 'droop') [-1, 1].forEach(s => { const e = sphere(0.17, F, s * 0.55, 1.45, 0, 10); e.scale.set(0.7, 1.7, 0.6); g.add(e); });
+  g.add(sphere(eyeSize, D, -0.2, 1.72, 0.48, 6)); g.add(sphere(eyeSize, D, 0.2, 1.72, 0.48, 6));
+  g.add(sphere(0.22, F, -0.62, 0.88, 0.2, 10)); g.add(sphere(0.22, F, 0.62, 0.88, 0.2, 10));
+  g.add(sphere(0.22, F, -0.3, 0.2, 0.1, 10)); g.add(sphere(0.22, F, 0.3, 0.2, 0.1, 10));
+  decorate && decorate(g, F);
+  g.scale.setScalar(scale); return g;
+}
+const SPECIES = {
+  bear: () => makeCritter({ fur: 0x9c6b3c, decorate: (g) => {
+    const light = mat(0xe8c9a0); const sn = sphere(0.26, light, 0, 1.5, 0.42, 12); sn.scale.set(1.2, 0.85, 0.8); g.add(sn); g.add(sphere(0.1, mat(0x2b2b3d), 0, 1.58, 0.62, 8));
+    g.add(box(0.7, 0.8, 0.1, mat(0xffffff), 0, 0.7, 0.52)); g.add(box(0.75, 0.12, 0.12, mat(0xff6b9d), 0, 1.05, 0.5));
+    g.add(cyl(0.34, 0.3, 0.3, mat(0xffffff), 0, 2.2, 0, 14)); const ht = sphere(0.4, mat(0xffffff), 0, 2.42, 0, 14); ht.scale.y = 0.7; g.add(ht); } }),
+  stbernard: () => makeCritter({ fur: 0xb07a45, belly: 0xfff4e0, ears: 'droop', decorate: (g) => {
+    const sn = sphere(0.28, mat(0xfff4e0), 0, 1.48, 0.42, 12); sn.scale.set(1.1, 0.9, 0.9); g.add(sn); g.add(sphere(0.11, mat(0x2b2b3d), 0, 1.55, 0.66, 8));
+    g.add(cyl(0.42, 0.42, 0.06, mat(0x1b1b2b), 0, 2.15, 0, 16)); g.add(cyl(0.28, 0.3, 0.5, mat(0x1b1b2b), 0, 2.42, 0, 16)); g.add(cyl(0.29, 0.29, 0.08, mat(0xd4af37), 0, 2.22, 0, 16));
+    g.add(box(0.36, 0.14, 0.1, mat(0xe53935), 0, 1.15, 0.52)); g.add(cyl(0.12, 0.12, 0.22, mat(0x8b5a2b), 0, 1.0, 0.6)); } }),
+  beaver: () => makeCritter({ fur: 0x7a4b2a, belly: 0xa8734a, decorate: (g) => {
+    const tail = box(0.6, 0.1, 0.9, mat(0x4e2e17), 0, 0.25, -0.75); tail.rotation.x = 0.25; g.add(tail);
+    g.add(box(0.1, 0.16, 0.05, mat(0xffffff), -0.06, 1.42, 0.52)); g.add(box(0.1, 0.16, 0.05, mat(0xffffff), 0.06, 1.42, 0.52));
+    g.add(sphere(0.1, mat(0x2b2b3d), 0, 1.6, 0.52, 8));
+    g.add(mesh(new THREE.SphereGeometry(0.5, 14, 8, 0, 6.29, 0, Math.PI / 2), mat(0xffc107), 0, 2.0, 0)); g.add(cyl(0.56, 0.56, 0.06, mat(0xffc107), 0, 2.0, 0.05, 16));
+    g.add(box(0.7, 0.14, 0.7, mat(0x5d4037), 0, 0.42, 0)); } }),
+  cat: () => makeCritter({ fur: 0x1e1b2e, ears: 'pointy', eye: 0xffd54f, eyeSize: 0.085, decorate: (g) => {
+    g.add(sphere(0.03, mat(0x111111), -0.2, 1.72, 0.56, 4)); g.add(sphere(0.03, mat(0x111111), 0.2, 1.72, 0.56, 4));
+    const cape = cone(0.95, 1.7, mat(0x5e35b1, { side: THREE.DoubleSide }), 0, 0.85, -0.15, 12); g.add(cape);
+    const hood = mesh(new THREE.SphereGeometry(0.62, 14, 10, 0, 6.29, 0, Math.PI / 2.4), mat(0x5e35b1), 0, 1.66, -0.05); g.add(hood);
+    const ball = sphere(0.24, glow(0xb388ff, 0x7c4dff, 1.2, { transparent: true, opacity: 0.85 }), 0, 0.95, 0.62, 14); g.add(ball);
+    const l = new THREE.PointLight(0x7c4dff, 1.5, 4, 2); l.position.set(0, 1, 0.8); g.add(l);
+    const tail = mesh(new THREE.TorusGeometry(0.35, 0.07, 8, 12, Math.PI * 1.3), mat(0x1e1b2e), 0.5, 0.45, -0.5); tail.rotation.y = 1; g.add(tail); } }),
+  axolotl: () => makeCritter({ fur: 0xf8a5c2, belly: 0xffd6e0, ears: 'none', decorate: (g) => {
+    const gill = mat(0xe91e63, { flatShading: true });
+    [-1, 1].forEach(s => { for (let i = 0; i < 3; i++) { const c = cone(0.08, 0.45, gill, s * 0.5, 1.9 - i * 0.18, -0.1 + i * 0.05, 5); c.rotation.z = s * (1.2 + i * 0.35); g.add(c); } });
+    g.add(box(0.9, 0.85, 0.15, mat(0xffffff), 0, 0.68, 0.5)); g.add(box(0.5, 0.06, 0.16, mat(0x2b2b3d), 0, 1.08, 0.5));
+    [-0.18, 0.18].forEach(x => g.add(mesh(new THREE.TorusGeometry(0.12, 0.035, 8, 14), mat(0x00acc1), x, 2.02, 0.4)));
+    g.add(sphere(0.045, mat(0x2b2b3d), 0, 1.5, 0.55, 5)); const smile = mesh(new THREE.TorusGeometry(0.12, 0.02, 6, 10, Math.PI), mat(0x2b2b3d), 0, 1.46, 0.53); smile.rotation.z = Math.PI; g.add(smile);
+    const tail = cone(0.25, 0.9, mat(0xf8a5c2), 0, 0.5, -0.65, 6); tail.rotation.x = -1.2; g.add(tail); } }),
+  pelican: () => makeCritter({ fur: 0xfafafa, ears: 'none', decorate: (g) => {
+    const beak = cone(0.22, 1.1, mat(0xffb300), 0, 1.5, 0.95, 8); beak.rotation.x = Math.PI / 2; g.add(beak);
+    const pouch = sphere(0.22, mat(0xff8f00), 0, 1.3, 0.62, 10); pouch.scale.set(1, 1.3, 1); g.add(pouch);
+    g.add(cyl(0.3, 0.3, 0.22, mat(0xffffff), 0, 2.15, 0, 16)); g.add(cyl(0.32, 0.32, 0.08, mat(0x1e3a8a), 0, 2.08, 0, 16)); g.add(box(0.7, 0.06, 0.4, mat(0xffffff), 0, 2.04, 0.25));
+    g.add(cyl(0.12, 0.12, 0.1, mat(0xff8f00), 0, 0.2, 0.28, 6));
+    [-1, 1].forEach(s => { const w = sphere(0.3, mat(0xeeeeee), s * 0.6, 0.85, 0, 10); w.scale.set(0.5, 1.4, 0.9); g.add(w); }); } }),
+};
+function makeHedgehog(shades) {
+  return makeCritter({ fur: 0xc79a6b, belly: 0xf3dcc0, ears: 'round', scale: 0.72, decorate: (g) => {
+    const sp = mat(0x5d4037, { flatShading: true });
+    for (let i = 0; i < 14; i++) { const c = cone(0.1, 0.5, sp, (Math.random() - 0.5) * 0.9, 0.9 + Math.random() * 0.9, -0.3 - Math.random() * 0.35, 5); c.rotation.x = -0.9 - Math.random() * 0.6; c.rotation.z = (Math.random() - 0.5) * 0.8; g.add(c); }
+    g.add(sphere(0.07, mat(0x2b2b3d), 0, 1.5, 0.58, 6));
+    if (shades) { g.add(box(0.5, 0.14, 0.1, mat(0x111111), 0, 1.72, 0.52)); g.add(box(0.7, 0.03, 0.03, mat(0x111111), 0, 1.76, 0.4)); }
+    else { const ph = box(0.22, 0.34, 0.04, glow(0x111111, 0x42a5f5, 1.4), 0.62, 1.05, 0.5); ph.rotation.y = -0.5; g.add(ph); }
+  } });
+}
+
+/* =========================================================
+   7. ALDEA PRINCIPAL: PANADERÍA, CASA, LAPTOP
+   ========================================================= */
+const S_V = SITES.village;
+const bakery = (() => {
+  const g = makeBuilding({ w: 4.4, h: 3.2, d: 3.8, wall: 0xfff1d6, roof: 0xf28cb1, sign: 'PANADERÍA DEL OSO' });
+  const neonPink = glow(0xff4fa3, 0xff2d8f, 0), neonCyan = glow(0x4ff0ff, 0x00e5ff, 0);
+  g.add(box(0.6, 1.2, 0.6, mat(0xb5651d), 1.2, 4.3, -0.8));
+  const awningTex = (() => { const c = document.createElement('canvas'); c.width = 256; c.height = 64; const x = c.getContext('2d'); for (let i = 0; i < 8; i++) { x.fillStyle = i % 2 ? '#ff7fb0' : '#ffffff'; x.fillRect(i * 32, 0, 32, 64); } const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t; })();
+  const aw = box(4.6, 0.12, 1.3, new THREE.MeshStandardMaterial({ map: awningTex, roughness: 0.9 }), 0, 2.4, 2.4); aw.rotation.x = 0.35; g.add(aw);
+  [box(3.6, 0.08, 0.08, neonPink, 0, 3.1, 2.02), box(3.6, 0.08, 0.08, neonPink, 0, 2.3, 2.02), box(0.08, 0.9, 0.08, neonCyan, -1.8, 2.7, 2.02), box(0.08, 0.9, 0.08, neonCyan, 1.8, 2.7, 2.02)].forEach(t => g.add(t));
+  const bulbs = []; for (let i = 0; i < 9; i++) { const b = sphere(0.09, glow(0xffffff, [0xff4fa3, 0x4ff0ff, 0xffe14f][i % 3], 0), -2 + i * 0.5, 3.25 + Math.sin(i * 1.3) * 0.08, 2.2, 8); bulbs.push(b); g.add(b); }
+  g.add(cyl(0.5, 0.55, 0.35, mat(0xffb3c6), -1.3, 5.2, 0.9, 12)); g.add(sphere(0.14, mat(0xe53935), -1.3, 5.47, 0.9, 8));
+  const lPink = new THREE.PointLight(0xff3d9a, 0, 9, 2); lPink.position.set(-1.5, 2.8, 3); const lCyan = new THREE.PointLight(0x2ee6ff, 0, 9, 2); lCyan.position.set(1.5, 2.8, 3); g.add(lPink, lCyan);
+  Object.assign(g.userData, { neonMats: [neonPink, neonCyan], bulbs, lights: [lPink, lCyan] });
+  return g;
+})();
+placeAtSite(bakery, S_V, 6.2, -4.5, -0.55, -0.1); scene.add(bakery); colliders.push({ pos: bakery.position.clone(), r: 3.2 });
+
+/** Casa del jugador con 3 niveles: Casa → Tienda → Villa */
+let house = null, houseCollider = { pos: new THREE.Vector3(), r: 2.8 }; colliders.push(houseCollider);
+function buildHouse(level) {
+  if (house) scene.remove(house);
+  const g = new THREE.Group();
+  if (level === 0) {
+    g.add(makeBuilding({ w: 3.6, h: 2.8, d: 3.2, wall: 0xa7d8ff, roof: 0xff8f5a, windowGlow: 0.6 }));
+    g.add(box(0.5, 1, 0.5, mat(0x8d6e63), -1, 3.7, -0.6));
+  } else if (level === 1) {
+    g.add(makeBuilding({ w: 4.6, h: 3.2, d: 3.6, wall: 0xb2ebf2, roof: 0x26a69a, sign: 'MI TIENDA', signColor: '#00695c', windowGlow: 0.7 }));
+    const aw = box(4.8, 0.12, 1.2, mat(0x0097a7), 0, 2.15, 2.3); aw.rotation.x = 0.35; g.add(aw);
+    g.add(box(1.2, 0.8, 0.8, mat(0xffe082), 2.9, 0.4, 1.2)); g.add(box(0.8, 0.6, 0.6, mat(0xffab91), 2.7, 1.1, 1.0));
+  } else {
+    g.add(makeBuilding({ w: 5.4, h: 5, d: 4.2, wall: 0xfff8e1, roof: 0xffc107, roofType: 'flat', sign: 'VILLA $TOKEN', signColor: '#b8860b', windowGlow: 0.8 }));
+    g.add(box(5.6, 0.15, 1.4, mat(0xffffff), 0, 2.6, 2.7)); [-2.5, 0, 2.5].forEach(x => g.add(box(0.12, 1, 0.12, mat(0xffffff), x, 3.1, 3.3)));
+    g.add(box(5.6, 0.08, 0.08, mat(0xffffff), 0, 3.6, 3.3)); g.add(box(3, 0.5, 2, glow(0xb2ebf2, 0x4dd0e1, 0.6), 0, 0.15, 4.3));
+    [-1.4, 1.4].forEach(x => g.add(box(0.7, 0.8, 0.5, mat(0xd4af37), x, 5.4, 0)));
+    g.add(cyl(0.2, 0.2, 5.6, mat(0xffffff), -3.2, 2.7, 2.5, 8)); g.add(cyl(0.2, 0.2, 5.6, mat(0xffffff), 3.2, 2.7, 2.5, 8));
+    const p = makePalm(); p.position.set(3.2, 0, 4.6); g.add(p);
+  }
+  g.add(cyl(0.05, 0.05, 1, mat(0x5d4037), 1.9, 0.5, 1.9, 6)); g.add(box(0.35, 0.3, 0.5, mat(0xe53935), 1.9, 1.1, 1.9));
+  if (house) { const i = interactables.indexOf(house); if (i >= 0) interactables.splice(i, 1); }
+  registerInteractable(g, { type: 'house', label: 'Tu casa' });
+  placeAtSite(g, S_V, -6.5, -3.5, 0.5, -0.1); scene.add(g); house = g;
+  houseCollider.pos.copy(g.position); houseCollider.r = [2.8, 3.3, 4.2][level];
+  state.houseLevel = level;
+}
+buildHouse(0);
+
+const laptopMats = { body: mat(0xcfd8dc), disp: glow(0x1de9b6, 0x00e5a0, 1.2), light: new THREE.PointLight(0x1de9b6, 1.2, 3, 2) };
+const laptop = (() => {
+  const g = new THREE.Group(); g.add(box(1.4, 0.1, 0.9, mat(0xb07d4f), 0, 0.75, 0));
+  [[-0.6, -0.35], [0.6, -0.35], [-0.6, 0.35], [0.6, 0.35]].forEach(([x, z]) => g.add(box(0.1, 0.75, 0.1, mat(0x8d6e63), x, 0.37, z)));
+  g.add(box(0.7, 0.05, 0.5, laptopMats.body, 0, 0.83, 0.05)); const sc = box(0.7, 0.45, 0.04, laptopMats.body, 0, 1.05, -0.2); sc.rotation.x = -0.25; g.add(sc);
+  const disp = box(0.6, 0.36, 0.01, laptopMats.disp, 0, 1.06, -0.17); disp.rotation.x = -0.25; g.add(disp);
+  laptopMats.light.position.set(0, 1.2, 0.3); g.add(laptopMats.light);
+  g.userData.interact = { type: 'laptop' }; g.traverse(o => { if (o.isMesh) o.userData.root = g; }); return g;
+})();
+placeAtSite(laptop, S_V, -4.2, -0.6, 0.3); scene.add(laptop); colliders.push({ pos: laptop.position.clone(), r: 0.9 });
+const stoneMat = mat(0xd9cfc1, { flatShading: true });
+for (let i = 0; i <= 10; i++) { const t = i / 10; const s = cyl(0.45 + Math.random() * 0.15, 0.5, 0.12, stoneMat, 0, 0, 0, 7); placeAtSite(s, S_V, lerp(-4, 4.5, t), lerp(1.2, 0.2, t) + Math.sin(t * Math.PI) * 1.2, Math.random() * 3, 0.04); scene.add(s); }
+
+/* =========================================================
+   8. JUGADOR + AURA
+   ========================================================= */
+const player = (() => {
+  const g = new THREE.Group(); const skin = mat(0xffd5b3), shirt = mat(0x3fb1c9), pants = mat(0x3c4a7a);
+  const parts = {};
+  const legPivot = (x) => { const p = new THREE.Group(); p.position.set(x, 0.65, 0); p.add(box(0.26, 0.65, 0.26, pants, 0, -0.32, 0)); p.add(box(0.3, 0.12, 0.36, mat(0x2b2b3d), 0, -0.68, 0.04)); return p; };
+  const armPivot = (x) => { const p = new THREE.Group(); p.position.set(x, 1.4, 0); p.add(box(0.2, 0.3, 0.2, shirt, 0, -0.15, 0)); p.add(box(0.19, 0.4, 0.19, skin, 0, -0.5, 0)); return p; };
+  parts.legL = legPivot(-0.17); parts.legR = legPivot(0.17); parts.armL = armPivot(-0.47); parts.armR = armPivot(0.47);
+  g.add(box(0.72, 0.8, 0.42, shirt, 0, 1.05, 0), parts.legL, parts.legR, parts.armL, parts.armR);
+  g.add(sphere(0.38, skin, 0, 1.82, 0, 18)); g.add(mesh(new THREE.SphereGeometry(0.4, 18, 10, 0, 6.29, 0, Math.PI / 2.2), mat(0x4e342e), 0, 1.86, -0.02));
+  g.add(sphere(0.05, mat(0x2b2b3d), -0.13, 1.86, 0.34, 6)); g.add(sphere(0.05, mat(0x2b2b3d), 0.13, 1.86, 0.34, 6));
+  g.add(sphere(0.06, mat(0xff9aa2), -0.24, 1.76, 0.3, 6)); g.add(sphere(0.06, mat(0xff9aa2), 0.24, 1.76, 0.3, 6));
+  g.add(box(0.5, 0.55, 0.22, mat(0xff8f5a), 0, 1.1, -0.3));
+  g.userData.parts = parts; return g;
+})();
+player.userData.dir = siteDir(S_V, -2.5, 3.5); player.userData.fwd = frameAt(player.userData.dir, V_N).fwd;
+scene.add(player);
+const aura = new THREE.Group(); aura.position.y = 0.9; player.add(aura);
+const AURAS = { none: null, fire: { c: 0xff7043, e: 0xff3d00 }, ice: { c: 0x80deea, e: 0x00e5ff }, void: { c: 0x7c4dff, e: 0x651fff }, gold: { c: 0xffd54f, e: 0xffab00 } };
+function setAura(id) {
+  state.aura = id; aura.clear(); const a = AURAS[id]; if (!a) return;
+  for (let i = 0; i < 12; i++) { const s = sphere(0.07, glow(a.c, a.e, 1.6), Math.cos(i / 12 * 6.28) * 0.8, 0, Math.sin(i / 12 * 6.28) * 0.8, 6); s.castShadow = false; s.userData.i = i; aura.add(s); }
+  const l = new THREE.PointLight(a.e, 1.6, 5, 2); l.position.y = 0.5; aura.add(l);
+}
+const LAPTOP_SKINS = { default: { body: 0xcfd8dc, screen: 0x00e5a0 }, neon: { body: 0xff4fa3, screen: 0xff2d8f }, matrix: { body: 0x1b1b1b, screen: 0x00ff41 }, gold: { body: 0xd4af37, screen: 0xffd54f } };
+function setLaptopSkin(id) { state.laptopSkin = id; const s = LAPTOP_SKINS[id]; laptopMats.body.color.setHex(s.body); laptopMats.disp.color.setHex(s.screen); laptopMats.disp.emissive.setHex(s.screen); laptopMats.light.color.setHex(s.screen); }
+
+/* =========================================================
+   9. NPCs, EDIFICIOS Y SITIOS DEL PLANETA
+   ========================================================= */
+const missionSteps = (who, comps, app) => [[10, `🧠 Analizando requerimientos de ${who}…`], [25, '🎨 Diseñando UI estilo cartoon pastel…'], [45, `⚙️ Generando componentes: ${comps}…`], [65, '🪙 Integrando $TOKEN (PlanetWallet SDK)…'], [85, '🧪 Probando en dispositivos de todo el planeta…'], [100, `🚀 Desplegado en https://planet.local/${app} ✅`]];
+const card = (emoji, name, sub) => `<div class="bg-white rounded-2xl shadow p-3 text-center"><div class="text-4xl">${emoji}</div><div class="font-bold text-sm mt-1">${name}</div><div class="text-xs text-slate-500">${sub}</div></div>`;
+const previewShell = (color, title, sub, body) => `<div class="min-h-full bg-gradient-to-b from-white to-slate-50"><div class="${color} text-white px-5 py-3 flex items-center justify-between"><div class="font-bold text-lg">${title}</div><div class="text-xs bg-white/20 px-2 py-1 rounded-full">🪙 $TOKEN</div></div><div class="px-5 py-3 text-center text-slate-500 text-sm">${sub}</div><div class="grid grid-cols-3 gap-3 px-5 pb-5">${body}</div></div>`;
+
+const NPCS = [
+  { id: 'bear', name: 'Oso Panadero', emoji: '🐻', species: 'bear', site: 'village', pos: [4.3, -1.2], yaw: Math.PI + 0.6, reward: 500, building: 'bakery', app: 'bakery',
+    intro: '¡Hola! Mi panadería necesita una web interactiva para vender pasteles en la isla. ¿Puedes usar tu laptop con IA para crearla?',
+    waiting: '¿Ya tienes lista mi web? ¡Usa tu laptop con IA, confío en ti! 🥐', done: '¡Gracias a tu web los pasteles vuelan por todo el planeta! 🍰 ¿Viste mis luces neón?',
+    celebrate: '¡¡WOW!! ¡La web es perfecta! 🎉 Toma 500 $TOKEN por tu trabajo. ¡Enciendo las luces de neón para celebrarlo!',
+    mission: { title: 'Web de la Panadería', app: 'panaderia.html', comps: 'Catálogo, Carrito, Checkout',
+      prompt: 'Crea una web interactiva para "La Panadería del Oso": catálogo de pasteles, carrito y pagos con $TOKEN. Estilo cartoon pastel y responsive. 🐻🍰',
+      code: ['// panaderia.html · generado por villager-gpt', 'const pasteles = [{ nombre: "Tarta Fresa", precio: 12 }, { nombre: "Cupcake", precio: 5 }, { nombre: "Croissant", precio: 4 }];', 'const carrito = [];', 'function render() {', '  catalogo.innerHTML = pasteles.map(p => card(p)).join("");', '}', 'async function pagar() {', '  await PlanetWallet.transfer({ to: "oso.bakery", amount: total(), token: "$TOKEN" });', '  confetti(); // 🎉 pedido confirmado', '}', 'render();'],
+      preview: previewShell('bg-pink-400', '🐻 La Panadería del Oso', 'Pasteles recién horneados · envío en bici 🚲', card('🍰', 'Tarta Fresa', '12 $TOKEN') + card('🧁', 'Cupcake', '5 $TOKEN') + card('🥐', 'Croissant', '4 $TOKEN')) } },
+  { id: 'mayor', name: 'Mayor Reginald', emoji: '🐶', species: 'stbernard', site: 'townhall', pos: [2.2, 1.2], yaw: Math.PI, reward: 1000, building: 'townhall', app: 'board',
+    intro: '¡Ejem! Soy el Alcalde Reginald. Tengo 4.000 formularios en papel, tres sellos rotos y una ordenanza de 1987 que nadie encuentra. ¿Podrías crear un Gestor Legal con Smart Contracts usando tu IA para los papeles del ayuntamiento?',
+    waiting: '¿Cómo va ese gestor legal? Los papeles ya llegan al techo… literalmente.', done: '¡El ayuntamiento por fin es digital! Mira el Tablón Holográfico: holders y precio del token en tiempo real. ¡Ejem, magnífico!',
+    celebrate: '¡Por mis bigotes! ¡Smart contracts firmados en segundos! Toma 1000 $TOKEN. ¡Activo el Tablón de Anuncios Holográfico!',
+    mission: { title: 'Gestor Legal + Smart Contracts', app: 'ayuntamiento.html', comps: 'Registro, Firmas, SmartContract.sol',
+      prompt: 'Crea un Gestor Legal para el Ayuntamiento: digitaliza formularios, genera Smart Contracts en Solidity para licencias y permisos, y publica un tablón con holders y precio de $TOKEN en tiempo real. 🐶📜',
+      code: ['// ayuntamiento.html + Licencias.sol', 'contract LicenciasMunicipales {', '  mapping(address => bool) public licencias;', '  function firmar(bytes32 documento) external { // firma digital', '    emit Firmado(msg.sender, documento);', '  }', '}', 'const holders = await Token.topHolders(10);', 'const precio = await Oracle.price("$TOKEN");', 'Tablon.render({ holders, precio, holo: true });'],
+      preview: previewShell('bg-blue-500', '🏛️ Ayuntamiento Digital', 'Trámites en segundos · Smart Contracts firmados on-chain', card('📜', 'Licencias', '0 en papel') + card('✍️', 'Firmas', '1.204 hoy') + card('📊', 'Tablón Holo', 'en vivo')) } },
+  { id: 'glover', name: 'Glover', emoji: '🦫', species: 'beaver', site: 'workshop', pos: [2.4, 1.0], yaw: Math.PI, reward: 800, building: 'workshop', app: 'shop',
+    intro: '*suspiro* Soy Glover, ingeniero jefe. Llevo 72 horas dibujando planos a mano… y ahora dicen que la IA nos va a reemplazar. Si tanto sabe, que configure un Generador de Planos y Modelos 3D para acelerar las obras. Pero que sea PERFECTO.',
+    waiting: '¿Los planos? Cuidado con las tolerancias, ¿eh? Ni un milímetro.', done: 'Vale, lo admito: la IA no me quita el trabajo, me quita las ojeras. La Tienda de Mejoras del Mundo está abierta.',
+    celebrate: '¡Increíble! ¡Planos milimétricos en 3 segundos! Toma 800 $TOKEN. ¡Abro la Tienda de Mejoras del Mundo!',
+    mission: { title: 'Generador de Planos 3D', app: 'planos.html', comps: 'Blueprint, Mesh3D, Presupuesto',
+      prompt: 'Configura un Generador de Planos y Modelos 3D con IA: a partir de un texto crea el plano 2D, el modelo low-poly 3D y el presupuesto en $TOKEN para cada obra del planeta. 🦫📐',
+      code: ['// planos.html · generador de obras', 'import { generateMesh } from "villager-3d";', 'async function planificar(descripcion) {', '  const plano = await AI.blueprint(descripcion); // 2D', '  const modelo = await generateMesh(plano, { style: "lowpoly" });', '  const coste = presupuesto(modelo.volumen);', '  return { plano, modelo, coste };', '}', 'Tienda.registrar(["Tienda", "Villa", "Fuente", "Molino"]);'],
+      preview: previewShell('bg-amber-500', '📐 Planos & Modelos 3D', 'De texto a obra en segundos', card('🏠', 'Casa → Tienda', 'listo') + card('🏡', 'Tienda → Villa', 'listo') + card('⛲', 'Fuente', 'listo')) } },
+  { id: 'sombra', name: 'Madame Sombra', emoji: '🐈‍⬛', species: 'cat', site: 'sombra', pos: [1.6, 1.6], yaw: Math.PI, reward: 1200, building: 'tent', app: 'secret',
+    intro: 'Mmm… te esperaba. Soy Madame Sombra. Las cartas dicen que hackers acechan la economía oculta del planeta. No confío en las máquinas… pero construye un Firewall Místico con tu IA. Y no toques mi bola de cristal.',
+    waiting: '¿El firewall? Las sombras se impacientan… y los hackers también.', done: 'El velo está protegido. Mi Tienda Secreta está abierta para ti… no se lo digas a nadie.',
+    celebrate: 'Las runas brillan… ¡el firewall funciona! 1200 $TOKEN, en silencio. Te abro mi Tienda Secreta de skins y auras.',
+    mission: { title: 'Firewall Místico', app: 'firewall.html', comps: 'Runas, Honeypot, Detector IA',
+      prompt: 'Construye un Firewall Místico y Sistema de Ciberseguridad con IA: detección de anomalías en la wallet del planeta, honeypots encantados y alertas por runas. Estética mística oscura. 🐈‍⬛🔮',
+      code: ['// firewall.html · runas de protección', 'const modelo = await AI.load("anomaly-detector-v3");', 'Wallet.on("tx", async (tx) => {', '  const riesgo = await modelo.score(tx);', '  if (riesgo > 0.9) { Runas.sellar(tx.from); alerta("🔮 hacker bloqueado"); }', '});', 'Honeypot.desplegar({ señuelos: 13, encantados: true });', 'TiendaSecreta.abrir({ skins: true, auras: true });'],
+      preview: previewShell('bg-purple-700', '🔮 Firewall Místico', 'Amenazas bloqueadas: 666 · Runas activas: 13', card('🛡️', 'Wallet', 'protegida') + card('🕸️', 'Honeypots', '13 activos') + card('👁️', 'Detector IA', '99.3%')) } },
+  { id: 'dax', name: 'Professor Dax', emoji: '🦎', species: 'axolotl', site: 'lab', pos: [-2.2, 1.4], yaw: Math.PI, reward: 500, building: 'lab', app: 'farm',
+    intro: '¡¡HOLA!! ¡Soy el Profesor Dax! ¿Sabías que la IA puede predecir el clima? ¡Y las cosechas! ¡Y el desayuno! Necesito entrenar un Modelo de Predicción Meteorológica y Agrícola. ¡¡YA!! ¿Me ayudas? ¿Me ayudas? ¿Me ayudas?',
+    waiting: '¿Ya entrenó el modelo? ¡Podría hacerlo yo pero se me olvidó dónde puse el dataset!', done: '¡Las Frutas Doradas crecen según la predicción! Cosecha cada día… bueno, cada 60 segundos en esta demo. ¡CIENCIA!',
+    celebrate: '¡¡98,7% DE PRECISIÓN!! ¡Toma 500 $TOKEN! ¡Los cultivos de Frutas Doradas ya están activos! ¡Haz clic en ellas para cosechar!',
+    mission: { title: 'Modelo Meteorológico y Agrícola', app: 'clima.html', comps: 'Dataset, Entrenamiento, Predicción',
+      prompt: 'Entrena un Modelo de Predicción Meteorológica y Agrícola con IA para el planeta: predice lluvia y sol, optimiza el crecimiento de las Frutas Doradas y activa recompensas diarias por cosecha. 🦎🌦️',
+      code: ['// clima.html · entrenamiento del modelo', 'const dataset = await Sensores.historial({ dias: 365 });', 'const modelo = new AI.Model("weather-agro-lstm");', 'await modelo.train(dataset, { epochs: 42 }); // 98.7% precisión', 'const pronostico = modelo.predict({ horas: 24 });', 'Cultivos.programar("FrutaDorada", pronostico);', 'DailyClaim.activar({ recompensa: 50, cooldown: "24h" });'],
+      preview: previewShell('bg-emerald-500', '🌦️ Predicción Agro-IA', 'Mañana: ☀️ 24°C · Cosecha óptima: 09:00', card('🍋', 'Frutas Doradas', '9 maduras') + card('🌧️', 'Lluvia', '12%') + card('📈', 'Precisión', '98.7%')) } },
+  { id: 'sam', name: 'Salty Sam', emoji: '🦤', species: 'pelican', site: 'port', pos: [-2.0, 0.6], yaw: Math.PI, reward: 750, building: 'port', app: 'port',
+    intro: 'Arrr… ¿es esto el puerto o la panadería? Soy Salty Sam. Perdí el correo, las rutas y creo que mi propio barco. Programa una Ruta de Navegación Automatizada con Drones Marítimos y esa IA tuya, grumete.',
+    waiting: '¿La ruta? Mi brújula señala hacia arriba, no es buena señal.', done: '¡El barco mercante llega solo al puerto! Trae noticias del mercado crypto. Arrr, qué tiempos.',
+    celebrate: '¡Por los siete mares! ¡El barco navega solo! Toma 750 $TOKEN. ¡Atento al puerto, grumete: el mercante llegará periódicamente!',
+    mission: { title: 'Ruta Marítima Automatizada', app: 'navegacion.html', comps: 'Rutas, Drones, Radar',
+      prompt: 'Programa una Ruta de Navegación Automatizada con Drones Marítimos e IA: el barco mercante debe llegar solo al puerto, esquivar tormentas y traer noticias y datos del mercado crypto. 🦤⚓',
+      code: ['// navegacion.html · piloto automático', 'const ruta = await AI.route({ desde: "Isla Lejana", hasta: "Puerto Sam" });', 'Drones.escoltar(ruta, { evitarTormentas: true });', 'Barco.on("llegada", async () => {', '  const noticias = await CryptoFeed.latest(["$TOKEN", "BTC", "ETH"]);', '  Puerto.anunciar(noticias); // 📰 ticker en el muelle', '});', 'Barco.zarpar({ cada: "60s" });'],
+      preview: previewShell('bg-sky-600', '⚓ Navegación Automática', 'Barco mercante: en ruta · ETA 18s', card('🚢', 'Mercante', 'en ruta') + card('🛸', 'Drones', '4 escoltas') + card('📰', 'Noticias', 'crypto feed')) } },
+  { id: 'hedgehogs', name: 'Barnaby Jr. & Pip', emoji: '🦔', species: 'hedgehogs', site: 'studio', pos: [2.4, 1.4], yaw: Math.PI, reward: 600, building: 'studio', app: 'memes',
+    intro: '¡Broooo! Somos Barnaby Jr. y Pip. Nuestro último meme hizo 3 likes (2 eran de mamá). Necesitamos un Generador Automático de Memes e Imágenes Virales con IA. ¡Vamos a petarlo!',
+    waiting: '¿Y el generador de memes? El algoritmo no espera a nadie, bro.', done: '¡¡SOMOS VIRALES!! El generador está en el estudio. ¡Crea memes del proyecto y tuitéalos!',
+    celebrate: '¡¡ESTO ES ORO, BRO!! +600 $TOKEN. ¡La Herramienta de Memes está desbloqueada en el estudio!',
+    mission: { title: 'Generador de Memes Virales', app: 'memes.html', comps: 'Plantillas, TextoImpact, Share',
+      prompt: 'Crea un Generador Automático de Memes e Imágenes Virales con IA para el proyecto $TOKEN: plantillas con los personajes del planeta, texto arriba/abajo, descarga PNG y botón para tuitear. 🦔🔥',
+      code: ['// memes.html · fábrica de virales', 'const plantillas = ["Oso", "Alcalde", "Sombra", "$TOKEN"];', 'function generar({ top, bottom, plantilla }) {', '  const c = Canvas.crear(600, 600);', '  c.dibujar(plantilla); c.textoImpact(top, "top"); c.textoImpact(bottom, "bottom");', '  return c.toPNG(); // listo para tuitear', '}', 'Share.twitter({ hashtags: ["MicroWorld", "TOKEN"] });'],
+      preview: previewShell('bg-fuchsia-500', '🔥 Meme Factory', 'Genera · Descarga · Tuitea', card('🐻', 'Plantilla Oso', 'viral') + card('🐶', 'Plantilla Alcalde', 'viral') + card('🪙', 'Plantilla $TOKEN', 'to the moon')) } },
+];
+const npcById = Object.fromEntries(NPCS.map(n => [n.id, n]));
+NPCS.forEach(n => state.missions[n.id] = { status: 0, generated: false });
+
+// --- Sitios con sus edificios y decoración ---
+const buildings = {};
+function addProp(obj, site, x, z, yaw = 0, lift = 0, r = 0) { placeAtSite(obj, site, x, z, yaw, lift); scene.add(obj); if (r) colliders.push({ pos: obj.position.clone(), r }); return obj; }
+
+registerInteractable(bakery, { type: 'building', label: 'Entrar a la Panadería' }, 'bear'); buildings.bear = bakery;
+registerInteractable(laptop, { type: 'laptop', label: 'Usar Laptop de IA' });
+
+// Ayuntamiento
+{ const s = SITES.townhall; const b = makeBuilding({ w: 6, h: 3.8, d: 4, wall: 0xf5f5f5, roof: 0x4f7dd8, roofType: 'dome', sign: 'AYUNTAMIENTO', signColor: '#1e3a8a', door: 0x5d4037, windowGlow: 0.3 });
+  [-2.2, 2.2].forEach(x => b.add(cyl(0.22, 0.22, 3.6, mat(0xffffff), x, 1.7, 2.4, 10)));
+  b.add(cyl(0.05, 0.05, 3, mat(0x5d4037), 3.6, 5, -0.5, 6)); b.add(box(1, 0.6, 0.04, mat(0xe53935), 4.1, 6.2, -0.5));
+  addProp(b, s, 0, -2, 0, -0.1, 3.8); registerInteractable(b, { type: 'building', label: 'Ayuntamiento' }, 'mayor'); buildings.mayor = b;
+  [[-4, 2.5], [4, 2.5]].forEach(([x, z]) => { const l = new THREE.Group(); l.add(cyl(0.06, 0.08, 2.2, mat(0x2b2b3d), 0, 1.1, 0, 6)); l.add(sphere(0.2, glow(0xfff3b0, 0xffe08a, 0.8), 0, 2.3, 0, 8)); addProp(l, s, x, z, 0, 0, 0.3); }); }
+// Taller de Glover
+{ const s = SITES.workshop; const b = makeBuilding({ w: 4.8, h: 3, d: 4, wall: 0xd7a86e, roof: 0x6d4c41, roofType: 'flat', sign: 'TALLER GLOVER', signColor: '#5d4037' });
+  b.add(cyl(0.12, 0.12, 5, mat(0xff9800), 2.6, 2.5, -1.5, 6)); const arm = box(4, 0.2, 0.2, mat(0xff9800), 1.2, 5, -1.5); b.add(arm); b.add(cyl(0.02, 0.02, 1.5, mat(0x333333), -0.6, 4.25, -1.5, 4)); b.add(box(0.6, 0.6, 0.6, mat(0xb5651d), -0.6, 3.2, -1.5));
+  addProp(b, s, 0, -2, 0, -0.1, 3.4); registerInteractable(b, { type: 'building', label: 'Taller de Glover' }, 'glover'); buildings.glover = b;
+  for (let i = 0; i < 4; i++) addProp(box(1.6, 0.16, 0.4, mat(0xc98b4a), 0, 0, 0), s, -3.5, 1.5 + i * 0.05, 0.2 * i, 0.1 + i * 0.17, i === 0 ? 0.8 : 0);
+  const sh = new THREE.Group(); sh.add(box(1.4, 0.1, 0.3, mat(0x8d6e63), 0, 0.8, 0)); [-0.5, 0.5].forEach(x => { sh.add(box(0.08, 0.8, 0.08, mat(0x8d6e63), x, 0.4, 0.15)); sh.add(box(0.08, 0.8, 0.08, mat(0x8d6e63), x, 0.4, -0.15)); }); addProp(sh, s, 3.2, 2.2, 0.4, 0, 0.6); }
+// Tienda mística de Sombra
+{ const s = SITES.sombra; const b = new THREE.Group();
+  b.add(cone(3.2, 4.2, mat(0x4a148c, { flatShading: true }), 0, 2.0, 0, 8)); b.add(cone(3.3, 1, mat(0x7b1fa2, { flatShading: true }), 0, 0.5, 0, 8));
+  b.add(sphere(0.3, glow(0xffd54f, 0xffab00, 1.5), 0, 4.3, 0, 10)); b.add(box(1, 1.8, 0.1, mat(0x1a0b2e), 0, 0.85, 2.55));
+  for (let i = 0; i < 5; i++) { const a = i / 5 * 6.28 + 0.3; const c = new THREE.Group(); c.add(cyl(0.06, 0.07, 0.4, mat(0xfff3e0), 0, 0.2, 0, 6)); c.add(sphere(0.06, glow(0xffe082, 0xff9100, 2), 0, 0.45, 0, 6)); c.position.set(Math.cos(a) * 3.9, 0, Math.sin(a) * 3.9); b.add(c); }
+  const l = new THREE.PointLight(0x9c27b0, 3, 10, 2); l.position.set(0, 2.5, 2); b.add(l);
+  b.userData = { winMat: glow(0, 0, 0), roofMesh: b.children[0] };
+  addProp(b, s, 0, -1.5, 0, -0.15, 3.4); registerInteractable(b, { type: 'building', label: 'Carpa de Madame Sombra' }, 'sombra'); buildings.sombra = b;
+  for (let i = 0; i < 7; i++) { const a = i / 7 * 6.28; const r = mesh(new THREE.OctahedronGeometry(0.3 + Math.random() * 0.25, 0), glow(0xb388ff, 0x7c4dff, 0.8, { transparent: true, opacity: 0.85 })); addProp(r, s, Math.cos(a) * 4.6, -1.5 + Math.sin(a) * 4.6, Math.random() * 3, 0.25); r.rotateX(0.3); } }
+// Laboratorio de Dax
+{ const s = SITES.lab; const b = makeBuilding({ w: 4.6, h: 3, d: 4, wall: 0xe0f7fa, roof: 0x80deea, roofType: 'dome', sign: 'LAB. DAX', signColor: '#00838f', windowGlow: 0.5 });
+  const tel = cyl(0.15, 0.25, 1.8, mat(0x37474f), 1.2, 5.2, 0, 10); tel.rotation.x = -0.8; b.add(tel); b.add(cyl(0.3, 0.3, 0.3, mat(0x263238), 1.2, 4.6, 0, 10));
+  [-1.6, 1.6].forEach(x => b.add(cyl(0.25, 0.3, 1, glow(0x69f0ae, 0x00e676, 0.8, { transparent: true, opacity: 0.8 }), x, 0.5, 2.6, 10)));
+  addProp(b, s, -1, -2.5, 0, -0.1, 3.4); registerInteractable(b, { type: 'building', label: 'Laboratorio de Dax' }, 'dax'); buildings.dax = b;
+  const gh = new THREE.Group(); gh.add(box(2.4, 1.6, 1.6, new THREE.MeshStandardMaterial({ color: 0xb2ebf2, transparent: true, opacity: 0.45, roughness: 0.2 }), 0, 0.8, 0)); gh.add(box(2.5, 0.1, 1.7, mat(0xffffff), 0, 1.6, 0)); addProp(gh, s, 3.5, -1.5, 0, 0, 1.5); }
+// Puerto de Sam
+{ const s = SITES.port; const b = makeBuilding({ w: 3.6, h: 2.6, d: 3, wall: 0xcfd8dc, roof: 0x1e88e5, sign: 'PUERTO SAM', signColor: '#0d47a1' });
+  addProp(b, s, -2.2, -2, 0.3, -0.1, 2.6); registerInteractable(b, { type: 'building', label: 'Capitanía del Puerto' }, 'sam'); buildings.sam = b;
+  const lh = new THREE.Group(); lh.add(cyl(0.5, 0.7, 4, mat(0xffffff), 0, 2, 0, 12)); lh.add(cyl(0.52, 0.52, 0.6, mat(0xe53935), 0, 1.2, 0, 12)); lh.add(cyl(0.52, 0.52, 0.6, mat(0xe53935), 0, 2.6, 0, 12)); lh.add(cyl(0.4, 0.4, 0.6, glow(0xfff59d, 0xffee58, 2), 0, 4.2, 0, 10)); lh.add(cone(0.6, 0.6, mat(0x37474f), 0, 4.8, 0, 12)); const ll = new THREE.PointLight(0xffee58, 3, 12, 2); ll.position.y = 4.2; lh.add(ll); addProp(lh, s, 3, -1, 0, -0.1, 0.9);
+  // Muelle: tablones que salen hacia el mar (dirección S del sitio)
+  for (let i = 0; i < 9; i++) { const z = 1.5 + i * 0.75; const p = box(1.8, 0.12, 0.7, mat(0xa1704a)); const d = siteDir(s, 0, z); placeOnPlanet(p, d, 0, 0, s.S, Math.max(heightAt(d) + 0.15, SEA + 0.3)); scene.add(p);
+    if (i % 2 === 0) [-0.8, 0.8].forEach(x => { const post = cyl(0.08, 0.08, 1, mat(0x6d4c41), 0, 0, 0, 6); const dd = siteDir(s, x, z); placeOnPlanet(post, dd, 0, -0.35, s.S, Math.max(heightAt(dd) + 0.15, SEA + 0.3)); scene.add(post); }); }
+  [[1.5, 0.8], [1.9, 1.5]].forEach(([x, z], i) => addProp(box(0.7, 0.7, 0.7, mat(i ? 0xb5651d : 0x8d6e63), 0, 0, 0), s, x, z, 0.4 * i, 0.35, 0.5)); }
+// Estudio de los erizos
+{ const s = SITES.studio; const b = makeBuilding({ w: 4.6, h: 3.2, d: 3.8, wall: 0xf8bbd0, roof: 0x7c4dff, roofType: 'flat', sign: 'STUDIO VIRAL', signColor: '#6a1b9a', windowGlow: 0.9 });
+  b.add(cyl(0.04, 0.04, 2.5, mat(0x333333), 1.5, 4.5, -1, 4)); [0.6, 1.2, 1.8].forEach(y => b.add(box(0.8 - y * 0.2, 0.03, 0.03, mat(0x333333), 1.5, 3.7 + y, -1)));
+  b.add(sphere(0.12, glow(0xff1744, 0xff1744, 3), 1.5, 5.8, -1, 8)); b.add(mesh(new THREE.TorusGeometry(0.5, 0.06, 8, 24), glow(0xffffff, 0xffffff, 2), -1.8, 1.4, 2.6));
+  addProp(b, s, 0, -2, 0, -0.1, 3.4); registerInteractable(b, { type: 'building', label: 'Studio Viral' }, 'hedgehogs'); buildings.hedgehogs = b;
+  const bb = box(2.6, 1.4, 0.1, new THREE.MeshStandardMaterial({ map: textTexture('#TOKEN 🚀', { bg: '#1c1b2e', color: '#ffde59' }), emissive: 0x222222 }), 0, 2.2, 0); const bp = new THREE.Group(); bp.add(bb); bp.add(cyl(0.08, 0.08, 1.6, mat(0x333333), 0, 0.8, 0, 6)); addProp(bp, s, 3.8, 1.2, -0.5, 0, 0.5); }
+
+// --- Instanciar NPCs ---
+const npcObjs = {};
+NPCS.forEach(n => {
+  let g;
+  if (n.species === 'hedgehogs') { g = new THREE.Group(); const a = makeHedgehog(true); a.position.x = -0.55; const b = makeHedgehog(false); b.position.x = 0.55; b.rotation.y = -0.3; a.rotation.y = 0.3; g.add(a, b); }
+  else g = SPECIES[n.species]();
+  const bubble = new THREE.Sprite(new THREE.SpriteMaterial({ map: bubbleTexture('!', '#ffde59'), depthTest: false }));
+  bubble.position.set(0, n.species === 'hedgehogs' ? 2.8 : 3.4, 0); bubble.renderOrder = 10; g.add(bubble);
+  g.userData.bubble = bubble; g.userData.celebrateUntil = 0;
+  placeAtSite(g, SITES[n.site], n.pos[0], n.pos[1], n.yaw);
+  registerInteractable(g, { type: 'npc', label: `Hablar con ${n.name}` }, n.id);
+  scene.add(g); colliders.push({ pos: g.position.clone(), r: 0.9 }); npcObjs[n.id] = g;
+});
+
+/* =========================================================
+   10. VEGETACIÓN Y DECORACIÓN GLOBAL
+   ========================================================= */
+const treeDirs = [];
+function addTreeAt(dir, scale) {
+  const p = dir.clone().multiplyScalar(heightAt(dir));
+  if (colliders.some(c => c.pos.distanceTo(p) < c.r + 1.2)) return false;
+  const t = heightAt(dir) - SEA < 0.45 ? makePalm() : makeTree(scale);
+  placeOnPlanet(t, dir, Math.random() * 6.28); scene.add(t); colliders.push({ pos: t.position.clone(), r: 0.6 * scale }); treeDirs.push(dir); return true;
+}
+function scatter(count, tries, fn) { let placed = 0; for (let i = 0; i < tries && placed < count; i++) if (fn(randomDir())) placed++; }
+[[-10, -6, 1.1], [-11.5, 1, 0.9], [-9, 7, 1.2], [-3, 10, 1], [4, 10.5, 0.9], [10, 6, 1.1], [11.5, -1, 1], [9, -8.5, 1.2], [2, -11, 1], [-5, -11, 0.9], [-1, -6.5, 0.8], [7.5, 4.5, 0.85]]
+  .forEach(([x, z, s]) => { const d = siteDir(S_V, x, z); if (isLand(d)) addTreeAt(d, s); });
+const nearAnySite = (d, margin) => Object.values(SITES).some(s => angleBetween(d, s.dir) < s.r0 + margin);
+scatter(110, 1200, d => isLand(d) && !nearAnySite(d, 0.05) && heightAt(d) - SEA < 1.7 && !treeDirs.some(t => angleBetween(t, d) < 0.08) && addTreeAt(d, 0.8 + Math.random() * 0.5));
+const rockMat = mat(0x9e9aa8, { flatShading: true });
+scatter(40, 300, d => { if (!isLand(d) || nearAnySite(d, 0)) return false; const r = mesh(new THREE.DodecahedronGeometry(0.35 + Math.random() * 0.45, 0), rockMat); placeOnPlanet(r, d, Math.random() * 6, -0.1); r.rotateX(Math.random()); scene.add(r); return true; });
+const flowerColors = [0xff6b9d, 0xffd93d, 0xff8c42, 0xc77dff, 0xffffff];
+scatter(240, 700, d => { if (!isLand(d) || heightAt(d) - SEA > 1.4) return false; const f = new THREE.Group(); f.add(cyl(0.03, 0.03, 0.35, mat(0x3f8f3a), 0, 0.17, 0, 4)); f.add(sphere(0.11, mat(flowerColors[Math.floor(Math.random() * 5)]), 0, 0.38, 0, 6)); placeOnPlanet(f, d); scene.add(f); return true; });
+scatter(160, 400, d => { if (!isLand(d)) return false; const w = new THREE.Group(); w.add(cone(0.15, 0.5, mat(0x5cbf4a, { flatShading: true }), 0, 0.25, 0, 4)); placeOnPlanet(w, d, Math.random() * 6); scene.add(w); return true; });
+const marker = new THREE.Mesh(new THREE.RingGeometry(0.3, 0.45, 24), new THREE.MeshBasicMaterial({ color: 0xffde59, transparent: true, opacity: 0, side: THREE.DoubleSide, depthWrite: false }));
+scene.add(marker);
+
+/* =========================================================
+   11. TRANSFORMACIONES DESBLOQUEABLES (3D)
+   ========================================================= */
+// --- Tablón holográfico (Ayuntamiento) con leaderboard y gráfica en vivo ---
+const boardCanvas = document.createElement('canvas'); boardCanvas.width = 512; boardCanvas.height = 340; boardCanvas.className = 'w-full rounded-xl border-[3px] border-[#2b2b3d]';
+const boardTex = new THREE.CanvasTexture(boardCanvas); boardTex.colorSpace = THREE.SRGBColorSpace;
+const holo = new THREE.Group();
+holo.add(mesh(new THREE.PlaneGeometry(4.2, 2.8), new THREE.MeshBasicMaterial({ map: boardTex, transparent: true, opacity: 0.92, side: THREE.DoubleSide }), 0, 3.2, 0, false));
+holo.add(cyl(0.12, 0.25, 1.4, mat(0x263238), 0, 0.7, 0, 8)); holo.add(cyl(0.5, 0.5, 0.15, glow(0x00e5ff, 0x00e5ff, 1.2), 0, 1.45, 0, 16));
+const holoLight = new THREE.PointLight(0x00e5ff, 0, 8, 2); holoLight.position.y = 2.5; holo.add(holoLight);
+holo.visible = false; placeAtSite(holo, SITES.townhall, -4.5, -0.5, 0.6); scene.add(holo);
+const market = { price: 0.042, history: [], holders: [['🐻 OsoPanadero', 18400], ['🐶 Mayor Reginald', 15200], ['🐈‍⬛ Madame Sombra', 13900], ['🦫 Glover', 9800], ['🦎 Prof. Dax', 7600], ['🦤 Salty Sam', 6100], ['🦔 Barnaby & Pip', 4200]], btc: 64210, eth: 3120 };
+for (let i = 0; i < 40; i++) market.history.push(0.042 * (1 + (Math.random() - 0.5) * 0.1));
+function tickMarket() {
+  market.price = Math.max(0.005, market.price * (1 + (Math.random() - 0.48) * 0.05)); market.history.push(market.price); if (market.history.length > 40) market.history.shift();
+  market.btc *= 1 + (Math.random() - 0.5) * 0.01; market.eth *= 1 + (Math.random() - 0.5) * 0.012;
+  market.holders.forEach(h => h[1] = Math.max(0, Math.round(h[1] * (1 + (Math.random() - 0.5) * 0.02))));
+  drawBoard();
+}
+function drawBoard() {
+  const ctx = boardCanvas.getContext('2d'), W = 512, H = 340;
+  ctx.clearRect(0, 0, W, H); ctx.fillStyle = 'rgba(4,24,48,0.9)'; ctx.beginPath(); ctx.roundRect(0, 0, W, H, 18); ctx.fill();
+  ctx.strokeStyle = '#00e5ff'; ctx.lineWidth = 4; ctx.stroke();
+  ctx.fillStyle = '#7ef0c0'; ctx.font = 'bold 22px Fredoka, Arial'; ctx.fillText('📊 $TOKEN LIVE · TABLÓN MUNICIPAL', 18, 34);
+  const ch = market.history, ch0 = ch[0], up = market.price >= ch0;
+  ctx.fillStyle = up ? '#69f0ae' : '#ff5252'; ctx.font = 'bold 30px Fredoka, Arial'; ctx.fillText(`$${market.price.toFixed(4)}`, 18, 74);
+  ctx.font = 'bold 16px Fredoka, Arial'; ctx.fillText(`${up ? '▲' : '▼'} ${(((market.price - ch0) / ch0) * 100).toFixed(2)}%`, 190, 72);
+  const gx = 18, gy = 90, gw = 240, gh = 110, mn = Math.min(...ch), mx = Math.max(...ch);
+  ctx.strokeStyle = 'rgba(255,255,255,.15)'; ctx.lineWidth = 1; for (let i = 0; i <= 4; i++) { ctx.beginPath(); ctx.moveTo(gx, gy + i * gh / 4); ctx.lineTo(gx + gw, gy + i * gh / 4); ctx.stroke(); }
+  ctx.strokeStyle = up ? '#69f0ae' : '#ff5252'; ctx.lineWidth = 3; ctx.beginPath();
+  ch.forEach((v, i) => { const x = gx + i / (ch.length - 1) * gw, y = gy + gh - ((v - mn) / (mx - mn || 1)) * gh; i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }); ctx.stroke();
+  ctx.fillStyle = '#b3e5fc'; ctx.font = '14px Fredoka, Arial'; ctx.fillText(`BTC $${market.btc.toFixed(0)}  ·  ETH $${market.eth.toFixed(0)}`, 18, 225);
+  ctx.fillStyle = '#ffde59'; ctx.font = 'bold 16px Fredoka, Arial'; ctx.fillText('🏆 TOP HOLDERS', 290, 74);
+  const rows = [...market.holders, ['🧑‍💻 Tú (jugador)', state.tokens]].sort((a, b) => b[1] - a[1]).slice(0, 7);
+  rows.forEach(([n, v], i) => { const me = n.startsWith('🧑'); ctx.fillStyle = me ? '#ffde59' : '#e0f7fa'; ctx.font = `${me ? 'bold ' : ''}14px Fredoka, Arial`; ctx.fillText(`${i + 1}. ${n}`, 290, 98 + i * 20); ctx.textAlign = 'right'; ctx.fillText(v.toLocaleString('es-ES'), 494, 98 + i * 20); ctx.textAlign = 'left'; });
+  ctx.fillStyle = 'rgba(255,255,255,.5)'; ctx.font = '12px Fredoka, Arial'; ctx.fillText(`Actualizado: ${new Date().toLocaleTimeString()} · Smart Contracts activos: 42`, 18, 320);
+  boardTex.needsUpdate = true;
+}
+drawBoard(); setInterval(tickMarket, 1000);
+
+// --- Estructuras compradas en la Tienda de Mejoras ---
+const structures = { fountain: null, lamps: null, windmill: null, statue: null };
+function buildStructure(id) {
+  if (structures[id]) return;
+  let g = new THREE.Group();
+  if (id === 'fountain') {
+    g.add(cyl(1.6, 1.7, 0.4, mat(0xd7ccc8), 0, 0.2, 0, 16)); g.add(cyl(1.35, 1.35, 0.1, glow(0x4dd0e1, 0x26c6da, 0.4, { transparent: true, opacity: 0.85 }), 0, 0.42, 0, 16));
+    g.add(cyl(0.2, 0.3, 1.2, mat(0xd7ccc8), 0, 0.9, 0, 10)); g.add(cyl(0.5, 0.5, 0.1, mat(0xd7ccc8), 0, 1.5, 0, 12));
+    g.userData.drops = []; for (let i = 0; i < 10; i++) { const d = sphere(0.07, glow(0x80deea, 0x00e5ff, 0.8), 0, 1.6, 0, 6); d.userData.p = i / 10; g.add(d); g.userData.drops.push(d); }
+    addProp(g, S_V, 0, 4.5, 0, 0, 1.8);
+  } else if (id === 'lamps') {
+    g.userData.lamps = [];
+    [[-3, 2.5], [-0.5, 3], [2, 2.6], [4.5, 1.5]].forEach(([x, z]) => { const l = new THREE.Group(); l.add(cyl(0.06, 0.09, 2.4, mat(0x2b2b3d), 0, 1.2, 0, 6)); l.add(sphere(0.22, glow(0xfff3b0, 0xffd54f, 1.5), 0, 2.5, 0, 8)); const pl = new THREE.PointLight(0xffd54f, 2.5, 6, 2); pl.position.y = 2.5; l.add(pl); addProp(l, S_V, x, z, 0, 0, 0.3); });
+    g = null;
+  } else if (id === 'windmill') {
+    g.add(cyl(0.9, 1.3, 4.5, mat(0xfff8e1), 0, 2.25, 0, 8)); g.add(cone(1.2, 1.2, mat(0xef5350), 0, 5.1, 0, 8)); g.add(box(1, 1.6, 0.1, mat(0x6d4c41), 0, 0.8, 1.25));
+    const blades = new THREE.Group(); blades.position.set(0, 4, 1.3); for (let i = 0; i < 4; i++) { const b = box(0.35, 2.6, 0.06, mat(0xffffff)); b.geometry.translate(0, 1.3, 0); b.rotation.z = i * Math.PI / 2; blades.add(b); const f = box(0.5, 1.8, 0.02, mat(0x8d6e63)); f.geometry.translate(0.2, 1.6, 0.03); f.rotation.z = i * Math.PI / 2; blades.add(f); }
+    g.add(blades); g.userData.blades = blades; addProp(g, S_V, 1, 7.5, Math.PI, 0, 1.6);
+  } else if (id === 'statue') {
+    g.add(cyl(0.9, 1.1, 0.6, mat(0x455a64), 0, 0.3, 0, 8)); g.add(cyl(0.5, 0.6, 1.4, mat(0x546e7a), 0, 1.3, 0, 8));
+    const coin = mesh(new THREE.CylinderGeometry(0.9, 0.9, 0.18, 24), glow(0xffd54f, 0xffab00, 0.6, { metalness: 0.8, roughness: 0.3 }), 0, 3.1, 0); coin.rotation.x = Math.PI / 2; g.add(coin); g.userData.coin = coin;
+    g.add(mesh(new THREE.PlaneGeometry(1.2, 0.6), new THREE.MeshBasicMaterial({ map: textTexture('$TOKEN', { bg: '#00000000', color: '#2b2b3d', font: 'bold 70px Fredoka' }), transparent: true }), 0, 1.2, 0.62, false));
+    const l = new THREE.PointLight(0xffab00, 2, 6, 2); l.position.y = 3; g.add(l); addProp(g, S_V, 0, -4, 0, 0, 1.2);
+  }
+  structures[id] = g || true;
+}
+// --- Frutas doradas (Daily Claim) ---
+const fruits = [];
+function buildFarm() {
+  const s = SITES.lab;
+  [[3, 3], [4.6, 0.6], [1.5, -0.5]].forEach(([x, z]) => {
+    const t = makeTree(1.1, 0x66bb6a); addProp(t, s, x, z, Math.random() * 6, 0, 0.7);
+    for (let i = 0; i < 3; i++) {
+      const f = sphere(0.2, glow(0xffd54f, 0xffab00, 1.4, { metalness: 0.4, roughness: 0.3 }), 0, 0, 0, 10);
+      f.position.set(Math.cos(i * 2.1) * 0.7, 1.9 + i * 0.5, Math.sin(i * 2.1) * 0.7); f.scale.setScalar(1.1);
+      t.add(f); f.userData = { root: f, interact: { type: 'fruit', label: 'Cosechar Fruta Dorada (+50)' }, respawnAt: 0, ready: true };
+      fruits.push(f); interactables.push(f);
+    }
+  });
+  state.farmUnlocked = true;
+}
+// --- Barco mercante ---
+const ship = (() => {
+  const g = new THREE.Group();
+  const hull = box(1.6, 0.8, 4, mat(0x795548), 0, 0.3, 0); g.add(hull); g.add(box(1.7, 0.15, 4.1, mat(0xa1887f), 0, 0.72, 0));
+  const prow = cone(0.8, 1.4, mat(0x795548), 0, 0.3, 2.6, 4); prow.rotation.x = Math.PI / 2; prow.rotation.y = Math.PI / 4; prow.scale.set(1, 1, 0.6); g.add(prow);
+  g.add(box(1.2, 0.9, 1.2, mat(0xfff8e1), 0, 1.25, -1.1)); g.add(box(1.3, 0.1, 1.3, mat(0xe53935), 0, 1.75, -1.1));
+  g.add(cyl(0.06, 0.08, 3.2, mat(0x5d4037), 0, 2.3, 0.4, 6)); g.add(mesh(new THREE.PlaneGeometry(1.6, 1.6), mat(0xffffff, { side: THREE.DoubleSide }), 0, 2.6, 0.4)); g.add(box(0.6, 0.35, 0.02, mat(0x42a5f5), 0.3, 3.75, 0.4));
+  [[-0.4, 0.9], [0.35, 0.6], [0, 1.5]].forEach(([x, z]) => g.add(box(0.5, 0.5, 0.5, mat(0xb5651d), x, 1.05, z)));
+  const l = new THREE.PointLight(0xffe082, 1.5, 6, 2); l.position.set(0, 2, 1); g.add(l);
+  g.visible = false; return g;
+})();
+scene.add(ship);
+const NEWS = ['📰 Salty Sam informa: el barco mercante llegó a puerto sin perderse por primera vez en 20 años', '🐻 La Panadería del Oso acepta $TOKEN: ventas +340%', '🏛️ El Ayuntamiento firmó 1.204 smart contracts esta semana', '🔮 Madame Sombra bloqueó 666 ataques con el Firewall Místico', '🦎 Prof. Dax: "Mañana lloverá Frutas Doradas (probablemente)"', '🦔 Meme de Barnaby & Pip alcanza 1M de visitas', '🦫 Glover: nuevas obras disponibles en la Tienda de Mejoras'];
+function genTicker() {
+  const pct = (v) => `${v >= 0 ? '+' : ''}${v.toFixed(2)}%`;
+  const tk = ((market.price - market.history[0]) / market.history[0]) * 100;
+  const items = [`💠 $TOKEN $${market.price.toFixed(4)} (${pct(tk)})`, `₿ BTC $${market.btc.toFixed(0)} (${pct((Math.random() - 0.5) * 4)})`, `Ξ ETH $${market.eth.toFixed(0)} (${pct((Math.random() - 0.5) * 5)})`, `👥 Holders: ${(12842 + Math.floor(Math.random() * 200)).toLocaleString('es-ES')}`, NEWS[Math.floor(Math.random() * NEWS.length)], NEWS[Math.floor(Math.random() * NEWS.length)]];
+  document.getElementById('tickerText').textContent = items.join('    ·    ') + '    ·    ';
+}
+const SHIP_CYCLE = { approach: 18, dock: 20, depart: 18, wait: 6 };
+function updateShip(dt) {
+  if (!state.shipUnlocked) return;
+  const s = SITES.port; const C = SHIP_CYCLE; const T = C.approach + C.dock + C.depart + C.wait;
+  state.shipTime = (state.shipTime + dt) % T; const t = state.shipTime;
+  const far = 1.15, near = 0.33; let th, moving = 0;
+  if (t < C.approach) { th = lerp(far, near, smoothstep(0, 1, t / C.approach)); moving = -1; }
+  else if (t < C.approach + C.dock) th = near;
+  else if (t < C.approach + C.dock + C.depart) { th = lerp(near, far, smoothstep(0, 1, (t - C.approach - C.dock) / C.depart)); moving = 1; }
+  else { ship.visible = false; setDocked(false); return; }
+  ship.visible = true;
+  const P = siteDir(s, 2.2, 0); // carril de atraque paralelo al muelle
+  const dir = P.clone().multiplyScalar(Math.cos(th)).addScaledVector(s.S, Math.sin(th)).normalize();
+  const tangentDir = tangent(P.clone().multiplyScalar(-Math.sin(th)).addScaledVector(s.S, Math.cos(th)), dir); // hacia θ creciente (mar)
+  const fwd = moving === 0 ? tangentDir.clone().negate() : tangentDir.clone().multiplyScalar(moving);
+  quatFromFrame(frameAt(dir, fwd), ship.quaternion); ship.quaternion.multiply(_q.setFromAxisAngle(new THREE.Vector3(0, 0, 1), Math.sin(performance.now() * 0.002) * 0.03));
+  ship.position.copy(dir).multiplyScalar(SEA + 0.05 + Math.sin(performance.now() * 0.0025) * 0.06);
+  setDocked(moving === 0);
+}
+function setDocked(v) { if (v === state.shipDocked) return; state.shipDocked = v; const tk = document.getElementById('ticker'); if (v) { genTicker(); tk.style.display = 'block'; showToast('🚢 ¡El barco mercante ha llegado al puerto!', 'text-white'); } else tk.style.display = 'none'; }
+
+/* =========================================================
+   12. CÁMARA ORBITAL CONTINUA (jugador → planeta completo)
+   ========================================================= */
+const cam = { yaw: 0, pitch: 0.42, dist: 9, tYaw: 0, tPitch: 0.42, tDist: 9, min: 4, max: 78, refF: V_N.clone() };
+const currentLook = new THREE.Vector3(); const _q = new THREE.Quaternion();
+/** Pose deseada: al alejar el zoom, el objetivo se desliza del jugador al centro del planeta */
+function camPose() {
+  const up = player.userData.dir; const blend = smoothstep(13, 40, cam.dist);
+  const target = player.position.clone().addScaledVector(up, 1.4).lerp(new THREE.Vector3(), blend);
+  const f = frameAt(up, cam.refF);
+  const pitch = clamp(cam.pitch, lerp(0.08, -1.25, blend * blend), 1.4);
+  const look = f.fwd.clone().applyAxisAngle(up, cam.yaw);
+  const pos = target.clone().addScaledVector(look, -Math.cos(pitch) * cam.dist).addScaledVector(up, Math.sin(pitch) * cam.dist);
+  const hp = heightAt(pos.clone().normalize()) + 0.6; if (pos.length() < hp) pos.setLength(hp);
+  return { pos, target, up: up.clone() };
+}
+function tweenCamera(pose, duration, onDone) { state.camTween = { fromPos: camera.position.clone(), toPos: pose.pos.clone(), fromLook: currentLook.clone(), toLook: pose.target.clone(), fromUp: camera.up.clone(), toUp: pose.up.clone(), t: 0, duration, onDone }; }
+const easeInOut = (x) => x < 0.5 ? 2 * x * x : 1 - Math.pow(-2 * x + 2, 2) / 2;
+function applyLook(pos, target, up) { camera.position.copy(pos); camera.up.copy(up).normalize(); camera.lookAt(target); currentLook.copy(target); }
+function updateCamera(dt) {
+  cam.refF = tangent(cam.refF, player.userData.dir); if (cam.refF.lengthSq() < 1e-6) cam.refF = frameAt(player.userData.dir, V_N).fwd;
+  const k = 1 - Math.exp(-dt * (cam.rate || 10)); cam.yaw += (cam.tYaw - cam.yaw) * k; cam.pitch += (cam.tPitch - cam.pitch) * k; cam.dist += (cam.tDist - cam.dist) * k;
+  const tw = state.camTween;
+  if (tw) {
+    tw.t += dt; const e = easeInOut(Math.min(tw.t / tw.duration, 1));
+    applyLook(tw.fromPos.clone().lerp(tw.toPos, e), tw.fromLook.clone().lerp(tw.toLook, e), tw.fromUp.clone().lerp(tw.toUp, e));
+    if (tw.t >= tw.duration) { state.camTween = null; tw.onDone && tw.onDone(); }
+    return;
+  }
+  if (state.mode === 'dialog') { const p = state.dialogPose; applyLook(p.pos, p.target, p.up); return; }
+  if (state.menuOpen) cam.tYaw += dt * 0.12; // el planeta gira lentamente detrás del menú
+  const p = camPose(); applyLook(p.pos, p.target, p.up);
+  ui.btnPlanet.classList.toggle('active', cam.dist > 30); ui.btnPlayer.classList.toggle('active', cam.dist <= 30);
+}
+const pointers = new Map(); let pinchDist = 0, downPos = null;
+const canControl = () => !state.menuOpen && !state.modalOpen && state.mode !== 'dialog' && !state.camTween;
+
+/* ---- Joystick virtual (móvil) ---- */
+{
+  const joy = document.getElementById('joystick'), knob = document.getElementById('joyKnob'); let jid = null, cx = 0, cy = 0; const RAD = 42;
+  const setKnob = (x, y) => { knob.style.transform = `translate(${x}px, ${y}px)`; };
+  joy.addEventListener('pointerdown', (e) => { if (jid !== null) return; jid = e.pointerId; joy.setPointerCapture(jid); const r = joy.getBoundingClientRect(); cx = r.left + r.width / 2; cy = r.top + r.height / 2; e.preventDefault(); });
+  joy.addEventListener('pointermove', (e) => { if (e.pointerId !== jid) return; let dx = e.clientX - cx, dy = e.clientY - cy; const len = Math.hypot(dx, dy); if (len > RAD) { dx *= RAD / len; dy *= RAD / len; } setKnob(dx, dy); state.joy.x = dx / RAD; state.joy.y = -dy / RAD; });
+  const release = (e) => { if (e.pointerId !== jid) return; jid = null; state.joy.x = state.joy.y = 0; setKnob(0, 0); };
+  joy.addEventListener('pointerup', release); joy.addEventListener('pointercancel', release);
+}
+const actionBtn = document.getElementById('actionBtn'), actionLabel = document.getElementById('actionLabel');
+actionBtn.addEventListener('pointerdown', (e) => e.stopPropagation());
+actionBtn.onclick = () => { if (!canControl()) return; const near = getNearbyInteractable(); if (near) interactWith(near.obj); };
+canvas.addEventListener('pointerdown', (e) => { pointers.set(e.pointerId, { x: e.clientX, y: e.clientY }); canvas.setPointerCapture(e.pointerId); if (pointers.size === 1) downPos = { x: e.clientX, y: e.clientY }; if (pointers.size === 2) { const [a, b] = [...pointers.values()]; pinchDist = Math.hypot(a.x - b.x, a.y - b.y); } });
+canvas.addEventListener('pointermove', (e) => {
+  if (!pointers.has(e.pointerId)) return; const prev = pointers.get(e.pointerId); const dx = e.clientX - prev.x, dy = e.clientY - prev.y; pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (!canControl()) return;
+  if (pointers.size === 1) { cam.tYaw -= dx * 0.006; cam.tPitch = clamp(cam.tPitch + dy * 0.005, -1.25, 1.4); }
+  else if (pointers.size === 2) { const [a, b] = [...pointers.values()]; const nd = Math.hypot(a.x - b.x, a.y - b.y); if (nd > 0) { cam.tDist = clamp(cam.tDist * pinchDist / nd, cam.min, cam.max); pinchDist = nd; } }
+});
+const endPointer = (e) => { pointers.delete(e.pointerId); if (pointers.size === 0 && downPos) { if (Math.hypot(e.clientX - downPos.x, e.clientY - downPos.y) < 6) handleClick(e); downPos = null; } };
+canvas.addEventListener('pointerup', endPointer); canvas.addEventListener('pointercancel', endPointer);
+canvas.addEventListener('wheel', (e) => { e.preventDefault(); if (!canControl()) return; cam.tDist = clamp(cam.tDist * Math.exp(e.deltaY * 0.0012), cam.min, cam.max); }, { passive: false });
+ui_bind('btnPlanet', () => { if (canControl()) cam.tDist = 70; });
+ui_bind('btnPlayer', () => { if (canControl()) cam.tDist = 9; });
+function ui_bind(id, fn) { document.getElementById(id).onclick = fn; }
+
+/* =========================================================
+   13. ENTRADA E INTERACCIÓN
+   ========================================================= */
+const raycaster = new THREE.Raycaster(); const pointer = new THREE.Vector2();
+window.addEventListener('keydown', (e) => {
+  state.keys[e.code] = true;
+  if (e.code === 'KeyE' && canControl()) { const near = getNearbyInteractable(); if (near) interactWith(near.obj); }
+  if (e.code === 'Escape') { if (state.modalOpen) { closeLaptop(); closeApp(); } else if (state.mode === 'dialog') endDialog(); }
+});
+window.addEventListener('keyup', (e) => state.keys[e.code] = false);
+function rangeFor(obj) { const t = obj.userData.interact.type; return t === 'building' ? CFG.interactDist + 2.4 : t === 'house' ? CFG.interactDist + 2 : t === 'fruit' ? 4 : CFG.interactDist; }
+function handleClick(e) {
+  if (!canControl()) return;
+  pointer.set((e.clientX / innerWidth) * 2 - 1, -(e.clientY / innerHeight) * 2 + 1); raycaster.setFromCamera(pointer, camera);
+  const hits = raycaster.intersectObjects(interactables.filter(o => o.visible !== false), true);
+  if (hits.length && hits[0].object.userData.root) {
+    const root = hits[0].object.userData.root; const wp = new THREE.Vector3(); root.getWorldPosition(wp);
+    if (player.position.distanceTo(wp) <= rangeFor(root)) interactWith(root);
+    else { const up = wp.clone().normalize(); const away = tangent(player.position.clone().sub(wp), up); const stop = wp.clone().addScaledVector(away, rangeFor(root) - 1.2).normalize(); setMoveTarget(stop); state.pendingInteract = root; }
+    return;
+  }
+  const ground = raycaster.intersectObjects([planet, water], false);
+  if (ground.length) { setMoveTarget(ground[0].point.clone().normalize()); state.pendingInteract = null; }
+}
+function setMoveTarget(dir) { state.moveTarget = dir.clone(); marker.position.copy(dir).multiplyScalar(surfaceR(dir) + 0.08); marker.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), dir); marker.material.opacity = 1; marker.scale.setScalar(1); }
+const _wp = new THREE.Vector3();
+function getNearbyInteractable() {
+  let best = null;
+  for (const obj of interactables) { if (obj.userData.interact.type === 'fruit' && !obj.userData.ready) continue; obj.getWorldPosition(_wp); const d = player.position.distanceTo(_wp) - (rangeFor(obj) - CFG.interactDist); if (d <= CFG.interactDist && (!best || d < best.d)) best = { obj, d }; }
+  return best;
+}
+function interactWith(obj) {
+  state.moveTarget = null; state.pendingInteract = null;
+  const it = obj.userData.interact, npcId = obj.userData.npcId;
+  if (it.type === 'npc') startDialog(npcId);
+  else if (it.type === 'building') { if (state.missions[npcId].status === 2) openUnlockedApp(npcById[npcId].app); else startDialog(npcId); }
+  else if (it.type === 'laptop') { if (!Object.values(state.missions).some(m => m.status >= 1)) showToast('Primero acepta una misión hablando con un NPC', 'text-white'); else openLaptop(); }
+  else if (it.type === 'house') showToast(['🏠 Tu casa. Glover puede mejorarla.', '🏪 Tu tienda. ¡Siguiente nivel: Villa!', '🏡 ¡Tu Villa $TOKEN!'][state.houseLevel], 'text-white');
+  else if (it.type === 'fruit') harvest(obj);
+}
+function harvest(f) { if (!f.userData.ready) return; f.userData.ready = false; f.visible = false; f.userData.respawnAt = performance.now() + CFG.fruitCooldown; addTokens(CFG.fruitReward); playBeep(1046, 0.1, 'triangle'); const wp = new THREE.Vector3(); f.getWorldPosition(wp); spawnConfetti(wp, 18); }
+
+/* =========================================================
+   14. DIÁLOGOS Y MISIONES
+   ========================================================= */
+const ui = Object.fromEntries(['hint', 'hintText', 'dialog', 'dialogText', 'dialogButtons', 'dialogAvatar', 'dialogName', 'missionText', 'missionCount', 'missionList', 'btnMissions', 'tokenValue', 'toastArea', 'laptopModal', 'promptText', 'btnGenerate', 'progressBar', 'stepsLog', 'codePane', 'previewPane', 'tabCode', 'tabPreview', 'laptopStatus', 'btnDeliver', 'btnPlanet', 'btnPlayer', 'missionSelect', 'codeFile', 'appModal', 'appTitle', 'appBody'].map(id => [id, document.getElementById(id)]));
+let typeTimer = null;
+function typeText(el, text, speed = 18, onDone) { clearInterval(typeTimer); el.textContent = ''; let i = 0; typeTimer = setInterval(() => { el.textContent = text.slice(0, ++i); if (i >= text.length) { clearInterval(typeTimer); onDone && onDone(); } }, speed); }
+function dialogButton(label, cls, onClick) { const b = document.createElement('button'); b.className = `btn-game px-4 py-2 text-sm ${cls}`; b.textContent = label; b.onclick = onClick; return b; }
+
+function startDialog(npcId) {
+  const n = npcById[npcId], obj = npcObjs[npcId], m = state.missions[npcId];
+  state.mode = 'dialog'; state.dialogNpc = npcId;
+  const up = obj.userData.up; const near = player.position.distanceTo(obj.position) < 8;
+  const focus = near ? player.position.clone().lerp(obj.position, 0.55) : obj.position.clone();
+  const toNpc = near ? tangent(obj.position.clone().sub(player.position), player.userData.dir) : tangent(player.position.clone().sub(obj.position), up);
+  if (near) player.userData.fwd.copy(toNpc);
+  const side = new THREE.Vector3().crossVectors(toNpc, up).normalize(); const bld = buildings[npcId] || bakery;
+  const mid = focus.addScaledVector(up, 1.35); const cA = mid.clone().addScaledVector(side, 4.4).addScaledVector(up, 1.2), cB = mid.clone().addScaledVector(side, -4.4).addScaledVector(up, 1.2);
+  state.dialogPose = { pos: cA.distanceTo(bld.position) > cB.distanceTo(bld.position) ? cA : cB, target: mid, up: up.clone() };
+  tweenCamera(state.dialogPose, 0.9);
+  ui.hint.classList.add('hidden'); ui.dialog.classList.remove('hidden'); ui.dialogButtons.innerHTML = '';
+  ui.dialogAvatar.textContent = n.emoji; ui.dialogName.textContent = n.name.toUpperCase();
+  const openBtn = dialogButton('💻 Abrir Laptop de IA', 'bg-cyan-300 text-[#2b2b3d]', () => { if (m.status === 0) setMissionStatus(npcId, 1); openLaptop(npcId); });
+  if (m.status === 0) typeText(ui.dialogText, n.intro, 16, () => ui.dialogButtons.append(openBtn, dialogButton('Más tarde', 'bg-slate-200 text-[#2b2b3d]', () => { setMissionStatus(npcId, 1); endDialog(); })));
+  else if (m.status === 1) typeText(ui.dialogText, n.waiting, 16, () => ui.dialogButtons.append(openBtn, dialogButton('Cerrar', 'bg-slate-200 text-[#2b2b3d]', endDialog)));
+  else typeText(ui.dialogText, n.done, 16, () => ui.dialogButtons.append(dialogButton(`✨ Abrir ${APP_TITLES[n.app]}`, 'bg-emerald-300 text-[#2b2b3d]', () => openUnlockedApp(n.app)), dialogButton('¡Hasta luego!', 'bg-slate-200 text-[#2b2b3d]', endDialog)));
+}
+function endDialog() { clearInterval(typeTimer); ui.dialog.classList.add('hidden'); tweenCamera(camPose(), 0.7, () => { state.mode = 'player'; }); }
+function setMissionStatus(id, status) { state.missions[id].status = status; refreshMissionUI(); }
+function refreshMissionUI() {
+  const done = NPCS.filter(n => state.missions[n.id].status === 2).length; ui.missionCount.textContent = `${done}/${NPCS.length}`;
+  const next = NPCS.find(n => state.missions[n.id].status === 1) || NPCS.find(n => state.missions[n.id].status === 0);
+  ui.missionText.textContent = done === NPCS.length ? '🏆 ¡Todas las misiones completadas!' : next ? `${next.emoji} ${state.missions[next.id].status === 1 ? next.mission.title + ' (usa la laptop)' : 'Habla con ' + next.name}` : '';
+  ui.missionList.innerHTML = NPCS.map(n => { const s = state.missions[n.id].status; return `<div class="flex items-center gap-2 text-xs font-semibold p-1.5 rounded-lg ${s === 2 ? 'bg-emerald-100' : s === 1 ? 'bg-amber-100' : 'bg-slate-100'}"><span class="text-base">${n.emoji}</span><div class="flex-1 min-w-0"><div class="truncate">${n.mission.title}</div><div class="text-[10px] text-slate-500">${n.name} · +${n.reward} $TOKEN</div></div><span>${s === 2 ? '✅' : s === 1 ? '⏳' : '❗'}</span><button data-go="${n.id}" class="btn-game px-2 py-0.5 bg-sky-200 text-[10px]">Ir</button></div>`; }).join('');
+  ui.missionList.querySelectorAll('[data-go]').forEach(b => b.onclick = () => { const obj = npcObjs[b.dataset.go]; const up = obj.userData.up; const away = tangent(player.position.clone().sub(obj.position), up); setMoveTarget(obj.position.clone().addScaledVector(away, 2).normalize()); state.pendingInteract = obj; showToast(`🧭 Viajando hacia ${npcById[b.dataset.go].name}…`, 'text-white'); });
+}
+ui.btnMissions.onclick = () => ui.missionList.classList.toggle('hidden');
+
+/* =========================================================
+   15. LAPTOP DE IA (multi-proyecto)
+   ========================================================= */
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+let generating = false;
+function openLaptop(preferId) {
+  if (state.modalOpen) return;
+  const accepted = NPCS.filter(n => state.missions[n.id].status >= 1);
+  if (!accepted.length) { showToast('Acepta una misión primero', 'text-white'); return; }
+  state.modalOpen = true; ui.dialog.classList.add('hidden'); clearInterval(typeTimer); ui.laptopModal.style.display = 'flex';
+  ui.missionSelect.innerHTML = accepted.map(n => `<option value="${n.id}">${n.emoji} ${n.mission.title}${state.missions[n.id].status === 2 ? ' ✅' : ''}</option>`).join('');
+  loadMission(preferId && state.missions[preferId].status >= 1 ? preferId : (accepted.find(n => state.missions[n.id].status === 1) || accepted[0]).id);
+}
+ui.missionSelect.onchange = () => loadMission(ui.missionSelect.value);
+function loadMission(id) {
+  if (generating) return;
+  state.activeMission = id; ui.missionSelect.value = id; const n = npcById[id], m = state.missions[id];
+  ui.codeFile.textContent = n.mission.app; ui.previewPane.innerHTML = n.mission.preview; ui.stepsLog.innerHTML = ''; ui.progressBar.style.width = '0%';
+  ui.btnDeliver.textContent = `${n.emoji} Entregar a ${n.name}`; ui.btnDeliver.classList.toggle('hidden', !(m.generated && m.status === 1));
+  if (m.generated) { ui.promptText.textContent = n.mission.prompt; ui.promptText.classList.remove('cursor'); ui.codePane.innerHTML = n.mission.code.map(hl).join('\n'); ui.progressBar.style.width = '100%'; showTab('preview'); ui.btnGenerate.disabled = true; ui.laptopStatus.textContent = m.status === 2 ? 'Estado: ✅ entregado' : 'Estado: ✅ web app lista · entrégala'; return; }
+  showTab('code'); ui.codePane.innerHTML = '<span class="cm">// Esperando prompt…</span>'; ui.btnGenerate.disabled = true; ui.promptText.classList.add('cursor'); ui.laptopStatus.textContent = 'Estado: escribiendo prompt…';
+  typeText(ui.promptText, n.mission.prompt, 12, () => { ui.btnGenerate.disabled = false; ui.laptopStatus.textContent = 'Estado: prompt listo · pulsa Generar'; });
+}
+function closeLaptop() { if (ui.laptopModal.style.display === 'none') return; state.modalOpen = false; clearInterval(typeTimer); ui.laptopModal.style.display = 'none'; if (state.mode === 'dialog') endDialog(); }
+function showTab(t) { const code = t === 'code'; ui.codePane.classList.toggle('hidden', !code); ui.previewPane.classList.toggle('hidden', code); ui.tabCode.className = `px-4 py-2 border-b-2 ${code ? 'text-cyan-300 border-cyan-300' : 'text-slate-400 border-transparent'}`; ui.tabPreview.className = `px-4 py-2 border-b-2 ${!code ? 'text-cyan-300 border-cyan-300' : 'text-slate-400 border-transparent'}`; }
+ui.tabCode.onclick = () => showTab('code'); ui.tabPreview.onclick = () => showTab('preview');
+ui_bind('btnCloseLaptop', closeLaptop); ui_bind('btnCancelLaptop', closeLaptop);
+ui.btnGenerate.onclick = async () => {
+  const id = state.activeMission, n = npcById[id]; generating = true; ui.missionSelect.disabled = true;
+  ui.btnGenerate.disabled = true; ui.promptText.classList.remove('cursor'); ui.laptopStatus.textContent = 'Estado: generando con IA…'; ui.codePane.innerHTML = ''; playBeep(660, 0.05);
+  const codeTask = (async () => { for (const line of n.mission.code) { ui.codePane.innerHTML += hl(line) + '\n'; ui.codePane.scrollTop = ui.codePane.scrollHeight; await sleep(150); } })();
+  for (const [pct, msg] of missionSteps(n.name, n.mission.comps, n.mission.app)) {
+    const row = document.createElement('div'); row.className = 'flex items-center gap-2 fade-in'; row.innerHTML = `<span class="w-2 h-2 rounded-full bg-cyan-300 animate-pulse"></span><span>${msg}</span>`;
+    ui.stepsLog.append(row); ui.stepsLog.scrollTop = ui.stepsLog.scrollHeight; ui.progressBar.style.width = pct + '%'; await sleep(650 + Math.random() * 300); row.firstChild.className = 'w-2 h-2 rounded-full bg-emerald-400';
+  }
+  await codeTask; state.missions[id].generated = true; generating = false; ui.missionSelect.disabled = false;
+  showTab('preview'); ui.laptopStatus.textContent = `Estado: ✅ Web App lista · entrégala a ${n.name}`; ui.btnDeliver.classList.remove('hidden'); ui.btnDeliver.classList.add('pop-in');
+  playBeep(880, 0.08); setTimeout(() => playBeep(1174, 0.1), 120);
+};
+ui.btnDeliver.onclick = () => { const id = state.activeMission; state.modalOpen = false; ui.laptopModal.style.display = 'none'; completeMission(id); };
+
+const UNLOCKS = {
+  bear: () => { state.neonOn = true; },
+  mayor: () => { holo.visible = true; state.boardUnlocked = true; },
+  glover: () => {},
+  sombra: () => {},
+  dax: () => buildFarm(),
+  sam: () => { state.shipUnlocked = true; state.shipTime = 0; },
+  hedgehogs: () => {},
+};
+function completeMission(id) {
+  const n = npcById[id], obj = npcObjs[id];
+  setMissionStatus(id, 2); addTokens(n.reward); UNLOCKS[id]();
+  obj.userData.celebrateUntil = performance.now() + 3200;
+  obj.userData.bubble.material.map = bubbleTexture('✓', '#7dffa8'); obj.userData.bubble.material.needsUpdate = true;
+  spawnConfetti(obj.position.clone().addScaledVector(obj.userData.up, 2.5)); const b = buildings[id]; if (b) spawnConfetti(b.position.clone().addScaledVector(b.userData.up, 4));
+  playChime();
+  startDialog(id); ui.dialogButtons.innerHTML = '';
+  typeText(ui.dialogText, n.celebrate, 16, () => ui.dialogButtons.append(dialogButton('¡Genial! 🚀', 'bg-yellow-300 text-[#2b2b3d]', endDialog), dialogButton(`✨ Abrir ${APP_TITLES[n.app]}`, 'bg-emerald-300 text-[#2b2b3d]', () => openUnlockedApp(n.app))));
+}
+
+/* =========================================================
+   16. APPS DESBLOQUEADAS (UI)
+   ========================================================= */
+const APP_TITLES = { bakery: 'Web de la Panadería', board: 'Tablón Holográfico', shop: 'Tienda de Mejoras del Mundo', secret: 'Tienda Secreta', farm: 'Cultivos de Frutas Doradas', port: 'Puerto & Mercado', memes: 'Generador de Memes' };
+function openApp(title, html, onMount) { state.modalOpen = true; ui.dialog.classList.add('hidden'); clearInterval(typeTimer); ui.appTitle.textContent = title; ui.appBody.innerHTML = html; ui.appModal.style.display = 'flex'; onMount && onMount(ui.appBody); }
+function closeApp() { if (ui.appModal.style.display === 'none') return; state.modalOpen = false; ui.appModal.style.display = 'none'; ui.appBody.innerHTML = ''; ui.appBody._token = null; if (state.mode === 'dialog') endDialog(); }
+/** Re-renderiza un panel cada segundo mientras siga siendo la app abierta */
+function liveApp(b, render) { const my = Symbol(); b._token = my; render(); const timer = setInterval(() => { if (b._token !== my) clearInterval(timer); else render(); }, 1000); }
+ui_bind('btnCloseApp', closeApp);
+const UPGRADES = [
+  { id: 'house1', name: '🏪 Casa → Tienda', cost: 800, desc: 'Amplía tu casa con local comercial y toldo.', apply: () => buildHouse(1) },
+  { id: 'house2', name: '🏡 Tienda → Villa', cost: 1500, desc: 'Dos plantas, balcón, columnas y piscina.', req: 'house1', apply: () => buildHouse(2) },
+  { id: 'fountain', name: '⛲ Fuente de la Plaza', cost: 300, desc: 'Una fuente animada en el centro de la aldea.', apply: () => buildStructure('fountain') },
+  { id: 'lamps', name: '🏮 Farolas del Camino', cost: 200, desc: 'Iluminación cálida a lo largo del camino.', apply: () => buildStructure('lamps') },
+  { id: 'windmill', name: '🌬️ Molino de Viento', cost: 500, desc: 'Un molino con aspas giratorias.', apply: () => buildStructure('windmill') },
+  { id: 'statue', name: '🪙 Estatua $TOKEN', cost: 1000, desc: 'Monumento dorado giratorio al token.', apply: () => buildStructure('statue') },
+];
+const SKINS = [
+  { id: 'aura:fire', name: '🔥 Aura de Fuego', cost: 300, apply: () => setAura('fire') }, { id: 'aura:ice', name: '❄️ Aura de Hielo', cost: 300, apply: () => setAura('ice') },
+  { id: 'aura:void', name: '🌌 Aura del Vacío', cost: 500, apply: () => setAura('void') }, { id: 'aura:gold', name: '✨ Aura Dorada (Easter Egg)', cost: 900, apply: () => setAura('gold') },
+  { id: 'laptop:neon', name: '💗 Laptop Neón', cost: 250, apply: () => setLaptopSkin('neon') }, { id: 'laptop:matrix', name: '🟢 Laptop Matrix', cost: 250, apply: () => setLaptopSkin('matrix') }, { id: 'laptop:gold', name: '🏆 Laptop de Oro', cost: 600, apply: () => setLaptopSkin('gold') },
+];
+function shopHTML(items, kind) {
+  return `<div class="text-sm text-slate-600 mb-3">Saldo: <b class="text-amber-600">🪙 ${state.tokens.toLocaleString('es-ES')} $TOKEN</b></div><div class="grid grid-cols-1 sm:grid-cols-2 gap-3">` + items.map(it => {
+    const owned = state.owned.has(it.id), locked = it.req && !state.owned.has(it.req); const canBuy = !owned && !locked && state.tokens >= it.cost;
+    const equip = kind === 'skin' && owned; const active = (it.id === 'aura:' + state.aura) || (it.id === 'laptop:' + state.laptopSkin);
+    return `<div class="app-card p-3 ${owned ? 'owned' : ''}"><div class="font-bold text-[#2b2b3d]">${it.name}</div><div class="text-xs text-slate-500 mt-0.5 min-h-[2em]">${it.desc || ''}</div><div class="flex items-center justify-between mt-2"><span class="pixel text-[10px] text-amber-600">${it.cost} $T</span>
+      ${owned ? (equip ? `<button data-equip="${it.id}" class="btn-game px-3 py-1 text-xs ${active ? 'bg-emerald-300' : 'bg-sky-200'}">${active ? '✓ Equipado' : 'Equipar'}</button>` : '<span class="text-xs font-bold text-emerald-600">✅ Construido</span>') : `<button data-buy="${it.id}" class="btn-game px-3 py-1 text-xs bg-yellow-300" ${canBuy ? '' : 'disabled'}>${locked ? '🔒 Requiere nivel previo' : 'Comprar'}</button>`}</div></div>`; }).join('') + '</div>';
+}
+function mountShop(body, items, kind, title) {
+  const render = () => { body.innerHTML = shopHTML(items, kind);
+    body.querySelectorAll('[data-buy]').forEach(b => b.onclick = () => { const it = items.find(i => i.id === b.dataset.buy); if (state.tokens < it.cost) return; state.tokens -= it.cost; state.owned.add(it.id); it.apply(); playChime(); showToast(`${it.name} ✔`, 'text-white'); render(); });
+    body.querySelectorAll('[data-equip]').forEach(b => b.onclick = () => { items.find(i => i.id === b.dataset.equip).apply(); playBeep(880, 0.08); render(); }); };
+  render();
+}
+function openUnlockedApp(app) {
+  if (state.modalOpen) closeApp();
+  if (app === 'bakery') openApp('🐻 ' + APP_TITLES.bakery, `<div class="rounded-xl overflow-hidden border-[3px] border-[#2b2b3d]">${npcById.bear.mission.preview}</div>`);
+  else if (app === 'board') openApp('🏛️ ' + APP_TITLES.board, '', (b) => { b.append(boardCanvas); const p = document.createElement('p'); p.className = 'text-xs text-slate-500 mt-3'; p.textContent = 'Leaderboard de holders y precio de $TOKEN actualizados cada segundo (simulación on-chain). Tu balance aparece en el ranking en tiempo real.'; b.append(p); });
+  else if (app === 'shop') openApp('🦫 ' + APP_TITLES.shop, '', (b) => mountShop(b, UPGRADES, 'build'));
+  else if (app === 'secret') openApp('🐈‍⬛ ' + APP_TITLES.secret, '', (b) => mountShop(b, SKINS, 'skin'));
+  else if (app === 'farm') openApp('🦎 ' + APP_TITLES.farm, '', (b) => { const render = () => { const ready = fruits.filter(f => f.userData.ready).length; const next = fruits.filter(f => !f.userData.ready).map(f => f.userData.respawnAt).sort()[0]; b.innerHTML = `<div class="text-sm text-slate-600 space-y-2"><div class="app-card p-4"><div class="font-bold text-lg text-[#2b2b3d]">🍋 Frutas maduras: ${ready} / ${fruits.length}</div><div>Cada fruta = <b>+${CFG.fruitReward} $TOKEN</b>. Acércate a los árboles dorados junto al laboratorio y haz clic (o pulsa E).</div><div class="text-xs text-slate-500 mt-1">Recompensa diaria — en esta demo rebrotan cada ${CFG.fruitCooldown / 1000}s. ${next ? `Próxima cosecha en ${Math.max(0, Math.ceil((next - performance.now()) / 1000))}s` : ''}</div></div><div class="app-card p-4"><div class="font-bold text-[#2b2b3d]">🌦️ Pronóstico IA</div><div>Mañana: ☀️ 24 °C · Lluvia 12% · Viento 8 km/h · Cosecha óptima 09:00</div></div></div>`; }; liveApp(b, render); });
+  else if (app === 'port') openApp('🦤 ' + APP_TITLES.port, '', (b) => { const render = () => { const C = SHIP_CYCLE, t = state.shipTime; const eta = t < C.approach ? Math.ceil(C.approach - t) : t < C.approach + C.dock ? 0 : Math.ceil(C.approach + C.dock + C.depart + C.wait - t + C.approach); b.innerHTML = `<div class="space-y-3 text-sm text-slate-600"><div class="app-card p-4"><div class="font-bold text-lg text-[#2b2b3d]">🚢 Barco mercante: ${state.shipDocked ? '⚓ atracado en el puerto' : 'en ruta'}</div><div>${state.shipDocked ? 'Descargando noticias y datos del mercado…' : `Llegada estimada: <b>${eta}s</b>`}</div><div class="text-xs text-slate-500 mt-1">Ruta automática escoltada por 4 drones marítimos 🛸</div></div><div class="app-card p-4"><div class="font-bold text-[#2b2b3d] mb-1">📰 Último parte del mercado</div><div class="text-xs font-mono whitespace-pre-wrap">${document.getElementById('tickerText').textContent.split('·').map(s => s.trim()).filter(Boolean).join('\n') || 'Esperando al barco…'}</div></div></div>`; }; liveApp(b, render); });
+  else if (app === 'memes') openApp('🦔 ' + APP_TITLES.memes, '', mountMemeTool);
+}
+// --- Generador de memes real (canvas) ---
+const MEME_TPL = [{ id: 'bear', name: '🐻 Oso Panadero', a: '#ff9ec4', b: '#ffd6a8', e: '🐻' }, { id: 'mayor', name: '🐶 Mayor Reginald', a: '#4f7dd8', b: '#a9dcff', e: '🐶' }, { id: 'cat', name: '🐈‍⬛ Madame Sombra', a: '#2a0a4a', b: '#7c4dff', e: '🐈‍⬛' }, { id: 'token', name: '🪙 $TOKEN to the moon', a: '#1c1b2e', b: '#ffb300', e: '🪙' }, { id: 'dax', name: '🦎 Prof. Dax', a: '#00acc1', b: '#f8a5c2', e: '🦎' }];
+const MEME_IDEAS = [['CUANDO EL OSO ACEPTA $TOKEN', 'PASTELES TO THE MOON'], ['EL ALCALDE FIRMÓ 1.204 CONTRATOS', 'SIN UN SOLO PAPEL'], ['MADAME SOMBRA VIO TU WALLET', 'Y LA PROTEGIÓ'], ['HOLD $TOKEN', 'COMO EL OSO SUS CROISSANTS'], ['PROF. DAX PREDIJO LLUVIA', 'LLOVIERON FRUTAS DORADAS'], ['NO ES UNA ISLA', 'ES UN PLANETA ENTERO']];
+function mountMemeTool(b) {
+  b.innerHTML = `<div class="grid grid-cols-1 md:grid-cols-2 gap-4"><div class="space-y-3"><label class="block text-xs font-bold text-slate-500">PLANTILLA</label><select id="mTpl" class="game w-full">${MEME_TPL.map(t => `<option value="${t.id}">${t.name}</option>`).join('')}</select>
+    <label class="block text-xs font-bold text-slate-500">TEXTO ARRIBA</label><input id="mTop" class="game w-full" maxlength="60" value="${MEME_IDEAS[0][0]}"><label class="block text-xs font-bold text-slate-500">TEXTO ABAJO</label><input id="mBot" class="game w-full" maxlength="60" value="${MEME_IDEAS[0][1]}">
+    <div class="flex flex-wrap gap-2 pt-1"><button id="mRand" class="btn-game px-3 py-2 bg-fuchsia-300 text-sm">🎲 Idea IA</button><button id="mDown" class="btn-game px-3 py-2 bg-emerald-300 text-sm">⬇️ Descargar PNG</button><button id="mTweet" class="btn-game px-3 py-2 bg-sky-300 text-sm">🐦 Tuitear</button></div>
+    <p class="text-xs text-slate-500">Descarga la imagen y adjúntala al tuit. #MicroWorld #TOKEN</p></div><canvas id="mCanvas" width="600" height="600" class="w-full rounded-xl border-[3px] border-[#2b2b3d] shadow"></canvas></div>`;
+  const c = b.querySelector('#mCanvas'), ctx = c.getContext('2d'), tpl = b.querySelector('#mTpl'), top = b.querySelector('#mTop'), bot = b.querySelector('#mBot');
+  const drawText = (text, y, base) => { ctx.font = 'bold 44px Impact, "Arial Black", Fredoka, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = base; ctx.lineWidth = 8; ctx.strokeStyle = '#000'; ctx.fillStyle = '#fff'; const words = text.toUpperCase().split(' '); const lines = []; let cur = ''; words.forEach(w => { if (ctx.measureText(cur + ' ' + w).width > 560 && cur) { lines.push(cur); cur = w; } else cur = cur ? cur + ' ' + w : w; }); if (cur) lines.push(cur); lines.forEach((l, i) => { const yy = base === 'top' ? y + i * 52 : y - (lines.length - 1 - i) * 52; ctx.strokeText(l, 300, yy); ctx.fillText(l, 300, yy); }); };
+  const draw = () => { const t = MEME_TPL.find(x => x.id === tpl.value); const g = ctx.createLinearGradient(0, 0, 0, 600); g.addColorStop(0, t.a); g.addColorStop(1, t.b); ctx.fillStyle = g; ctx.fillRect(0, 0, 600, 600);
+    for (let i = 0; i < 30; i++) { ctx.fillStyle = 'rgba(255,255,255,.15)'; ctx.beginPath(); ctx.arc((i * 97) % 600, (i * 173) % 600, 4 + (i % 5) * 3, 0, 6.29); ctx.fill(); }
+    ctx.font = '260px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(t.e, 300, 310);
+    ctx.font = 'bold 22px Fredoka, Arial'; ctx.fillStyle = 'rgba(255,255,255,.85)'; ctx.textAlign = 'right'; ctx.textBaseline = 'alphabetic'; ctx.fillText('🪙 $TOKEN · Micro World', 585, 585);
+    if (top.value.trim()) drawText(top.value, 20, 'top'); if (bot.value.trim()) drawText(bot.value, 580, 'bottom'); };
+  [tpl, top, bot].forEach(el => el.addEventListener('input', draw));
+  b.querySelector('#mRand').onclick = () => { const idea = MEME_IDEAS[Math.floor(Math.random() * MEME_IDEAS.length)]; top.value = idea[0]; bot.value = idea[1]; tpl.value = MEME_TPL[Math.floor(Math.random() * MEME_TPL.length)].id; draw(); playBeep(880, 0.06); };
+  b.querySelector('#mDown').onclick = () => { const a = document.createElement('a'); a.download = 'meme-token.png'; a.href = c.toDataURL('image/png'); a.click(); };
+  b.querySelector('#mTweet').onclick = () => window.open('https://twitter.com/intent/tweet?text=' + encodeURIComponent(`${top.value} — ${bot.value} 🪙 #MicroWorld #TOKEN`), '_blank');
+  draw();
+}
+
+/* =========================================================
+   17. TOKENS, TOASTS, AUDIO
+   ========================================================= */
+function addTokens(n) { state.tokens += n; const t = document.createElement('div'); t.className = 'toast absolute left-1/2 whitespace-nowrap pixel text-sm text-yellow-300 drop-shadow-[0_2px_0_#7a4a00]'; t.textContent = `+${n} $TOKEN`; ui.toastArea.append(t); setTimeout(() => t.remove(), 2500); }
+function showToast(msg, cls = '') { const t = document.createElement('div'); t.className = `toast absolute left-1/2 whitespace-nowrap font-bold text-sm bg-[#2b2b3d]/90 px-3 py-1.5 rounded-lg ${cls}`; t.textContent = msg; ui.toastArea.append(t); setTimeout(() => t.remove(), 2500); }
+let audioCtx = null;
+function playBeep(freq, dur, type = 'square') { try { audioCtx ||= new (window.AudioContext || window.webkitAudioContext)(); const o = audioCtx.createOscillator(), g = audioCtx.createGain(); o.type = type; o.frequency.value = freq; g.gain.value = 0.06; o.connect(g).connect(audioCtx.destination); o.start(); g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + dur + 0.1); o.stop(audioCtx.currentTime + dur + 0.12); } catch (e) {} }
+function playChime() { [523, 659, 784, 1046].forEach((f, i) => setTimeout(() => playBeep(f, 0.18, 'triangle'), i * 110)); }
+
+/* =========================================================
+   18. ACTUALIZACIÓN: JUGADOR, NPCs, EFECTOS
+   ========================================================= */
+const _fwd = new THREE.Vector3(), _right = new THREE.Vector3(), _move = new THREE.Vector3();
+function updatePlayer(dt) {
+  const pd = player.userData, parts = pd.parts, up = pd.dir; let moving = false;
+  if (canControl()) {
+    _fwd.copy(tangent(currentLook.clone().sub(camera.position), up)); _right.crossVectors(_fwd, up).normalize();
+    const k = state.keys; let f = (k.KeyW || k.ArrowUp ? 1 : 0) - (k.KeyS || k.ArrowDown ? 1 : 0), r = (k.KeyD || k.ArrowRight ? 1 : 0) - (k.KeyA || k.ArrowLeft ? 1 : 0);
+    if (!f && !r && (Math.abs(state.joy.x) > 0.12 || Math.abs(state.joy.y) > 0.12)) { f = state.joy.y; r = state.joy.x; } // joystick táctil (analógico)
+    _move.set(0, 0, 0); let mag = 1;
+    if (f || r) { _move.addScaledVector(_fwd, f).addScaledVector(_right, r); mag = Math.min(1, _move.length()); _move.normalize(); state.moveTarget = null; state.pendingInteract = null; }
+    else if (state.moveTarget) {
+      if (angleBetween(up, state.moveTarget) * R < 0.15) { state.moveTarget = null; if (state.pendingInteract) { const o = state.pendingInteract; state.pendingInteract = null; interactWith(o); } }
+      else _move.copy(tangent(state.moveTarget.clone().sub(up), up));
+    }
+    if (_move.lengthSq() > 0) {
+      moving = true;
+      const speed = CFG.playerSpeed * mag * (state.swimming ? CFG.swimFactor : 1);
+      const newDir = up.clone().multiplyScalar(R).addScaledVector(_move, speed * dt).normalize();
+      const wp = newDir.clone().multiplyScalar(surfaceR(newDir));
+      for (const c of colliders) { const d = wp.clone().sub(c.pos); const dist = d.length(), min = c.r + 0.4; if (dist < min && dist > 1e-4) wp.addScaledVector(d.normalize(), min - dist); }
+      const finalDir = wp.normalize();
+      if (state.moveTarget && angleBetween(finalDir, up) * R < 0.002) { state.moveTarget = null; state.pendingInteract = null; }
+      pd.dir.copy(finalDir); pd.fwd.lerp(tangent(_move, pd.dir), Math.min(1, dt * 12));
+    }
+  }
+  const wasSwimming = state.swimming; state.swimming = !isLand(pd.dir);
+  if (state.swimming && !wasSwimming) showToast('🏊 ¡Nadando!', 'text-white');
+  pd.fwd.copy(tangent(pd.fwd, pd.dir)); if (pd.fwd.lengthSq() < 1e-6) pd.fwd.copy(frameAt(pd.dir, V_N).fwd);
+  quatFromFrame(frameAt(pd.dir, pd.fwd), player.quaternion);
+  let bob;
+  if (state.swimming) { state.walkCycle += dt * 6; const s = Math.sin(state.walkCycle); parts.armL.rotation.x = Math.PI + s * 1.2; parts.armR.rotation.x = Math.PI - s * 1.2; parts.legL.rotation.x = s * 0.4; parts.legR.rotation.x = -s * 0.4; bob = Math.sin(performance.now() * 0.004) * 0.08; }
+  else if (moving) { state.walkCycle += dt * 11; const s = Math.sin(state.walkCycle); parts.legL.rotation.x = s * 0.7; parts.legR.rotation.x = -s * 0.7; parts.armL.rotation.x = -s * 0.6; parts.armR.rotation.x = s * 0.6; bob = Math.abs(s) * 0.06; }
+  else { ['legL', 'legR', 'armL', 'armR'].forEach(p => parts[p].rotation.x *= 0.85); bob = Math.sin(performance.now() * 0.003) * 0.02; }
+  player.position.copy(pd.dir).multiplyScalar(surfaceR(pd.dir) + bob);
+  if (marker.material.opacity > 0) { marker.material.opacity -= dt * 0.8; marker.scale.addScalar(dt * 0.8); }
+  const near = canControl() ? getNearbyInteractable() : null; ui.hint.classList.toggle('hidden', !near); if (near) ui.hintText.textContent = near.obj.userData.interact.label;
+  if (IS_MOBILE) { document.getElementById('joystick').style.display = canControl() ? 'block' : 'none'; actionBtn.style.display = near ? 'flex' : 'none'; if (near) actionLabel.textContent = near.obj.userData.interact.label.replace('Hablar con ', '').replace('Cosechar Fruta Dorada', 'Cosechar'); }
+  aura.rotation.y += dt * 2.2; aura.children.forEach(c => { if (c.isMesh) c.position.y = Math.sin(performance.now() * 0.004 + c.userData.i) * 0.15; });
+}
+function updateNPCs(dt, t) {
+  NPCS.forEach(n => {
+    const obj = npcObjs[n.id], u = obj.userData, b = u.bubble; const baseY = n.species === 'hedgehogs' ? 2.8 : 3.4;
+    b.position.y = baseY + Math.sin(t * 3 + obj.position.x) * 0.15; b.material.rotation = Math.sin(t * 2) * 0.1;
+    b.scale.setScalar(clamp(cam.dist / 9, 1, 5)); // el "!" se ve desde lejos en modo planeta
+    if (performance.now() < u.celebrateUntil) { obj.quaternion.multiply(_q.setFromAxisAngle(UP_Y, dt * 6)); obj.scale.y = 1 + Math.sin(t * 24) * 0.05; obj.position.copy(u.dir).multiplyScalar(heightAt(u.dir) + Math.abs(Math.sin(t * 12)) * 0.6); }
+    else {
+      if (player.position.distanceTo(obj.position) < 6) { const fwd = tangent(player.position.clone().sub(obj.position), u.up); if (fwd.lengthSq() > 0) obj.quaternion.slerp(quatFromFrame(frameAt(u.up, fwd)), Math.min(1, dt * 4)); }
+      obj.scale.y = 1 + Math.sin(t * 2.5) * 0.015; obj.position.copy(u.dir).multiplyScalar(heightAt(u.dir) + Math.sin(t * 2.5 + obj.position.z) * 0.03);
+    }
+  });
+}
+function updateNeon(dt, t) {
+  if (!state.neonOn) return; state.neonT = Math.min(1, state.neonT + dt * 0.6);
+  const k = easeInOut(state.neonT), u = bakery.userData, flicker = 0.85 + Math.sin(t * 14) * 0.1 + (Math.random() < 0.03 ? -0.4 : 0);
+  u.neonMats.forEach(m => m.emissiveIntensity = k * 2.2 * flicker); u.winMat.emissiveIntensity = k * 0.9;
+  u.lights[0].intensity = k * 14 * flicker; u.lights[1].intensity = k * 14 * flicker;
+  u.bulbs.forEach((b, i) => b.material.emissiveIntensity = k * (1.2 + Math.sin(t * 6 + i) * 0.9)); u.wallMat.color.lerpColors(new THREE.Color(0xfff1d6), new THREE.Color(0xffc7dc), k);
+}
+function updateUnlocks(dt, t) {
+  if (holo.visible) { holo.children[0].position.y = 3.2 + Math.sin(t * 1.5) * 0.08; holoLight.intensity = 3 + Math.sin(t * 8) * 0.6; holo.children[0].material.opacity = 0.88 + Math.sin(t * 20) * 0.04; }
+  if (structures.fountain) structures.fountain.userData.drops.forEach(d => { const p = (d.userData.p + t * 0.4) % 1; d.position.set(Math.cos(d.userData.p * 6.28) * p * 1.1, 1.6 + Math.sin(p * Math.PI) * 1.2 - p * 1.1, Math.sin(d.userData.p * 6.28) * p * 1.1); });
+  if (structures.windmill) structures.windmill.userData.blades.rotation.z += dt * 1.2;
+  if (structures.statue) structures.statue.userData.coin.rotation.y += dt * 1.5;
+  fruits.forEach(f => { if (!f.userData.ready && performance.now() > f.userData.respawnAt) { f.userData.ready = true; f.visible = true; } if (f.visible) { f.rotation.y += dt; f.scale.setScalar(1.1 + Math.sin(t * 3 + f.position.y) * 0.08); } });
+}
+const confetti = []; const confettiGeo = new THREE.PlaneGeometry(0.16, 0.16);
+function spawnConfetti(origin, n = 70) {
+  const up = origin.clone().normalize();
+  for (let i = 0; i < n; i++) { const m = new THREE.Mesh(confettiGeo, new THREE.MeshBasicMaterial({ color: flowerColors[i % 5], side: THREE.DoubleSide })); m.position.copy(origin); const side = tangent(randomDir(), up), s = 2 + Math.random() * 4; confetti.push({ m, vel: side.multiplyScalar(s).addScaledVector(up, 4 + Math.random() * 5), rot: new THREE.Vector3(Math.random() * 6, Math.random() * 6, Math.random() * 6), life: 3 + Math.random() }); scene.add(m); }
+}
+function updateConfetti(dt) {
+  for (let i = confetti.length - 1; i >= 0; i--) { const c = confetti[i], up = c.m.position.clone().normalize(); c.vel.addScaledVector(up, -9.8 * dt).multiplyScalar(0.985); c.m.position.addScaledVector(c.vel, dt); c.m.rotation.x += c.rot.x * dt; c.m.rotation.y += c.rot.y * dt; c.life -= dt;
+    const ground = Math.max(heightAt(up), SEA) + 0.05; if (c.m.position.length() < ground) { c.m.position.setLength(ground); c.vel.set(0, 0, 0); c.rot.set(0, 0, 0); }
+    if (c.life <= 0) { scene.remove(c.m); c.m.material.dispose(); confetti.splice(i, 1); } }
+}
+function updateWater(t) { const p = waterGeo.attributes.position; for (let i = 0; i < p.count; i++) { const x = waterBase[i * 3], y = waterBase[i * 3 + 1], z = waterBase[i * 3 + 2]; const r = SEA + 0.07 * Math.sin(x * 9 + y * 4 + t * 1.4) + 0.06 * Math.cos(z * 8 + y * 6 - t); p.setXYZ(i, x * r, y * r, z * r); } p.needsUpdate = true; waterGeo.computeVertexNormals(); }
+function updateSun() { const camDir = camera.position.clone().normalize(); const right = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 0); const sunDir = camDir.addScaledVector(camera.up, 0.7).addScaledVector(right, 0.6).normalize(); sun.position.copy(sunDir).multiplyScalar(50).add(player.position); sun.target.position.copy(player.position); sun.target.updateMatrixWorld(); }
+function updateTokens() { if (state.tokensShown !== state.tokens) { const diff = state.tokens - state.tokensShown; state.tokensShown += Math.sign(diff) * Math.max(1, Math.ceil(Math.abs(diff) * 0.08)); if (Math.sign(state.tokens - state.tokensShown) !== Math.sign(diff)) state.tokensShown = state.tokens; ui.tokenValue.textContent = state.tokensShown.toLocaleString('es-ES'); } }
+
+/* =========================================================
+   19. BUCLE PRINCIPAL
+   ========================================================= */
+const clock = new THREE.Clock();
+function animate() {
+  requestAnimationFrame(animate);
+  const dt = Math.min(clock.getDelta(), 0.05), t = clock.elapsedTime;
+  updatePlayer(dt); updateNPCs(dt, t); updateCamera(dt); updateSun(); updateNeon(dt, t); updateUnlocks(dt, t); updateShip(dt); updateConfetti(dt); updateWater(t);
+  clouds.children.forEach(p => p.rotateY(p.userData.speed * dt)); updateTokens();
+  sky.position.copy(camera.position); renderer.render(scene, camera);
+}
+window.addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
+/* =========================================================
+   20. MENÚ DE ENTRADA → PLAY
+   ========================================================= */
+cam.dist = cam.tDist = 70; cam.pitch = cam.tPitch = 0.35; // vista desde el espacio mientras se lee el menú
+{ const p = camPose(); applyLook(p.pos, p.target, p.up); }
+refreshMissionUI(); animate();
+const btnPlay = document.getElementById('btnPlay');
+btnPlay.disabled = false; btnPlay.textContent = '▶ PLAY';
+btnPlay.onclick = () => {
+  const menu = document.getElementById('menu'); menu.classList.add('hide'); setTimeout(() => menu.remove(), 700);
+  try { audioCtx ||= new (window.AudioContext || window.webkitAudioContext)(); audioCtx.resume(); } catch (e) {}
+  playChime();
+  cam.rate = 1.7; cam.tDist = 9; cam.tPitch = 0.42; // zoom cinematográfico desde el espacio hasta el personaje
+  setTimeout(() => { state.menuOpen = false; cam.rate = 10; showToast('🐻 Busca al Oso Panadero: tiene un “!” sobre la cabeza', 'text-white'); }, 2600);
+};
+</script>
+</body>
+</html>
