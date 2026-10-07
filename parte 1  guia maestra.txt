@@ -1,0 +1,117 @@
+SECCIÓN 0 — VISIÓN Y PILARES
+0.1 Elevator pitch
+MICRO WORLD: AI VILLAGE es un life-sim de economía y reputación ambientado en un micro planeta low-poly... que es un sueño. Eres un programador que se quedó dormido frente a su portátil. En el sueño eres el único humano con una Laptop de IA: los vecinos (animales con problemas) te encargan aplicaciones, aprendes a comerciar, construyes una reputación y una fortuna en $TOKEN... con un único objetivo final: pagar el billete de 40.000.000 $TOKEN que te devuelva a tu mundo. O decidir quedarte para siempre.
+
+0.2 Pilares de diseño
+P1 · El sueño lo explica todo.
+Toda incoherencia (planeta diminuto, animales con burocracia, IA "simulada", un avión en una isla-esfera) es canon: es un sueño. El absurdo no se justifica, se celebra. Nunca se rompe la cuarta pared sin intención.
+
+P2 · Confianza antes que talento.
+Ningún contenido se desbloquea por tiempo o dinero solamente: se desbloquea porque alguien confía en ti. La confianza se gana comerciando, regalando y cumpliendo. Tu aura muestra tu reputación al mundo.
+
+P3 · La economía ES el juego.
+Todos los sistemas son mercados: tiendas NPC, feria, tablón de ofertas, especulación, negocios. El dinero se gana con margen y capital compuesto, no con clicks repetidos. El jugador listo progresa más rápido que el jugador insistente.
+
+P4 · Un número imposible siempre visible.
+✈️ 3.412 / 40.000.000 $TOKEN vive en el HUD permanentemente. Cada sesión debe mover ese número de forma perceptible. Es el compás, la motivación y la promesa del juego.
+
+P5 · Simulación honesta.
+Lo simulado se etiqueta como simulado (mercado, IA, clima, holders). Lo real es real (tu partida, tu esfuerzo, el comercio P2P cuando exista). El juego jamás miente al jugador sobre qué es verdad.
+
+0.3 Experiencia objetivo
+Duración: ~10 horas hasta poder comprar el billete (jugador dedicado). Sesiones de 20–60 min con progreso tangible en cada una.
+Plataformas: navegador, escritorio y móvil. Offline-first; el online llega por fases sin invalidar partidas locales.
+Verbos del jugador: explorar, hablar, generar, comerciar, construir, especular, despertar.
+0.4 Lo que NO es
+No es un juego de combate, salud ni muerte.
+No es blockchain real ni requiere wallet externa.
+No es pay-to-win: no hay compras con dinero real.
+No es un juego terminado: es un prototipo en crecimiento dirigido.
+SECCIÓN 1 — NARRATIVA, LORE Y ESTRUCTURA DE ACTOS
+1.1 Premisa
+Un programador lleva demasiadas horas despierto. Café frío, código que no compila, 4:37 AM. Se queda dormido frente al portátil.
+
+Despierta tumbado en la hierba de un planeta diminuto, pastel y absurdo, con su laptop al lado — imposiblemente, con batería infinita. Los animales que le rodean no se sorprenden: "¡Por fin llegó el humano de la laptop!"
+
+En este sueño, tu habilidad real (programar con IA) es tu superpoder.
+
+1.2 Reglas del lore
+R1 · Quién sabe qué es un sueño.
+
+Madame Sombra lo sabe completamente. Es la guardiana del sueño; lleva "siglos de sueño" aquí. Es la única que puede emitir el billete de salida.
+Salty Sam lo sospecha. Lleva años intentando llegar al horizonte con su barco y jamás lo ha tocado. Por eso colecciona mapas y por eso tendrá él el avión.
+Mayor Reginald lo niega institucionalmente. Tiene un formulario que demuestra que todo es real (el Formulario 27-B).
+El resto no lo sabe ni le importa: tienen panaderías que sacar adelante.
+R2 · La Laptop de IA es la manifestación onírica de tu habilidad real. En el sueño, "villager-gpt" siempre compila.
+
+R3 · $TOKEN es "materia de sueño solidificada": la moneda de la voluntad dentro del sueño. Acumularla es, literalmente, acumular el poder de despertar.
+
+R4 · El billete y el avión. Sombra emite el billete (un contrato místico: la salida del sueño). Sam posee el transporte físico: un avión de juguete gigante varado en su puerto ("lo encontré flotando donde debería estar el horizonte, grumete"). Para irte necesitas ambos: el billete de Sombra y la pista de Sam.
+
+R5 · Honestidad diegética. Los mercados, el clima y la IA del sueño son simulados también dentro de la ficción — los NPCs más listos lo comentan con humor ("ese precio lo decide el azar, como todo aquí", dice Sombra). La ficción y el juego dicen la misma verdad.
+
+1.3 Prólogo (minuto 0–5)
+Pantalla de entrada: escritorio real, portátil con código, Zzz flotando. Botón: DORMIRSE.
+Fundido a blanco → despiertas en la aldea con la Laptop al lado. El Oso Panadero te descubre y te presenta el mundo (tutorial orgánico: moverse, hablar, la primera misión).
+La revelación: al acercarte por primera vez a la carpa, Madame Sombra te dice:
+"Mmm... te esperaba, soñador. Sí, soñador: esto es un sueño, y tú lo sabes tan bien como yo. Hay un vuelo de vuelta a tu mundo. Cuesta 40.000.000 $TOKEN. Nadie lo ha pagado jamás. Pero tú tienes esa máquina... y tiempo. Todo el tiempo del sueño."
+
+Aparece en el HUD el contador permanente: ✈️ 0 / 40.000.000 $TOKEN.
+1.4 Acto 1 — "El Novato" (horas 0–2)
+Las 7 misiones actuales no cambian de mecánica, cambian de significado: no son el juego, son cómo te ganas el nombre. Cada misión es un trabajo de confianza que deja una función económica permanentemente abierta (tiendas, granja, barco, tablón, memes).
+
+Las misiones ahora tienen puerta de confianza (Sección 3 detallará el sistema):
+
+Misión	Confianza requerida	Rol narrativo
+🐻 Oso Panadero	Nivel 1 (tutorial)	Tu primer cliente y primer amigo
+🦔 Erizos	Nivel 1	La fama joven: memes y difusión
+🦎 Dax	Nivel 2	La ciencia: producción pasiva (granja)
+🦫 Glover	Nivel 2	La construcción: casa y aldea
+🦤 Sam	Nivel 2	El puerto: comercio exterior
+🐶 Mayor Reginald	Nivel 3	La institución: tablón y legitimidad
+🐈‍⬛ Sombra	Nivel 3	"No confío en las máquinas... ni en la gente"
+Cierre del Acto 1: las 7 apps entregadas, todas las tiendas abiertas, capital ~10.000 $T, y la frase de transición de Sombra: "Ya eres de aquí. Ahora la pregunta es si quieres dejar de serlo. 40 millones, soñador."
+
+1.5 Acto 2 — "El Comerciante" (horas 2–9)
+El juego real. El objetivo deja de ser "completar misiones" y pasa a ser "mover el contador". Sistemas protagonistas (detallados en sus secciones):
+
+Vivienda con alquiler (estilo Animal Crossing): la casa genera obligaciones y prestigio (Sección 6).
+Feria y Tablón de Ofertas: comercio con NPCs con precios dinámicos; en online, P2P real entre jugadores (Sección 4).
+Negocios y cadenas de valor: la fruta dorada se puede vender cruda... o convertida en productos de más margen (Sección 5).
+Especulación: el Tablón Holográfico del Alcalde se vuelve interactivo (Sección 4).
+Encargos de confianza: trabajos repetibles por NPC desbloqueados por reputación (Sección 7).
+La curva de capital es compuesta: 10K → 100K → 1M → 5M → 40M. El dinero trabaja para el jugador cada vez más y el jugador trabaja para el dinero cada vez menos.
+
+1.6 Acto 3 — "El Despertar" (horas 9–10+)
+Requisitos del billete (objeto único: dream_ticket, categoría especial, no vendible, no apilable):
+
+💰 40.000.000 $TOKEN
+🔮 Confianza nivel 4 (Aliada) con Madame Sombra — "No le vendería la salida del sueño a un desconocido."
+Al comprarlo, escena de despedida: los 7 vecinos se reúnen en el puerto de Sam (con una línea de diálogo cada uno que cambia según tu confianza con ellos — el momento Inside Out). Sam sube al avión de juguete gigante. Y entonces, el juego hace su única pregunta importante:
+
+Final A — 🛫 Despertar
+El avión despega hacia un sol que es la pantalla de un monitor. Abres los ojos: 7:12 AM, el café frío, y en el portátil... el código compila. Sobre el escritorio, una concha del planeta. Créditos. Desbloquea "Nuevo Sueño+" (NG+): nueva partida con multiplicadores y secretos.
+
+Final B — 💤 Quedarse
+"¿Sabes qué? Este sueño es mejor que mi vida real." Devuelves el billete (Sombra te devuelve los 40M con una sonrisa: "lo sabía"). Desbloqueas el aura legendaria "Soñador Eterno" y el modo post-juego: metas de lujo (expansión Villa→Mansión, colección de estatuas, Club de los 100M, completar el museo de objetos).
+
+1.7 Tono
+80% humor absurdo + 20% corazón. La burocracia del alcalde es ridícula, los erizos son insufribles adorables, Dax grita CIENCIA... pero la despedida del puerto debe doler de verdad. Regla de escritura: ningún chiste en las escenas de despedida; ningún sentimentalismo en las tiendas.
+
+1.8 Impacto en el prototipo actual
+Elemento actual	Cambio narrativo	Cambio de código
+Menú "USAINBOT"	Añadir overlay de prólogo (escritorio → sueño)	Overlay HTML pre-menú
+Las 7 misiones	Recontextualizadas como Acto 1	Solo diálogos y gates de confianza
+Auras compradas	Pasan a ser estilos con perk; el nivel lo da la reputación	setAura(tier, style); migración v2→v3
+Tablón Holográfico	Se vuelve especulación jugable en Acto 2	Nueva app interactiva
+Puerto de Sam	Gana el "Aeropuerto Onírico" (avión de juguete)	Props 3D + escena final
+HUD	Contador ✈️ n / 40.000.000 permanente	Elemento nuevo en barra superior
+Guardado	Nuevos campos: trust, dream_ticket, ending	Migración SAVE_VERSION 2→3
+1.9 Reglas de oro para escritura futura
+Todo NPC habla como si el sueño fuera su vida normal (excepto Sombra y Sam en sus líneas clave).
+El precio del billete se menciona pronto y se repite: es la promesa del juego.
+Ningún texto anuncia como real algo simulado (Pilar P5).
+Los diálogos de despedida se escriben al final del desarrollo, cuando los NPCs ya existen de verdad para el equipo.
+
+
+

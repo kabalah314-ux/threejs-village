@@ -1,0 +1,100 @@
+SECCIÓN 8 — AVATAR Y MODA ONÍRICA
+v1.0 · El creador de personaje, el armario, las tiendas de moda y las prendas insignia. Todo paramétrico (primitivas Three.js + CanvasTexture), sin assets externos, y serializable como datos puros para el modo online.
+
+8.1 Filosofía
+En un mundo donde el aura grita tu reputación, la ropa susurra quién eres. El avatar cumple tres funciones:
+
+Identidad: tu versión onírica de ti mismo. El juego pregunta al inicio: "¿Quién eres en el sueño?" — y la respuesta puede ser "yo, pero con mejor pelo".
+Progresión visible: las prendas insignia de Aliado son medallas que se llevan puestas. Un gorro de chef del Oso cuenta una historia que ningún número cuenta.
+Economía: la moda es un sumidero amable de $TOKEN en mid/endgame (cuando el jugador tiene de sobra) y una vía de comercio P2P futura (telas exclusivas del mercante).
+Cuatro reglas de diseño:
+
+La ropa nunca da ventaja mecánica. Ni velocidad, ni precios, ni confianza. El aura (Sec. 3) es el único sistema de perks. Esto mantiene la moda como territorio de pura expresión y evita "comprar poder".
+Cambiar de look es siempre gratis. Solo se paga por desbloquear una pieza; una vez tuya, la combinas para siempre. La reinvención es un derecho, no un servicio.
+Sin género. Ninguna pieza está etiquetada por género. El avatar es un lienzo cartoon: falda, traje, sudadera y moño para quien quiera.
+Todo es combinación. Nada de conjuntos cerrados: cada pieza vive en su slot y combina con todas las demás. El absurdo estilístico es canon (es un sueño).
+8.2 El creador: cuándo y dónde
+Creación inicial (minuto ~2)
+Después del prólogo (escritorio → fundido → hierba) y antes de despertar del todo:
+
+"El sueño se forma a tu alrededor… ¿y tú? ¿Cómo te sueñas?"
+
+El creador aparece con el avatar sobre la hierba y la cámara en modo probador (reutiliza tweenCamera con una pose cercana tipo diálogo). Controles: rotar el personaje arrastrando, flechas ‹ › por categoría, selección en vivo. Sin presión: botón "Así estoy bien" siempre visible y todo se puede cambiar después gratis.
+
+Re-edición: el Armario 🪞
+Tu casa incluye por defecto un armario/espejo (interactable nuevo junto a la cama). Abrirlo = mismo probador, mismas opciones, coste 0. Cambiarse de ropa antes de una feria es comportamiento esperado y fomentado.
+
+8.3 Anatomía del avatar (slots y opciones v1)
+Slot	Opciones v1	Colores
+Piel	6 tonos	—
+Pelo	7 estilos: clásico (el actual), rapado, coleta, melena, rizos, moño, cresta	8 colores
+Ojos	4 estilos: clásicos, alegres (cerrados ^^), redondos, entrecerrados	6 colores
+Top	8: camiseta (actual), camisa, tirantes, sudadera, hawaiana, traje chaqueta, camiseta $TOKEN, delantal	paleta 12
+Pantalón	6: vaquero (actual), cortos, chándal, falda, elegante, bombacho	paleta 12
+Zapatos	4: botas (actuales), deportivas, sandalias, elegantes	paleta 12
+Cabeza	6 base: ninguno, gorra, gorro de lana, pañuelo, diadema, flor + 7 insignia (8.5)	según pieza
+Gafas	5: ningunas, redondas (torus, patrón Dax), sol (box, patrón erizos), corazón, de laboratorio	4 colores de montura
+Mochila	3 modelos: clásica (actual), grande, mini-riñonera	paleta 12
+Combinaciones: >100 millones. Ningún jugador se cruza con su clon.
+
+Técnica de render: cada pieza es una función decoradora sobre el grupo base (patrón SPECIES/makeCritter ya existente). Pelos = media esfera deformada + primitivas; sudadera = torso con capucha (cone invertido); falda = cone truncado; gafas redondas = 2 TorusGeometry (ya usadas en Dax). Materiales cacheados por color para no regenerar MeshStandardMaterial en cada cambio.
+
+8.4 Qué es gratis, qué se compra y qué se gana
+Origen	Piezas	Coste
+🆓 Base (creador inicial)	Toda la piel, pelos básicos, ojos, top/pantalón/zapatos base con paleta completa	Gratis para siempre
+🛍️ Boutique Viral (erizos)	Catálogo rotativo: 4 piezas al día de un pool de ~40 (hawaiana, traje, cresta, gafas corazón…)	50–2.000 $T por rareza
+🚢 Importaciones (Trabajo Mayor de Sam)	Telas imposibles: 12 piezas exclusivas que solo llegan por barco (1 aleatoria por atraque)	Precio de compra en el muelle: 300–1.500 $T
+🏆 Prendas insignia (7)	Regalo automático al alcanzar confianza 4 con cada NPC	No comprables. Se ganan
+🌟 Especiales	Pijama del Soñador (NG+) · Traje del Mundo Despierto (Final A)	No comprables
+La rotación de la Boutique usa el mismo generador determinista que los encargos (mulberry32(día + saveId)): mismo día = mismo catálogo, sin reroll por recarga. La escasez suave ("¿estará mañana?") es el gancho de la moda: los erizos lo venden como "drops, bro".
+
+8.5 Las 7 prendas insignia (confianza 4)
+NPC	Prenda	Momento de entrega
+🐻 Oso	👨‍🍳 Gorro de Chef (toque blanco, como el suyo)	"La familia lleva gorro. Tú eres familia."
+🐶 Mayor	🎩 Sombrero de Copa Municipal	"¡Ejem! Le nombro Ciudadano Honorario de Primera. Con sombrero."
+🦫 Glover	⛑️ Casco de Obra Amarillo	"Tolerancia cero, como el mío. Cuídalo."
+🐈‍⬛ Sombra	🟣 Capucha del Velo (capa corta violeta con glow tenue)	"Pocos la han llevado despiertos. Ninguno tan despierto como tú."
+🦎 Dax	🥽 Gafas de CIENCIA (turquesa brillante)	"¡¡COAUTOR CON GAFAS!! ¡Es oficial!"
+🦤 Sam	⚓ Gorro de Marinero	"Arrr… el mar reconoce a los suyos, grumete."
+🦔 Erizos	🕶️ Gafas de Sol Virales	"Bro. Las gafas. Es… (se emociona) …es nuestro símbolo, bro."
+Diseño: son las piezas más reconocibles del juego, ninguna se puede comprar, y lucir una en la plaza online certifica una relación completa. Completar las 7 es la "colección social" del endgame junto al aura legendaria.
+
+8.6 El avatar online
+En la plaza (Sueño Compartido) se ve: avatar completo + nombre + aura (tier y estilo). Nunca dinero ni inventario (Sec. 3.7).
+La config del avatar es un JSON diminuto ({skin:2, hair:5, hairColor:3, top:7, topColor:9, …}, ~20 bytes): viaja como dato puro y se renderiza localmente con buildAvatar() — exactamente el principio del Anexo A.
+En el trueque P2P, tu look es tu carta de presentación: las insignias certifican trayectoria sin decir una palabra.
+8.7 El probador (UI)
+Categorías en carrusel (iconos por slot) + grid de opciones + paleta de color cuando aplica.
+Cambio en vivo sobre el personaje real (no un maniquí): lo que ves es literalmente lo que llevas puesto al cerrar.
+Botones: 🎲 Aleatorio (diversión garantizada), 💾 Guardar, ✕ Salir sin guardar.
+Móvil: mismo panel con scroll táctil; la cámara de probador ya es responsive (sistema de diálogos).
+Nota de expansión (fase 2, sin compromiso): "Foto para memes": render del avatar a canvas para usarlo como plantilla en el Generador de Memes. Técnicamente viable (renderer offscreen + toDataURL), se agenda aparte.
+8.8 El guardado y la migración
+JavaScript
+
+// GS v3 (nuevo campo)
+avatar: {
+  skin: 0, hair: 0, hairColor: 0, eyes: 0, eyeColor: 0,
+  top: 0, topColor: 2, pants: 0, pantsColor: 3, shoes: 0, shoesColor: 0,
+  hat: null, glasses: null, backpack: 0, backpackColor: 1,
+  wardrobe: ['top:0','top:1', ...],   // piezas desbloqueadas (las base vienen por defecto)
+}
+Migración v2→v3: avatar = config "clásico" (exactamente el look actual del prototipo: piel #ffd5b3, camiseta cian, vaqueros, pelo marrón, mochila naranja). Ningún jugador existente amanece convertido en otro: abre el armario y descubre que puede cambiarse.
+
+8.9 Impacto técnico en el código actual
+Elemento	Cambio
+player	Refactor: la construcción actual pasa a buildAvatar(cfg), llamada al arrancar y al guardar cambios en el probador. Conserva userData.parts (pivots) para las animaciones de updatePlayer
+Datos	AVATAR_PARTS (catálogo: id, slot, decorador, rareza, precio, origen) + PALETTE (12 colores) — patrón ITEMS/BUILDABLES
+GS v3	+ avatar (8.8). deepMerge lo rellena con el clásico en migración
+Probador	Nuevo modal wardrobeModal + pose de cámara testerPose (patrón dialogPose) + input rotación por arrastre sobre el personaje
+Casa	Nuevo interactable Armario (mesh simple: box + espejo con material reflectante básico) junto a la cama, presente en los 3 niveles de buildHouse
+Boutique Viral	Nueva tienda en el Estudio (interactable o botón en diálogo de los erizos tras su misión): catálogo rotativo determinista, compra con Wallet.spend, piezas a avatar.wardrobe
+Importaciones	La loot table nueva del crate (Sec. 7.9) incluye piezas de tela imposibles
+Trust.add	Al alcanzar nivel 4 con un NPC → entrega automática de su insignia + toast + confeti + línea de diálogo
+Materiales	Cache matCache[colorHex] para no regenerar materiales al recolorear
+8.10 Reglas de oro del avatar
+Expresión sí, ventaja no. Ninguna prenda da bonus mecánico jamás. Si un día algo parece dar ventaja, es un aura, no ropa.
+Todo lo desbloqueado es permanente. No hay alquiler de moda ni piezas que caducan.
+El probador siempre muestra el personaje real en el mundo real: cero maniquíes abstractos.
+Las insignias no se venden ni se regalan: certifican relaciones. Son intransferibles por diseño (en P2P futuro tampoco se pueden tradear).
+El clásico siempre existe: el look original del prototipo es una opción disponible para siempre (homenaje y punto seguro).

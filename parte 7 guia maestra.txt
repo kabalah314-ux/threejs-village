@@ -1,0 +1,126 @@
+SECCIÓN 7 — MISIONES, TRABAJOS MAYORES Y ENCARGOS
+v1.0 · Catálogo completo de contenido por misiones: las 7 del Acto 1 (con gates), los 7 Trabajos Mayores del Acto 2 (nuevos, con desbloqueos sistémicos), la cadena del Despertar (recta final) y el sistema de encargos diarios. Todo sigue el patrón técnico existente (NPCS + estados 0/1/2 + UNLOCKS idempotentes).
+
+7.1 Filosofía
+En el prototipo, las misiones ERAN el juego. En la versión completa, las misiones son los hitos entre los que ocurre el juego. Su función cambia por acto:
+
+Acto 1: enseñar los verbos (explorar, hablar, generar, comerciar) y establecer tu nombre.
+Acto 2: convertir relaciones en infraestructura. Cada Trabajo Mayor deja un sistema económico permanente funcionando a tu favor.
+Recta final: darle al momento cumbre (el billete) la ceremonia que merece.
+Regla de diseño: ninguna misión se repite, ninguna misión es obligatoria para el billete salvo las del Acto 1 (que son el tutorial extendido), y toda misión deja el mundo mejor de como lo encontró. El juego nunca te encarga "mata 10 ratas": te encarga cambiarle la vida a alguien con nombre y cara.
+
+7.2 Los cinco tipos de contenido por misión
+Tipo	Frecuencia	Origen	Recompensa
+📜 Misión Principal	1 por NPC (7 total)	Confianza nivel 1–3	$TOKEN + desbloqueo sistémico + +30 confianza + Caja Regalo
+🏗️ Trabajo Mayor	1 por NPC (7 total)	Misión principal hecha + confianza 3	$TOKEN grande + sistema permanente nuevo
+📋 Encargo diario	1 por NPC por día	Confianza 2	$TOKEN pequeño + 2–5 confianza
+💼 Encargo premium	1 por NPC por día (alternativo)	Confianza 3	×3 volumen, ×3 recompensa + rumor de mercado
+⭐ Cadena especial	Única	Evento concreto	Narrativa (el Despertar)
+7.3 Las 7 Misiones Principales (Acto 1) — ficha de cambios
+No cambian: diálogos, recompensas (500/1.000/800/1.200/500/750/600), apps, código simulado, previews, desbloqueos (neón, tablón, tienda de mejoras, tienda secreta, granja, barco, memes).
+
+Cambian: ahora tienen puerta de confianza. Si no la cumples, el NPC dice su línea de "aún no" (Sección 2) y no aparece el botón de laptop.
+
+#	Misión	Gate	Vía rápida para el gate
+1	🐻 Web de la Panadería	Confianza 1	Encargo tutorial "véndeme 3 conchas" (10 min)
+2	🦔 Generador de Memes	Confianza 1	1–2 ventas o 1 regalo dulce
+3	🦎 Modelo Meteorológico	Confianza 2	~3 días de tratos/regalos
+4	🦫 Generador de Planos 3D	Confianza 2	Venderle materiales (troncos/piedra)
+5	🦤 Ruta Marítima	Confianza 2	Venderle pescado / comprarle la caña
+6	🐶 Gestor Legal	Confianza 3	Pagar tasas a tiempo (+1/día) + empleo municipal
+7	🐈‍⬛ Firewall Místico	Confianza 3	Venderle cristales/estrellas; es la más lenta a propósito
+Orden recomendado: 1→2→(3/4/5 en cualquier orden)→6→7. El diseño guía pero no fuerza: un jugador puede obsesionarse con Sombra desde el día 1 y hacer su misión cuarta.
+
+HUD: el contador MISIONES 0/7 se conserva para el Acto 1. Al completarlas todas, el panel pasa a mostrar ACTO 2: Trabajos Mayores 0/7 y el contador ✈️ pasa a ser el protagonista visual.
+
+7.4 Los 7 Trabajos Mayores (Acto 2) — contenido nuevo
+Requisitos comunes: misión principal del NPC completada + confianza nivel 3 (Socio). Se generan en la laptop como apps "de nivel empresarial" (mismo teatro, código más largo). Cada uno da: recompensa $TOKEN + +30 confianza + sistema permanente.
+
+🐻 1. OsoExpress — "La Franquicia del Horno"
+App: franquicia.html (pedidos recurrentes, rutas de reparto, club de clientes)
+Recompensa: 2.500 $T
+Sistema desbloqueado — Pedidos del Horno: cada día el Oso publica 1 pedido grande (ej: "4 Mermeladas + 2 Pasteles Dorados") con pago premium ×1.5 sobre el valor de tienda. Demanda estable y predecible de tu cadena de cocina. "¡La web trae más pedidos que horno tengo! ¡Necesito un proveedor oficial y eres tú!"
+🐶 2. Censo Digital — "El Formulario Definitivo"
+App: censo.html (registro de ciudadanos, estadísticas municipales, pozo de lotería en vivo)
+Recompensa: 3.000 $T
+Sistemas desbloqueados: ① el pozo de la lotería se muestra públicamente en el Tablón; ② título Ciudadano Ejemplar: −10% en la tasa de residencia para siempre; ③ panel de estadísticas del mundo (recursos recogidos, días vividos, ranking local). "¡Ejem! Por fin un censo sin un solo papel. Este ayuntamiento le concede el título de Ciudadano Ejemplar. Con su correspondiente descuento fisc— administrativo."
+🦫 3. El Puente del Horizonte — "La Gran Obra"
+App: granobra.html (planos colaborativos, gestión de materiales, fases de obra)
+Recompensa: 4.000 $T
+Sistema desbloqueado — Proyecto comunitario: durante 5 días oníricos puedes donar materiales a la obra (troncos, piedras, gemas). Al completarla se alza en la costa un puente-mirador que apunta al horizonte (monumento permanente animado). Perk: −15% en costes de construcción para siempre + tu nombre en una placa. "Llevo toda la vida queriendo construir algo que mire al horizonte. No me preguntes por qué. (Sabe por qué. No lo dice.)" — Es su arco completo: de escéptico a co-autor.
+🐈‍⬛ 4. El Oráculo de los Mercados — "La Bola Rentable"
+App: oraculo.html (predicción de tendencias, análisis de sentimiento onírico, runas de precisión)
+Recompensa: 5.000 $T
+Sistema desbloqueado — El Oráculo: una predicción gratuita al día (buzón): qué categoría subirá o bajará mañana en la feria. Las predicciones aciertan el ~70% (la incertidumbre es canon: "el azar también tiene derechos, soñador"). Es la herramienta de especulación definitiva. Lore: al entregarla, Sombra casi revela algo: "Curioso. La bola muestra tu futuro y solo veo… un escritorio. Debe estar estropeada. Mmm."
+🦎 5. El Climatizador Onírico — "¡¡METEOROLOGÍA APLICADA!!"
+App: climatizador.html (control de estaciones del sueño, sensores, alertas)
+Recompensa: 3.500 $T
+Sistema desbloqueado — Eventos meteorológicos: el mundo gana clima real con efectos de gameplay: 🌧️ Lluvia (cosechas y jardín ×2, pesca +tropical), ☀️ Ola de sol (saciedad baja +50% más rápido, el Oso vende más), ⛈️ Tormenta (mejor pesca del juego, Pez Dorado ×3 también de día), 🌠 Lluvia de estrellas (evento raro: 5–8 Fragmentos en una noche). El Climatizador avisa con 1 día de antelación. "¡¡AHORA SÍ!! ¡El clima obedece a la CIENCIA! (Susurro) bueno, al 98,7% de la ciencia."
+🦤 6. Rutas del Horizonte — "El Mercante de Ultramar"
+App: rutas.html (nuevas rutas, catálogo de importación, seguro de mercancías)
+Recompensa: 3.000 $T
+Sistema desbloqueado — Importaciones: el barco mercante ahora trae mercancía de fuera del sueño: 1 objeto exclusivo aleatorio por atraque (especias oníricas, telas imposibles, objetos de colección con alto valor de venta). La caja del muelle puede contenerlos. "Arrr… las nuevas rutas traen cosas que no existen en ningún mapa, grumete. Porque el mapa… bueno. Tú ya sabes del mapa."
+🦔 7. Agencia Viral — "El Algoritmo Domesticado"
+App: agencia.html (calendario de tendencias, analytics, campañas)
+Recompensa: 2.500 $T
+Sistema desbloqueado — Tendencia del Día: cada mañana, un objeto aleatorio entra en tendencia (icono 🔥 en inventario y tiendas): su precio de venta a NPCs y su probabilidad en escaparate se duplican durante ese día. "¡BRO! ¡Hemos hackeado el algoritmo! (Era solo una ruleta.) ¡NO DIGAS ESO, PIP!"
+Totales del Acto 2: 23.500 $T en recompensas + 7 sistemas permanentes que alimentan la curva compuesta de la Sección 4.9 (pedidos, oráculo, clima, importaciones, tendencias: todas son palancas de ingreso escalables).
+
+7.5 La Cadena del Despertar (recta final)
+Se activa automáticamente al comprar el Billete del Despertar. Tres pasos, sin fallo posible, diseñados como ceremonia:
+
+⭐ 1. "El vuelo necesita alas" (Sam)
+Objetivo: inspeccionar el avión con Sam + entregar 5× Gasolina Gasil.
+Sam revisa el avión de juguete contigo (escena en el puerto, cámara cinematográfica). "Motor de juguete: OK. Alas de juguete: OK. Piloto: tú, grumete. Esto va a funcionar o va a ser la mejor historia del puerto."
+Al entregar la gasolina: el avión queda "listo para despegar" (luces encendidas de noche, permanente).
+⭐ 2. "El Formulario 99-Z" (Reginald)
+Objetivo: solicitar el Permiso de Salida en el ayuntamiento.
+Humor burocrático final: el formulario requiere un día onírico de tramitación… o una "tasa exprés" de 1.000 $T. La decisión es trivial y a propósito: después de 40 millones, el jugador sonríe. "¡Ejem! El 99-Z. El formulario que ningún funcionario quiere firmar. (Lo firma sin mirar.) Listo. Tramitado. Y… ejem… ha sido un honor tramitarle, ciudadano."
+⭐ 3. "La última lectura" (Sombra)
+Objetivo: visitar a Sombra con el billete y el permiso.
+Ella lee las cartas por última vez. Es la única escena que prepara la decisión A/B: "Las cartas muestran dos caminos, soñador. En uno despiertas. En el otro… te quedas con nosotros. No, no preguntes cuál es correcto. Llevo siglos aquí y aún no lo sé."
+Se desbloquea la escena del puerto (Sección 2.10) → Final A / Final B.
+Regla: la cadena no puede fallar ni bloquearse. Si vendiste la gasolina, puedes volver a conseguirla (crates del mercante, tienda de Sam, Rocco). Es una ceremonia, no un examen.
+
+7.6 Sistema de Encargos Diarios (detalle)
+Disponibilidad: confianza 2 con ese NPC. Uno al día por NPC (hasta 7/día si mantienes relaciones con todos).
+
+Generación: rotación determinista por día onírico + saveId como semilla (patrón mulberry32 ya usado en pickups) sobre la tabla de la Sección 3.4. Mismo día = mismo encargo para ese jugador (no se puede rerollear recargando).
+
+Estructura de recompensa:
+
+text
+
+$TOKEN = 40–150 según dificultad del objeto pedido
+Confianza = 2–5 puntos (proporcional a la rareza)
+Encargos de mensajería (variante social): Sam y el Mayor a veces piden "lleva este paquete a X": objeto de misión (no vendible) que se entrega hablando con otro NPC. Bonus: +1 punto con ambos. Fomenta recorrer el mundo y cruzar relaciones.
+
+Premium (confianza 3): en el diálogo aparece como opción alternativa: ×3 cantidad pedida, ×3 $TOKEN, +8 confianza, +1 rumor (pista real de mercado para mañana).
+
+Anti-grind: los encargos no se acumulan (el de hoy caduca a medianoche), no se pueden repetir y el tope de comercio diario (Sección 3.3) limita la vía rápida. La constancia vale más que el maratón: exactamente el comportamiento que queremos premiar.
+
+Sin rachas en v1: se valoró un bonus por días consecutivos; se pospone a la Sección 10 (retención) para no inflar la economía de confianza antes del playtesting.
+
+7.7 Resumen de recompensas totales
+Bloque	$TOKEN	Confianza
+7 Misiones Principales	5.350	+30 c/u
+7 Trabajos Mayores	23.500	+30 c/u
+Encargos (vida del juego)	40–150/día/NPC	2–8/día/NPC
+Total misiones únicas	28.850	Suficiente para nivel 4 con constancia
+Coherente con la curva (Sec. 4.9): los ~29K de misiones te llevan al final del Acto 2a (~100K con comercio). El salto a millones lo dan los sistemas desbloqueados, no más misiones.
+
+7.8 Reglas de oro
+Toda misión usa el patrón existente: entrada en NPCS (o BIG_JOBS), estados 0/1/2 + generated, UNLOCKS idempotentes, recompensa vía Wallet, confianza vía Trust. Cero excepciones.
+Ningún desbloqueo sistémico depende de azar: el azar vive en el mercado y el botín; las misiones son promesas cumplidas.
+Las misiones nunca compiten con la economía, la alimentan: cada Trabajo Mayor crea demanda (pedidos), información (oráculo, tendencias) u oferta (importaciones, clima).
+Los textos de misión respetan las voces de la Sección 2. La laptop "genera" apps; los vecinos las viven.
+La recta final no se puede romper: sin permadeath de objetos de misión, sin caducidades, sin azar.
+7.9 Impacto técnico en el código actual
+Elemento	Cambio
+Datos	Nuevo array BIG_JOBS (mismo esquema que NPCS[].mission + requires: { mission, trustLevel: 3 } + unlockSystem)
+GS v3	+ bigJobs: { [id]: { status, generated, completedAt } } · encargos: { [npcId]: { id, day, done, premium } } · awakening: { step: 0–3, planeFueled: false, permit: false, permitDay: 0 }
+Laptop	El selector de proyectos lista: misión principal → trabajo mayor (si desbloqueado). Misma UI de generación
+HUD misiones	Pestañas: Principales (0/7) · Trabajos Mayores (0/7) · Encargos de hoy
+Encargos	Generador con mulberry32(dayCount + hash(saveId) + npcId); entrega por diálogo; caducidad en la liquidación diaria
+Sistemas de Trabajos Mayores	Pedidos del Horno (panel del Oso), Clima (nuevo WeatherSystem en el game loop + aviso en buzón), Tendencia del Día (multiplicador en shopSellPrice + flag en item), Importaciones (loot table nueva del crate), Oráculo (carta diaria), Puente (monumento con makeBuildable-style + contador de donaciones), Censo (perk −10% tasa + panel stats)
+Cadena del Despertar	startAwakening() al comprar dream_ticket; props del avión con luces; escena final (ya diseñada en 2.10)

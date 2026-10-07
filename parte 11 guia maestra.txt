@@ -1,0 +1,172 @@
+SECCIÓN 11 — ROADMAP DE IMPLEMENTACIÓN
+v1.0 · Plan de trabajo completo: de v0.1 a v1.0 (juego offline completo) y F1–F4 (online, resumen de la Sec. 9). Cada versión tiene objetivo, contenido, dependencias y criterio de terminado. Anexos A y B son vinculantes para todo el roadmap.
+
+11.1 Filosofía del roadmap
+Tres principios:
+
+Cada versión es un juego jugable. Al terminar cualquier hito, el juego arranca, se guarda, se carga y se puede jugar de principio a fin de lo que existe hasta ese momento. Si una funcionalidad no está terminada, no se publica a medias: se desactiva y entra en la siguiente versión.
+El guardado es sagrado desde la primera versión. La migración v2→v3 se construye en v0.1 y cada versión posterior solo añade campos con deepMerge (patrón ya existente). Ninguna versión borra ni reinterpreta datos del jugador.
+Primero los cimientos, luego el contenido, luego el brillo. Los sistemas (tiempo, confianza, economía) van antes que el contenido (misiones, objetos) y el contenido antes que el polish (eventos, museo). La tentación de empezar por lo vistoso es la causa de muerte nº 1 de los proyectos.
+11.2 Reglas globales de implementación (guardrails)
+Estas reglas aplican a todas las versiones y deben ir en todo prompt de implementación:
+
+Todo el progreso persistente vive en GS; nunca duplicar en state (que es solo ejecución).
+Todo el dinero pasa por Wallet; toda la confianza por Trust; todo objeto por Inventory. Sin excepciones.
+Todo efecto de desbloqueo es idempotente y se ejecuta en applyGameStateToWorld() al restaurar.
+Migraciones aditivas: campos nuevos con valores por defecto vía deepMerge(defaultGameState(), save). SAVE_VERSION sube a 3 en v0.1 y solo vuelve a subir si cambia el formato.
+Todo número de balance vive en CFG (precios, tasas, umbrales, topes). Nada de números mágicos en la lógica.
+Móvil y escritorio funcionan en cada versión (probar joystick, botón de acción y pinch-zoom).
+Lo simulado se etiqueta como simulado en la UI (Pilar P5): probabilidades de apuestas visibles, mercado "simulación", etc.
+Sin assets externos nuevos: todo con primitivas Three.js, CanvasTexture, Web Audio y el CSS/Fonts actuales.
+Un solo archivo index.html mientras el proyecto lo tolere (la modularización se evalúa en F1, no antes).
+Textos con las voces de la Sección 2; humor en tiendas, corazón en despedidas.
+11.3 El mapa de versiones (vista general)
+Versión	Nombre	Contenido principal	Depende de	Tamaño*
+v0.1	Fundamentos	GS v3, ciclo día/noche, hambre, liquidación diaria, HUD nuevo	—	M
+v0.2	Confianza	Trust, regalos, encargos, gates de misión, aura por reputación	v0.1	L
+v0.3	La Factura del Sueño	Alquiler, tasa, deuda, rescate, apuestas, lotería, redes de seguridad	v0.1, v0.2	L
+v0.4	Oficios	19 objetos nuevos, pesca, minería, estrellas, herramientas	v0.1, v0.3	L
+v0.5	Hogar	Panel de casa, buzón, dormir, cocina, escaparate, muebles, sello	v0.3, v0.4	L
+v0.6	El Sueño se Revela	Prólogo, revelación de Sombra, contador ✈️, Acto 1 completo	v0.2, v0.5	M
+v0.7	Quién Eres en el Sueño	Creador de avatar, armario, Boutique, insignias	v0.2	L
+v0.8	El Comerciante	7 Trabajos Mayores + sus sistemas (pedidos, clima, tendencias, oráculo, importaciones, puente, censo)	v0.2–v0.5	XL
+v0.9	El Despertar	Billete, cadena final, escena de despedida, finales A/B, NG+	v0.8	L
+v1.0	El Juego Completo	Sello semanal, logros, museo, eventos semanales, balance y polish	v0.9	L
+F1–F4	Online	Cuentas → economía segura + plaza → P2P → comunidad (Sec. 9)	v1.0	por fases
+* S/M/L/XL = tallas orientativas de esfuerzo relativo. La velocidad real depende del equipo (tú + asistencia IA); no prometo fechas porque sería inventarlas.
+
+11.4 Detalle por versión
+🔧 v0.1 — Fundamentos
+Objetivo: el tiempo y el cuerpo existen. Sin contenido nuevo visible aún: son los cimientos.
+
+SAVE_VERSION = 3 + migración aditiva (todos los campos nuevos de GS v3: needs, housing, debt, daily, trust, avatar, bigJobs, encargos, awakening, weekly, museum, cosmetics.auraV3…). Partidas v2 cargan sin pérdida; auras compradas migran a estilos (Sec. 3.8).
+Ciclo día/noche: sol rotando, cielo nocturno, estrellas visibles, farolas encendidas de noche.
+Hambre: barra 🍗, drenaje, debuffs <30, desmayo + rescate de Sombra (primera vez gratis).
+Liquidación diaria a medianoche onírica (hook central: aquí se enchufarán alquiler, tasas, escaparate, encargos).
+HUD: reloj + día, 🍗 saciedad, hueco del contador ✈️ (oculto hasta la revelación, v0.6).
+✅ Terminado cuando: una partida v2 carga migrada; pasan 2 días oníricos con resumen de liquidación; el hambre mata y Sombra rescata; las farolas se encienden de noche; móvil OK.
+🤝 v0.2 — Confianza
+Objetivo: las relaciones existen y se ven.
+
+Módulo Trust completo (Sec. 3): comercio con cap diario, regalos con preferencias y decaimiento, +30 por misión, gestos municipales, multiplicador de estatua.
+Refactor setAura(tier, style); tier derivado de Trust; perks de estilos activos.
+Gates de misión (0/1/2/3 por NPC) + líneas de "aún no" (Sec. 2) + saludos por nivel.
+Botón 🎁 Regalar en diálogos; panel de Relaciones en la mochila.
+Encargos diarios deterministas (mulberry32(día + saveId + npc)) con caducidad en liquidación.
+Precios de tienda modificados por confianza.
+✅ Terminado cuando: el encargo tutorial del Oso (3 conchas) sube a nivel 1 y desbloquea su misión; regalar un café a Glover da puntos; el aura crece con la media; las misiones bloqueadas muestran "aún no".
+🧾 v0.3 — La Factura del Sueño
+Objetivo: la economía muerde (con cariño).
+
+Alquiler por nivel con 5 días de gracia, deuda, avisos por buzón básico, escalera de impago (sin sello visual aún: eso llega en v0.5 con el panel de casa).
+Tasa de residencia 1% + resumen diario completo.
+Deuda Onírica con interés 3% + embargo de construcciones.
+Ruleta de Runas (probabilidad visible, avisos al 20%/50% de capital) + Dados de Sam.
+Lotería semanal real (boletos, pozo alimentado por tasas, sorteo domingo 20:00 — Anexo B).
+Redes: Pan del Pobre del Oso + Empleo Municipal.
+✅ Terminado cuando: un jugador puede arruinarse y recuperarse usando las redes; la tasa aparece en la liquidación; la lotería paga el domingo; la deuda crece y se puede saldar.
+🎣 v0.4 — Oficios
+Objetivo: el mundo da de comer (literalmente).
+
+Los 19 objetos nuevos (Sec. 5) + categorías ingredient/tool + erratas de saciedad (Anexo A.2).
+Herramientas con durabilidad (slots {id, qty, dur}, rotura, reparación DIY y de tienda).
+Pesca en orillas (tabla día/noche), minería en nodos, Fragmentos de Estrella nocturnos.
+Actualización de tiendas, loot tables y efectos de consumibles.
+✅ Terminado cuando: se puede vivir pescando y asando (cocina temporal simplificada hasta v0.5: cocinar en la hoguera del puerto, se mueve a casa en v0.5); la caña se rompe y se repara; de noche caen estrellas.
+🏠 v0.5 — Hogar
+Objetivo: la casa es el centro de operaciones (Sec. 6 completa).
+
+Panel "Mi Casa" con 6 pestañas + buzón con cartas (facturas, lotería, ventas, rumores, hitos).
+Dormir (avanzar día + buff Descansado).
+Cocina por lotes con timestamps (se migra la hoguera de v0.4 a la cocina de casa; requisito: alquiler al día).
+Escaparate (6/12 slots, probabilidad por precio, hucha, comisión 0%).
+Muebles con efectos (cama, cocina de hierro, estantería, caja fuerte, hucha, lava).
+Sello de runas visual al 3er día de deuda + desellado (primera gratis).
+✅ Terminado cuando: el loop diario completo funciona (buzón → cocina → encargos → escaparate → dormir → liquidación); el sello bloquea funciones y se levanta pagando.
+🌙 v0.6 — El Sueño se Revela
+Objetivo: la narrativa enchufa (Sec. 1).
+
+Prólogo: escritorio → fundido → hierba (overlay HTML pre-menú).
+Revelación de Sombra al primer acercamiento a su carpa → aparece el contador ✈️ n / 40.000.000 permanente.
+Acto 1 completo verificado de punta a punta: 7 misiones con gates, desbloqueos, celebraciones.
+✅ Terminado cuando: un jugador nuevo juega de prólogo a 7/7 misiones sin fricción y entiende el objetivo de los 40M en el minuto 5.
+🎨 v0.7 — Quién Eres en el Sueño
+Objetivo: el avatar (Sec. 8 completa).
+
+Refactor buildAvatar(cfg) conservando animaciones; config clásica como defecto en migración.
+Creador inicial tras el prólogo + probador con cámara + armario en casa.
+Boutique Viral (catálogo rotativo determinista) + insignias de confianza 4 con entrega y diálogo.
+✅ Terminado cuando: >100M de combinaciones posibles, cambio gratis en armario, las 7 insignias se ganan con Aliado y no se pueden comprar.
+💼 v0.8 — El Comerciante
+Objetivo: el Acto 2 existe (Sec. 7.4, la versión más grande).
+
+BIG_JOBS (7) con su teatro de laptop empresarial.
+Los 7 sistemas: Pedidos del Horno · Censo (título −10% tasa + stats) · Puente del Horizonte (donaciones + monumento + −15% construcción) · Oráculo (predicción diaria ~70%) · Climatizador (clima con efectos) · Rutas de Ultramar (importaciones) · Agencia Viral (tendencia del día).
+✅ Terminado cuando: los 7 sistemas alimentan la economía (la curva 4.9 se puede recorrer de 10K a millones); cada Trabajo Mayor deja algo permanente y visible.
+✈️ v0.9 — El Despertar
+Objetivo: el final existe (Sec. 7.5 + 2.10).
+
+dream_ticket (40M + confianza 4 Sombra) + requisito 5× gasolina.
+Cadena: alas de Sam → Formulario 99-Z → última lectura.
+Escena del puerto: reunión de NPCs, despedidas por nivel (cordial/profunda), decisión A/B con silencio de diseño.
+Final A (escritorio, código que compila, concha, créditos) + NG+ (×1.5, pijama, diálogos déjà vu).
+Final B (devolución, aura Soñador Eterno, post-juego: Mansión, Club de los 100M).
+✅ Terminado cuando: una partida completa 0 → billete → ambos finales funciona; la escena emociona (pruébala con alguien que no la conozca).
+🏆 v1.0 — El Juego Completo
+Objetivo: retención y brillo (Sec. 10).
+
+Sello Semanal (premios sin capital) + Logros (~30, listeners en Wallet/Inventory/Trust) + Museo del Sueño (pedestales + sets).
+Eventos semanales: Feria del Sábado, Noche de Estrellas del viernes, integración del sorteo.
+Pase de balance completo con playtesting: la curva 10K→40M en ~10h, gastos diarios, precios de la Sec. 5.12. Todo lo calibrable está en CFG para esto.
+Rendimiento (draw calls, móvil), textos finales, pulido de UI.
+✅ Terminado cuando: 3+ jugadores de prueba completan el juego sin guía externa; la curva se siente justa; cero bugs de guardado tras 30 días oníricos.
+11.5 Fases online (resumen; detalle en Sec. 9)
+Fase	Entregable clave	Puerta de entrada
+F1	Cuentas + vinculación + sync multi-dispositivo	v1.0 estable
+F2	Economía server-authoritative + plaza social	Antes de cualquier P2P
+F3	Tablón de Ofertas, trueque, visitas a sueños ⭐, escaparate real	F2 validada
+F4	Amigos, rankings, eventos comunitarios	F3 con comunidad activa
+11.6 Protocolo de pruebas de guardado (obligatorio en cada versión)
+Cargar una partida de la versión anterior → verificar que nada se pierde (dinero, misiones, inventario, construcciones, confianza).
+Jugar 10 minutos → recargar → verificar restauración completa.
+Exportar JSON → nueva partida → importar → verificar.
+Borrar localStorage → partida nueva → verificar defaults.
+En móvil: cerrar pestaña a mitad de acción → reabrir → estado coherente.
+11.7 Plantilla de prompt de implementación (para cualquier IA)
+text
+
+Contexto: Micro World: AI Village, index.html único (Three.js 0.160 + Tailwind CDN).
+Te paso: [código actual] + Guía Maestra secciones [X, Y] + Anexos [A/B].
+Tarea: implementar la versión [vX.Z] según la sección 11.4.
+Guardrails: GS única fuente de verdad · Wallet/Trust/Inventory como únicas vías ·
+migración aditiva con deepMerge · desbloqueos idempotentes · números en CFG ·
+móvil + escritorio · sin assets externos · lo simulado se etiqueta.
+Criterio de terminado: [el de la sección 11.4 de esa versión].
+No cambies nada fuera del alcance de esta versión.
+11.8 Qué NO hacer (anti-patrones)
+❌ Empezar por el online o por el avatar (lo vistoso) antes que los cimientos.
+❌ Cambiar un número de balance "en caliente" en la lógica en vez de en CFG.
+❌ Añadir un campo a GS sin valor por defecto en defaultGameState() (rompe deepMerge y las partidas viejas).
+❌ Publicar una versión con una funcionalidad "casi" lista activada.
+❌ Reescribir el proyecto a otro stack/framework antes de v1.0 (el single-file es una ventaja ahora mismo: cero build, despliegue instantáneo en Vercel).
+❌ Dar capital como premio de retención (regla de la Sec. 10).
+11.9 Parking lot (post-1.0, sin compromiso)
+Interior 3D de la casa (Fase 2 de la Sec. 6.9) · foto de avatar para memes (Sec. 8.7) · vehículos con gasolina · gremios oníricos · eventos de temporada ampliados · final secreto de NG+ · logros nuevos por temporada. Todo lo que surja en playtesting y no esté en la guía se apunta aquí y se evalúa contra los Pilares antes de aceptarse.
+
+🎓 ESTADO FINAL DE LA GUÍA MAESTRA
+Sección	Contenido	Estado
+0	Visión y pilares	🟢
+1	Narrativa, lore y actos	🟢
+2	Personajes y arcos	🟢
+3	Confianza, reputación y auras	🟢
+4	Economía, necesidades y riesgo	🟢
+5	Objetos y cadenas de valor	🟢
+6	Vivienda y alquiler	🟢
+7	Misiones, Trabajos Mayores y encargos	🟢
+8	Avatar y moda onírica	🟢
+9	Modo online	🟢
+10	Retención	🟢
+11	Roadmap de implementación	🟢 Lista para guardar
+Anexo A	Dos Capas del Sueño + erratas	🟢
+Anexo B	Errata lotería + rachas	🟢
+La Guía Maestra está completa. 🎉

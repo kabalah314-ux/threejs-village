@@ -1,0 +1,132 @@
+SECCIÓN 10 — RETENCIÓN: POR QUÉ VOLVER MAÑANA
+v1.0 · Todos los ganchos del juego, recopilados y cerrados: los ya sembrados en secciones anteriores + los nuevos (Sello Semanal, logros, Museo del Sueño, eventos, NG+). Incluye el calendario semanal completo y una errata sobre la lotería (Anexo B).
+
+10.1 Filosofía de retención
+La gente vuelve a un juego por tres motivos, y los tres están diseñados aquí:
+
+Compromiso: "tengo cosas en marcha que me esperan" (cocina en el horno, encargos del día, frutas maduras, ofertas activas en el tablón).
+Curiosidad: "¿qué pasará hoy?" (tendencia del día, clima de mañana, catálogo de la Boutique, el barco que llega).
+Comunidad: "me conocen" (los NPCs te saludan por tu nivel, tu aura te representa, tu escaparate tiene clientes, tu nombre está en el museo).
+Las cuatro reglas anti-FOMO (innegociables):
+
+Nada se rompe por ausencia. La confianza no decae, las construcciones no se degradan, las rachas no se "rompen" — como mucho, una semana termina y empieza otra.
+La ausencia tiene un coste pequeño y conocido (alquiler + tasa se devengan solo por días oníricos jugados, no por tiempo real fuera del juego). Si no juegas, el reloj onírico no avanza: no vuelves a una ruina.
+Los premios de constancia nunca son capital. Cajas, consumibles, cosméticos, títulos, confianza. El dinero se gana jugando a la economía, no por login. (Si el login diera dinero, la curva de los 40M sería mentira.)
+El jugador que vuelve tras semanas recibe bienvenida, no factura. El Oso tiene una línea especial: "¡Mira quién volvió! El horno siguió encendido, ¿eh?"
+10.2 El mapa de ganchos (inventario completo)
+Gancho	Frecuencia	Tipo	Origen
+Encargos diarios (hasta 7)	Diario onírico	Compromiso + confianza	Sec. 7.6
+Cosechas (frutas 5min, jardín diario)	Continuo	Compromiso	Sec. 5
+Respawn de pickups (3–10 min)	Continuo	Compromiso	Código actual
+Cocina por lotes en tiempo real	Continuo	Compromiso	Sec. 6.6
+Barco mercante (~62s) + importaciones	Continuo	Curiosidad	Sec. 7.4
+Tendencia del Día 🔥	Diario onírico	Curiosidad + economía	Sec. 7.4
+Clima de mañana (Climatizador)	Diario onírico	Curiosidad	Sec. 7.4
+El Oráculo (predicción ~70%)	Diario onírico	Curiosidad + especulación	Sec. 7.4
+Catálogo rotativo de la Boutique	Diario onírico	Curiosidad + moda	Sec. 8.4
+Liquidación diaria (resumen)	Diario onírico	Compromiso	Sec. 4.2
+Lotería del Sueño	Semanal real	Cita semanal	Sec. 4.7 + errata
+Sello Semanal 🆕	Semanal real	Compromiso	10.3
+Feria del Sábado 🆕	Semanal real	Comunidad + economía	10.6
+Noche de Estrellas (viernes) 🆕	Semanal real	Curiosidad + colección	10.6
+Logros 🆕	Permanentes	Progresión	10.4
+Museo del Sueño 🆕	Permanente	Colección + prestigio	10.5
+Eventos de temporada 🆕	~Mensual real	Comunidad	10.6
+Ranking de holders (tablón)	Continuo	Prestigio	Código actual
+NG+ 🆕	Post-Final A	Rejugabilidad	10.7
+10.3 El Sello Semanal (racha sin castigo)
+Mecánica: cada día real que entras y completas al menos 1 actividad económica (un encargo, una venta, una cosecha), sellas el día en tu Carta de la Semana (panel accesible desde el HUD: 7 casillas L→D).
+
+Sellos	Premio
+3	🎁 Caja Regalo + ☕ Café ×2
+5	🎁 Caja Regalo Dorada (loot mejorado) + fin de semana con +10% confianza
+7	🎁 Caja Regalo Dorada ×2 + 🏅 Título semanal "Vecino Ejemplar" + 1 pieza de moda aleatoria del pool base
+Por qué no es FOMO:
+
+Los sellos no se "rompen": simplemente la semana termina el domingo y el lunes hay carta nueva. No perdiste nada: ganaste lo que ganaste.
+El premio de 3 sellos es alcanzable por cualquier jugador casual; el de 7 es para el dedicado, y es cosmético/título, no ventaja.
+Nada de esto da capital directo (regla 3).
+Cierre del cabo dejado en Sec. 7.6: el "bonus de racha de encargos" queda absorbido por este sistema (el +10% de confianza del fin de semana). No hay bonus de racha separado por encargos.
+
+10.4 Logros
+Catálogo v1 (~30 logros). Recompensa estándar: título equipable (se muestra junto a tu nombre en la plaza online) + premio menor (caja, consumible, pieza). Nunca capital grande.
+
+Categoría	Ejemplos
+💰 Economía	"Primer millón" (capital 1M) · "Manos de seda" (100 ventas) · "Tiburón de la feria" (50 ofertas P2P aceptadas) · "Rescate evitado" (30 días sin desmayarte)
+🧑‍🤝‍🧑 Social	"Amigo del pueblo" (todos los vecinos ≥2) · "Corazón del sueño" (los 7 en Aliado — premio: aura legendaria asegurada + título dorado) · "Filántropo" (100 regalos dados)
+🎣 Oficios	"Pescador del Sueño" (los 3 peces + la bota 😄) · "Maestro pastelero" (100 lotes cocinados) · "Pico de plata" (10 gemas minadas)
+🏗️ Mundo	"Urbanista" (10 construcciones) · "El Puente" (completar la Gran Obra) · "Museo completo" (10.5)
+🎲 Riesgo	"El azar sonríe" (ganar la lotería) · "Jugador honrado" (dejar de apostar tras perder 3 seguidas — logro secreto, humor + guía sana)
+🌟 Historia	"El Despertar" (Final A) · "Soñador Eterno" (Final B) · "Déjà vu" (empezar NG+)
+Técnica: el campo GS.achievements ya existe vacío a propósito desde la v2 (lo vi en tu código): se rellena sin migración traumática. Los logros se evalúan con listeners en Wallet/Inventory/Trust (mismo patrón de hooks que SaveSystem.onBeforeSave).
+
+10.5 El Museo del Sueño 🏛️
+Qué es: una exposición de pedestales al aire libre, en los jardines del ayuntamiento (sin interior: pedestales con el objeto flotando y girando, patrón de frutas/pickups ya existente). Se desbloquea tras la misión del Mayor ("¡Ejem! Todo pueblo digitalizado merece un museo.").
+
+Mecánica: donas 1 unidad de cada pieza coleccionable. La donada se exhibe con una placa: "Donado por [tu nombre]". No se puede recuperar (es una donación: decisión con peso).
+
+Sets v1:
+
+Set	Piezas	Premio al completar
+🎣 Vida Marina	Pescado · Pez Tropical · Pez Dorado · Bota Vieja	Trofeo de pesca (mueble) + título
+💎 Tesoros	Perla · Cristal Místico · Gema en Bruto · Fragmento de Estrella	Trofeo mineral + título
+🍳 Alta Cocina Onírica	Pan · Mermelada · Pastel Dorado · Brasa	Trofeo de cocina + receta exclusiva futura
+🚢 Ultramar	4 importaciones del mercante	Trofeo náutico + Sam te cuenta el secreto del horizonte (lore)
+🎁 Curiosidades	Caja Regalo · Carga del Mercante · Boleto de lotería · Café del Mundo Real	Título "Coleccionista del Sueño"
+Por qué funciona: convierte objetos que ya tienen uso económico en decisiones (¿vendo la Gema por 150 o la dono al museo?), alimenta el sumidero de objetos, da prestigio visible y — online — tu museo es visitable junto a tu sueño.
+
+10.6 Eventos
+Semanales (tiempo real)
+Evento	Cuándo	Qué pasa
+🎪 Feria del Sábado	Sábados	Los NPCs montan puestos especiales en la aldea con ofertas únicas (−20% en algo, stock raro, el Oso vende Harina en oferta…). Online: puestos de jugadores en la plaza con +visibilidad
+🌠 Noche de Estrellas	Viernes noche (onírica)	Lluvia de estrellas garantizada (5–8 Fragmentos). Online: sincronizada en la plaza — todos la ven a la vez, momento comunitario
+🎫 Sorteo de la Lotería	Domingo 20:00 (real)	El pozo acumulado de la semana (tasas + boletos) se sortea en el Tablón. Ganador anunciado por buzón y, online, en la plaza
+De temporada (~mensual, calendario real)
+Evento	Inspiración	Contenido
+🌸 El Despertar de Primavera	Primavera	Flores ×2, ramos premium, moda floral
+🎃 La Noche del Velo	Halloween	Sombra protagonista: aura especial temporal, decoración púrpura, la ruleta paga ×1.2 (ella lo llama "noche de generosidad calculada")
+❄️ El Solsticio Soñado	Invierno	Nieve low-poly en el planeta, regalos entre NPCs y jugador, moda invernal
+🎉 El Aniversario del Sueño	Aniversario del juego	Doble tendencia, sorteo especial, título conmemorativo
+Regla de contenido de eventos: todo lo exclusivo de temporada es cosmético, título o experiencia — nunca ventaja económica ni FOMO de poder. Lo que no consigues este año vuelve el siguiente.
+
+10.7 Post-juego y NG+
+Tras el Final B (Quedarse)
+Modo post-juego con metas de lujo (ya sembradas en Sec. 1.6): Club de los 100M (título), Mansión Onírica (casa nivel 3, 5.000 $T/día de alquiler y orgullo infinito), museo completo, las 7 insignias, aura legendaria.
+
+Tras el Final A (Despertar): Nuevo Sueño+
+Al terminar los créditos: "Esa noche, te vuelves a quedar dormido frente al portátil…"
+
+Conservas: armario completo + insignias (como "recuerdos que te siguieron") + títulos + Pijama del Soñador (prenda exclusiva NG+).
+Reseteas: capital, misiones, confianza, construcciones (es un sueño nuevo).
+Multiplicador ×1.5 a todas las ganancias (el sueño "te reconoce": progresión más rápida, respetando la curva pero comprimiéndola).
+Diálogos déjà vu: los NPCs te reconocen vagamente (oro narrativo): el Oso dice "¿Nos conocemos? Me suenas… de un sueño." — y Sombra, sonriendo: "Ah. Has vuelto. Interesante. Nadie vuelve dos veces al mismo sueño… casi nadie."
+Semilla para contenido futuro: un final secreto adicional solo alcanzable en NG+ (se define cuando el juego base esté validado).
+10.8 El calendario semanal tipo (la vida del jugador)
+Día	Ganchos activos
+Lunes	Encargos + tendencia + Oráculo + pedido del Horno · Sello 1
+Martes	Encargos + tendencia + clima anunciado · Sello 2
+Miércoles	Encargos + tendencia + Boutique nueva · Sello 3 → 🎁
+Jueves	Encargos + tendencia + importación del barco · Sello 4
+Viernes	🌠 Noche de Estrellas · Sello 5 → 🎁 dorada + finde +10% confianza
+Sábado	🎪 Feria del Sábado (ofertas NPC / puestos online) · Sello 6
+Domingo	🎫 Sorteo de la Lotería 20:00 · Sello 7 → 🏅 · la semana cierra, mañana carta nueva
+Y en cada sesión, siempre: cocina en marcha, cosechas, respawns, escaparate vendiendo, ofertas del tablón, el contador ✈️ moviéndose.
+
+10.9 Métricas (para cuando haya online)
+Medir, con privacidad desde el diseño (agregado, anónimo): retención D1/D7/D30, duración de sesión, % de jugadores que llegan al Acto 2, % que compra el billete, fuentes de ingreso dominantes (para detectar desequilibrios de la curva). Sin métricas, el balanceo es adivinación; con métricas invasivas, traicionamos el Pilar P5. Equilibrio.
+
+10.10 Impacto técnico en el código actual
+Elemento	Cambio
+GS v3	achievements (ya reservado ✅) · + weekly: { seals: [bool×7], weekStart } · + museum: { donated: [] } · + ngplus: { count, multiplier }
+Nuevos módulos	Achievements (listeners en Wallet/Inventory/Trust) · WeeklySeal (sello al primera actividad económica del día real) · Museum (pedestales + donación) · Events (calendario real → flags oníricos)
+Lotería	ERRATA (Anexo B): sorteo semanal real (domingo 20:00), no cada 7 días oníricos. El pozo se acumula con tasas + boletos durante la semana
+HUD	Icono de Carta de la Semana · badges de logro (toast "🏆 Logro desbloqueado")
+Museo	Pedestales exteriores en SITES.townhall (patrón addProp), objetos flotantes con la rotación tipo fruta, placas con textTexture
+Eventos	Events modifica: spawn de estrellas (viernes), ofertas de tiendas (sábado), nieve/decoración (temporada) — todo como flags que leen los sistemas existentes
+10.11 Reglas de oro de la retención
+Premiar volver, jamás castigar faltar.
+Los premios de constancia nunca son capital (la economía se gana en la economía).
+El reloj onírico solo avanza jugando: nadie vuelve a una ruina tras dos semanas fuera.
+Toda cita semanal tiene versión offline (feria, estrellas, sorteo): el jugador sin cuenta también vive el calendario.
+Los eventos son cosméticos y experiencias, no ventajas ni FOMO de poder.
+Medir para equilibrar, con privacidad — nunca para exprimir.

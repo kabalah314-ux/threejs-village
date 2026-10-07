@@ -1,0 +1,144 @@
+SECCIÓN 3 — CONFIANZA, REPUTACIÓN Y AURAS
+v1.0 · Sistema de doble capa: confianza individual por NPC (que desbloquea contenido) + Nivel de Aura global (que lo muestra al mundo). Todo lo que la alimenta ya está sembrado en las Secciones 4 y 5.
+
+3.1 Filosofía
+En el mundo despierto, el dinero abre puertas. En el sueño, la confianza abre puertas y el dinero paga las facturas. Son dos progresiones paralelas y deliberadamente independientes:
+
+Puedes ser rico y desconocido (no te venderán el billete, ni los encargos premium, ni los mejores precios).
+Puedes ser querido y pobre (te regalarán pan, te darán trabajo, te venderán barato… pero el avión cuesta 40 millones).
+El jugador ganador cultiva ambas. Esta dualidad es la que diferencia al juego de un simple "grindea y paga".
+
+Tres reglas de diseño:
+
+La confianza nunca baja. No hay decaimiento ni castigo por inactividad. Lo que un vecino siente por ti es permanente. (El jugador casual no debe tener miedo a volver tras una semana.)
+La confianza se gana dando, no recibiendo. Comerciar con ellos, regalarles, trabajar para ellos. El juego premia la generosidad y la constancia, no el acaparamiento.
+La confianza es visible. En sus diálogos, en sus precios, y — a través del aura — en tu propio cuerpo dentro del mundo.
+3.2 Los cinco niveles de confianza
+Cada NPC guarda points (0 → ∞) que se traducen en nivel:
+
+Nivel	Nombre	Puntos	Qué significa
+0	🤍 Desconocido	0	Te trata con cortesía. Precios estándar. No te encargaría nada importante
+1	💛 Conocido	10	Te saluda por tu nombre. Te encarga su misión principal
+2	🧡 Amigo	30	Mejores precios (+5% venta / −5% compra). Encargos diarios
+3	❤️ Socio	70	Precios de socio (+10%/−10%). Encargos premium, te cuenta rumores (pistas de mercado)
+4	💜 Aliado	150	Precios máximos (+15%/−15%). Te confía secretos, regalos ocasionales y — en el caso de Sombra — el billete
+Los umbrales (10/30/70/150) están en CFG.trustThresholds y son calibrables. La distancia entre niveles crece exponencialmente: llegar a Conocido cuesta minutos; llegar a Aliado cuesta días de relación.
+
+3.3 Fuentes de confianza (fórmulas exactas)
+💱 Comercio — la fuente principal
+Operar en la tienda de un NPC (comprarle o venderle):
+
+text
+
+puntos = 1 por operación + 1 extra por cada 100 $T de valor de la operación
+Tope: 5 puntos/día/NPC por comercio
+El tope diario evita el exploit "compro y vendo la misma piedra 200 veces" y empuja a repartir la vida social entre varios vecinos. En endgame, con volúmenes de miles de $T, el tope se alcanza rápido: la confianza alta exige constancia, no solo capital.
+
+Excepción Rocco: con él TODO es comercio (no acepta regalos ni tiene misión). Su tope es 8 puntos/día y su "nivel" da descuentos progresivos. No cuenta para el Aura (ver 3.6): él es neutral mercantil, no "el pueblo".
+
+🎁 Regalos — el acelerador
+Cualquier objeto del inventario puede regalarse desde el diálogo del NPC (botón 🎁). Puntos según la tabla de preferencias de la Sección 5.8 (ej: Sombra +15 por una Estrella, Glover +8 por un Café).
+
+text
+
+Tope: 3 regalos/NPC/día, con rendimiento decreciente: 100% / 50% / 25%
+El decreciente hace que el spam de regalos caros sea ineficiente: mejor 1 regalo bueno al día que 3 de golpe. Regalar algo que el NPC detesta da +0 y una línea de diálogo ("¿...qué hago yo con esto?").
+
+💻 Misiones — el salto
+Completar la misión principal de un NPC: +30 puntos (garantiza mínimo +1 nivel completo, y acerca al siguiente). Es la única fuente instantánea grande: la ficción lo justifica — le has cambiado la vida a ese vecino.
+
+📋 Encargos diarios — el sustento
+Desde nivel 2, cada NPC ofrece 1 encargo al día (ver 3.4): entregas de objetos o mini-tareas. Recompensa doble: $TOKEN + puntos de confianza (2–5 según dificultad). Es la vía principal de crecimiento a largo plazo y el motivo de "entrar un rato cada día".
+
+🏛️ Gestos institucionales (casos especiales)
+Pagar la tasa de residencia a tiempo: +1 punto/día con el Mayor. ("Un contribuyente ejemplar. ¡Ejem!")
+Empleo municipal: +2 puntos con el Mayor por trabajo completado.
+Estatua $TOKEN construida: +5% a TODOS los puntos de confianza ganados (multiplicador final, redondeado hacia arriba). El monumento a tu leyenda trabaja por ti.
+🚫 Lo que NO da confianza
+Apostar en la ruleta o los dados (Sombra respeta tu dinero, no tu ludopatía).
+Comprar en tiendas "neutras" no vinculadas (el mercado del barco).
+Completar misiones de OTROS vecinos (a Dax le da igual lo que hiciste por el Oso... aunque el Aura sí lo refleja).
+3.4 Encargos diarios por NPC
+NPC	Encargos rotativos (1/día, desde nivel 2)	Puntos
+🐻 Oso	"Tráeme 2 Frutas Doradas" · "2 Harina para el horno" · "1 Mermelada (quiero probar la competencia)"	3–4
+🦔 Erizos	"Crea 1 meme en el estudio" · "Tráe 1 Tarta de Fresa" · "1 Café, bro, que no dormimos"	2–3
+🦎 Dax	"¡1 Pescado! ¡Para ciencia!" · "3 Frutas Doradas para el experimento" · "1 Gema en Bruto (no preguntes)"	3–5
+🦫 Glover	"3 Troncos para la obra" · "2 Piedras" · "Repara algo hoy (usa tu pico 3 veces)"	3–4
+🦤 Sam	"1 Pez Tropical para la cena" · "1 Gasolina para… mi lancha" · "Llévale este paquete a Sombra"	3–4
+🐶 Mayor	"Recoge 5 recursos para el municipio" · "Paga tu tasa 3 días seguidos" · "1 documento sellado (misión de mensajería)"	2–4
+🐈‍⬛ Sombra	"1 Fragmento de Estrella. No preguntes para qué" · "1 Cristal Místico" · "1 Perla… para la bola"	4–5
+Encargos premium (nivel 3+): versiones de mayor volumen con recompensa multiplicada y pistas exclusivas ("mañana el Oso pagará el doble por la mermelada" — gancho para la especulación del Tablón).
+
+El encargo 0 del tutorial: el Oso tiene un encargo especial disponible desde nivel 0: "véndeme 3 conchas". Es la primera interacción económica del juego y enseña, en 2 minutos, el ciclo completo: explorar → recolectar → vender → confianza +1 nivel → misión desbloqueada.
+
+3.5 Gates de misión y contenido por nivel
+Contenido	Nivel requerido	Con quién
+Misión del Oso	1	🐻 (vía encargo tutorial)
+Misión de los Erizos	1	🦔
+Misión de Dax	2	🦎
+Misión de Glover	2	🦫
+Misión de Sam	2	🦤
+Misión del Mayor	3	🐶
+Misión de Sombra	3	🐈‍⬛ ("no confío en las máquinas… ni en la gente. Convénceme.")
+Encargos diarios	2	El propio NPC
+Encargos premium + rumores	3	El propio NPC
+Billete del Despertar	4	🐈‍⬛ Sombra
+Caridad del Oso (pan diario)	1	🐻
+Cómo se siente en juego: si hablas con un NPC sin el nivel suficiente, no te rechaza en frío: tiene una línea de "aún no" coherente con su personalidad y te orienta ("Cómprame algo de vez en cuando y hablamos, soñador"). El jugador siempre sabe qué hacer para avanzar.
+
+3.6 El Aura: reputación hecha luz
+Capa 1 — el NIVEL (lo ganas)
+El Nivel de Aura es la media de tus niveles de confianza con los 7 vecinos de misión (Rocco no cuenta). No se compra, no se regala: se deriva. Trust.auraTier() lo calcula en tiempo real.
+
+Tier	Nombre visual	Requisito (media)	Aspecto
+0	Sin aura	< 1	Nada
+1	Chispa	≥ 1	6 partículas pequeñas, sin luz
+2	Llama	≥ 2	10 partículas, luz tenue
+3	Radiante	≥ 3	14 partículas, luz clara, estela al caminar
+4	Legendaria	≥ 3.5	18 partículas, luz intensa, estela + destellos
+Una media de 3.5 exige prácticamente a todo el pueblo en Aliado: el aura legendaria es el certificado visible de "este jugador lo ha dado todo por el sueño".
+
+Capa 2 — el ESTILO (lo eliges)
+El estilo define color y perk pasivo. Se desbloquean por compra o logro, y se equipan libremente (solo uno activo). El tier manda el tamaño; el estilo manda el color y el bonus.
+
+Estilo	Color	Perk pasivo	Desbloqueo
+🔥 Fuego	naranja	+5% al vender a NPCs	300 $T (Sombra)
+❄️ Hielo	cian	−10% cooldowns de recursos	300 $T (Sombra)
+🌌 Vacío	violeta	+15% rarezas en cajas y botín	500 $T (Sombra)
+✨ Dorada	dorado	+5% en todo comercio	900 $T (Sombra)
+🌟 Soñador Eterno	arcoíris	+10% confianza y comercio	Solo Final B (intransferible)
+Los perks son pequeños a propósito (5–15%): son carácter, no poder. La diferencia real la hace el nivel, que no se compra.
+
+3.7 Visibilidad online (diseño anticipado)
+Cuando exista el modo online, el aura es tu currículum ambulante:
+
+Otros jugadores ven tu tier de aura (tamaño/brillo) y tu estilo (color) sin abrir ningún menú.
+Al interactuar contigo: tu nombre, tier de aura y estilo. Nunca tu dinero ni tu inventario (eso se negocia hablando).
+En el trueque P2P, el aura es la señal de confianza: un Radiante que estafa tiene mucho que perder socialmente; un Sin-Aura tendrá que construir reputación trato a trato.
+Regla de privacidad: el aura muestra reputación, jamás riqueza. El juego no expone tu capital a otros jugadores.
+3.8 Migración de auras compradas (partidas v2)
+Nadie pierde lo comprado. Migración automática v2→v3:
+
+text
+
+GS.cosmetics.aura (v2: 'none'|'fire'|'ice'|'void'|'gold')
+  → GS.cosmetics.auraV3 = { style: <la que tenías equipada>, unlockedStyles: [todas las compradas] }
+Si compraste Fuego: lo conservas desbloqueado y además ahora tiene perk (+5% venta). Antes era cosmético puro → estrictamente mejor.
+El tier se calcula desde GS.trust (que empieza en 0 para todos los NPCs en la migración... con una excepción de cortesía: las misiones ya completadas en v2 otorgan sus +30 puntos retroactivos en la migración, porque esas relaciones ya ocurrieron en la ficción). Un jugador con las 7 misiones hechas migra con todos los vecinos en nivel 1–2 mínimo.
+3.9 Impacto técnico en el código actual
+Elemento	Cambio
+CFG	+ trustThresholds: [10, 30, 70, 150], tradePointsCapPerDay: 5, giftCapPerDay: 3, giftDecay: [1, 0.5, 0.25], statueTrustBonus: 0.05
+GS (v3)	+ trust: { [npcId]: { points, tradeToday, tradeDay, giftsToday, giftDay } } · cosmetics.auraV3: { style, unlockedStyles[] } · encargos: { [npcId]: { id, done, day } }
+Nuevo módulo Trust	Trust.add(npcId, points, reason) · Trust.level(npcId) · Trust.priceMult(npcId, mode) · Trust.auraTier() · mismo patrón que Wallet (única vía de tocar confianza)
+setAura(id)	Refactor → setAura(tier, style): tier derivado de Trust (recalcula en cada Trust.add), style desde auraV3.style. Partículas/estela escalan por tier
+startDialog	Rama nueva: si nivel < requerido para su misión → línea "aún no" + pista. Botón 🎁 Regalar. Saludo variable por nivel. Encargo diario disponible desde nivel 2
+shopBuy/shopSell	Multiplicadores de precio por nivel de confianza; llamada a Trust.add por operación (con cap diario)
+completeMission	+ Trust.add(npcId, 30, 'mission')
+HUD	Icono de nivel junto al nombre en diálogos (💛🧡❤️💜) · panel de Relaciones nuevo (lista de NPCs, nivel, barra de progreso al siguiente) accesible desde la mochila
+Estatua	Su efecto se aplica como multiplicador en Trust.add
+3.10 Reglas de oro del sistema
+Todo punto de confianza pasa por Trust.add, igual que todo dinero pasa por Wallet. Sin excepciones.
+Ningún contenido se bloquea SOLO por confianza durante demasiado tiempo: el encargo tutorial garantiza que el primer nivel se alcanza en minutos; los niveles altos tardan días porque su recompensa (precios, premium, billete) es de largo plazo.
+La ficción siempre justifica la mecánica: los NPCs comentan tu progreso ("¡mi cliente favorito!"), nunca muestran números fríos en los diálogos (los números viven en el panel de Relaciones).
+Confianza y dinero nunca se canjean directamente: no se pueden comprar puntos con $TOKEN. Puedes comprar un regalo, pero el gesto de regalarlo es tuyo.
+El aura nunca miente: representa exactamente tu reputación. Ni potenciadores temporales ni auras falsas.

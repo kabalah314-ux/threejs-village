@@ -1,0 +1,138 @@
+SECCIÓN 5 — CATÁLOGO DE OBJETOS, CADENAS DE VALOR Y ACTIVIDADES
+v1.0 · Catálogo completo: 12 objetos actuales replanteados + 19 nuevos. Todo objeto tiene utilidad ligada a un objetivo del juego. Incluye errata de balance sobre la Sección 4.
+
+5.1 Filosofía del catálogo
+Nada está muerto. Si un objeto no tiene uso, es un bug de diseño. (gasil_fuel era el único objeto muerto del prototipo: se corrige en 5.4.)
+Las cadenas de valor enseñan el juego. Crudo → procesado → premium. El jugador que transforma gana más que el que vende crudo. Esta es la lección que escala hasta los negocios del Acto 2.
+Precios orientativos, no verdades. sell es lo que paga un NPC (≈50–60% del "valor real" percibido). buy es lo que cobra un NPC. Entre jugadores (Tablón de Ofertas), el precio es libre: la referencia sirve para negociar, no para fijar.
+Retrocompatibilidad total. Los 12 items actuales conservan ID y funciones previas; solo ganan nuevas. Migración v2→v3 sin pérdidas.
+5.2 Categorías (se añaden 2)
+Categoría	Icono	Contenido
+resource	🌾	Recursos recolectables (concha, fruta, pescados)
+ingredient 🆕	🥕	Ingredientes de cocina (harina, grano)
+tool 🆕	🧰	Herramientas con durabilidad (caña, pico)
+valuable	💎	Objetos valiosos (perla, cristal, gema, estrella)
+consumable	🍹	Comida y bebida (efectos + saciedad)
+material	🔧	Materiales de construcción (tronco, piedra)
+cosmetic	🎨	Cosméticos
+special	🎁	Especiales (cajas, tickets, billete)
+5.3 El mapa de cadenas de valor
+text
+
+🌾 Grano (Jardín, 2/día) ──Molino──> 🥕 Harina ──┬──> 🍞 Pan del Sueño (saciedad 50)
+                                                 └──> 🥮 Pastel Dorado (+ 🍯) → venta 300 / regalo top
+
+🍋 Fruta Dorada ×2 (granja Dax) ──Cocina──> 🍯 Mermelada (venta 150 vs 100 crudo)
+
+🎣 Pescar (caña + orilla) → 🐟/🐠/🐡 ──┬──> vender crudo
+                                       └──> 🍢 Pescado a la Brasa (saciedad 35)
+
+⛏️ Minar (pico + nodos montaña) → 🪨 ×2-3 + 💎 Gema en Bruto (8%)
+
+🌙 Noche → ⭐ Fragmento de Estrella (1-3/noche, Sombra paga premium)
+
+💐 Jardín → Flores → 💐 Ramo (regalo universal de confianza)
+5.4 Los 12 objetos actuales — replanteo
+ID	Icono	Cambio
+golden_fruit	🍋	Sin cambio de precio (sell 50). Gana: ingrediente de Mermelada; regalo preferido de Dax y el Oso
+seashell	🐚	Sin cambio (sell 8, 15%→perla). Regalo menor universal
+wood_log	🪵	Sin cambio. Gana: reparar herramientas (DIY)
+stone	🪨	Sin cambio. Gana: producto de minería con pico (rendimiento ×2-3)
+pearl	🦪	Sin cambio (sell 90). Gana: regalo preferido de Mayor y Sombra
+mystic_crystal	🔮	Sin cambio. Gana: Sombra lo acepta como moneda para desbloquear estilos de aura; regalo preferido de Sombra
+croissant	🥐	Errata de saciedad: 20 → 10 (es un dulce, no una comida). Mantiene buff velocidad +30%/20s
+cupcake	🧁	Errata: 25 → 12. Mantiene buff +30%/30s
+strawberry_cake	🍰	Errata: 45 → 25. Mantiene buff +50%/45s + confeti
+gasil_fuel	⛽	OBJETO RESCATADO. Nuevos usos: ① el avión final necesita 5 unidades para despegar ("el avión de juguete no vuela a sueños, grumete") — ver 5.10; ② Sam lo compra con bonus ×1.5; ③ reserva para vehículos futuros (etiquetado honesto)
+gift_box	🎁	Sin cambio. Loot table ampliada (puede incluir ☕ Café o 💐 Ramo)
+merchant_crate	📦	Sin cambio. Sigue siendo fuente clave de gasil_fuel para el requisito del avión
+5.5 Objetos nuevos — ingredientes y cadena del pan
+ID	Nombre	Icono	Cat	Rareza	Sell	Buy	Origen	Utilidad
+dream_wheat	Grano Onírico	🌾	ingredient	common	3	6	Cosecha del Jardín (2/día); Rocco vende	Se muele en el Molino (×2 → 1 Harina, 30s)
+flour	Harina	🥕	ingredient	common	5	8	Molino; la vende el Oso	Ingrediente de Pan y Pastel
+dream_bread	Pan del Sueño	🍞	consumable	common	8	—	Cocina: 2 Harina	Saciedad 50 (~0,32 $T/punto: la comida eficiente)
+golden_jam	Mermelada Dorada	🍯	consumable	uncommon	150	—	Cocina: 2 Fruta Dorada	Venta premium (+50% sobre crudo); regalo de confianza alto; ingrediente del Pastel
+golden_cake	Pastel Dorado	🥮	consumable	rare	300	—	Cocina: 1 Harina + 1 Mermelada	Saciedad 80 + buff +50% vel./60s; regalo top; producto de lujo
+poor_bread	Pan del Pobre	🥖	special	common	0 (no vendible)	—	Caridad del Oso (1/día si capital < 50 $T)	Saciedad 30. No vendible (anti-exploit): es dignidad, no mercancía
+Lección económica: comer comprando dulces cuesta ~0,4 $T/punto de saciedad; cocinar pan cuesta ~0,32; pescar y asar, casi gratis (cuesta tiempo y durabilidad). Tres estrategias válidas según tu momento de partida.
+
+5.6 Objetos nuevos — pesca y minería
+ID	Nombre	Icono	Cat	Rareza	Sell	Origen
+fish	Pescado	🐟	resource	common	15	Pesca: 65%
+tropical_fish	Pez Tropical	🐠	resource	uncommon	40	Pesca: 25%
+golden_fish	Pez Dorado	🐡	resource	rare	150	Pesca: 5% (×3 probabilidad de noche)
+old_boot	Bota Vieja	🥾	resource	common	1	Pesca: 5%. Objeto-chiste; Sam la acepta como regalo (+1: "arrr, un clásico")
+grilled_fish	Pescado a la Brasa	🍢	consumable	common	12	Cocina: 1 Pescado → saciedad 35
+raw_gem	Gema en Bruto	💎	valuable	epic	150	Minería: 8% por nodo
+star_shard	Fragmento de Estrella	⭐	valuable	epic	200	Cae del cielo de noche (1–3 por noche, brilla y suena al caer); Sombra paga ×1.3
+Pesca (requiere caña): interactuar en cualquier orilla → espera 2–4s → captura según tabla. Zonas con más profundidad (lejos de playa) mejoran la tabla. De noche, mejor botín: incentivo para jugar con el ciclo día/noche.
+
+Minería (requiere pico): 4 nodos fijos en las zonas altas (respawn 10 min). Cada nodo: 2–3 Piedra + 8% Gema.
+
+5.7 Objetos nuevos — herramientas (con durabilidad)
+ID	Nombre	Icono	Cat	Sell	Buy	Durabilidad	Reparación
+fishing_rod	Caña de Soñador	🎣	tool	60	150 (Sam)	20 usos	Sam: 40 $T · DIY: 2 Troncos
+pickaxe	Pico de Glover	⛏️	tool	80	200 (Glover)	30 usos	Glover: 60 $T · DIY: 1 Tronco + 1 Piedra
+Reglas de herramientas:
+
+stack: 1 — no se apilan. Cada slot de herramienta lleva campo dur (durabilidad restante).
+Al llegar a 0 no desaparece: queda rota (icono desaturado) hasta repararla. Reparar DIY consume materiales y se hace desde el inventario.
+Vender una herramienta usada paga sell × (dur/máx). En el Tablón P2P, la durabilidad se muestra en la oferta.
+"Las herramientas se rompen, los oficios no." — Glover.
+5.8 Objetos nuevos — confianza y vida social
+ID	Nombre	Icono	Cat	Sell	Origen	Utilidad
+flower_bouquet	Ramo de Flores	💐	special	10	Jardín (1/día)	Regalo universal: +confianza pequeña con cualquier NPC
+coffee	Café del Mundo Real	☕	consumable	10	Sombra lo vende (25 $T): "lo encontré flotando junto a un escritorio"	La laptop "genera" ×2 más rápido durante 5 min + pausa el hambre 5 min. Objeto-puente con la narrativa del sueño
+Tabla de preferencias de regalo (puntos de confianza; tope 3 regalos/NPC/día, con rendimiento decreciente 100%/50%/25% — detalle completo en Sección 3):
+
+NPC	Regalos preferidos
+🐻 Oso	🍯 Mermelada +8 · 🍋 Fruta +3 · 🥮 Pastel +12
+🐶 Mayor	🦪 Perla +10 · ☕ Café +6 · 🥮 Pastel +8
+🦫 Glover	☕ Café +8 ("72 horas dibujando…") · 🪵 Tronco +2 · 🪨 Piedra +2
+🐈‍⬛ Sombra	⭐ Estrella +15 · 🔮 Cristal +12 · 🦪 Perla +6
+🦎 Dax	🍋 Fruta +5 · 🐟 Pescado +4 · ☕ Café +7
+🦤 Sam	🐠 Tropical +10 · ⛽ Gasolina +8 · 🐟 Pescado +6
+🦔 Erizos	🍰 Tarta +6 · 🧁 Cupcake +4 · ☕ Café +5
+🦝 Rocco	No acepta regalos: con él la confianza es volumen de comercio
+5.9 Objeto nuevo — ticket de lotería
+ID	Nombre	Icono	Cat	Sell	Buy
+lottery_ticket	Boleto de la Lotería del Sueño	🎫	special	0	50 (Ayuntamiento, máx. 10/día)
+Cada boleto guarda un número (0–999) en su slot. El sorteo es cada 7 días oníricos, anunciado en el Tablón Holográfico.
+El pozo = acumulado de tasas de residencia + venta de boletos. Premio cap: 5% del objetivo (2M $T).
+Ganar muestra confeti global y tu nombre en el tablón: "¡El soñador X se ha llevado el pozo!"
+5.10 Objeto final — EL BILLETE
+ID	Nombre	Icono	Cat	Rareza	Precio
+dream_ticket	Billete del Despertar	🎟️	special	legendary	40.000.000 $TOKEN
+Se compra a Madame Sombra. Requisitos: 40M + confianza nivel 4 (Aliada) con ella.
+stack: 1, no vendible, no regalable, no se puede perder. Al comprarlo aparece como objeto permanente destacado en la mochila: ya tienes la salida… la pregunta es cuándo la usas.
+Requisito adicional de embarque (enmienda menor a Sección 1.6): el avión de Sam necesita 5× Gasolina Gasil. Sombra te avisa al comprar: "El billete es mío; el combustible es cosa del pelícano." Última mini-búsqueda que da sentido a gasil_fuel, al barco mercante (crates con gasolina) y al comercio con Sam.
+Presentar billete + combustible a Sam → escena de despedida → decisión final (Finales A/B).
+5.11 Construcciones con función económica
+Construcción	Función nueva
+🌷 Jardín	Produce 2 Grano + 1 Ramo al día (cosecha con E). Deja de ser decoración: es la base de la cadena del pan
+🌬️ Molino	Estación de procesado: 2 Grano → 1 Harina (30s/lote). Su unlock (casa nivel 1) cobra sentido económico
+⛲ Fuente	Deseo diario: lanzas 1 $T y recibes 1–10 $T (esperanza neutra, teatro bonito; sonido de moneda garantizado)
+🪙 Estatua	+5% a toda ganancia de confianza (monumento a tu leyenda)
+🏮 Farola	Se enciende de noche (ya existía la luz; ahora la noche existe)
+🪑 Banco / 🌳 Árbol / 🚩 Bandera	Prestigio puro. Está bien que algunas cosas solo sean bonitas: es un sueño
+5.12 Reglas de precios (referencia para todo el catálogo)
+Procesado > crudo, siempre: si transformar no paga, nadie transforma. (Mermelada 150 > 2×50; Pastel 300 > coste 158; Harina 8 > 2×3 de grano + tiempo de molino.)
+El NPC compra barato y vende caro: margen del ~40% entre sell y buy. El jugador vive de ese spread… o lo evita comerciando con jugadores.
+Nada vendible tiene sell 0 salvo objetos de dignidad o de misión (poor_bread, gift_box, lottery_ticket, dream_ticket): lo que puede venderse, puede perderse.
+Todo precio es calibrable en CFG tras playtesting: los valores de esta sección son v1.0, no dogma.
+5.13 Impacto técnico en el código actual
+Elemento	Cambio
+CATEGORIES	+ ingredient 🥕, + tool 🧰
+ITEMS	12 entradas se editan (solo ganan campos/usos) + 19 nuevas entradas con el mismo defItem()
+Slot de inventario	Extensión: { id, qty, dur? } para herramientas y boletos (num? para el número de lotería). deepMerge y migración los añaden sin romper pilas existentes
+ITEM_EFFECTS	+ satiety en consumibles existentes; + efectos nuevos (café, pan, pastel, brasa, estrella no usable, etc.)
+LOOT	gift_box += coffee, flower_bouquet · merchant_crate mantiene gasil_fuel (ahora con uso real)
+SHOPS	Oso += flour · Sam += fishing_rod, bonus gasil_fuel ×1.5 · Glover += pickaxe · Sombra += coffee, bonus star_shard ×1.3 · Rocco += dream_wheat
+BUILDABLES	Jardín/Molino/Fuente/Estatua ganan lógica diaria o de procesado (nuevo módulo Production, mismo patrón que buildFarm)
+Mundo	+ nodos de minería en zonas altas (mismo patrón que pickups con seed) + spawn nocturno de star_shard
+GS v3	tools viven en slots normales · garden: { lastHarvestDay } · lottery: { pool, nextDrawDay } · fountain: { lastWishDay }
+HUD/Físicas	Interacción "Pescar" en orillas (nuevo tipo de interactable dinámico)
+5.14 ⚠️ Errata sobre la Sección 4 (actualizar tu copia)
+4.3 — Saciedad de dulces: croissant 20→10, cupcake 25→12, tarta 45→25. Motivo: los dulces comprados eran tan eficientes que cocinar no compensaba; ahora comprar ≈0,4 $T/punto vs cocinar ≈0,32.
+4.6 — Comida diaria: sustituir "100–300 $T/día" por "30–90 $T/día según estrategia". La presión económica real vive en alquiler + tasa + ambición, no en el pan. El hambre es mecánica de atención (debuffs + rescate), no el sumidero principal.
+1.6 — Requisitos del billete: añadir 5× Gasolina Gasil como requisito de embarque con Sam.
