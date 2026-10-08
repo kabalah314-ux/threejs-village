@@ -361,6 +361,16 @@ const CFG = {
   restedDurationDays: 0.5,        // dura medio día onírico
   /* ===== v0.1 · OBJETIVO (Sec. 0.2 P4 · Sec. 1.6) ===== */
   ticketPrice: 40000000,          // precio del billete de vuelta (dream_ticket) · siempre visible en el HUD
+  /* ===== S1.3 · CLIMA ONÍRICO (diseño propio, no definido en la Guía · calibrable) ===== */
+  weatherChances: { clear: 50, rain: 30, fog: 15, stars: 5 },   // % por franja · 'stars' solo en la franja 14:00–24:00
+  weatherRainSpeedMult: 0.9,      // lluvia: velocidad −10%
+  weatherRainFishRareMult: 1.5,   // lluvia: peces raros ×1.5 (se usa en S2.3)
+  weatherRainGardenBonus: 1,      // lluvia: +1 trigo en la cosecha del jardín (se usa en S3)
+  weatherFogPearlMult: 1.5,       // niebla: perla en concha ×1.5
+  weatherFogGemMult: 1.5,         // niebla: gema al minar ×1.5 (se usa en S2.4)
+  weatherStarsShardMult: 2,       // lluvia de estrellas: fragmentos ×2 (se usa en S2.5)
+  weatherFogDensity: 0.035,       // densidad visual de la niebla onírica
+  weatherRainFogDensity: 0.015,   // densidad visual durante la lluvia
 };
 /** Detección de dispositivo táctil → controles y calidad adaptados */
 const IS_MOBILE = matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window;
@@ -1473,7 +1483,7 @@ function addPickup(itemId, dir) {
 function restorePickups() { pickups.forEach(p => { const at = GS.world.pickups[p.userData.idx]; if (at && Date.now() < at) { p.userData.ready = false; p.visible = false; p.userData.respawnAt = at; } else { p.userData.ready = true; p.visible = true; } }); }
 function collectPickup(g) {
   if (!g.userData.ready) return;
-  let id = g.userData.itemId; if (id === 'seashell' && Math.random() < 0.15 * (typeof AuraFX !== 'undefined' ? AuraFX.rareLootBoost() : 1)) id = 'pearl'; // sorpresa ocasional (el Vacío la mejora)
+  let id = g.userData.itemId; if (id === 'seashell' && Math.random() < 0.15 * (typeof AuraFX !== 'undefined' ? AuraFX.rareLootBoost() : 1) * Weather.pearlMult()) id = 'pearl'; // sorpresa ocasional (el Vacío la mejora)
   if (!Inventory.add(id, 1)) return; // inventario lleno: el objeto se queda en el mundo
   if (typeof trackMunicipalJob === 'function') trackMunicipalJob(g.userData.itemId);   // v0.3: cuenta para el Empleo Municipal (el objeto ORIGINAL del pickup: una concha-perla también limpia la playa)
   g.userData.ready = false; g.visible = false; g.userData.respawnAt = Date.now() + (CFG.pickupRespawnMin[g.userData.itemId] || 3) * 60000 * (typeof AuraFX !== 'undefined' ? AuraFX.cooldownMult() : 1);
@@ -3034,7 +3044,7 @@ function updatePlayer(dt) {
     if (_move.lengthSq() > 0) {
       moving = true;
       const buff = Date.now() < state.buff.until ? state.buff.mult : 1;   // consumibles (croissant, cupcake, tarta)
-      const speed = CFG.playerSpeed * mag * buff * (state.swimming ? CFG.swimFactor : 1) * Needs.speedMult();
+      const speed = CFG.playerSpeed * mag * buff * (state.swimming ? CFG.swimFactor : 1) * Needs.speedMult() * Weather.speedMult();   // S1.3: lluvia −10%
       const newDir = up.clone().multiplyScalar(R).addScaledVector(_move, speed * dt).normalize();
       const wp = newDir.clone().multiplyScalar(surfaceR(newDir));
       for (const c of colliders) { const d = wp.clone().sub(c.pos); const dist = d.length(), min = c.r + 0.4; if (dist < min && dist > 1e-4) wp.addScaledVector(d.normalize(), min - dist); }
@@ -3135,6 +3145,79 @@ function updateTokens() { const money = GS.economy.money; if (state.tokensShown 
    19. BUCLE PRINCIPAL
    ========================================================= */
 const clock = new THREE.Clock();
+/* ===== S1.3 · CLIMA ONÍRICO (diseño propio, no definido en la Guía) =====
+   2 franjas por día onírico (00:00–13:59 y 14:00–23:59). Determinista por (día, franja): no se guarda en GS.
+   Otros sistemas consultan: Weather.speedMult(), pearlMult(), gemMult(), fishRareMult(), gardenBonus(), starShardMult() */
+const WEATHER_TYPES = {
+  clear: { name: 'Despejado',           icon: '☀️', msg: '☀️ Se despeja el cielo del sueño' },
+  rain:  { name: 'Lluvia',              icon: '🌧️', msg: '🌧️ Empieza a llover: los peces pican mejor · velocidad −10%' },
+  fog:   { name: 'Niebla onírica',      icon: '🌫️', msg: '🌫️ Niebla onírica: las conchas esconden más perlas' },
+  stars: { name: 'Lluvia de estrellas', icon: '✨', msg: '✨ Esta noche lloverán estrellas: más Fragmentos de Estrella' },
+};
+const Weather = (() => {
+  let _id = null, _forced = null, _forcedSlot = -1, _rain = null, _fog = null;
+  const _q = new THREE.Quaternion(), _v = new THREE.Vector3();
+  const hourNow = () => (GS.daily.clockMs / 3600000) % 24;
+  const slotNow = () => GS.daily.dayCount * 2 + (hourNow() >= 14 ? 1 : 0);
+  function hash(n) { let x = (n * 2654435761) >>> 0; x ^= x >>> 16; x = Math.imul(x, 2246822507) >>> 0; x ^= x >>> 13; x = Math.imul(x, 3266489909) >>> 0; x ^= x >>> 16; return (x >>> 0) / 4294967296; }
+  function roll(slot) {
+    const t = CFG.weatherChances, r = hash(slot + 7919) * 100;
+    let acc = 0, pick = 'clear';
+    for (const k of ['clear', 'rain', 'fog', 'stars']) { acc += t[k] || 0; if (r < acc) { pick = k; break; } }
+    if (pick === 'stars' && slot % 2 === 0) pick = 'clear';   // las estrellas solo caen en la franja de tarde-noche
+    return pick;
+  }
+  function current() { if (!SaveSystem.started) return 'clear'; const s = slotNow(); if (_forced && _forcedSlot === s) return _forced; return roll(s); }
+  function refreshChip() {
+    let el = document.getElementById('weatherChip');
+    if (!el) { const gw = document.getElementById('goalWrap'); if (!gw) return; gw.insertAdjacentHTML('beforebegin', '<div id="weatherChip" class="pixel text-[7px] md:text-[8px] text-sky-200/80 mt-1 whitespace-nowrap"></div>'); el = document.getElementById('weatherChip'); }
+    const w = WEATHER_TYPES[_id || 'clear']; el.textContent = `${w.icon} ${w.name}`; el.title = w.msg;
+  }
+  function buildRain() {
+    const n = IS_MOBILE ? 350 : 700, pos = new Float32Array(n * 3);
+    for (let i = 0; i < n; i++) { pos[i * 3] = (Math.random() - 0.5) * 26; pos[i * 3 + 1] = Math.random() * 14; pos[i * 3 + 2] = (Math.random() - 0.5) * 26; }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    const p = new THREE.Points(g, new THREE.PointsMaterial({ color: 0xaecbff, size: 0.09, transparent: true, opacity: 0.75, depthWrite: false }));
+    p.frustumCulled = false; p.visible = false; scene.add(p); return p;
+  }
+  function update(dt) {
+    const id = current();
+    if (id !== _id) { const prev = _id; _id = id; if (prev !== null && SaveSystem.started) showToast(WEATHER_TYPES[id].msg, 'text-white'); refreshChip(); }
+    /* Lluvia: partículas alrededor del jugador, cayendo hacia el centro del planeta */
+    if (id === 'rain') {
+      if (!_rain) _rain = buildRain();
+      _rain.visible = true;
+      _rain.position.copy(player.position);
+      _rain.quaternion.copy(_q.setFromUnitVectors(UP_Y, _v.copy(player.position).normalize()));
+      const a = _rain.geometry.attributes.position, arr = a.array;
+      for (let i = 1; i < arr.length; i += 3) { arr[i] -= dt * 18; if (arr[i] < 0) arr[i] += 14; }
+      a.needsUpdate = true;
+    } else if (_rain) _rain.visible = false;
+    /* Niebla: solo cerca del jugador (en Modo Planeta se desvanece) y más oscura de noche */
+    const want = id === 'fog' ? CFG.weatherFogDensity : id === 'rain' ? CFG.weatherRainFogDensity : 0;
+    const camDist = camera.position.distanceTo(player.position);
+    const k = want * clamp(1 - (camDist - 30) / 30, 0, 1);
+    if (k > 0.0005) {
+      if (!_fog) _fog = new THREE.FogExp2(0xc9c3e6, 0);
+      const h = hourNow(), light = clamp(Math.sin(((h - 6) / 12) * Math.PI) * 1.4, 0.15, 1);
+      _fog.color.setRGB(0.79 * light, 0.76 * light, 0.90 * light);
+      _fog.density += (k - _fog.density) * Math.min(1, dt * 1.5);
+      scene.fog = _fog;
+    } else if (_fog && scene.fog) { _fog.density *= Math.max(0, 1 - dt * 1.5); if (_fog.density < 0.0005) scene.fog = null; }
+  }
+  const is = (k) => _id === k;
+  return {
+    current, update, refreshChip,
+    id: () => _id || 'clear',
+    speedMult: () => is('rain') ? CFG.weatherRainSpeedMult : 1,
+    pearlMult: () => is('fog') ? CFG.weatherFogPearlMult : 1,
+    gemMult: () => is('fog') ? CFG.weatherFogGemMult : 1,
+    fishRareMult: () => is('rain') ? CFG.weatherRainFishRareMult : 1,
+    gardenBonus: () => is('rain') ? CFG.weatherRainGardenBonus : 0,
+    starShardMult: () => is('stars') ? CFG.weatherStarsShardMult : 1,
+    debugForce(id) { if (!WEATHER_TYPES[id]) { console.warn('[Weather] tipos: ' + Object.keys(WEATHER_TYPES).join(', ')); return; } _forced = id; _forcedSlot = slotNow(); },
+  };
+})();
 /* ===== v0.1 · HUD OBJETIVO 40M (Guía Sec. 0.2 P4: "un número imposible siempre visible") ===== */
 let _goalLast = -1;
 function updateGoalHUD() {
@@ -3152,7 +3235,7 @@ function animate() {
   requestAnimationFrame(animate);
   const dt = Math.min(clock.getDelta(), 0.05), t = clock.elapsedTime;
   updatePlayer(dt); Needs.update(dt); updateNPCs(dt, t); updateCamera(dt); updateSun(); updateNeon(dt, t); updateUnlocks(dt, t); updateShip(dt); updateConfetti(dt); updateWater(t);
-  clouds.children.forEach(p => p.rotateY(p.userData.speed * dt)); updateTokens(); updateGoalHUD();
+  clouds.children.forEach(p => p.rotateY(p.userData.speed * dt)); updateTokens(); updateGoalHUD(); Weather.update(dt);
   if (SaveSystem.started && !state.menuOpen) {
     GS.meta.playTimeSec += dt;
     GS.daily.clockMs += dt * 1000 * DAY_SCALE;                 // v0.1: el reloj onírico solo avanza jugando
@@ -3375,6 +3458,7 @@ const DBG = (() => {
 window.DBG = DBG;
 DBG.give = (id, qty = 1) => { if (!ITEMS[id]) { console.warn('[DBG] objeto desconocido: ' + id); return false; } const ok = Inventory.add(id, qty); if (ok) DBG.save('debug_give'); return ok; };
 DBG.items = () => console.table(Object.values(ITEMS).map(i => ({ id: i.id, nombre: i.name, cat: i.cat, rareza: i.rarity, sell: i.sell, buy: i.buy, stack: i.stack, maxDur: i.maxDur ?? '' })));
+DBG.weather = (id) => { Weather.debugForce(id); console.log('[DBG] Clima forzado hasta la próxima franja: ' + id); };
 </script>
 </body>
 </html>
