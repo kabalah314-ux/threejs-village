@@ -397,6 +397,8 @@ const CFG = {
   housePrestigeByLevel: [0, 0.02, 0.05],                              // Sec. 6.2: prestigio de confianza (se pierde con la casa sellada)
   trophyShelfTrustBonus: 0.05, muniSafeExemptPct: 0.25,               // Sec. 6.8
   coffeeMs: 300000,               // Sec. 5.5: Café → laptop ×2 y hambre en pausa durante 5 min
+  starMin: 1, starMax: 3, starFridayMin: 5, starFridayMax: 8,   // Sec. 5.5 y 10.6 (viernes = Noche de Estrellas)
+  starIntervalMinMs: 20000, starIntervalMaxMs: 60000,           // diseño propio: separación entre caídas (tiempo real)
   bouquetGiftPoints: 5,           // diseño propio: valor del Ramo como regalo universal (la guía no da cifra)
   cookBatchExtra: 0.25,
   cookMaxBatch: 10,
@@ -1856,6 +1858,7 @@ function interactWith(obj) {
   else if (it.type === 'pickup') collectPickup(obj);
   else if (it.type === 'fishing') Fishing.cast();   // S2.3
   else if (it.type === 'mine') Mining.hit(obj);   // S2.4
+  else if (it.type === 'star') StarFall.collect(obj);   // S2.6
   else if (it.type === 'crate') { if (state.crateTaken) return; if (Inventory.add('merchant_crate', 1)) { state.crateTaken = true; crate.visible = false; playChime(); } }
   else if (it.type === 'vendor') startVendorDialog();
   else if (it.type === 'store') { if (!canControl()) return; openApp('🦝 Tienda de Rocco', '', (b) => mountItemShop(b, 'store')); }
@@ -3768,6 +3771,54 @@ function openDreamTicketPanel() {
     render();
   });
 }
+/* ===== S2.6 · FRAGMENTOS DE ESTRELLA (Guía Sec. 5.5, 10.6) =====
+   GS.world.starNight = { key: día de la noche, left: por caer } · al amanecer desaparecen los no recogidos */
+const StarFall = (() => {
+  const live = []; let _acc = 0, _nextAt = 0;
+  const _v = new THREE.Vector3(), _t1 = new THREE.Vector3();
+  function nightKey() { const h = (GS.daily.clockMs / 3600000) % 24; return h >= CFG.nightStartHour ? GS.daily.dayCount : (h < CFG.nightEndHour ? GS.daily.dayCount - 1 : null); }
+  function rollCount() {
+    if (new Date().getDay() === 5) return CFG.starFridayMin + Math.floor(Math.random() * (CFG.starFridayMax - CFG.starFridayMin + 1));
+    return Math.round((CFG.starMin + Math.floor(Math.random() * (CFG.starMax - CFG.starMin + 1))) * Weather.starShardMult());
+  }
+  function despawn(g) { scene.remove(g); const i = interactables.indexOf(g); if (i >= 0) interactables.splice(i, 1); const j = live.indexOf(g); if (j >= 0) live.splice(j, 1); }
+  function spawn() {
+    const up = player.userData.dir;
+    for (let tries = 0; tries < 40; tries++) {
+      _t1.set(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5); _t1.addScaledVector(up, -_t1.dot(up)); if (_t1.lengthSq() < 1e-6) continue; _t1.normalize();
+      const ang = 0.08 + Math.random() * 0.27;
+      const d = up.clone().multiplyScalar(Math.cos(ang)).addScaledVector(_t1, Math.sin(ang)).normalize();
+      if (!isLand(d)) continue;
+      const g = new THREE.Group();
+      const spr = new THREE.Sprite(new THREE.SpriteMaterial({ map: iconTexture('🌠'), depthWrite: false })); spr.scale.setScalar(0.9); spr.position.y = 0.7; g.add(spr);
+      const l = new THREE.PointLight(0xfff3b0, 1.6, 4, 2); l.position.y = 0.9; g.add(l);
+      placeOnPlanet(g, d); g.userData.ready = false; g.userData.fallT = 0; g.userData.base = g.position.clone(); g.userData.spr = spr;
+      registerInteractable(g, { type: 'star', label: 'Recoger Fragmento de Estrella' }); scene.add(g); live.push(g);
+      playBeep(1400, 0.25, 'sine'); setTimeout(() => playBeep(700, 0.3, 'sine'), 180);
+      showToast('🌠 ¡Una estrella ha caído cerca! Recógela antes del amanecer', 'text-white');
+      return true;
+    }
+    return false;
+  }
+  function update(dt) {
+    for (const g of live) {
+      const u = g.userData;
+      if (u.fallT < 1) { u.fallT = Math.min(1, u.fallT + dt / 1.2); _v.copy(u.base).normalize(); g.position.copy(u.base).addScaledVector(_v, 25 * (1 - u.fallT) * (1 - u.fallT)); if (u.fallT >= 1) u.ready = true; }
+      else u.spr.position.y = 0.7 + Math.sin(performance.now() * 0.004) * 0.12;
+    }
+    _acc += dt; if (_acc < 1) return; _acc = 0;
+    if (!SaveSystem.started) return;
+    const key = nightKey(), st = (GS.world.starNight ||= { key: null, left: 0 });
+    if (key === null) { while (live.length) despawn(live[0]); return; }
+    if (st.key !== key) { st.key = key; st.left = rollCount(); _nextAt = Date.now() + 5000; SaveSystem.save('star-night'); if (st.left >= 5) showToast('✨ Noche de Estrellas: el cielo está inquieto…', 'text-white'); }
+    if (st.left > 0 && Date.now() >= _nextAt) {
+      if (spawn()) { st.left--; SaveSystem.save('star-spawn'); }
+      _nextAt = Date.now() + CFG.starIntervalMinMs + Math.random() * (CFG.starIntervalMaxMs - CFG.starIntervalMinMs);
+    }
+  }
+  function collect(g) { if (!g.userData.ready) return; if (!Inventory.add('star_shard', 1)) return; GS.stats.starsCollected = (GS.stats.starsCollected || 0) + 1; playChime(); despawn(g); SaveSystem.save('star'); }
+  return { update, collect, spawn, live };
+})();
 /* ===== v0.1 · HUD OBJETIVO 40M (Guía Sec. 0.2 P4: "un número imposible siempre visible") ===== */
 let _goalLast = -1;
 function updateGoalHUD() {
@@ -3785,7 +3836,7 @@ function animate() {
   requestAnimationFrame(animate);
   const dt = Math.min(clock.getDelta(), 0.05), t = clock.elapsedTime;
   updatePlayer(dt); Needs.update(dt); updateNPCs(dt, t); updateCamera(dt); updateSun(); updateNeon(dt, t); updateUnlocks(dt, t); updateShip(dt); updateConfetti(dt); updateWater(t);
-  clouds.children.forEach(p => p.rotateY(p.userData.speed * dt)); updateTokens(); updateGoalHUD(); Weather.update(dt); Fishing.update(dt); Mining.update(dt);
+  clouds.children.forEach(p => p.rotateY(p.userData.speed * dt)); updateTokens(); updateGoalHUD(); Weather.update(dt); Fishing.update(dt); Mining.update(dt); StarFall.update(dt);
   if (SaveSystem.started && !state.menuOpen) {
     GS.meta.playTimeSec += dt;
     GS.daily.clockMs += dt * 1000 * DAY_SCALE;                 // v0.1: el reloj onírico solo avanza jugando
@@ -4018,6 +4069,7 @@ DBG.house = (lv) => { GS.house.level = clamp(lv | 0, 0, 2); buildHouse(GS.house.
 DBG.showcaseSettle = () => { Showcase.settle(); DBG.save('debug_showcase'); console.log('[DBG] Hucha: ' + (GS.housing.showcaseRevenue | 0)); };
 DBG.furniture = (id) => { if (!FURNITURE.some(f => f.id === id)) { console.warn('[DBG] muebles: ' + FURNITURE.map(f => f.id).join(', ')); return; } if (!hasFurniture(id)) GS.furniture.owned.push(id); DBG.save('debug_furniture'); console.log('[DBG] Mueble: ' + id); };
 DBG.coffee = () => { Coffee.until = Date.now() + CFG.coffeeMs; console.log('[DBG] Café activo 5 min'); };
+DBG.star = () => { console.log(StarFall.spawn() ? '[DBG] Estrella caída cerca' : '[DBG] No hay tierra cerca'); };
 DBG.cookNow = () => { Kitchen.q.forEach(k => k.readyAt = 0); console.log('[DBG] Lotes listos: ' + Kitchen.q.length); };
 </script>
 </body>
