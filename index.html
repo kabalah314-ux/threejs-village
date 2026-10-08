@@ -214,6 +214,7 @@
       <button id="btnPlayer" class="btn-game clickable px-3 md:px-4 py-2 bg-emerald-300 text-[#2b2b3d] text-sm active">🎮<span class="hidden md:inline"> Modo Jugador</span></button>
       <button id="btnSettingsGame" class="btn-game clickable px-3 md:px-4 py-2 bg-slate-200 text-[#2b2b3d] text-sm" title="Ajustes y guardado">⚙️<span class="hidden md:inline"> Ajustes</span></button>
       <button id="btnBackpack" class="btn-game clickable px-3 md:px-4 py-2 bg-amber-300 text-[#2b2b3d] text-sm" title="Mochila (B)">🎒<span class="hidden md:inline"> Mochila</span> <span id="invBadge" class="pixel text-[8px] bg-[#2b2b3d] text-yellow-300 px-1.5 py-0.5 rounded ml-1">0/20</span></button>
+      <button id="btnTools" class="btn-game clickable px-3 md:px-4 py-2 bg-orange-200 text-[#2b2b3d] text-sm" title="Herramientas">🛠️<span class="hidden md:inline"> Herramientas</span></button>
     </div>
   </div>
 
@@ -371,6 +372,19 @@ const CFG = {
   weatherStarsShardMult: 2,       // lluvia de estrellas: fragmentos ×2 (se usa en S2.5)
   weatherFogDensity: 0.035,       // densidad visual de la niebla onírica
   weatherRainFogDensity: 0.015,   // densidad visual durante la lluvia
+  /* ===== v0.4 · HERRAMIENTAS (Sec. 5.7) ===== */
+  toolRepair: {
+    fishing_rod: { npc: 'sam',    fee: 40, diy: [['wood_log', 2]] },
+    pickaxe:     { npc: 'glover', fee: 60, diy: [['wood_log', 1], ['stone', 1]] },
+  },
+  /* ===== v0.4 · PESCA (Sec. 5.5–5.6) ===== */
+  fishTable: { fish: 65, tropical_fish: 25, golden_fish: 5, old_boot: 5 },   // % base
+  fishNightGoldenMult: 3,         // Pez Dorado ×3 de noche
+  fishWaitMinMs: 2000, fishWaitMaxMs: 4000,
+  fishDepthRareBonus: 0.5,        // diseño propio: hasta +50% de raros en agua profunda (la guía solo dice "mejoran la tabla")
+  nightStartHour: 20, nightEndHour: 6,   // diseño propio: franja nocturna para botín
+  /* ===== v0.4 · MINERÍA (Sec. 5.6) ===== */
+  mineNodes: 4, mineRespawnMin: 10, mineStoneMin: 2, mineStoneMax: 3, mineGemChance: 0.08,
 };
 /** Detección de dispositivo táctil → controles y calidad adaptados */
 const IS_MOBILE = matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window;
@@ -683,10 +697,11 @@ function refreshInvBadge() { const el = document.getElementById('invBadge'); if 
    ========================================================= */
 const SHOPS = {
   bear:   { name: 'Panadería del Oso', icon: '🐻', restockMin: 10, sells: [{ id: 'croissant', stock: 10 }, { id: 'cupcake', stock: 10 }, { id: 'strawberry_cake', stock: 4 }], buys: ['golden_fruit', 'seashell', 'pearl', 'wood_log'], buyMult: {} },
-  sam:    { name: 'Mercado del Puerto', icon: '🦤', restockMin: 15, sells: [{ id: 'gasil_fuel', stock: 5 }, { id: 'wood_log', stock: 10 }, { id: 'stone', stock: 10 }], buys: 'all', buyMult: { seashell: 1.5, pearl: 1.2, merchant_crate: 1 } },
-  sombra: { name: 'Bazar Místico', icon: '🐈‍⬛', restockMin: 30, sells: [{ id: 'mystic_crystal', stock: 2 }], buys: ['mystic_crystal', 'pearl', 'golden_fruit'], buyMult: { mystic_crystal: 1.3, golden_fruit: 1.1 } },
+  sam:    { name: 'Mercado del Puerto', icon: '🦤', restockMin: 15, sells: [{ id: 'gasil_fuel', stock: 5 }, { id: 'wood_log', stock: 10 }, { id: 'stone', stock: 10 }, { id: 'fishing_rod', stock: 2 }], buys: 'all', buyMult: { seashell: 1.5, pearl: 1.2, merchant_crate: 1, gasil_fuel: 1.5 } },   // v0.4: Caña + Gasolina ×1.5 (Sec. 5.4)
+  sombra: { name: 'Bazar Místico', icon: '🐈‍⬛', restockMin: 30, sells: [{ id: 'mystic_crystal', stock: 2 }], buys: ['mystic_crystal', 'pearl', 'golden_fruit', 'star_shard'], buyMult: { mystic_crystal: 1.3, golden_fruit: 1.1, star_shard: 1.3 } },   // v0.4: Fragmento de Estrella ×1.3 (Sec. 5.5)
   // 🏪 TIENDA FÍSICA de la aldea (Rocco el mapache): compra de todo lo vendible y venta de materiales/consumibles básicos
   store:  { name: 'Tienda de Rocco', icon: '🦝', restockMin: 8, sells: [{ id: 'wood_log', stock: 12 }, { id: 'stone', stock: 12 }, { id: 'gasil_fuel', stock: 6 }, { id: 'croissant', stock: 6 }, { id: 'golden_fruit', stock: 2, price: 120 }], buys: 'all', buyMult: {} },
+  glover: { name: 'Taller de Glover', icon: '🦫', restockMin: 30, sells: [{ id: 'pickaxe', stock: 2 }], buys: ['pickaxe', 'fishing_rod', 'wood_log', 'stone'], buyMult: {} },   // v0.4: herramientas (Sec. 5.7)
 };
 
 /* =========================================================
@@ -730,6 +745,7 @@ function shopBuy(shopId, itemId, qty = 1) {
 /** VENDER: tener el objeto y que la tienda lo compre → -objeto, +$TOKEN, guardar */
 function shopSell(shopId, itemId, qty = 1) {
   if (!shopBuysItem(shopId, itemId)) { showToast('❌ Esta tienda no compra ese objeto', 'text-red-200'); return false; }
+  if (ITEMS[itemId]?.maxDur) return shopSellTool(shopId, itemId);   // v0.4: herramientas → precio × durabilidad (Sec. 5.7)
   if (!Inventory.has(itemId, qty)) { showToast('❌ No tienes suficientes unidades', 'text-red-200'); return false; }
   if (!Inventory.remove(itemId, qty)) return false;
   const total = shopSellPrice(shopId, itemId) * qty;
@@ -760,7 +776,7 @@ const TRUST_LEVELS = [
 ];
 const TRUST_NPCS = ['bear', 'mayor', 'glover', 'sombra', 'dax', 'sam', 'hedgehogs'];   // los 7 de misión (Rocco no cuenta para el aura)
 const NO_GIFT = ['dream_ticket', 'poor_bread'];
-const SHOP_OWNER = { bear: 'bear', sam: 'sam', sombra: 'sombra', store: 'rocco' };     // tienda → quién gana confianza
+const SHOP_OWNER = { bear: 'bear', sam: 'sam', sombra: 'sombra', store: 'rocco', glover: 'glover' };     // tienda → quién gana confianza
 const Trust = {
   entry(id) { GS.trust[id] ||= { points: 0, tradeToday: 0, tradeDay: 0, giftsToday: 0, giftDay: 0, trades: 0, met: false }; return GS.trust[id]; },
   points(id) { return this.entry(id).points; },
@@ -1858,6 +1874,8 @@ function serviceBtns(npcId) {
   if (npcId === 'mayor' && typeof openMunicipalJob === 'function') btns.push(dialogButton('🏛️ Empleo Municipal', 'bg-blue-200 text-[#2b2b3d]', () => openMunicipalJob()));
   if (npcId === 'bear' && typeof bearCharityAvailable === 'function' && bearCharityAvailable()) btns.push(dialogButton('🥖 Pan del Pobre (gratis)', 'bg-orange-200 text-[#2b2b3d]', () => claimCharityBread()));   // v0.3: solo aparece si estás en apuros (Sec. 4.8)
   if (npcId === 'mayor' && ((GS.housing.rentDebt || 0) > 0 || GS.housing.sealed)) btns.push(dialogButton('💼 Saldar cuentas', 'bg-emerald-200 text-[#2b2b3d]', () => GS.housing.sealed ? openSealedHousePanel() : openHousePanel()));   // S1.2 (Sec. 6.3)
+  if (npcId === 'glover') btns.push(dialogButton('⛏️ Taller de Glover', 'bg-orange-200 text-[#2b2b3d]', () => openApp('🦫 Taller de Glover', '', (b) => mountItemShop(b, 'glover'))));   // S2.2
+  if (npcId === 'sam' || npcId === 'glover') btns.push(dialogButton('🔧 Reparar herramientas', 'bg-amber-200 text-[#2b2b3d]', () => openToolsPanel(npcId)));   // S2.2 (Sec. 5.7)
   return btns;
 }
 
@@ -3218,6 +3236,86 @@ const Weather = (() => {
     debugForce(id) { if (!WEATHER_TYPES[id]) { console.warn('[Weather] tipos: ' + Object.keys(WEATHER_TYPES).join(', ')); return; } _forced = id; _forcedSlot = slotNow(); },
   };
 })();
+/* ===== S2.2 · HERRAMIENTAS CON DURABILIDAD (Guía Sec. 5.7) =====
+   slot.dur = usos restantes (undefined = nueva). Se gasta la menos durable que aún funcione. A 0 queda rota. */
+const Tools = {
+  max(id) { return ITEMS[id]?.maxDur || 0; },
+  isTool(id) { return !!ITEMS[id]?.maxDur; },
+  dur(s) { return s.dur == null ? this.max(s.id) : s.dur; },
+  owned(id) { return GS.inventory.slots.some(s => s.id === id); },
+  pick(id) { let b = null; for (const s of GS.inventory.slots) { if (s.id !== id) continue; const d = this.dur(s); if (d > 0 && (!b || d < this.dur(b))) b = s; } return b; },
+  usable(id) { return !!this.pick(id); },
+  needMsg(id) { return this.owned(id) ? `💥 Tu ${ITEMS[id].name} está rota: repárala (🛠️)` : `Necesitas ${ITEMS[id].icon} ${ITEMS[id].name}`; },
+  wear(id) {
+    const s = this.pick(id); if (!s) return false;
+    s.dur = this.dur(s) - 1;
+    if (s.dur <= 0) { s.dur = 0; showToast(`💥 ¡Tu ${ITEMS[id].name} se ha roto! Repárala (🛠️)`, 'text-red-200'); playBeep(180, 0.25, 'square'); }
+    else if (s.dur === 3) showToast(`⚠️ ${ITEMS[id].name}: quedan 3 usos`, 'text-amber-200');
+    SaveSystem.save('tool-wear'); return true;
+  },
+  repairDIY(idx) {
+    const s = GS.inventory.slots[idx]; if (!s || !this.isTool(s.id)) return false;
+    const rep = CFG.toolRepair[s.id], max = this.max(s.id);
+    if (this.dur(s) >= max) { showToast('✓ Ya está como nueva', 'text-white'); return false; }
+    if (!rep.diy.every(([id, q]) => Inventory.has(id, q))) { showToast('❌ Te faltan: ' + rep.diy.map(([id, q]) => `${q} ${ITEMS[id].name}`).join(' + '), 'text-red-200'); return false; }
+    rep.diy.forEach(([id, q]) => Inventory.remove(id, q));
+    s.dur = max; showToast(`🔧 ${ITEMS[s.id].name} reparada (${max}/${max})`, 'text-white'); playBeep(660, 0.08, 'triangle'); SaveSystem.saveNow('tool-diy'); return true;
+  },
+  repairAt(idx, npcId) {
+    const s = GS.inventory.slots[idx]; if (!s || !this.isTool(s.id)) return false;
+    const rep = CFG.toolRepair[s.id], max = this.max(s.id);
+    if (rep.npc !== npcId) { showToast('❌ Aquí no reparan esa herramienta', 'text-red-200'); return false; }
+    if (this.dur(s) >= max) { showToast('✓ Ya está como nueva', 'text-white'); return false; }
+    if (!Wallet.spend(rep.fee, `Reparación: ${ITEMS[s.id].name}`)) return false;
+    if (typeof Trust !== 'undefined') Trust.addTrade(npcId, rep.fee);   // reparar es comercio (Sec. 3.3)
+    s.dur = max; showToast(`🔧 ${ITEMS[s.id].name} reparada (${max}/${max})`, 'text-white'); playBeep(660, 0.08, 'triangle'); SaveSystem.saveNow('tool-repair'); return true;
+  },
+};
+/** Venta de herramienta: se vende la MÁS gastada que aún funcione; paga sell × dur/máx. Rotas: no se compran. */
+function shopSellTool(shopId, itemId) {
+  const slots = GS.inventory.slots; let idx = -1, worst = Infinity;
+  slots.forEach((s, i) => { if (s.id === itemId) { const d = Tools.dur(s); if (d > 0 && d < worst) { worst = d; idx = i; } } });
+  if (idx < 0) { showToast(Tools.owned(itemId) ? '💥 Una herramienta rota no vale nada: repárala antes de venderla' : '❌ No tienes esa herramienta', 'text-red-200'); return false; }
+  const s = slots[idx], d = Tools.dur(s), max = Tools.max(itemId);
+  const total = Math.max(1, Math.round(shopSellPrice(shopId, itemId) * d / max));
+  slots.splice(idx, 1); refreshInvBadge();
+  Wallet.add(total, `Venta: ${ITEMS[itemId].name} (${d}/${max})`); GS.stats.itemsSold += 1;
+  const owner = SHOP_OWNER[shopId]; if (owner && typeof Trust !== 'undefined') Trust.addTrade(owner, total);
+  showToast(`✓ Vendido ${ITEMS[itemId].icon} ${ITEMS[itemId].name} (${d}/${max}) por ${fmt(total)} $T`, 'text-white'); playBeep(1046, 0.06, 'triangle'); SaveSystem.saveNow('sell:' + itemId); return true;
+}
+function openToolsPanel(npcId = null) {
+  openApp(npcId ? `🔧 Reparaciones · ${npcById[npcId]?.name || npcId}` : '🛠️ Mis herramientas', '', (body) => {
+    const render = () => {
+      const list = GS.inventory.slots.map((s, i) => ({ s, i })).filter(o => Tools.isTool(o.s.id));
+      let html = balanceBar();
+      if (!list.length) html += `<div class="app-card p-3 text-sm text-slate-600">No llevas herramientas. La 🎣 Caña de Soñador se compra en el Mercado del Puerto (Sam) y el ⛏️ Pico en el Taller de Glover.</div>`;
+      list.forEach(({ s, i }) => {
+        const it = ITEMS[s.id], max = Tools.max(s.id), d = Tools.dur(s), pct = Math.round(d / max * 100), rep = CFG.toolRepair[s.id];
+        const broken = d <= 0, full = d >= max;
+        const diyTxt = rep.diy.map(([id, q]) => `${q} ${ITEMS[id].icon}`).join(' + ');
+        const diyOk = rep.diy.every(([id, q]) => Inventory.has(id, q));
+        const npcOk = npcId && rep.npc === npcId;
+        html += `<div class="app-card p-3 mb-2 flex items-center gap-3">
+          <div class="text-3xl" style="${broken ? 'filter:grayscale(1);opacity:.5' : ''}">${it.icon}</div>
+          <div class="flex-1 min-w-0">
+            <div class="font-bold text-sm text-[#2b2b3d]">${esc(it.name)} ${broken ? '<span class="text-red-600 text-xs">· ROTA</span>' : ''}</div>
+            <div class="h-2 rounded-full bg-slate-200 overflow-hidden mt-1"><div class="h-full ${pct > 50 ? 'bg-emerald-400' : pct > 20 ? 'bg-amber-400' : 'bg-red-500'}" style="width:${pct}%"></div></div>
+            <div class="text-[11px] text-slate-500 mt-0.5">Durabilidad ${d}/${max}</div>
+          </div>
+          <div class="flex flex-col gap-1">
+            ${npcOk ? `<button data-npcfix="${i}" class="btn-game px-2 py-1 text-[11px] bg-emerald-300" ${full ? 'disabled' : ''}>Reparar (${fmt(rep.fee)} $T)</button>` : ''}
+            <button data-diy="${i}" class="btn-game px-2 py-1 text-[11px] ${diyOk ? 'bg-sky-200' : 'bg-slate-200 opacity-60'}" ${full ? 'disabled' : ''}>Tú mismo (${diyTxt})</button>
+          </div></div>`;
+      });
+      if (npcId) html += `<div class="text-[11px] text-slate-500">${npcId === 'sam' ? '🦤 Sam repara Cañas.' : '🦫 Glover repara Picos.'} Hacerlo tú mismo cuesta materiales.</div>`;
+      body.innerHTML = html;
+      body.querySelectorAll('[data-diy]').forEach(b => b.onclick = () => { Tools.repairDIY(+b.dataset.diy); render(); });
+      body.querySelectorAll('[data-npcfix]').forEach(b => b.onclick = () => { Tools.repairAt(+b.dataset.npcfix, npcId); render(); });
+    };
+    render();
+  });
+}
+{ const b = document.getElementById('btnTools'); if (b) b.onclick = () => { if (canControl()) openToolsPanel(); }; }
 /* ===== v0.1 · HUD OBJETIVO 40M (Guía Sec. 0.2 P4: "un número imposible siempre visible") ===== */
 let _goalLast = -1;
 function updateGoalHUD() {
@@ -3459,6 +3557,7 @@ window.DBG = DBG;
 DBG.give = (id, qty = 1) => { if (!ITEMS[id]) { console.warn('[DBG] objeto desconocido: ' + id); return false; } const ok = Inventory.add(id, qty); if (ok) DBG.save('debug_give'); return ok; };
 DBG.items = () => console.table(Object.values(ITEMS).map(i => ({ id: i.id, nombre: i.name, cat: i.cat, rareza: i.rarity, sell: i.sell, buy: i.buy, stack: i.stack, maxDur: i.maxDur ?? '' })));
 DBG.weather = (id) => { Weather.debugForce(id); console.log('[DBG] Clima forzado hasta la próxima franja: ' + id); };
+DBG.toolDur = (id, n) => { const s = GS.inventory.slots.find(x => x.id === id); if (!s) { console.warn('[DBG] no tienes ' + id); return; } s.dur = Math.max(0, n | 0); DBG.save('debug_dur'); console.log('[DBG] ' + id + ' dur = ' + s.dur); };
 </script>
 </body>
 </html>
