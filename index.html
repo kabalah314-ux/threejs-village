@@ -385,6 +385,11 @@ const CFG = {
   nightStartHour: 20, nightEndHour: 6,   // diseño propio: franja nocturna para botín
   /* ===== v0.4 · MINERÍA (Sec. 5.6) ===== */
   mineNodes: 4, mineRespawnMin: 10, mineStoneMin: 2, mineStoneMax: 3, mineGemChance: 0.08,
+  /* ===== v0.5 · DORMIR Y COCINA (Sec. 4.2, 6.5) ===== */
+  sleepFromHour: 18,
+  cookSecs: { dream_bread: 20, grilled_fish: 15, golden_jam: 30, golden_cake: 45 },
+  cookBatchExtra: 0.25,
+  cookMaxBatch: 10,
 };
 /** Detección de dispositivo táctil → controles y calidad adaptados */
 const IS_MOBILE = matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window;
@@ -727,9 +732,9 @@ function shopState(id) {
   if (Date.now() > (s.restockAt || 0)) { s.stock = {}; def.sells.forEach(x => s.stock[x.id] = x.stock); s.restockAt = Date.now() + def.restockMin * 60000; }
   return s;
 }
-const shopSellPrice = (shopId, itemId) => Math.max(1, Math.round((ITEMS[itemId].sell || 0) * (SHOPS[shopId].buyMult[itemId] || 1) * (typeof Needs !== 'undefined' ? Needs.priceMult() : 1) * (typeof AuraFX !== 'undefined' ? AuraFX.sellMult() : 1) * (typeof Trust !== 'undefined' && SHOP_OWNER[shopId] ? Trust.sellMult(SHOP_OWNER[shopId]) : 1)));   // v0.2: × confianza con el dueño (Sec. 3.2)
+const shopSellPrice = (shopId, itemId) => Math.max(1, Math.round((ITEMS[itemId].sell || 0) * (SHOPS[shopId].buyMult[itemId] || 1) * (typeof Needs !== 'undefined' ? Needs.priceMult() : 1) * (typeof AuraFX !== 'undefined' ? AuraFX.sellMult() : 1) * (typeof Trust !== 'undefined' && SHOP_OWNER[shopId] ? Trust.sellMult(SHOP_OWNER[shopId]) : 1) * (typeof Rested !== 'undefined' ? Rested.sellMult() : 1)));   // v0.2 × confianza · S3.1 × Descansado
 /** Precio de COMPRA mostrado y cobrado (aura Dorada: −5%). Fuente única para UI y cobro. */
-const shopBuyPrice = (shopId, itemId) => { const e = SHOPS[shopId].sells.find(x => x.id === itemId); return Math.max(1, Math.round(((e?.price ?? ITEMS[itemId].buy) || 1) * (typeof AuraFX !== 'undefined' ? AuraFX.buyMult() : 1) * (typeof Trust !== 'undefined' && SHOP_OWNER[shopId] ? Trust.buyMult(SHOP_OWNER[shopId]) : 1))); };   // v0.2: × confianza con el dueño
+const shopBuyPrice = (shopId, itemId) => { const e = SHOPS[shopId].sells.find(x => x.id === itemId); return Math.max(1, Math.round(((e?.price ?? ITEMS[itemId].buy) || 1) * (typeof AuraFX !== 'undefined' ? AuraFX.buyMult() : 1) * (typeof Trust !== 'undefined' && SHOP_OWNER[shopId] ? Trust.buyMult(SHOP_OWNER[shopId]) : 1) * (typeof Rested !== 'undefined' ? Rested.buyMult() : 1))); };   // v0.2 × confianza · S3.1 × Descansado
 const shopBuysItem = (shopId, itemId) => ITEMS[itemId]?.sellable && (SHOPS[shopId].buys === 'all' || SHOPS[shopId].buys.includes(itemId));
 /** COMPRAR: dinero suficiente → -$TOKEN, +objeto, -stock, guardar */
 function shopBuy(shopId, itemId, qty = 1) {
@@ -2620,7 +2625,9 @@ function openHousePanel() {
       html += letters.length
         ? `<div class="max-h-[30vh] overflow-auto divide-y divide-slate-100">` + letters.map((l, i) => `<button data-letter="${i}" class="block w-full text-left py-2 ${l.read ? 'opacity-55' : ''}"><div class="text-xs font-bold ${l.read ? 'text-slate-500' : 'text-[#2b2b3d]'}">${l.read ? '' : '🔴 '}${esc(l.from)} · día ${l.day}</div><div class="text-xs text-slate-600 leading-snug mt-0.5">${esc(l.text)}</div></button>`).join('') + '</div>'
         : `<div class="text-sm text-slate-500">Sin cartas. El cartero onírico descansa.</div>`;
-      html += `</div><div class="text-[11px] text-slate-500">🚧 Próximamente en tu casa: dormir con buff, cocina por lotes y escaparate (v0.5).</div>`;
+      html += `</div>`;   // cierre de la tarjeta del buzón
+      html += (typeof homeActionsHTML === 'function') ? homeActionsHTML() : '';   // S3.1–S3.2: dormir y cocina (Sec. 6.5)
+      html += `<div class="text-[11px] text-slate-500">🚧 Próximamente en tu casa: escaparate y muebles (v0.5).</div>`;
       body.innerHTML = html;
       const amt = (id, max) => { const el = body.querySelector(id); const v = el && el.value ? +el.value : max; return clamp(Math.floor(v) || max, 1, max); };
       const q = (sel, fn) => { const b = body.querySelector(sel); if (b) b.onclick = () => { fn(); updateMailboxBadge(); render(); }; };
@@ -2628,6 +2635,8 @@ function openHousePanel() {
       q('[data-payrent-all]', () => payRentDebt(rentDebt));
       q('[data-paydebt]', () => payDebt(amt('#payDebtAmt', debt)));
       q('[data-paydebt-all]', () => payDebt(debt));
+      q('[data-sleep]', () => { if (Sleep.canSleep().ok) closeApp(); Sleep.sleep(); });   // S3.1
+      q('[data-kitchen]', () => { closeApp(); if (typeof openKitchenPanel === 'function') openKitchenPanel(); });   // S3.2
       q('[data-readall]', () => { letters.forEach(l => l.read = true); GS.housing.mailboxUnread = 0; SaveSystem.save('mailbox-read'); });
       body.querySelectorAll('[data-letter]').forEach(b => b.onclick = () => { const l = letters[+b.dataset.letter]; if (l && !l.read) { l.read = true; GS.housing.mailboxUnread = Math.max(0, (GS.housing.mailboxUnread || 0) - 1); SaveSystem.save('letter-read'); updateMailboxBadge(); render(); } });
     };
@@ -3064,7 +3073,7 @@ function updatePlayer(dt) {
     if (_move.lengthSq() > 0) {
       moving = true;
       const buff = Date.now() < state.buff.until ? state.buff.mult : 1;   // consumibles (croissant, cupcake, tarta)
-      const speed = CFG.playerSpeed * mag * buff * (state.swimming ? CFG.swimFactor : 1) * Needs.speedMult() * Weather.speedMult();   // S1.3: lluvia −10%
+      const speed = CFG.playerSpeed * mag * buff * (state.swimming ? CFG.swimFactor : 1) * Needs.speedMult() * Weather.speedMult() * Rested.speedMult();   // S1.3 lluvia −10% · S3.1 Descansado +10%
       const newDir = up.clone().multiplyScalar(R).addScaledVector(_move, speed * dt).normalize();
       const wp = newDir.clone().multiplyScalar(surfaceR(newDir));
       for (const c of colliders) { const d = wp.clone().sub(c.pos); const dist = d.length(), min = c.r + 0.4; if (dist < min && dist > 1e-4) wp.addScaledVector(d.normalize(), min - dist); }
@@ -3439,6 +3448,60 @@ const Mining = (() => {
   }
   return { nodes, restore, update, hit };
 })();
+/* ===== S3.1 · DORMIR Y BUFF DESCANSADO (Guía Sec. 4.2 y 6.5) =====
+   restedUntil se guarda en "ms oníricos absolutos" = dayCount * DAY_MS + clockMs */
+const dreamNow = () => GS.daily.dayCount * DAY_MS + GS.daily.clockMs;
+const Rested = {
+  active() { return dreamNow() < (GS.daily.restedUntil || 0); },
+  speedMult() { return this.active() ? CFG.restedSpeedMult : 1; },
+  sellMult() { return this.active() ? CFG.restedPriceMult : 1; },
+  buyMult() { return this.active() ? 2 - CFG.restedPriceMult : 1; },
+  leftText() { const ms = Math.max(0, (GS.daily.restedUntil || 0) - dreamNow()); const h = Math.floor(ms / 3600000), m = Math.floor((ms % 3600000) / 60000); return `${h}h ${String(m).padStart(2, '0')}m`; },
+};
+const Sleep = {
+  _busy: false,
+  canSleep() {
+    if (houseSealed()) return { ok: false, why: 'Casa sellada: no puedes dormir' };
+    const h = (GS.daily.clockMs / 3600000) % 24;
+    if (h >= CFG.sleepFromHour || h < CFG.dayStartClockMs / 3600000) return { ok: true };
+    return { ok: false, why: `Aún no tienes sueño (desde las ${CFG.sleepFromHour}:00)` };
+  },
+  sleep() {
+    const c = this.canSleep(); if (!c.ok) { showToast('🛏️ ' + c.why, 'text-white'); return false; }
+    if (this._busy) return false; this._busy = true;
+    if (typeof Fishing !== 'undefined') Fishing.cancel();
+    state.moveTarget = null; state.pendingInteract = null;
+    const ov = document.createElement('div');
+    ov.style.cssText = 'position:fixed;inset:0;background:#0b0a1a;opacity:0;transition:opacity .8s;z-index:70;pointer-events:none;display:flex;align-items:center;justify-content:center;color:#c7d2fe;font:bold 22px sans-serif';
+    ov.textContent = '💤 Zzz…'; document.body.append(ov); requestAnimationFrame(() => ov.style.opacity = '1');
+    setTimeout(() => {
+      const crossesMidnight = GS.daily.clockMs >= CFG.dayStartClockMs;   // si ya es de madrugada, la medianoche ya se liquidó
+      GS.daily.clockMs = CFG.dayStartClockMs;
+      if (crossesMidnight) { GS.daily.dayCount++; if (typeof settleDay === 'function') settleDay(); }
+      GS.daily.restedUntil = dreamNow() + CFG.restedDurationDays * DAY_MS;
+      GS.stats.nightsSlept = (GS.stats.nightsSlept || 0) + 1;
+      SaveSystem.saveNow('sleep');
+      showToast('☀️ Despiertas Descansado: +10% velocidad y +5% mejores precios', 'text-white'); playChime();
+      ov.style.opacity = '0'; setTimeout(() => { ov.remove(); this._busy = false; }, 900);
+    }, 1200);
+    return true;
+  },
+};
+function homeActionsHTML() {
+  const can = Sleep.canSleep(), r = Rested.active();
+  let h = `<div class="app-card p-3 mb-3"><div class="font-bold text-[#2b2b3d] mb-1">🛏️ Dormir</div>
+    <div class="text-sm text-slate-600">${r ? `😴 Descansado: quedan <b>${Rested.leftText()}</b> oníricas.` : 'Duerme hasta el amanecer (08:00) y despierta <b>Descansado</b>: +10% velocidad y +5% mejores precios durante medio día.'}</div>
+    <button data-sleep class="btn-game px-3 py-1.5 text-xs mt-2 ${can.ok ? 'bg-indigo-300' : 'bg-slate-200 opacity-60'}">🛏️ ${can.ok ? 'Dormir hasta el amanecer' : esc(can.why)}</button></div>`;
+  if (typeof Kitchen !== 'undefined') h += `<div class="app-card p-3 mb-3"><div class="font-bold text-[#2b2b3d] mb-1">🍳 Cocina</div>
+    <div class="text-sm text-slate-600">${Kitchen.statusText()}</div>
+    <button data-kitchen class="btn-game px-3 py-1.5 text-xs mt-2 bg-orange-200">🍳 Abrir cocina</button></div>`;
+  return h;
+}
+setInterval(() => {
+  let el = document.getElementById('restChip');
+  if (!el) { const gw = document.getElementById('goalWrap'); if (!gw) return; gw.insertAdjacentHTML('beforebegin', '<div id="restChip" class="pixel text-[7px] md:text-[8px] text-indigo-200/80 mt-1 whitespace-nowrap hidden"></div>'); el = document.getElementById('restChip'); }
+  const on = SaveSystem.started && Rested.active(); el.classList.toggle('hidden', !on); if (on) el.textContent = '😴 Descansado · ' + Rested.leftText();
+}, 2000);
 /* ===== v0.1 · HUD OBJETIVO 40M (Guía Sec. 0.2 P4: "un número imposible siempre visible") ===== */
 let _goalLast = -1;
 function updateGoalHUD() {
@@ -3683,6 +3746,7 @@ DBG.weather = (id) => { Weather.debugForce(id); console.log('[DBG] Clima forzado
 DBG.toolDur = (id, n) => { const s = GS.inventory.slots.find(x => x.id === id); if (!s) { console.warn('[DBG] no tienes ' + id); return; } s.dur = Math.max(0, n | 0); DBG.save('debug_dur'); console.log('[DBG] ' + id + ' dur = ' + s.dur); };
 DBG.goMine = (i = 0) => { const n = Mining.nodes[i]; if (!n) { console.warn('[DBG] hay ' + Mining.nodes.length + ' nodos'); return; } setMoveTarget(n.userData.dir.clone()); state.pendingInteract = n; console.log('[DBG] Caminando al nodo ' + i); };
 DBG.mineReset = () => { GS.world.mineNodes = {}; Mining.restore(); DBG.save('debug_mine'); console.log('[DBG] Nodos de minería repuestos'); };
+DBG.rest = () => { GS.daily.restedUntil = dreamNow() + CFG.restedDurationDays * DAY_MS; DBG.save('debug_rest'); console.log('[DBG] Descansado activado'); };
 </script>
 </body>
 </html>
