@@ -3606,6 +3606,76 @@ setInterval(() => {   // aviso único por lote terminado
   const now = Date.now();
   Kitchen.q.forEach(k => { if (!k.notified && now >= k.readyAt) { k.notified = true; showToast(`🍳 Tu ${ITEMS[Kitchen.recipe(k.recipe).out].name} está listo`, 'text-white'); playBeep(880, 0.08, 'triangle'); } });
 }, 1000);
+/* ===== S3.4 · ESCAPARATE (Guía Sec. 6.2, 6.7) =====
+   GS.housing.showcase = [{ id, qty, price }] · cada hueco tira 1 venta por liquidación · ingresos → hucha (showcaseRevenue) */
+const Showcase = {
+  get list() { if (!Array.isArray(GS.housing.showcase)) GS.housing.showcase = []; return GS.housing.showcase; },
+  slots() { return (CFG.showcaseSlotsByLevel[clamp(GS.house.level | 0, 0, 2)] || 0) + (hasFurniture('piggy_xl') ? CFG.piggyXlExtraSlots : 0); },
+  canShow(id) { const it = ITEMS[id]; return !!it && it.sellable && !it.maxDur && id !== 'dream_ticket'; },
+  odds(price, id) { const ratio = price / Math.max(1, ITEMS[id].sell); for (const [maxR, p] of CFG.showcaseOdds) if (ratio <= maxR) return p; return CFG.showcaseOdds[CFG.showcaseOdds.length - 1][1]; },
+  add(id, qty, price) {
+    if (houseSealed()) { showToast('🔒 Casa sellada: el escaparate está en pausa', 'text-red-200'); return false; }
+    if (!this.slots()) { showToast('🏪 El escaparate llega con la mejora a Tienda (nivel 1)', 'text-white'); return false; }
+    if (this.list.length >= this.slots()) { showToast('🪟 Escaparate lleno', 'text-red-200'); return false; }
+    if (!this.canShow(id)) { showToast('❌ Ese objeto no se puede poner a la venta', 'text-red-200'); return false; }
+    qty = clamp(Math.floor(qty) || 1, 1, ITEMS[id].stack); price = Math.max(1, Math.floor(price) || ITEMS[id].sell);
+    if (!Inventory.remove(id, qty)) { showToast('❌ No tienes suficientes unidades', 'text-red-200'); return false; }
+    this.list.push({ id, qty, price });
+    showToast(`🪟 ${ITEMS[id].icon} ${ITEMS[id].name} ×${qty} a ${fmt(price)} $T/u`, 'text-white'); SaveSystem.saveNow('showcase-add'); return true;
+  },
+  withdraw(i) {
+    const s = this.list[i]; if (!s) return false;
+    if (!Inventory.canAdd(s.id, s.qty)) { showToast('🎒 Inventario lleno', 'text-red-200'); return false; }
+    Inventory.add(s.id, s.qty, { silent: true }); this.list.splice(i, 1); SaveSystem.saveNow('showcase-withdraw'); return true;
+  },
+  collect() {
+    const n = GS.housing.showcaseRevenue | 0; if (!n) { showToast('🐷 La hucha está vacía', 'text-white'); return false; }
+    GS.housing.showcaseRevenue = 0; Wallet.add(n, 'Hucha del escaparate'); playChime(); SaveSystem.saveNow('showcase-collect'); return true;
+  },
+  settle() {
+    if (!this.list.length) return;
+    if (houseSealed()) { (GS.daily.lastCharges ||= []).push({ label: '🪟 Escaparate', note: 'en pausa (casa sellada)' }); return; }
+    const sold = {}; let total = 0;
+    this.list.forEach(s => { if (s.qty > 0 && Math.random() < this.odds(s.price, s.id)) { s.qty--; total += s.price; sold[s.id] = (sold[s.id] || 0) + 1; } });
+    GS.housing.showcase = this.list.filter(s => s.qty > 0);
+    if (!total) return;
+    GS.housing.showcaseRevenue = (GS.housing.showcaseRevenue | 0) + total;
+    (GS.daily.lastCharges ||= []).push({ label: '🪟 Escaparate → hucha', amount: total });
+    addLetter('🪟 Tu escaparate', `Vecinos compraron: ${Object.entries(sold).map(([id, n]) => `${n} ${ITEMS[id].name}`).join(', ')}. +${fmt(total)} $T en la hucha (sin comisión: es tu tienda).`);
+  },
+};
+DailySystem.onSettle(() => Showcase.settle());   // corre después de las facturas v0.3
+function openShowcasePanel() {
+  openApp('🪟 Escaparate', '', (body) => {
+    const render = () => {
+      let html = balanceBar();
+      const max = Showcase.slots();
+      if (!max) { body.innerHTML = html + `<div class="app-card p-3 text-sm text-slate-600">🏪 El escaparate llega con la mejora a <b>Tienda</b> (nivel 1) en el Taller de Glover: 6 huecos. En la Villa, 12.</div>`; return; }
+      if (houseSealed()) html += `<div class="app-card p-3 mb-3 text-sm text-purple-700 font-bold">🔒 Casa sellada: las ventas están en pausa (no pierdes nada).</div>`;
+      const rev = GS.housing.showcaseRevenue | 0;
+      html += `<div class="app-card p-3 mb-3 flex items-center justify-between gap-2"><div class="text-sm">🐷 Hucha: <b>${fmt(rev)} $T</b><div class="text-[11px] text-slate-500">Las ventas ocurren en la liquidación de medianoche. Comisión: 0%.</div></div><button data-collect class="btn-game px-3 py-1.5 text-xs ${rev ? 'bg-emerald-300' : 'bg-slate-200 opacity-60'}">Recoger</button></div>`;
+      html += `<div class="app-card p-3 mb-3"><div class="font-bold text-sm mb-2">En venta (${Showcase.list.length}/${max})</div>` + (Showcase.list.length ? Showcase.list.map((s, i) => { const it = ITEMS[s.id], p = Math.round(Showcase.odds(s.price, s.id) * 100); return `<div class="flex items-center gap-2 py-1 text-xs"><span class="text-lg">${it.icon}</span><div class="flex-1">${esc(it.name)} ×${s.qty} · <b>${fmt(s.price)} $T</b>/u <span class="text-slate-500">(ref. ${fmt(it.sell)} · ${p}%/día)</span></div><button data-withdraw="${i}" class="btn-game px-2 py-0.5 text-[11px] bg-slate-200">Retirar</button></div>`; }).join('') : `<div class="text-xs text-slate-500">Vacío.</div>`) + `</div>`;
+      const ids = [...new Set(GS.inventory.slots.map(s => s.id))].filter(id => Showcase.canShow(id));
+      if (Showcase.list.length < max && ids.length && !houseSealed()) {
+        html += `<div class="app-card p-3"><div class="font-bold text-sm mb-2">Poner a la venta</div><div class="flex flex-wrap gap-2 items-center">
+          <select data-item class="game text-xs">${ids.map(id => `<option value="${id}">${ITEMS[id].icon} ${esc(ITEMS[id].name)} (${Inventory.count(id)})</option>`).join('')}</select>
+          <input data-qty type="number" min="1" value="1" class="game w-16 text-xs" title="Cantidad">
+          <input data-price type="number" min="1" class="game w-24 text-xs" title="Precio por unidad">
+          <button data-add class="btn-game px-3 py-1.5 text-xs bg-amber-200">Poner</button></div>
+          <div data-hint class="text-[11px] text-slate-500 mt-1"></div>
+          <div class="text-[11px] text-slate-400 mt-1">Prob. de venta/día: ≤100% del valor 80% · ≤120% 50% · ≤150% 25% · más caro 5%.</div></div>`;
+      }
+      body.innerHTML = html;
+      const c = body.querySelector('[data-collect]'); if (c) c.onclick = () => { Showcase.collect(); render(); };
+      body.querySelectorAll('[data-withdraw]').forEach(x => x.onclick = () => { Showcase.withdraw(+x.dataset.withdraw); render(); });
+      const sel = body.querySelector('[data-item]'), pr = body.querySelector('[data-price]'), hint = body.querySelector('[data-hint]');
+      const upd = () => { if (!sel) return; const id = sel.value, v = +pr.value || ITEMS[id].sell; hint.textContent = `Valor de referencia: ${fmt(ITEMS[id].sell)} $T · a ${fmt(v)} $T → ${Math.round(Showcase.odds(v, id) * 100)}% de venta por día`; };
+      if (sel) { sel.onchange = () => { pr.value = ITEMS[sel.value].sell; upd(); }; pr.oninput = upd; pr.value = ITEMS[sel.value].sell; upd(); }
+      const add = body.querySelector('[data-add]'); if (add) add.onclick = () => { Showcase.add(sel.value, +body.querySelector('[data-qty]').value, +pr.value); render(); };
+    };
+    render();
+  });
+}
 /* ===== v0.1 · HUD OBJETIVO 40M (Guía Sec. 0.2 P4: "un número imposible siempre visible") ===== */
 let _goalLast = -1;
 function updateGoalHUD() {
@@ -3853,6 +3923,7 @@ DBG.mineReset = () => { GS.world.mineNodes = {}; Mining.restore(); DBG.save('deb
 DBG.rest = () => { GS.daily.restedUntil = dreamNow() + CFG.restedDurationDays * DAY_MS; DBG.save('debug_rest'); console.log('[DBG] Descansado activado'); };
 DBG.cookNow = () => { if (GS.housing.kitchen) { GS.housing.kitchen.readyAt = 0; console.log('[DBG] Cocina lista'); } else console.log('[DBG] La cocina está libre'); };
 DBG.house = (lv) => { GS.house.level = clamp(lv | 0, 0, 2); buildHouse(GS.house.level); DBG.save('debug_house'); console.log('[DBG] Casa nivel ' + GS.house.level); };
+DBG.showcaseSettle = () => { Showcase.settle(); DBG.save('debug_showcase'); console.log('[DBG] Hucha: ' + (GS.housing.showcaseRevenue | 0)); };
 DBG.cookNow = () => { Kitchen.q.forEach(k => k.readyAt = 0); console.log('[DBG] Lotes listos: ' + Kitchen.q.length); };
 </script>
 </body>
