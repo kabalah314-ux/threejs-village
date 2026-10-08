@@ -464,7 +464,7 @@ function defaultGameState() {
     /* ===== v3 · CONTENIDO FUTURO (defaults listos para no volver a migrar) ===== */
     bigJobs: {},                                     // Trabajos Mayores (Sec. 7.4)
     awakening: { step: 0, planeFueled: false, permit: false, permitDay: 0 },   // Cadena del Despertar (Sec. 7.5)
-    story: { prologueDone: false, revealed: false, farewellDone: false, ending: null },
+    story: { prologueDone: false, revealed: false, farewellDone: false, ending: null, act1Done: false },
     weekly: { seals: [false, false, false, false, false, false, false], weekStart: null },  // Sello Semanal (Sec. 10.3)
     museum: { donated: [] },                         // Museo del Sueño (Sec. 10.5)
      lottery: { pool: 0, nextDrawAt: null, tickets: [], lastDraw: null },   // Lotería semanal real (Anexo B) · tickets: [{ num, day }] · lastDraw: { num, at, winner, prize, myCount }
@@ -1927,6 +1927,64 @@ function serviceBtns(npcId) {
   return btns;
 }
 
+// ===== S4 · El Sueño se Revela (Guía 1.3 · v0.6) =====
+function storyState() { GS.story ||= { prologueDone: false, revealed: false, farewellDone: false, ending: null, act1Done: false }; return GS.story; }
+function missionsDoneCount() {            // status: 0 bloqueada/sin empezar · 1 en curso · 2 completada
+  return Object.values(GS.missions || {}).filter(m => m?.status === 2).length;
+}
+function storyMigrateLegacy() {           // partidas previas a v0.6: ni prólogo repetido ni contador oculto
+  const s = storyState(); if (s.prologueDone) return;
+  if ((GS.daily?.dayCount || 0) > 1 || missionsDoneCount() > 0) { s.prologueDone = true; s.revealed = true; }
+}
+function storyCSS() {
+  if (document.getElementById('storyCSS')) return;
+  const st = document.createElement('style'); st.id = 'storyCSS';
+  st.textContent = `
+  @keyframes zzz { 0% { transform: translate(0,0) scale(.6); opacity: 0 } 30% { opacity: 1 } 100% { transform: translate(40px,-90px) scale(1.3); opacity: 0 } }
+  @keyframes stBlink { 50% { opacity: 0 } }
+  @keyframes goalPop { 0% { transform: scale(.4); opacity: 0 } 60% { transform: scale(1.15); opacity: 1 } 100% { transform: scale(1) } }
+  .st-z { position: absolute; font: 700 22px Fredoka, sans-serif; color: #c5cae9; animation: zzz 3s linear infinite }
+  .st-cursor { animation: stBlink 1s steps(1) infinite }
+  .goal-pop { animation: goalPop .9s ease-out }`;
+  document.head.appendChild(st);
+}
+function storyFade(color, ms, cb) {
+  const f = document.createElement('div');
+  f.style.cssText = `position:fixed;inset:0;z-index:9999;background:${color};opacity:0;transition:opacity ${ms}ms ease;pointer-events:all`;
+  document.body.appendChild(f); requestAnimationFrame(() => f.style.opacity = '1');
+  setTimeout(() => { cb && cb(); f.style.opacity = '0'; setTimeout(() => f.remove(), ms + 50); }, ms + 100);
+}
+function showPrologue(onDone) {
+  storyCSS(); if ($('prologue')) return;
+  const o = document.createElement('div'); o.id = 'prologue';
+  o.style.cssText = 'position:fixed;inset:0;z-index:9998;background:radial-gradient(circle at 50% 70%,#2a2440,#0d0b18);display:flex;align-items:center;justify-content:center;font-family:Fredoka,sans-serif';
+  o.innerHTML = `
+  <div style="position:relative;width:min(92vw,520px);text-align:center;color:#e8eaf6">
+    <div style="font-size:14px;opacity:.7;margin-bottom:10px">🕓 4:37 AM</div>
+    <div style="position:relative;margin:0 auto;width:min(80vw,360px)">
+      <div style="background:#1e1e2e;border:6px solid #3a3a52;border-radius:12px 12px 4px 4px;padding:12px;text-align:left;font:13px/1.5 monospace;color:#a5d6a7;height:150px;overflow:hidden">
+        <div>&gt; npm run build</div><div style="color:#ef9a9a">✖ Error: Unexpected token ';'</div>
+        <div>&gt; npm run build</div><div style="color:#ef9a9a">✖ Error: Unexpected token ';'</div>
+        <div>&gt; <span class="st-cursor">▌</span></div>
+      </div>
+      <div style="height:12px;background:#4a4a66;border-radius:0 0 14px 14px;margin:0 -18px"></div>
+      <div style="position:absolute;right:-46px;bottom:4px;font-size:30px">☕</div>
+      <span class="st-z" style="left:40%;top:-10px">Z</span><span class="st-z" style="left:52%;top:-20px;animation-delay:1s">z</span><span class="st-z" style="left:46%;top:-5px;animation-delay:2s">Z</span>
+    </div>
+    <p style="margin:22px 0 6px;font-size:16px;opacity:.85">Café frío. Código que no compila. Demasiadas horas despierto.</p>
+    <button id="btnSleep" style="margin-top:14px;padding:14px 34px;border-radius:999px;background:#7e57c2;color:#fff;font:700 18px Fredoka,sans-serif;border:0;box-shadow:0 6px 24px #7e57c288;cursor:pointer">😴 DORMIRSE</button>
+  </div>`;
+  document.body.appendChild(o);
+  $('btnSleep').onclick = () => {
+    $('btnSleep').disabled = true;
+    storyFade('#ffffff', 1400, () => {
+      o.remove(); storyState().prologueDone = true;
+      onDone && onDone();
+      SaveSystem.saveNow('story:prologue');
+      setTimeout(() => showToast('🐻 "¡Eh, eh! ¿Estás bien? ¡Por fin llegó el humano de la laptop!"', 'text-white'), 1600);
+    });
+  };
+}
 function startDialog(npcId) {
   const n = npcById[npcId], obj = npcObjs[npcId], m = state.missions[npcId];
   state.mode = 'dialog'; state.dialogNpc = npcId;
@@ -3948,6 +4006,7 @@ const missionsDone = () => NPCS.filter(n => GS.missions[n.id].status === 2).leng
 
 /** Reconstruye el mundo 3D a partir de GS (una sola vez al arrancar). Todo lo que llama debe ser idempotente. */
 function applyGameStateToWorld() {
+  storyMigrateLegacy();
   NPCS.forEach(n => { GS.missions[n.id] ||= { status: 0, generated: false, completedAt: null }; });
   buildHouse(clamp(GS.house.level | 0, 0, 2));
   ['fountain', 'lamps', 'windmill', 'statue'].forEach(id => { if (hasItem(id)) buildStructure(id); });   // mejoras antiguas de la tienda de Glover (compatibilidad)
@@ -3986,7 +4045,7 @@ if (hadSave) {
 const btnPlay = $('btnPlay');
 btnPlay.disabled = false; btnPlay.textContent = hadSave ? '▶ CONTINUAR' : '▶ JUGAR';
 $('playSub').textContent = hadSave ? 'Partida de invitado guardada en este navegador' : 'Sin registro · empiezas como invitado · se guarda automáticamente';
-btnPlay.onclick = () => {
+const startGameFromMenu = () => {
   const menu = $('menu'); menu.classList.add('hide'); setTimeout(() => menu.remove(), 700);
   try { audioCtx ||= new (window.AudioContext || window.webkitAudioContext)(); audioCtx.resume(); } catch (e) {}
   playChime();
@@ -3994,6 +4053,7 @@ btnPlay.onclick = () => {
   cam.rate = 1.7; cam.tDist = 9; cam.tPitch = 0.42; // zoom cinematográfico desde el espacio hasta el personaje
   setTimeout(() => { state.menuOpen = false; cam.rate = 10; showToast(hadSave ? '💾 Partida restaurada · ¡bienvenido de nuevo!' : '🐻 Busca al Oso Panadero: tiene un “!” sobre la cabeza', 'text-white'); }, 2600);
 };
+btnPlay.onclick = () => (storyState().prologueDone ? startGameFromMenu() : showPrologue(startGameFromMenu));
 
 // ---- Guardado periódico de seguridad y al salir / ocultar la pestaña ----
 setInterval(() => SaveSystem.saveNow('periodic'), 30000);
@@ -4165,6 +4225,7 @@ DBG.coffee = () => { Coffee.until = Date.now() + CFG.coffeeMs; console.log('[DBG
 DBG.star = () => { console.log(StarFall.spawn() ? '[DBG] Estrella caída cerca' : '[DBG] No hay tierra cerca'); };
 DBG.seals = (n = 7) => { const w = Weekly.roll(); for (let i = 0; i < 7; i++) w.seals[i] = i < n; DBG.save('debug_seals'); console.log('[DBG] Sellos: ' + Weekly.count()); };
 DBG.cookNow = () => { Kitchen.q.forEach(k => k.readyAt = 0); console.log('[DBG] Lotes listos: ' + Kitchen.q.length); };
+DBG.prologue = () => { storyState().prologueDone = false; showPrologue(() => {}); };
 DBG.builds = () => console.table((GS.world.buildings || []).map(r => ({ id: r.id, type: r.type, placed: !!placedBuildings[r.id] })));
 DBG.demolish = (id, refund = 0.5) => removeBuilding(id ?? GS.world.buildings?.at(-1)?.id, refund);
 </script>
