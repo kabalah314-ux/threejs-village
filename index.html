@@ -1954,6 +1954,12 @@ function storyFade(color, ms, cb) {
   document.body.appendChild(f); requestAnimationFrame(() => f.style.opacity = '1');
   setTimeout(() => { cb && cb(); f.style.opacity = '0'; setTimeout(() => f.remove(), ms + 50); }, ms + 100);
 }
+function fmtDots(n) { return String(Math.floor(Math.max(0, n || 0))).replace(/\B(?=(\d{3})+(?!\d))/g, '.'); }
+function refreshGoalHUD(pop = false) {
+  const w = $('goalWrap'); if (!w) return; storyCSS();
+  const on = !!storyState().revealed; w.classList.toggle('hidden', !on);
+  if (pop && on) { w.classList.remove('goal-pop'); void w.offsetWidth; w.classList.add('goal-pop'); }
+}
 function showPrologue(onDone) {
   storyCSS(); if ($('prologue')) return;
   const o = document.createElement('div'); o.id = 'prologue';
@@ -3980,7 +3986,7 @@ function updateGoalHUD() {
   _goalLast = shown;
   const pct = Math.min(100, (shown / goal) * 100);
   const t = document.getElementById('goalText'), p = document.getElementById('goalPct'), b = document.getElementById('goalBar');
-  if (t) t.textContent = `${shown.toLocaleString('es-ES')} / ${goal.toLocaleString('es-ES')}`;
+  if (t) t.textContent = `✈️ ${fmtDots(shown)} / ${fmtDots(goal)}`;
   if (p) p.textContent = ` · ${pct.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`;
   if (b) b.style.width = (shown > 0 ? Math.max(pct, 0.6) : 0) + '%';
 }
@@ -4007,6 +4013,7 @@ const missionsDone = () => NPCS.filter(n => GS.missions[n.id].status === 2).leng
 /** Reconstruye el mundo 3D a partir de GS (una sola vez al arrancar). Todo lo que llama debe ser idempotente. */
 function applyGameStateToWorld() {
   storyMigrateLegacy();
+  refreshGoalHUD();
   NPCS.forEach(n => { GS.missions[n.id] ||= { status: 0, generated: false, completedAt: null }; });
   buildHouse(clamp(GS.house.level | 0, 0, 2));
   ['fountain', 'lamps', 'windmill', 'statue'].forEach(id => { if (hasItem(id)) buildStructure(id); });   // mejoras antiguas de la tienda de Glover (compatibilidad)
@@ -4226,6 +4233,7 @@ DBG.star = () => { console.log(StarFall.spawn() ? '[DBG] Estrella caída cerca' 
 DBG.seals = (n = 7) => { const w = Weekly.roll(); for (let i = 0; i < 7; i++) w.seals[i] = i < n; DBG.save('debug_seals'); console.log('[DBG] Sellos: ' + Weekly.count()); };
 DBG.cookNow = () => { Kitchen.q.forEach(k => k.readyAt = 0); console.log('[DBG] Lotes listos: ' + Kitchen.q.length); };
 DBG.prologue = () => { storyState().prologueDone = false; showPrologue(() => {}); };
+DBG.reveal = (on = true) => { storyState().revealed = on; refreshGoalHUD(on); };
 DBG.builds = () => console.table((GS.world.buildings || []).map(r => ({ id: r.id, type: r.type, placed: !!placedBuildings[r.id] })));
 DBG.demolish = (id, refund = 0.5) => removeBuilding(id ?? GS.world.buildings?.at(-1)?.id, refund);
 </script>
