@@ -337,8 +337,6 @@ const CFG = {
   taxRatePct: 1,                  // Tasa de Residencia Onírica: % del capital por día
   taxMin: 10,                     // tasa mínima diaria
   debtInterestPct: 3,             // interés diario de la Deuda Onírica
-  debtEmbargoThreshold: 1000,
-  debtEmbargoWarnPct: 0.6,
   debtEmbargoAt: 1000,            // deuda a partir de la cual Sombra embarga construcciones (Sec. 4.7)
   /* ===== v0.3 · LOTERÍA SEMANAL (Sec. 4.7 + Anexo B: sorteo domingo 20:00 real) ===== */
   lotteryTicketPrice: 50,
@@ -442,7 +440,7 @@ function defaultGameState() {
     economy: { money: 0, lifetimeEarned: 0, lifetimeSpent: 0, history: [] },   // history: últimas 40 operaciones { t, amount, label }
     inventory: { capacity: 20, slots: [] },          // slots: [{ id, qty, dur?, num? }] · dur = durabilidad (herramientas) · num = nº de lotería
     shops: {},                                       // { [shopId]: { stock: { itemId: n }, restockAt } }
-    world: { pickups: {}, embargo: { active: false, since: 0, times: 0, debtAtSeal: 0, warned: false } },                          // { [índiceDelPickup]: timestamp de reaparición }
+    world: { pickups: {} },                          // { [índiceDelPickup]: timestamp de reaparición }
     missions: {},                                    // { [npcId]: { status: 0|1|2, generated: bool, completedAt } }
     house: { level: 0 },                             // 0 Casa · 1 Tienda · 2 Villa
     purchases: { owned: [] },                        // ids comprados de UPGRADES y SKINS
@@ -1582,56 +1580,6 @@ drawBoard(); setInterval(tickMarket, 1000);
    - Modo construcción: vista previa que sigue al puntero/toque, validación, coste, guardado.
    ========================================================= */
 const animatedBuilds = [];   // grupos con partes animadas (gotas, aspas, moneda)
-// ===== S3.6 · Embargo de construcciones (Sec. 4.7 + reglas 6.4 / 6.13: nada se pierde, se pausa) =====
-const RUNE_H = { windmill: 6.2, statue: 4.2, flag: 3.4, lamp: 3.2 };
-const Embargo = {
-  st() { GS.world.embargo ||= { active: false, since: 0, times: 0, debtAtSeal: 0, warned: false }; return GS.world.embargo; },
-  debt() { return Math.max(0, Number(GS.debt) || 0); },
-  isActive() { return !!this.st().active; },
-  check(reason = '') {
-    const e = this.st(), d = this.debt(), lim = CFG.debtEmbargoThreshold, warnAt = lim * CFG.debtEmbargoWarnPct;
-    if (!e.active) {
-      if (d >= lim) this.seal();
-      else if (d >= warnAt && !e.warned) { e.warned = true; showToast('🔮 Sombra: "Tu deuda crece, soñador. Un poco más y tus obras dormirán bajo mis runas."', 'text-purple-200'); }
-      else if (d < warnAt) e.warned = false;
-    } else if (d <= 0) this.unseal();
-  },
-  seal() {
-    const e = this.st(); e.active = true; e.since = GS.daily?.dayCount || 0; e.debtAtSeal = this.debt(); e.times = (e.times || 0) + 1; e.warned = false;
-    this.apply();
-    showToast('🔮 Sombra ha sellado tus construcciones. Salda tu deuda para liberarlas.', 'text-purple-200');
-    SaveSystem.saveNow('embargo:seal');
-  },
-  unseal() {
-    const e = this.st();
-    if (e.times > 1) {
-      const fee = Math.ceil(e.debtAtSeal * CFG.unsealFeePct / 100);
-      if (fee > 0 && !Wallet.spend(fee, 'Desellado de construcciones (Sombra)')) { showToast(`🔮 Sombra: "La deuda está saldada, pero el desellado cuesta ${fee} $T."`, 'text-purple-200'); return false; }
-    } else showToast('🔮 Sombra: "La primera lección del sueño es gratis, soñador. La segunda ya tiene tarifa."', 'text-purple-200');
-    e.active = false; e.debtAtSeal = 0; this.apply();
-    showToast('✨ Tus construcciones vuelven a la vida', 'text-white'); SaveSystem.saveNow('embargo:unseal'); return true;
-  },
-  apply() { const on = this.isActive(); Object.values(placedBuildings).forEach(p => this.setSealed(p.group, on)); },
-  setSealed(g, on) {
-    const u = g.userData;
-    if (on && !u.sealed) {
-      u.sealed = true; u.sealedLights = [];
-      g.traverse(o => { if (o.isPointLight) { const k = nightLights.indexOf(o); if (k >= 0) { nightLights.splice(k, 1); u.sealedLights.push(o); } o.userData.prevI = o.intensity; o.intensity = 0; } });
-      const ai = animatedBuilds.indexOf(g); u.wasAnimated = ai >= 0; if (ai >= 0) animatedBuilds.splice(ai, 1);
-      if (!u.rune) {
-        u.rune = new THREE.Sprite(new THREE.SpriteMaterial({ map: textTexture('✦ ☾ ✦', { bg: '#00000000', color: '#b388ff', font: 'bold 90px Fredoka' }), transparent: true, depthWrite: false }));
-        u.rune.scale.set(1.6, 0.8, 1); u.rune.position.y = RUNE_H[u.type] || 2.4; g.add(u.rune);
-      }
-      u.rune.visible = true;
-    } else if (!on && u.sealed) {
-      u.sealed = false;
-      g.traverse(o => { if (o.isPointLight && o.userData.prevI !== undefined) o.intensity = o.userData.prevI; });
-      (u.sealedLights || []).forEach(l => { if (!nightLights.includes(l)) nightLights.push(l); }); u.sealedLights = [];
-      if (u.wasAnimated && !animatedBuilds.includes(g)) animatedBuilds.push(g);
-      if (u.rune) u.rune.visible = false;
-    }
-  }
-};
 function makeBuildable(type) {
   const g = new THREE.Group();
   if (type === 'fountain') {
@@ -1680,19 +1628,17 @@ function placeBuilding(rec) {
   if (!rec || !rec.id || placedBuildings[rec.id]) return;              // nunca duplicar
   const def = buildableById[rec.type]; if (!def) { console.warn('[build] tipo desconocido', rec.type); return; }
   if (!Array.isArray(rec.dir) || rec.dir.length !== 3 || rec.dir.some(n => !Number.isFinite(n))) { console.warn('[build] dir inválido', rec); return; }
-  const g = makeBuildable(rec.type); g.userData.recId = rec.id; g.userData.type = rec.type;
+  const g = makeBuildable(rec.type); g.userData.recId = rec.id;
   const dir = new THREE.Vector3().fromArray(rec.dir).normalize();
   placeOnPlanet(g, dir, rec.yaw || 0, 0, SITES.village.S); scene.add(g);
   const col = { pos: g.position.clone(), r: def.r || 1 }; colliders.push(col);
   placedBuildings[rec.id] = { group: g, collider: col };
-  if (Embargo.isActive()) Embargo.setSealed(g, true);
 }
 function restoreBuildings() {
   GS.world.buildings ||= [];
   const seen = new Set();
   GS.world.buildings = GS.world.buildings.filter(r => r && r.id && !seen.has(r.id) && seen.add(r.id));
   GS.world.buildings.forEach(placeBuilding);
-  Embargo.apply();
 }
 function removeBuilding(id, refund = 0.5) {
   const p = placedBuildings[id]; const i = (GS.world.buildings || []).findIndex(r => r.id === id);
@@ -1750,7 +1696,6 @@ function setBuildCursorFromPointer(clientX, clientY) {
 /** Confirmar: cobra $TOKEN + materiales, crea el registro en GS y coloca la construcción real */
 function confirmBuild() {
   const b = state.build; if (!b || !b.valid) return; const def = b.def;
-  if (Embargo.isActive()) { showToast('🔮 Sombra: "Nada de obras nuevas hasta que saldes tu deuda, soñador."', 'text-purple-200'); return; }
   if (!buildAffordable(def)) { showToast('❌ Ya no cumples los requisitos', 'text-red-200'); return; }
   if (!Wallet.spend(def.cost, `Construcción: ${def.name}`)) return;
   Object.entries(def.mats).forEach(([id, q]) => Inventory.remove(id, q));
@@ -2453,7 +2398,6 @@ function settleDay() {
   // 1) Hooks de la liquidación (v0.3: alquiler, tasa, intereses…). Van ANTES del resumen
   //    para que sus cargos (vía Wallet) cuenten en el cómputo del día.
   DailySystem._hooks.forEach(h => { try { h(); } catch (e) { console.warn('[Daily]', e); } });
-  Embargo.check('settle');
   // 2) Resumen económico del día que termina (desde el historial de Wallet por timestamp real)
   const since = GS.daily.lastSettleAt || (Date.now() - CFG.dayLengthMs);
   const ops = GS.economy.history.filter(e => e.t > since);
@@ -2601,7 +2545,7 @@ function payRentDebt(amount) {
 function payDebt(amount) {
   amount = Math.min(Math.max(0, Math.floor(amount)), GS.debt); if (!amount) return false;
   if (!Wallet.spend(amount, 'Pago Deuda Onírica')) return false;
-  GS.debt -= amount; Embargo.check('pay'); updateEmbargo();
+  GS.debt -= amount; updateEmbargo();
   if (GS.debt <= 0) { GS.debt = 0; showToast('🔮 Deuda con Sombra saldada. El velo te sonríe', 'text-white'); playChime(); }
   SaveSystem.saveNow('pay-debt'); return true;
 }
@@ -4221,7 +4165,6 @@ DBG.coffee = () => { Coffee.until = Date.now() + CFG.coffeeMs; console.log('[DBG
 DBG.star = () => { console.log(StarFall.spawn() ? '[DBG] Estrella caída cerca' : '[DBG] No hay tierra cerca'); };
 DBG.seals = (n = 7) => { const w = Weekly.roll(); for (let i = 0; i < 7; i++) w.seals[i] = i < n; DBG.save('debug_seals'); console.log('[DBG] Sellos: ' + Weekly.count()); };
 DBG.cookNow = () => { Kitchen.q.forEach(k => k.readyAt = 0); console.log('[DBG] Lotes listos: ' + Kitchen.q.length); };
-DBG.embargoDebt = n => { GS.debt = n; Embargo.check('dbg'); return Embargo.st(); };
 DBG.builds = () => console.table((GS.world.buildings || []).map(r => ({ id: r.id, type: r.type, placed: !!placedBuildings[r.id] })));
 DBG.demolish = (id, refund = 0.5) => removeBuilding(id ?? GS.world.buildings?.at(-1)?.id, refund);
 </script>
