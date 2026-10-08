@@ -1891,6 +1891,7 @@ function serviceBtns(npcId) {
   if (npcId === 'mayor' && ((GS.housing.rentDebt || 0) > 0 || GS.housing.sealed)) btns.push(dialogButton('💼 Saldar cuentas', 'bg-emerald-200 text-[#2b2b3d]', () => GS.housing.sealed ? openSealedHousePanel() : openHousePanel()));   // S1.2 (Sec. 6.3)
   if (npcId === 'glover') btns.push(dialogButton('⛏️ Taller de Glover', 'bg-orange-200 text-[#2b2b3d]', () => openApp('🦫 Taller de Glover', '', (b) => mountItemShop(b, 'glover'))));   // S2.2
   if (npcId === 'sam' || npcId === 'glover') btns.push(dialogButton('🔧 Reparar herramientas', 'bg-amber-200 text-[#2b2b3d]', () => openToolsPanel(npcId)));   // S2.2 (Sec. 5.7)
+  if (npcId === 'glover' && typeof openFurnitureShop === 'function') btns.push(dialogButton('🛋️ Muebles', 'bg-emerald-200 text-[#2b2b3d]', () => openFurnitureShop()));   // S3.5 (Sec. 6.8)
   return btns;
 }
 
@@ -2425,7 +2426,7 @@ DailySystem.onSettle(() => {
     }
   }
   /* 2) TASA DE RESIDENCIA ONÍRICA (1% del capital, mín. 10 $T) → el 100% alimenta el pozo de la lotería */
-  const tax = Math.max(CFG.taxMin, Math.floor(GS.economy.money * CFG.taxRatePct / 100));
+  const tax = Math.max(CFG.taxMin, Math.floor(GS.economy.money * (typeof hasFurniture === 'function' && hasFurniture('muni_safe') ? 1 - CFG.muniSafeExemptPct : 1) * CFG.taxRatePct / 100));   // S3.5: Caja Fuerte (Sec. 6.8)
   if (Wallet.spend(tax, 'Tasa de Residencia Onírica', { silent: true })) {
     charges.push({ label: '🏛️ Tasa municipal', amount: -tax });
     GS.lottery.pool += tax;
@@ -3676,6 +3677,45 @@ function openShowcasePanel() {
     render();
   });
 }
+/* ===== S3.5 · MUEBLES (Guía Sec. 6.8) · se compran a Glover tras su misión · GS.furniture.owned = [ids] ===== */
+const FURNITURE = [
+  { id: 'comfy_bed',    name: 'Cama Mullida',           icon: '🛏️', price: 300,  desc: 'Descansado mejorado: +15% velocidad y +8% precios.' },
+  { id: 'iron_stove',   name: 'Cocina de Hierro',       icon: '🔥', price: 500,  desc: '2 lotes de cocina a la vez.' },
+  { id: 'trophy_shelf', name: 'Estantería de Trofeos',  icon: '🏆', price: 400,  desc: '+5% a toda la confianza que ganes (prestigio).' },
+  { id: 'muni_safe',    name: 'Caja Fuerte Municipal™', icon: '🔐', price: 5000, desc: 'El 25% de tu capital queda exento de la tasa diaria del 1%. Reginald: "¡Ejem! Fiscalmente impecable. Moralmente… ejem."' },
+  { id: 'piggy_xl',     name: 'Hucha XL',               icon: '🐷', price: 800,  desc: '+6 huecos de escaparate.' },
+  { id: 'lava_lamp',    name: 'Lámpara de Lava',        icon: '🪔', price: 150,  desc: 'Bonita. Solo bonita. (Está bien: es un sueño.)' },
+];
+function buyFurniture(id) {
+  const f = FURNITURE.find(x => x.id === id); if (!f) return false;
+  if (hasFurniture(id)) { showToast('✓ Ya lo tienes', 'text-white'); return false; }
+  if (!Wallet.spend(f.price, `Mueble: ${f.name}`)) return false;
+  if (!Array.isArray(GS.furniture.owned)) GS.furniture.owned = [];
+  GS.furniture.owned.push(id);
+  if (typeof Trust !== 'undefined') Trust.addTrade('glover', f.price);
+  showToast(`🛋️ ${f.icon} ${f.name} instalado en tu casa`, 'text-white'); playChime(); SaveSystem.saveNow('furniture:' + id); return true;
+}
+function openFurnitureShop() {
+  if (GS.missions?.glover?.status !== 2) { showToast('🦫 Glover: "Primero terminamos lo de la laptop. Luego hablamos de muebles."', 'text-white'); return; }
+  openApp('🛋️ Muebles de Glover', '', (body) => {
+    const render = () => {
+      body.innerHTML = balanceBar() + FURNITURE.map(f => { const own = hasFurniture(f.id); return `<div class="app-card p-3 mb-2 flex items-center gap-3"><div class="text-3xl">${f.icon}</div><div class="flex-1 min-w-0"><div class="font-bold text-sm">${esc(f.name)}</div><div class="text-[11px] text-slate-500">${esc(f.desc)}</div></div>${own ? '<span class="text-emerald-600 font-bold text-xs">✓ En casa</span>' : `<button data-buy="${f.id}" class="btn-game px-3 py-1.5 text-xs ${Wallet.canAfford(f.price) ? 'bg-emerald-300' : 'bg-slate-200 opacity-60'}">${fmt(f.price)} $T</button>`}</div>`; }).join('') + `<div class="text-[11px] text-slate-500">Fase 1: los muebles actúan desde el panel de la casa (sin interior 3D todavía, Sec. 6.9).</div>`;
+      body.querySelectorAll('[data-buy]').forEach(b => b.onclick = () => { buyFurniture(b.dataset.buy); render(); });
+    };
+    render();
+  });
+}
+/* Prestigio de confianza: Estantería de Trofeos (+5%) + nivel de casa (+2% Tienda / +5% Villa, se pierde sellada). Envuelve Trust.add una sola vez. */
+if (typeof Trust !== 'undefined' && typeof Trust.add === 'function' && !Trust.__prestigeWrapped) {
+  const _trustAdd = Trust.add.bind(Trust);
+  Trust.add = function (id, pts, ...rest) {
+    let m = 1;
+    if (hasFurniture('trophy_shelf')) m += CFG.trophyShelfTrustBonus;
+    if (!houseSealed()) m += CFG.housePrestigeByLevel[clamp(GS.house.level | 0, 0, 2)] || 0;
+    return _trustAdd(id, (typeof pts === 'number' && pts > 0) ? pts * m : pts, ...rest);
+  };
+  Trust.__prestigeWrapped = true;
+}
 /* ===== v0.1 · HUD OBJETIVO 40M (Guía Sec. 0.2 P4: "un número imposible siempre visible") ===== */
 let _goalLast = -1;
 function updateGoalHUD() {
@@ -3924,6 +3964,7 @@ DBG.rest = () => { GS.daily.restedUntil = dreamNow() + CFG.restedDurationDays * 
 DBG.cookNow = () => { if (GS.housing.kitchen) { GS.housing.kitchen.readyAt = 0; console.log('[DBG] Cocina lista'); } else console.log('[DBG] La cocina está libre'); };
 DBG.house = (lv) => { GS.house.level = clamp(lv | 0, 0, 2); buildHouse(GS.house.level); DBG.save('debug_house'); console.log('[DBG] Casa nivel ' + GS.house.level); };
 DBG.showcaseSettle = () => { Showcase.settle(); DBG.save('debug_showcase'); console.log('[DBG] Hucha: ' + (GS.housing.showcaseRevenue | 0)); };
+DBG.furniture = (id) => { if (!FURNITURE.some(f => f.id === id)) { console.warn('[DBG] muebles: ' + FURNITURE.map(f => f.id).join(', ')); return; } if (!hasFurniture(id)) GS.furniture.owned.push(id); DBG.save('debug_furniture'); console.log('[DBG] Mueble: ' + id); };
 DBG.cookNow = () => { Kitchen.q.forEach(k => k.readyAt = 0); console.log('[DBG] Lotes listos: ' + Kitchen.q.length); };
 </script>
 </body>
