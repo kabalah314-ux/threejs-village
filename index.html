@@ -1837,6 +1837,7 @@ function interactWith(obj) {
   else if (it.type === 'fruit') harvest(obj);
   else if (it.type === 'pickup') collectPickup(obj);
   else if (it.type === 'fishing') Fishing.cast();   // S2.3
+  else if (it.type === 'mine') Mining.hit(obj);   // S2.4
   else if (it.type === 'crate') { if (state.crateTaken) return; if (Inventory.add('merchant_crate', 1)) { state.crateTaken = true; crate.visible = false; playChime(); } }
   else if (it.type === 'vendor') startVendorDialog();
   else if (it.type === 'store') { if (!canControl()) return; openApp('🦝 Tienda de Rocco', '', (b) => mountItemShop(b, 'store')); }
@@ -3382,6 +3383,62 @@ const Fishing = (() => {
   function cancel(msg) { if (_timer) clearTimeout(_timer); _timer = null; _busy = false; bobber.visible = false; if (msg) showToast(msg, 'text-white'); }
   return { update, cast, cancel, busy: () => _busy };
 })();
+/* ===== S2.4 · MINERÍA (Guía Sec. 5.5–5.6) =====
+   4 nodos fijos (semilla determinista) en zonas altas · respawn en tiempo REAL (como pickups) · GS.world.mineNodes = { idx: timestamp } */
+const Mining = (() => {
+  const nodes = [];
+  const rockM = new THREE.MeshStandardMaterial({ color: 0x8a8f99, roughness: 0.9, flatShading: true });
+  const gemM = new THREE.MeshStandardMaterial({ color: 0xb06bff, emissive: 0x5a1fa0, emissiveIntensity: 0.6, roughness: 0.3, flatShading: true });
+  function makeNode() {
+    const g = new THREE.Group(), body = new THREE.Group();
+    [[0, 0.45, 0, 0.6], [0.45, 0.3, 0.2, 0.42], [-0.35, 0.28, -0.25, 0.38]].forEach(([x, y, z, s]) => { const m = new THREE.Mesh(new THREE.DodecahedronGeometry(s, 0), rockM); m.position.set(x, y, z); m.castShadow = true; m.receiveShadow = true; body.add(m); });
+    [[0.2, 0.8, 0.15], [-0.15, 0.6, 0.3], [0.5, 0.55, -0.1]].forEach(([x, y, z]) => { const m = new THREE.Mesh(new THREE.OctahedronGeometry(0.11, 0), gemM); m.position.set(x, y, z); body.add(m); });
+    g.add(body); g.userData.body = body; return g;
+  }
+  {
+    const rnd = mulberry32(5150);
+    const rDir = () => { const u = rnd() * 2 - 1, th = rnd() * 6.2832, s = Math.sqrt(1 - u * u); return new THREE.Vector3(s * Math.cos(th), u, s * Math.sin(th)); };
+    const nearTree = (d) => typeof treeDirs !== 'undefined' && Array.isArray(treeDirs) && treeDirs.some(t => t && t.isVector3 && angleBetween(t, d) < 0.07);
+    for (const [minRel, spacing] of [[1.5, 0.5], [1.0, 0.35], [0.6, 0.25]]) {
+      let tries = 0;
+      while (nodes.length < CFG.mineNodes && tries++ < 4000) {
+        const d = rDir();
+        if (!isLand(d) || nearAnySite(d, 0.02) || heightAt(d) - SEA < minRel || nearTree(d)) continue;
+        if (nodes.some(n => angleBetween(n.userData.dir, d) < spacing)) continue;
+        if (pickups.some(p => p.userData.dir && angleBetween(p.userData.dir, d) < 0.08)) continue;
+        const g = makeNode(); placeOnPlanet(g, d);
+        g.userData.dir = g.userData.dir || d.clone(); g.userData.idx = nodes.length; g.userData.ready = true; g.userData.respawnAt = 0;
+        registerInteractable(g, { type: 'mine', label: 'Minar ⛏️' }); scene.add(g);
+        colliders.push({ pos: g.position.clone(), r: 0.75 }); nodes.push(g);
+      }
+      if (nodes.length >= CFG.mineNodes) break;
+    }
+  }
+  function setReady(g, ready) { g.userData.ready = ready; g.userData.body.scale.setScalar(ready ? 1 : 0.45); }
+  function restore() { const st = GS.world.mineNodes || {}; nodes.forEach(g => { const at = st[g.userData.idx]; if (at && Date.now() < at) { setReady(g, false); g.userData.respawnAt = at; } else setReady(g, true); }); }
+  let _acc = 0;
+  function update(dt) {
+    _acc += dt; if (_acc < 1) return; _acc = 0;
+    nodes.forEach(g => { if (!g.userData.ready && Date.now() > g.userData.respawnAt) { setReady(g, true); if (GS.world.mineNodes) delete GS.world.mineNodes[g.userData.idx]; } });
+  }
+  function hit(g) {
+    if (!g.userData.ready) return;
+    if (!Tools.usable('pickaxe')) { showToast(Tools.needMsg('pickaxe'), 'text-red-200'); return; }
+    const stones = CFG.mineStoneMin + Math.floor(Math.random() * (CFG.mineStoneMax - CFG.mineStoneMin + 1));
+    const gem = Math.random() < CFG.mineGemChance * Weather.gemMult() * (typeof AuraFX !== 'undefined' ? AuraFX.rareLootBoost() : 1);
+    const loot = [['stone', stones]]; if (gem) loot.push(['raw_gem', 1]);
+    if (!Inventory.canAddMany(loot)) { showToast('🎒 Inventario lleno: haz hueco antes de minar', 'text-red-200'); return; }
+    Tools.wear('pickaxe');
+    loot.forEach(([id, q]) => Inventory.add(id, q, { silent: true }));
+    GS.stats.nodesMined = (GS.stats.nodesMined || 0) + 1;
+    showToast(gem ? `💎 ¡Gema en Bruto! + 🪨 ×${stones}` : `⛏️ +${stones} 🪨 Piedra`, 'text-white');
+    if (gem) playChime(); else playBeep(330, 0.08, 'square');
+    setReady(g, false);
+    g.userData.respawnAt = Date.now() + CFG.mineRespawnMin * 60000 * (typeof AuraFX !== 'undefined' ? AuraFX.cooldownMult() : 1);
+    (GS.world.mineNodes ||= {})[g.userData.idx] = g.userData.respawnAt; SaveSystem.save('mine');
+  }
+  return { nodes, restore, update, hit };
+})();
 /* ===== v0.1 · HUD OBJETIVO 40M (Guía Sec. 0.2 P4: "un número imposible siempre visible") ===== */
 let _goalLast = -1;
 function updateGoalHUD() {
@@ -3399,7 +3456,7 @@ function animate() {
   requestAnimationFrame(animate);
   const dt = Math.min(clock.getDelta(), 0.05), t = clock.elapsedTime;
   updatePlayer(dt); Needs.update(dt); updateNPCs(dt, t); updateCamera(dt); updateSun(); updateNeon(dt, t); updateUnlocks(dt, t); updateShip(dt); updateConfetti(dt); updateWater(t);
-  clouds.children.forEach(p => p.rotateY(p.userData.speed * dt)); updateTokens(); updateGoalHUD(); Weather.update(dt); Fishing.update(dt);
+  clouds.children.forEach(p => p.rotateY(p.userData.speed * dt)); updateTokens(); updateGoalHUD(); Weather.update(dt); Fishing.update(dt); Mining.update(dt);
   if (SaveSystem.started && !state.menuOpen) {
     GS.meta.playTimeSec += dt;
     GS.daily.clockMs += dt * 1000 * DAY_SCALE;                 // v0.1: el reloj onírico solo avanza jugando
@@ -3424,7 +3481,7 @@ function applyGameStateToWorld() {
   restoreBuildings();                                                                                       // construcciones del jugador (GS.world.buildings)
   if (typeof updateEmbargo === 'function') updateEmbargo();   // v0.3: re-aplicar runas si había embargo activo
   if (typeof updateHouseSealVisual === 'function') updateHouseSealVisual();   // S1.2: runas sobre la casa sellada
-  restorePickups(); refreshInvBadge();
+  restorePickups(); refreshInvBadge(); if (typeof Mining !== 'undefined') Mining.restore();   // S2.4
   refreshAuraFromTrust();   // v0.2: el aura = reputación (tier) + estilo equipado (Sec. 3.6)
   setLaptopSkin(LAPTOP_SKINS[GS.cosmetics.laptopSkin] ? GS.cosmetics.laptopSkin : 'default');
   NPCS.forEach(n => { if (GS.missions[n.id].status === 2) { UNLOCKS[n.id](); const o = npcObjs[n.id]; o.userData.bubble.material.map = bubbleTexture('✓', '#7dffa8'); o.userData.bubble.material.needsUpdate = true; } });
@@ -3624,6 +3681,8 @@ DBG.give = (id, qty = 1) => { if (!ITEMS[id]) { console.warn('[DBG] objeto desco
 DBG.items = () => console.table(Object.values(ITEMS).map(i => ({ id: i.id, nombre: i.name, cat: i.cat, rareza: i.rarity, sell: i.sell, buy: i.buy, stack: i.stack, maxDur: i.maxDur ?? '' })));
 DBG.weather = (id) => { Weather.debugForce(id); console.log('[DBG] Clima forzado hasta la próxima franja: ' + id); };
 DBG.toolDur = (id, n) => { const s = GS.inventory.slots.find(x => x.id === id); if (!s) { console.warn('[DBG] no tienes ' + id); return; } s.dur = Math.max(0, n | 0); DBG.save('debug_dur'); console.log('[DBG] ' + id + ' dur = ' + s.dur); };
+DBG.goMine = (i = 0) => { const n = Mining.nodes[i]; if (!n) { console.warn('[DBG] hay ' + Mining.nodes.length + ' nodos'); return; } setMoveTarget(n.userData.dir.clone()); state.pendingInteract = n; console.log('[DBG] Caminando al nodo ' + i); };
+DBG.mineReset = () => { GS.world.mineNodes = {}; Mining.restore(); DBG.save('debug_mine'); console.log('[DBG] Nodos de minería repuestos'); };
 </script>
 </body>
 </html>
