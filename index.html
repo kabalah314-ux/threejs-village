@@ -1836,6 +1836,7 @@ function interactWith(obj) {
   else if (it.type === 'house') { if (GS.housing.sealed) openSealedHousePanel(); else openHousePanel(); }   // v0.3 panel Mi Casa · S1.2 casa sellada (Sec. 6.4)
   else if (it.type === 'fruit') harvest(obj);
   else if (it.type === 'pickup') collectPickup(obj);
+  else if (it.type === 'fishing') Fishing.cast();   // S2.3
   else if (it.type === 'crate') { if (state.crateTaken) return; if (Inventory.add('merchant_crate', 1)) { state.crateTaken = true; crate.visible = false; playChime(); } }
   else if (it.type === 'vendor') startVendorDialog();
   else if (it.type === 'store') { if (!canControl()) return; openApp('🦝 Tienda de Rocco', '', (b) => mountItemShop(b, 'store')); }
@@ -3316,6 +3317,71 @@ function openToolsPanel(npcId = null) {
   });
 }
 { const b = document.getElementById('btnTools'); if (b) b.onclick = () => { if (canControl()) openToolsPanel(); }; }
+/* ===== S2.3 · PESCA (Guía Sec. 5.5–5.6) =====
+   Punto de pesca dinámico: un interactuable invisible que se coloca en el agua junto al jugador si está en la orilla con caña. */
+const isNightNow = () => { const h = (GS.daily.clockMs / 3600000) % 24; return h >= CFG.nightStartHour || h < CFG.nightEndHour; };
+const Fishing = (() => {
+  const spot = new THREE.Group(); spot.visible = false; scene.add(spot);
+  registerInteractable(spot, { type: 'fishing', label: 'Pescar 🎣' });
+  const bobber = new THREE.Mesh(new THREE.SphereGeometry(0.14, 10, 8), new THREE.MeshStandardMaterial({ color: 0xff4d4d, roughness: 0.5 }));
+  bobber.visible = false; scene.add(bobber);
+  let _acc = 0, _depth = 0, _busy = false, _timer = null, _t = 0;
+  const _from = new THREE.Vector3(), _t1 = new THREE.Vector3(), _t2 = new THREE.Vector3(), _td = new THREE.Vector3(), _smp = new THREE.Vector3(), _n = new THREE.Vector3();
+  function findWater() {
+    const up = player.userData.dir, fwd = player.userData.fwd;
+    _t1.copy(fwd).addScaledVector(up, -fwd.dot(up)); if (_t1.lengthSq() < 1e-6) return false; _t1.normalize();
+    _t2.crossVectors(up, _t1).normalize();
+    for (const dist of [1.2, 1.8, 2.4]) {
+      const ang = dist / R;
+      for (let k = 0; k < 8; k++) {
+        const a = (k % 2 ? -1 : 1) * Math.ceil(k / 2) * (Math.PI / 4);   // primero delante, luego hacia los lados
+        _td.copy(_t1).multiplyScalar(Math.cos(a)).addScaledVector(_t2, Math.sin(a));
+        _smp.copy(up).multiplyScalar(Math.cos(ang)).addScaledVector(_td, Math.sin(ang)).normalize();
+        if (!isLand(_smp)) { _depth = Math.max(0, SEA - heightAt(_smp)); spot.position.copy(_smp).multiplyScalar(surfaceR(_smp)); return true; }
+      }
+    }
+    return false;
+  }
+  function update(dt) {
+    if (_busy) {
+      _t += dt; bobber.position.copy(spot.position).addScaledVector(_n.copy(spot.position).normalize(), Math.sin(_t * 6) * 0.05);
+      if (player.position.distanceTo(_from) > 1.0) cancel('🎣 Te has movido: el pez se ha escapado');
+      return;
+    }
+    _acc += dt; if (_acc < 0.2) return; _acc = 0;
+    spot.visible = !!(SaveSystem.started && !state.swimming && Tools.owned('fishing_rod') && findWater());
+  }
+  function rollCatch() {
+    const t = CFG.fishTable, night = isNightNow();
+    const rare = Weather.fishRareMult() * (1 + clamp(_depth / 1.5, 0, 1) * CFG.fishDepthRareBonus) * (typeof AuraFX !== 'undefined' ? AuraFX.rareLootBoost() : 1);
+    const w = { fish: t.fish, tropical_fish: t.tropical_fish * rare, golden_fish: t.golden_fish * rare * (night ? CFG.fishNightGoldenMult : 1), old_boot: t.old_boot };
+    let r = Math.random() * Object.values(w).reduce((a, b) => a + b, 0);
+    for (const [id, v] of Object.entries(w)) { if ((r -= v) < 0) return id; }
+    return 'fish';
+  }
+  function cast() {
+    if (_busy) { showToast('🎣 Ya estás pescando… paciencia', 'text-white'); return; }
+    if (!Tools.usable('fishing_rod')) { showToast(Tools.needMsg('fishing_rod'), 'text-red-200'); return; }
+    _busy = true; _t = 0; _from.copy(player.position);
+    bobber.position.copy(spot.position); bobber.visible = true;
+    showToast('🎣 Lanzas el sedal…', 'text-white'); playBeep(520, 0.05, 'triangle');
+    _timer = setTimeout(reel, CFG.fishWaitMinMs + Math.random() * (CFG.fishWaitMaxMs - CFG.fishWaitMinMs));
+  }
+  function reel() {
+    _timer = null; bobber.visible = false; _busy = false;
+    if (!SaveSystem.started) return;
+    const id = rollCatch();
+    if (!Inventory.canAdd(id, 1)) { showToast('🎒 Inventario lleno: devuelves la captura al agua', 'text-red-200'); return; }
+    Tools.wear('fishing_rod'); Inventory.add(id, 1, { silent: true });
+    GS.stats.fishCaught = (GS.stats.fishCaught || 0) + 1;
+    const it = ITEMS[id];
+    showToast(id === 'old_boot' ? '🥾 ¡Una Bota Vieja! Arrr, un clásico' : `${it.icon} ¡Has pescado ${it.name}!`, 'text-white');
+    if (id === 'golden_fish') { playChime(); spawnConfetti(player.position.clone().addScaledVector(player.userData.dir, 2), 16); } else playBeep(988, 0.08, 'triangle');
+    SaveSystem.save('fish');
+  }
+  function cancel(msg) { if (_timer) clearTimeout(_timer); _timer = null; _busy = false; bobber.visible = false; if (msg) showToast(msg, 'text-white'); }
+  return { update, cast, cancel, busy: () => _busy };
+})();
 /* ===== v0.1 · HUD OBJETIVO 40M (Guía Sec. 0.2 P4: "un número imposible siempre visible") ===== */
 let _goalLast = -1;
 function updateGoalHUD() {
@@ -3333,7 +3399,7 @@ function animate() {
   requestAnimationFrame(animate);
   const dt = Math.min(clock.getDelta(), 0.05), t = clock.elapsedTime;
   updatePlayer(dt); Needs.update(dt); updateNPCs(dt, t); updateCamera(dt); updateSun(); updateNeon(dt, t); updateUnlocks(dt, t); updateShip(dt); updateConfetti(dt); updateWater(t);
-  clouds.children.forEach(p => p.rotateY(p.userData.speed * dt)); updateTokens(); updateGoalHUD(); Weather.update(dt);
+  clouds.children.forEach(p => p.rotateY(p.userData.speed * dt)); updateTokens(); updateGoalHUD(); Weather.update(dt); Fishing.update(dt);
   if (SaveSystem.started && !state.menuOpen) {
     GS.meta.playTimeSec += dt;
     GS.daily.clockMs += dt * 1000 * DAY_SCALE;                 // v0.1: el reloj onírico solo avanza jugando
