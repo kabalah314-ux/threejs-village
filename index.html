@@ -396,6 +396,8 @@ const CFG = {
   showcaseOdds: [[1.0, 0.8], [1.2, 0.5], [1.5, 0.25], [9999, 0.05]],  // Sec. 6.7: precio/valor → prob. de venta/día
   housePrestigeByLevel: [0, 0.02, 0.05],                              // Sec. 6.2: prestigio de confianza (se pierde con la casa sellada)
   trophyShelfTrustBonus: 0.05, muniSafeExemptPct: 0.25,               // Sec. 6.8
+  coffeeMs: 300000,               // Sec. 5.5: Café → laptop ×2 y hambre en pausa durante 5 min
+  bouquetGiftPoints: 5,           // diseño propio: valor del Ramo como regalo universal (la guía no da cifra)
   cookBatchExtra: 0.25,
   cookMaxBatch: 10,
 };
@@ -612,6 +614,9 @@ const ITEMS = {
   star_shard:     defItem({ id: 'star_shard',     name: 'Fragmento de Estrella', icon: '🌠', cat: 'valuable',   rarity: 'epic',     sell: 200, desc: 'Cae del cielo de noche (1-3 por noche). Sombra paga más por él.' }),
   fishing_rod:    defItem({ id: 'fishing_rod',    name: 'Caña de Soñador',       icon: '🎣', cat: 'tool',       sell: 60,  buy: 150, stack: 1, maxDur: 20, desc: 'Para pescar en la orilla. 20 usos. Reparación: Sam (40 $T) o tú mismo con 2 Troncos.' }),
   pickaxe:        defItem({ id: 'pickaxe',        name: 'Pico de Glover',        icon: '⛏️', cat: 'tool',       sell: 80,  buy: 200, stack: 1, maxDur: 30, desc: 'Para minar los nodos de las zonas altas. 30 usos. Reparación: Glover (60 $T) o tú mismo con 1 Tronco + 1 Piedra.' }),
+  coffee:         defItem({ id: 'coffee',         name: 'Café del Mundo Real',   icon: '☕', cat: 'consumable', rarity: 'common',    sell: 10, buy: 25, usable: true, desc: 'Sombra lo encontró "flotando junto a un escritorio". Durante 5 min la laptop genera ×2 más rápido y el hambre se pausa.' }),
+  flower_bouquet: defItem({ id: 'flower_bouquet', name: 'Ramo de Flores',        icon: '💐', cat: 'special',    rarity: 'common',    sell: 10, desc: 'Sale del Jardín (1 al día). Regalo universal: a todos los vecinos les gusta.' }),
+  dream_ticket:   defItem({ id: 'dream_ticket',   name: 'Billete del Despertar', icon: '🎫', cat: 'special',    rarity: 'legendary', sell: 0, stack: 1, desc: 'Tu salida del sueño. No se vende, no se regala, no se pierde. El avión de Sam necesita 5 Gasolinas Gasil. Ya tienes la salida… la pregunta es cuándo la usas.' }),
 };
 /** Tablas de botín (peso relativo) para objetos que se abren */
 const LOOT = {
@@ -711,7 +716,7 @@ function refreshInvBadge() { const el = document.getElementById('invBadge'); if 
 const SHOPS = {
   bear:   { name: 'Panadería del Oso', icon: '🐻', restockMin: 10, sells: [{ id: 'croissant', stock: 10 }, { id: 'cupcake', stock: 10 }, { id: 'strawberry_cake', stock: 4 }], buys: ['golden_fruit', 'seashell', 'pearl', 'wood_log'], buyMult: {} },
   sam:    { name: 'Mercado del Puerto', icon: '🦤', restockMin: 15, sells: [{ id: 'gasil_fuel', stock: 5 }, { id: 'wood_log', stock: 10 }, { id: 'stone', stock: 10 }, { id: 'fishing_rod', stock: 2 }], buys: 'all', buyMult: { seashell: 1.5, pearl: 1.2, merchant_crate: 1, gasil_fuel: 1.5 } },   // v0.4: Caña + Gasolina ×1.5 (Sec. 5.4)
-  sombra: { name: 'Bazar Místico', icon: '🐈‍⬛', restockMin: 30, sells: [{ id: 'mystic_crystal', stock: 2 }], buys: ['mystic_crystal', 'pearl', 'golden_fruit', 'star_shard'], buyMult: { mystic_crystal: 1.3, golden_fruit: 1.1, star_shard: 1.3 } },   // v0.4: Fragmento de Estrella ×1.3 (Sec. 5.5)
+  sombra: { name: 'Bazar Místico', icon: '🐈‍⬛', restockMin: 30, sells: [{ id: 'mystic_crystal', stock: 2 }, { id: 'coffee', stock: 3 }], buys: ['mystic_crystal', 'pearl', 'golden_fruit', 'star_shard'], buyMult: { mystic_crystal: 1.3, golden_fruit: 1.1, star_shard: 1.3 } },   // v0.4: Estrella ×1.3 · Café (Sec. 5.5)
   // 🏪 TIENDA FÍSICA de la aldea (Rocco el mapache): compra de todo lo vendible y venta de materiales/consumibles básicos
   store:  { name: 'Tienda de Rocco', icon: '🦝', restockMin: 8, sells: [{ id: 'wood_log', stock: 12 }, { id: 'stone', stock: 12 }, { id: 'gasil_fuel', stock: 6 }, { id: 'croissant', stock: 6 }, { id: 'golden_fruit', stock: 2, price: 120 }], buys: 'all', buyMult: {} },
   glover: { name: 'Taller de Glover', icon: '🦫', restockMin: 30, sells: [{ id: 'pickaxe', stock: 2 }], buys: ['pickaxe', 'fishing_rod', 'wood_log', 'stone'], buyMult: {} },   // v0.4: herramientas (Sec. 5.7)
@@ -1892,6 +1897,7 @@ function serviceBtns(npcId) {
   if (npcId === 'glover') btns.push(dialogButton('⛏️ Taller de Glover', 'bg-orange-200 text-[#2b2b3d]', () => openApp('🦫 Taller de Glover', '', (b) => mountItemShop(b, 'glover'))));   // S2.2
   if (npcId === 'sam' || npcId === 'glover') btns.push(dialogButton('🔧 Reparar herramientas', 'bg-amber-200 text-[#2b2b3d]', () => openToolsPanel(npcId)));   // S2.2 (Sec. 5.7)
   if (npcId === 'glover' && typeof openFurnitureShop === 'function') btns.push(dialogButton('🛋️ Muebles', 'bg-emerald-200 text-[#2b2b3d]', () => openFurnitureShop()));   // S3.5 (Sec. 6.8)
+  if (npcId === 'sombra') btns.push(dialogButton('🎫 Billete del Despertar', 'bg-yellow-200 text-[#2b2b3d]', () => openDreamTicketPanel()));   // S2.5 (Sec. 5.10)
   return btns;
 }
 
@@ -3720,6 +3726,48 @@ if (typeof Trust !== 'undefined' && typeof Trust.add === 'function' && !Trust.__
 /* ===== S2.2b · DURABILIDAD VISIBLE EN MOCHILA Y TIENDA (Sec. 5.7) ===== */
 function toolBarHTML(s) { const max = Tools.max(s.id), d = Tools.dur(s), pct = Math.round(d / max * 100); return `<span class="absolute top-0.5 right-1 pixel text-[8px] ${d <= 0 ? 'text-red-600' : 'text-[#2b2b3d]'}">${d <= 0 ? 'ROTA' : d + '/' + max}</span><span class="absolute left-1 right-1 bottom-1 h-1 rounded-full bg-slate-200 overflow-hidden"><span class="block h-full ${pct > 50 ? 'bg-emerald-400' : pct > 20 ? 'bg-amber-400' : 'bg-red-500'}" style="width:${pct}%"></span></span>`; }
 function toolSellPreview(shopId, id) { let worst = null; for (const s of GS.inventory.slots) { if (s.id !== id) continue; const d = Tools.dur(s); if (d > 0 && (!worst || d < Tools.dur(worst))) worst = s; } return worst ? Math.max(1, Math.round(shopSellPrice(shopId, id) * Tools.dur(worst) / Tools.max(id))) : 0; }
+/* ===== S2.5 · CAFÉ, RAMO, BILLETE Y REGALOS (Guía Sec. 5.5, 5.8, 5.10) ===== */
+const Coffee = { until: 0, active() { return Date.now() < this.until; } };
+ITEM_EFFECTS.coffee = () => { Coffee.until = Date.now() + CFG.coffeeMs; showToast('☕ Café del Mundo Real: laptop ×2 y hambre en pausa 5 min', 'text-white'); };
+if (!Needs.__coffeeWrapped) {   // envuelve Needs una sola vez: el café pausa el hambre y acelera la laptop
+  const _nu = Needs.update.bind(Needs), _nl = Needs.laptopMult.bind(Needs);
+  Needs.update = function (dt) { if (Coffee.active()) return; return _nu(dt); };
+  Needs.laptopMult = function () { return _nl() * (Coffee.active() ? 0.5 : 1); };
+  Needs.__coffeeWrapped = true;
+}
+/* Sec. 5.8: completa las preferencias (lo demás ya estaba en NPC_SOCIAL) + Ramo universal */
+Object.assign(NPC_SOCIAL.sombra.giftPrefs, { pearl: 10, gasil_fuel: 8 });
+NPC_SOCIAL.sam.giftPrefs.old_boot = 1;   // "arrr, un clásico"
+TRUST_NPCS.forEach(id => { if (NPC_SOCIAL[id]?.giftPrefs && NPC_SOCIAL[id].giftPrefs.flower_bouquet == null) NPC_SOCIAL[id].giftPrefs.flower_bouquet = CFG.bouquetGiftPoints; });
+/* Sec. 5.10: el Billete del Despertar se compra a Sombra (40M + confianza 4 con ella) */
+function buyDreamTicket() {
+  if (Inventory.has('dream_ticket', 1)) { showToast('🎫 Ya tienes el billete', 'text-white'); return false; }
+  if (Trust.level('sombra') < 4) { showToast('🔮 Sombra: "Aún no confío en ti lo suficiente, soñador."', 'text-white'); return false; }
+  if (!Wallet.canAfford(CFG.ticketPrice)) { showToast(`❌ Necesitas ${fmt(CFG.ticketPrice)} $TOKEN`, 'text-red-200'); return false; }
+  if (!Inventory.canAdd('dream_ticket', 1)) { showToast('🎒 Haz hueco en la mochila para el billete', 'text-red-200'); return false; }
+  if (!Wallet.spend(CFG.ticketPrice, 'Billete del Despertar')) return false;
+  Inventory.add('dream_ticket', 1, { silent: true });
+  GS.awakening.step = Math.max(GS.awakening.step | 0, 1);   // arranca la Cadena del Despertar (Sec. 7.5)
+  addLetter('🔮 M. Sombra', 'El billete es mío; el combustible es cosa del pelícano. Habla con Sam: su avión necesita 5 Gasolinas Gasil. Mmm… y luego ven a verme.');
+  showToast('🎫 ¡BILLETE DEL DESPERTAR! Ya tienes la salida…', 'text-white'); playChime();
+  spawnConfetti(player.position.clone().addScaledVector(player.userData.dir, 2), 40);
+  SaveSystem.saveNow('dream-ticket'); return true;
+}
+function openDreamTicketPanel() {
+  openApp('🎫 Billete del Despertar', '', (body) => {
+    const render = () => {
+      const has = Inventory.has('dream_ticket', 1), lv = Trust.level('sombra'), okT = lv >= 4, okM = Wallet.canAfford(CFG.ticketPrice);
+      body.innerHTML = balanceBar() + `<div class="app-card p-4">
+        <div class="text-sm text-slate-600 mb-2">"Hay un vuelo de vuelta a tu mundo. Cuesta ${fmt(CFG.ticketPrice)} $TOKEN. Nadie lo ha pagado jamás." — Sombra</div>
+        ${has ? '<div class="font-bold text-emerald-700">✓ Ya tienes el billete. La pregunta es cuándo lo usas.</div>' : `
+        <div class="text-sm">${okM ? '✅' : '❌'} ${fmt(CFG.ticketPrice)} $TOKEN (tienes ${fmt(Wallet.balance)})</div>
+        <div class="text-sm">${okT ? '✅' : '❌'} Confianza con Sombra: ${TRUST_LEVELS[lv].heart} ${TRUST_LEVELS[lv].name} (requiere nivel 4)</div>
+        <button data-buyticket class="btn-game px-4 py-2 text-sm mt-3 ${okM && okT ? 'bg-yellow-300' : 'bg-slate-200 opacity-60'}">🎫 Comprar el billete</button>`}</div>`;
+      const b = body.querySelector('[data-buyticket]'); if (b) b.onclick = () => { buyDreamTicket(); render(); };
+    };
+    render();
+  });
+}
 /* ===== v0.1 · HUD OBJETIVO 40M (Guía Sec. 0.2 P4: "un número imposible siempre visible") ===== */
 let _goalLast = -1;
 function updateGoalHUD() {
@@ -3969,6 +4017,7 @@ DBG.cookNow = () => { if (GS.housing.kitchen) { GS.housing.kitchen.readyAt = 0; 
 DBG.house = (lv) => { GS.house.level = clamp(lv | 0, 0, 2); buildHouse(GS.house.level); DBG.save('debug_house'); console.log('[DBG] Casa nivel ' + GS.house.level); };
 DBG.showcaseSettle = () => { Showcase.settle(); DBG.save('debug_showcase'); console.log('[DBG] Hucha: ' + (GS.housing.showcaseRevenue | 0)); };
 DBG.furniture = (id) => { if (!FURNITURE.some(f => f.id === id)) { console.warn('[DBG] muebles: ' + FURNITURE.map(f => f.id).join(', ')); return; } if (!hasFurniture(id)) GS.furniture.owned.push(id); DBG.save('debug_furniture'); console.log('[DBG] Mueble: ' + id); };
+DBG.coffee = () => { Coffee.until = Date.now() + CFG.coffeeMs; console.log('[DBG] Café activo 5 min'); };
 DBG.cookNow = () => { Kitchen.q.forEach(k => k.readyAt = 0); console.log('[DBG] Lotes listos: ' + Kitchen.q.length); };
 </script>
 </body>
