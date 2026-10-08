@@ -3127,6 +3127,125 @@ $('btnNewGame').onclick = async () => {
   const ok = await confirmDialog({ title: '¿Seguro que quieres comenzar una nueva partida?', text: 'Se perderá el progreso guardado en este navegador:\n🪙 ' + GS.economy.money.toLocaleString('es-ES') + ' $TOKEN · ' + missionsDone() + '/' + NPCS.length + ' misiones · casa nivel ' + GS.house.level, okLabel: 'NUEVA PARTIDA' });
   if (!ok) return; SaveSystem.reset(); location.reload();
 };
+// =====================================================================
+// DEBUG (B0.2b) - Herramientas de prueba. Uso: consola -> DBG.help()
+// Panel en pantalla: añadir ?debug=1 a la URL
+// Nota: SaveSystem solo escribe tras pulsar JUGAR (SaveSystem.started)
+// =====================================================================
+const DBG = (() => {
+  const NPC_IDS = ['bear', 'mayor', 'glover', 'sombra', 'dax', 'sam', 'hedgehogs'];
+  const log = (...a) => console.log('%c[DBG]', 'color:#3f3;font-weight:bold', ...a);
+  const warn = (msg) => console.warn('[DBG] ' + msg);
+
+  function refresh() {
+    try { if (typeof refreshAuraFromTrust === 'function') refreshAuraFromTrust(); } catch (e) { console.error(e); }
+    try { if (typeof refreshMissionUI === 'function') refreshMissionUI(); } catch (e) { console.error(e); }
+  }
+
+  function save(reason = 'debug') {
+    if (!SaveSystem.started) { warn('Aún no has pulsado JUGAR: no se guarda nada'); return false; }
+    const ok = SaveSystem.saveNow(reason);
+    log(ok ? 'Partida guardada (' + reason + ')' : 'No se pudo guardar');
+    return ok;
+  }
+
+  function money(n) {
+    GS.economy.money = Math.max(0, Math.floor(Number(n) || 0));
+    save('debug_money');
+    log('Dinero = ' + GS.economy.money.toLocaleString('es-ES') + ' $TOKEN');
+    return GS.economy.money;
+  }
+
+  function addMoney(n) { return money((GS.economy.money || 0) + (Number(n) || 0)); }
+
+  function state() { const c = JSON.parse(JSON.stringify(GS)); console.log(c); return c; }
+
+  // Avanza n días oníricos usando el mismo camino que animate(): dayCount++ y settleDay()
+  function day(n = 1) {
+    n = Math.max(1, Math.floor(Number(n) || 1));
+    for (let i = 0; i < n; i++) {
+      GS.daily.dayCount++;
+      if (typeof settleDay === 'function') { try { settleDay(); } catch (e) { console.error('[DBG] settleDay falló', e); break; } }
+    }
+    save('debug_day');
+    log('Día onírico actual = ' + GS.daily.dayCount + (typeof settleDay === 'function' ? ' (liquidación ejecutada)' : ' (settleDay no existe)'));
+  }
+
+  // Fija la hora del día onírico (0-23.99). clockMs = ms desde las 00:00
+  function time(h) {
+    const hh = Math.max(0, Math.min(23.99, Number(h) || 0));
+    GS.daily.clockMs = Math.floor(hh * 3600000);
+    save('debug_time');
+    log('Hora onírica = ' + hh.toFixed(2) + ' h');
+  }
+
+  function hunger(v) {
+    GS.needs.hunger = Math.max(0, Math.min(100, Number(v)));
+    save('debug_hunger');
+    log('Saciedad = ' + GS.needs.hunger);
+  }
+
+  function trust(npcId, points) {
+    const id = String(npcId);
+    if (!NPC_IDS.includes(id) && !(typeof npcById !== 'undefined' && npcById[id])) { warn('NPC desconocido: ' + id + ' · usa: ' + NPC_IDS.join(', ')); return; }
+    GS.trust[id] = Object.assign({ points: 0, tradeToday: 0, tradeDay: 0, giftsToday: 0, giftDay: 0 }, GS.trust[id] || {});
+    GS.trust[id].points = Math.max(0, Math.floor(Number(points) || 0));
+    refresh(); save('debug_trust');
+    log('Confianza ' + id + ' = ' + GS.trust[id].points + ' pts');
+  }
+
+  function trustAll(points) { NPC_IDS.forEach(id => trust(id, points)); }
+
+  function reset() {
+    if (!confirm('[DBG] ¿Borrar la partida guardada y recargar?')) return;
+    SaveSystem.reset();
+    location.reload();
+  }
+
+  function help() {
+    console.log([
+      'DBG.help()                -> esta ayuda',
+      'DBG.state()               -> copia del GS en consola',
+      'DBG.money(n)              -> fija el dinero',
+      'DBG.addMoney(n)           -> suma (o resta con negativo)',
+      'DBG.day(n)                -> avanza n días oníricos y ejecuta settleDay',
+      'DBG.time(h)               -> fija la hora onírica (ej. 21.5 = 21:30)',
+      'DBG.hunger(v)             -> fija saciedad 0-100',
+      "DBG.trust('bear', pts)    -> fija confianza de un NPC",
+      'DBG.trustAll(pts)         -> fija confianza de los 7 NPC',
+      'DBG.save()                -> guarda ahora',
+      'DBG.reset()               -> borra la partida y recarga',
+      'IDs NPC: ' + NPC_IDS.join(', ')
+    ].join('\n'));
+  }
+
+  function mountPanel() {
+    if (!/[?&]debug=1\b/.test(location.search) || document.getElementById('dbgPanel')) return;
+    const p = document.createElement('div');
+    p.id = 'dbgPanel';
+    p.style.cssText = 'position:fixed;left:8px;bottom:8px;z-index:99999;background:rgba(0,0,0,.8);border:1px solid #3f3;border-radius:8px;padding:6px;display:flex;flex-wrap:wrap;gap:4px;max-width:270px;font:11px monospace;color:#3f3;pointer-events:auto;';
+    const btns = [
+      ['+10K', () => addMoney(10000)], ['+1M', () => addMoney(1000000)], ['$=0', () => money(0)],
+      ['+1 día', () => day(1)], ['21:00', () => time(21)], ['08:00', () => time(8)],
+      ['Hambre 0', () => hunger(0)], ['Hambre 100', () => hunger(100)],
+      ['Conf 150', () => trustAll(150)], ['Guardar', () => save('debug_btn')],
+      ['Estado', () => state()], ['Reset', () => reset()], ['Ocultar', () => p.remove()]
+    ];
+    for (const [label, fn] of btns) {
+      const b = document.createElement('button');
+      b.textContent = label;
+      b.style.cssText = 'background:#111;color:#3f3;border:1px solid #3f3;border-radius:4px;padding:3px 6px;cursor:pointer;font:11px monospace;';
+      b.addEventListener('click', (e) => { e.stopPropagation(); fn(); });
+      b.addEventListener('pointerdown', (e) => e.stopPropagation());
+      p.appendChild(b);
+    }
+    document.body.appendChild(p);
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mountPanel); else mountPanel();
+
+  return { help, state, money, addMoney, day, time, hunger, trust, trustAll, save, reset, refresh };
+})();
+window.DBG = DBG;
 </script>
 </body>
 </html>
