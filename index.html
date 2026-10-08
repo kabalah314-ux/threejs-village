@@ -387,7 +387,15 @@ const CFG = {
   mineNodes: 4, mineRespawnMin: 10, mineStoneMin: 2, mineStoneMax: 3, mineGemChance: 0.08,
   /* ===== v0.5 · DORMIR Y COCINA (Sec. 4.2, 6.5) ===== */
   sleepFromHour: 18,
-  cookSecs: { dream_bread: 20, grilled_fish: 15, golden_jam: 30, golden_cake: 45 },
+  cookSecs: { dream_bread: 20, grilled_fish: 15, golden_jam: 40, golden_cake: 60 },   // Sec. 6.6 (tiempos de la guía)
+  sleepWakeHour: 6,                                                   // Sec. 6.5: dormir avanza a las 06:00
+  comfyBedSpeedMult: 1.15, comfyBedPriceMult: 1.08,                   // Sec. 6.8: Cama Mullida
+  kitchenMinLevel: 1, gourmetMinLevel: 2,                             // Sec. 6.2: Cocina Básica (Tienda) · Gourmet (Villa)
+  cookQueueBase: 1, cookQueueIronStove: 2, cookQueueVilla: 3,         // Sec. 6.6: lotes simultáneos
+  showcaseSlotsByLevel: [0, 6, 12], piggyXlExtraSlots: 6,             // Sec. 6.2 y 6.8
+  showcaseOdds: [[1.0, 0.8], [1.2, 0.5], [1.5, 0.25], [9999, 0.05]],  // Sec. 6.7: precio/valor → prob. de venta/día
+  housePrestigeByLevel: [0, 0.02, 0.05],                              // Sec. 6.2: prestigio de confianza (se pierde con la casa sellada)
+  trophyShelfTrustBonus: 0.05, muniSafeExemptPct: 0.25,               // Sec. 6.8
   cookBatchExtra: 0.25,
   cookMaxBatch: 10,
 };
@@ -2627,7 +2635,7 @@ function openHousePanel() {
         : `<div class="text-sm text-slate-500">Sin cartas. El cartero onírico descansa.</div>`;
       html += `</div>`;   // cierre de la tarjeta del buzón
       html += (typeof homeActionsHTML === 'function') ? homeActionsHTML() : '';   // S3.1–S3.2: dormir y cocina (Sec. 6.5)
-      html += `<div class="text-[11px] text-slate-500">🚧 Próximamente en tu casa: escaparate y muebles (v0.5).</div>`;
+      html += `<div class="text-[11px] text-slate-500">🏠 Fase 1: la vida doméstica se gestiona desde este panel (Sec. 6.9).</div>`;
       body.innerHTML = html;
       const amt = (id, max) => { const el = body.querySelector(id); const v = el && el.value ? +el.value : max; return clamp(Math.floor(v) || max, 1, max); };
       const q = (sel, fn) => { const b = body.querySelector(sel); if (b) b.onclick = () => { fn(); updateMailboxBadge(); render(); }; };
@@ -2637,6 +2645,7 @@ function openHousePanel() {
       q('[data-paydebt-all]', () => payDebt(debt));
       q('[data-sleep]', () => { if (Sleep.canSleep().ok) closeApp(); Sleep.sleep(); });   // S3.1
       q('[data-kitchen]', () => { closeApp(); if (typeof openKitchenPanel === 'function') openKitchenPanel(); });   // S3.2
+      q('[data-showcase]', () => { closeApp(); if (typeof openShowcasePanel === 'function') openShowcasePanel(); });   // S3.4
       q('[data-readall]', () => { letters.forEach(l => l.read = true); GS.housing.mailboxUnread = 0; SaveSystem.save('mailbox-read'); });
       body.querySelectorAll('[data-letter]').forEach(b => b.onclick = () => { const l = letters[+b.dataset.letter]; if (l && !l.read) { l.read = true; GS.housing.mailboxUnread = Math.max(0, (GS.housing.mailboxUnread || 0) - 1); SaveSystem.save('letter-read'); updateMailboxBadge(); render(); } });
     };
@@ -3448,22 +3457,25 @@ const Mining = (() => {
   }
   return { nodes, restore, update, hit };
 })();
-/* ===== S3.1 · DORMIR Y BUFF DESCANSADO (Guía Sec. 4.2 y 6.5) =====
-   restedUntil se guarda en "ms oníricos absolutos" = dayCount * DAY_MS + clockMs */
+/* ===== S3.1 · DORMIR Y BUFF DESCANSADO (Guía Sec. 4.2, 6.2, 6.5, 6.8) · v2 (S3.3) =====
+   restedUntil en "ms oníricos absolutos" = dayCount * DAY_MS + clockMs · dormir requiere alquiler al día */
 const dreamNow = () => GS.daily.dayCount * DAY_MS + GS.daily.clockMs;
+const hasFurniture = (id) => Array.isArray(GS.furniture?.owned) && GS.furniture.owned.includes(id);
 const Rested = {
   active() { return dreamNow() < (GS.daily.restedUntil || 0); },
-  speedMult() { return this.active() ? CFG.restedSpeedMult : 1; },
-  sellMult() { return this.active() ? CFG.restedPriceMult : 1; },
-  buyMult() { return this.active() ? 2 - CFG.restedPriceMult : 1; },
+  speedMult() { return this.active() ? (hasFurniture('comfy_bed') ? CFG.comfyBedSpeedMult : CFG.restedSpeedMult) : 1; },
+  sellMult() { return this.active() ? (hasFurniture('comfy_bed') ? CFG.comfyBedPriceMult : CFG.restedPriceMult) : 1; },
+  buyMult() { return this.active() ? 2 - this.sellMult() : 1; },
+  durationDays() { return (GS.house.level | 0) >= 2 ? 1 : CFG.restedDurationDays; },   // Villa: el día completo (Sec. 6.5)
   leftText() { const ms = Math.max(0, (GS.daily.restedUntil || 0) - dreamNow()); const h = Math.floor(ms / 3600000), m = Math.floor((ms % 3600000) / 60000); return `${h}h ${String(m).padStart(2, '0')}m`; },
 };
 const Sleep = {
   _busy: false,
   canSleep() {
     if (houseSealed()) return { ok: false, why: 'Casa sellada: no puedes dormir' };
+    if ((GS.housing.rentDebt || 0) > 0) return { ok: false, why: 'Paga el alquiler pendiente para dormir' };
     const h = (GS.daily.clockMs / 3600000) % 24;
-    if (h >= CFG.sleepFromHour || h < CFG.dayStartClockMs / 3600000) return { ok: true };
+    if (h >= CFG.sleepFromHour || h < CFG.sleepWakeHour) return { ok: true };
     return { ok: false, why: `Aún no tienes sueño (desde las ${CFG.sleepFromHour}:00)` };
   },
   sleep() {
@@ -3475,13 +3487,14 @@ const Sleep = {
     ov.style.cssText = 'position:fixed;inset:0;background:#0b0a1a;opacity:0;transition:opacity .8s;z-index:70;pointer-events:none;display:flex;align-items:center;justify-content:center;color:#c7d2fe;font:bold 22px sans-serif';
     ov.textContent = '💤 Zzz…'; document.body.append(ov); requestAnimationFrame(() => ov.style.opacity = '1');
     setTimeout(() => {
-      const crossesMidnight = GS.daily.clockMs >= CFG.dayStartClockMs;   // si ya es de madrugada, la medianoche ya se liquidó
-      GS.daily.clockMs = CFG.dayStartClockMs;
+      const wake = CFG.sleepWakeHour * 3600000;
+      const crossesMidnight = GS.daily.clockMs >= wake;   // de madrugada la medianoche ya se liquidó
+      GS.daily.clockMs = wake;
       if (crossesMidnight) { GS.daily.dayCount++; if (typeof settleDay === 'function') settleDay(); }
-      GS.daily.restedUntil = dreamNow() + CFG.restedDurationDays * DAY_MS;
+      GS.daily.restedUntil = dreamNow() + Rested.durationDays() * DAY_MS;
       GS.stats.nightsSlept = (GS.stats.nightsSlept || 0) + 1;
       SaveSystem.saveNow('sleep');
-      showToast('☀️ Despiertas Descansado: +10% velocidad y +5% mejores precios', 'text-white'); playChime();
+      showToast(`🐦 06:00 · Despiertas Descansado: +${Math.round((Rested.speedMult() - 1) * 100)}% velocidad y +${Math.round((Rested.sellMult() - 1) * 100)}% mejores precios`, 'text-white'); playChime();
       ov.style.opacity = '0'; setTimeout(() => { ov.remove(); this._busy = false; }, 900);
     }, 1200);
     return true;
@@ -3490,11 +3503,16 @@ const Sleep = {
 function homeActionsHTML() {
   const can = Sleep.canSleep(), r = Rested.active();
   let h = `<div class="app-card p-3 mb-3"><div class="font-bold text-[#2b2b3d] mb-1">🛏️ Dormir</div>
-    <div class="text-sm text-slate-600">${r ? `😴 Descansado: quedan <b>${Rested.leftText()}</b> oníricas.` : 'Duerme hasta el amanecer (08:00) y despierta <b>Descansado</b>: +10% velocidad y +5% mejores precios durante medio día.'}</div>
+    <div class="text-sm text-slate-600">${r ? `😴 Descansado: quedan <b>${Rested.leftText()}</b> oníricas.` : `Duerme hasta las 06:00 y despierta <b>Descansado</b> (${(GS.house.level | 0) >= 2 ? 'todo el día' : 'medio día'}).`}</div>
     <button data-sleep class="btn-game px-3 py-1.5 text-xs mt-2 ${can.ok ? 'bg-indigo-300' : 'bg-slate-200 opacity-60'}">🛏️ ${can.ok ? 'Dormir hasta el amanecer' : esc(can.why)}</button></div>`;
   if (typeof Kitchen !== 'undefined') h += `<div class="app-card p-3 mb-3"><div class="font-bold text-[#2b2b3d] mb-1">🍳 Cocina</div>
     <div class="text-sm text-slate-600">${Kitchen.statusText()}</div>
     <button data-kitchen class="btn-game px-3 py-1.5 text-xs mt-2 bg-orange-200">🍳 Abrir cocina</button></div>`;
+  if (typeof Showcase !== 'undefined') h += `<div class="app-card p-3 mb-3"><div class="font-bold text-[#2b2b3d] mb-1">🪟 Escaparate</div>
+    <div class="text-sm text-slate-600">${Showcase.slots() ? `${Showcase.list.length}/${Showcase.slots()} huecos · 🐷 hucha: <b>${fmt(GS.housing.showcaseRevenue | 0)} $T</b>` : 'Llega con la mejora a Tienda (nivel 1).'}</div>
+    <button data-showcase class="btn-game px-3 py-1.5 text-xs mt-2 bg-amber-200">🪟 Abrir escaparate</button></div>`;
+  if (typeof FURNITURE !== 'undefined') { const own = FURNITURE.filter(f => hasFurniture(f.id)); h += `<div class="app-card p-3 mb-3"><div class="font-bold text-[#2b2b3d] mb-1">🛋️ Muebles</div>
+    <div class="text-sm text-slate-600">${own.length ? own.map(f => `${f.icon} ${esc(f.name)}`).join(' · ') : 'Aún no tienes muebles. Glover los vende cuando completas su misión.'}</div></div>`; }
   return h;
 }
 setInterval(() => {
@@ -3502,80 +3520,91 @@ setInterval(() => {
   if (!el) { const gw = document.getElementById('goalWrap'); if (!gw) return; gw.insertAdjacentHTML('beforebegin', '<div id="restChip" class="pixel text-[7px] md:text-[8px] text-indigo-200/80 mt-1 whitespace-nowrap hidden"></div>'); el = document.getElementById('restChip'); }
   const on = SaveSystem.started && Rested.active(); el.classList.toggle('hidden', !on); if (on) el.textContent = '😴 Descansado · ' + Rested.leftText();
 }, 2000);
-/* ===== S3.2 · COCINA POR LOTES (Guía Sec. 5.3, 5.5 y 6.5) =====
-   GS.housing.kitchen = { recipe, qty, readyAt (tiempo real), notified } | null · bloqueada si la casa está sellada */
+/* ===== S3.2 · COCINA POR LOTES (Guía Sec. 5.5, 6.2 y 6.6) · v2 (S3.3) =====
+   GS.housing.kitchenQ = [{ recipe, qty, readyAt (tiempo real), notified }] · requiere alquiler al día y nivel ≥ Tienda */
 const RECIPES = [
   { id: 'dream_bread',  out: 'dream_bread',  qty: 1, in: [['flour', 2]] },
   { id: 'grilled_fish', out: 'grilled_fish', qty: 1, in: [['fish', 1]] },
   { id: 'golden_jam',   out: 'golden_jam',   qty: 1, in: [['golden_fruit', 2]] },
-  { id: 'golden_cake',  out: 'golden_cake',  qty: 1, in: [['flour', 1], ['golden_jam', 1]] },
+  { id: 'golden_cake',  out: 'golden_cake',  qty: 1, in: [['flour', 1], ['golden_jam', 1]], gourmet: true },
 ];
 const kitchenFmt = (ms) => { const s = Math.max(0, Math.ceil(ms / 1000)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
 const Kitchen = {
-  get st() { return GS.housing.kitchen || null; },
+  get q() { const h = GS.housing; if (!Array.isArray(h.kitchenQ)) h.kitchenQ = []; if (h.kitchen) { h.kitchenQ.push(h.kitchen); h.kitchen = null; } return h.kitchenQ; },
+  slots() { return (GS.house.level | 0) >= 2 ? CFG.cookQueueVilla : hasFurniture('iron_stove') ? CFG.cookQueueIronStove : CFG.cookQueueBase; },
+  blocked() {
+    if (houseSealed()) return '🔒 Casa sellada: no puedes cocinar';
+    if ((GS.housing.rentDebt || 0) > 0) return '🏠 Paga el alquiler pendiente para usar la cocina';
+    if ((GS.house.level | 0) < CFG.kitchenMinLevel) return '🏪 La cocina llega con la mejora a Tienda (nivel 1, Taller de Glover)';
+    return null;
+  },
+  locked(r) { return r.gourmet && (GS.house.level | 0) < CFG.gourmetMinLevel ? '🏡 Receta Gourmet: requiere la Villa' : null; },
   recipe(id) { return RECIPES.find(r => r.id === id); },
   batchSecs(r, qty) { return Math.round(CFG.cookSecs[r.id] * (1 + CFG.cookBatchExtra * (qty - 1))); },
   maxQty(r) { return Math.max(0, Math.min(CFG.cookMaxBatch, ...r.in.map(([id, q]) => Math.floor(Inventory.count(id) / q)))); },
-  ready() { return !!this.st && Date.now() >= this.st.readyAt; },
+  readyCount() { const now = Date.now(); return this.q.filter(k => now >= k.readyAt).length; },
   start(id, qty) {
-    if (houseSealed()) { showToast('🔒 Casa sellada: no puedes cocinar', 'text-red-200'); return false; }
-    if (this.st) { showToast('🍳 La cocina está ocupada: recoge primero', 'text-white'); return false; }
+    const b = this.blocked(); if (b) { showToast(b, 'text-red-200'); return false; }
     const r = this.recipe(id); if (!r) return false;
+    const l = this.locked(r); if (l) { showToast(l, 'text-red-200'); return false; }
+    if (this.q.length >= this.slots()) { showToast(`🍳 Cocina llena (${this.slots()} lote(s) a la vez): recoge primero`, 'text-white'); return false; }
     qty = clamp(Math.floor(qty) || 1, 1, CFG.cookMaxBatch);
     if (this.maxQty(r) < qty) { showToast('❌ Te faltan ingredientes', 'text-red-200'); return false; }
     r.in.forEach(([iid, q]) => Inventory.remove(iid, q * qty));
-    GS.housing.kitchen = { recipe: r.id, qty, readyAt: Date.now() + this.batchSecs(r, qty) * 1000, notified: false };
+    this.q.push({ recipe: r.id, qty, readyAt: Date.now() + this.batchSecs(r, qty) * 1000, notified: false });
     showToast(`🍳 Cocinando ${qty}× ${ITEMS[r.out].name}…`, 'text-white'); playBeep(700, 0.06, 'triangle'); SaveSystem.saveNow('cook-start'); return true;
   },
-  collect() {
-    const k = this.st; if (!k) return false;
-    if (houseSealed()) { showToast('🔒 Casa sellada: la comida espera dentro', 'text-red-200'); return false; }
-    if (!this.ready()) { showToast('⏳ Aún no está listo', 'text-white'); return false; }
+  collect(i) {
+    const b = this.blocked(); if (b) { showToast(b, 'text-red-200'); return false; }
+    const k = this.q[i]; if (!k) return false;
+    if (Date.now() < k.readyAt) { showToast('⏳ Aún no está listo', 'text-white'); return false; }
     const r = this.recipe(k.recipe), n = k.qty * r.qty;
     if (!Inventory.canAdd(r.out, n)) { showToast('🎒 Inventario lleno: haz hueco para recoger', 'text-red-200'); return false; }
-    Inventory.add(r.out, n, { silent: true }); GS.housing.kitchen = null;
-    GS.stats.dishesCooked = (GS.stats.dishesCooked || 0) + n;
+    Inventory.add(r.out, n, { silent: true }); this.q.splice(i, 1);
+    GS.stats.dishesCooked = (GS.stats.dishesCooked || 0) + n; GS.stats.batchesCooked = (GS.stats.batchesCooked || 0) + 1;
     showToast(`${ITEMS[r.out].icon} +${n} ${ITEMS[r.out].name}`, 'text-white'); playChime(); SaveSystem.saveNow('cook-collect'); return true;
   },
   statusText() {
-    const k = this.st; if (!k) return 'Libre. Cocina por lotes: cuantas más unidades a la vez, mejor rinde el tiempo.';
-    const r = this.recipe(k.recipe), it = ITEMS[r.out];
-    if (this.ready()) return `✅ Listo: <b>${k.qty * r.qty}× ${it.icon} ${esc(it.name)}</b>. Recógelo en la cocina.`;
-    return `⏳ Cocinando <b>${k.qty}× ${it.icon} ${esc(it.name)}</b> · listo en <b>${kitchenFmt(k.readyAt - Date.now())}</b>`;
+    const b = this.blocked(); if (b) return b;
+    const q = this.q, n = this.readyCount();
+    if (!q.length) return `Libre · ${this.slots()} lote(s) a la vez.`;
+    return `${q.length}/${this.slots()} lote(s) en marcha${n ? ` · <b>${n} listo(s) para recoger</b>` : ''}.`;
   },
 };
 function openKitchenPanel() {
   openApp('🍳 Cocina', '', (body) => {
     const render = () => {
       let html = `<div data-kitchen-root></div>` + balanceBar();
-      if (houseSealed()) { body.innerHTML = html + `<div class="app-card p-3 text-sm text-purple-700 font-bold">🔒 Casa sellada: no puedes cocinar hasta romper el sello.</div>`; return; }
-      html += `<div class="app-card p-3 mb-3 text-sm text-slate-600">${Kitchen.statusText()}${Kitchen.ready() ? `<div><button data-collect class="btn-game px-3 py-1.5 text-xs mt-2 bg-emerald-300">🧺 Recoger</button></div>` : ''}</div>`;
-      const busy = !!Kitchen.st;
+      const b = Kitchen.blocked();
+      if (b) { body.innerHTML = html + `<div class="app-card p-3 text-sm text-slate-700 font-bold">${b}</div>`; return; }
+      const now = Date.now();
+      html += `<div class="app-card p-3 mb-3"><div class="font-bold text-sm mb-1">Lotes (${Kitchen.q.length}/${Kitchen.slots()})</div>` + (Kitchen.q.length ? Kitchen.q.map((k, i) => { const r = Kitchen.recipe(k.recipe), it = ITEMS[r.out], ready = now >= k.readyAt; return `<div class="flex items-center gap-2 py-1 text-xs"><span class="text-lg">${it.icon}</span><div class="flex-1">${k.qty}× ${esc(it.name)} · ${ready ? '<b class="text-emerald-600">¡Listo!</b>' : `listo en <b>${kitchenFmt(k.readyAt - now)}</b>`}</div>${ready ? `<button data-collect="${i}" class="btn-game px-2 py-0.5 text-[11px] bg-emerald-300">🧺 Recoger</button>` : ''}</div>`; }).join('') : `<div class="text-xs text-slate-500">Ningún lote en marcha.</div>`) + `</div>`;
+      const full = Kitchen.q.length >= Kitchen.slots();
       RECIPES.forEach(r => {
-        const it = ITEMS[r.out], max = Kitchen.maxQty(r), on = max > 0 && !busy;
+        const it = ITEMS[r.out], max = Kitchen.maxQty(r), lock = Kitchen.locked(r), on = max > 0 && !full && !lock;
         const ing = r.in.map(([id, q]) => `${q}× ${ITEMS[id].icon} ${esc(ITEMS[id].name)} <span class="${Inventory.count(id) >= q ? 'text-emerald-600' : 'text-red-500'}">(${Inventory.count(id)})</span>`).join(' + ');
-        html += `<div class="app-card p-3 mb-2"><div class="flex items-center gap-2"><span class="text-2xl">${it.icon}</span><div class="flex-1 min-w-0"><div class="font-bold text-sm">${esc(it.name)}</div><div class="text-[11px] text-slate-500">${ing}</div><div class="text-[11px] text-slate-400">${CFG.cookSecs[r.id]} s · cada unidad extra del lote +${Math.round(CFG.cookBatchExtra * 100)}% · máx. ${CFG.cookMaxBatch}</div></div></div>
-          <div class="flex flex-wrap gap-2 mt-2 items-center">
+        html += `<div class="app-card p-3 mb-2 ${lock ? 'opacity-60' : ''}"><div class="flex items-center gap-2"><span class="text-2xl">${it.icon}</span><div class="flex-1 min-w-0"><div class="font-bold text-sm">${esc(it.name)} ${r.gourmet ? '<span class="text-[10px] text-amber-600">GOURMET</span>' : ''}</div><div class="text-[11px] text-slate-500">${ing}</div><div class="text-[11px] text-slate-400">${lock ? lock : `${CFG.cookSecs[r.id]} s · cada unidad extra del lote +${Math.round(CFG.cookBatchExtra * 100)}% · máx. ${CFG.cookMaxBatch}`}</div></div></div>
+          ${lock ? '' : `<div class="flex flex-wrap gap-2 mt-2 items-center">
             <input data-qty="${r.id}" type="number" min="1" max="${Math.max(1, max)}" value="1" class="game w-16 text-xs">
             <button data-cook="${r.id}" class="btn-game px-3 py-1.5 text-xs ${on ? 'bg-orange-200' : 'bg-slate-200 opacity-60'}">Cocinar</button>
-            <button data-cookmax="${r.id}" class="btn-game px-3 py-1.5 text-xs ${on ? 'bg-orange-200' : 'bg-slate-200 opacity-60'}">Máx (${max})</button>
-          </div></div>`;
+            <button data-cookmax="${r.id}" class="btn-game px-3 py-1.5 text-xs ${on ? 'bg-orange-200' : 'bg-slate-200 opacity-60'}">Máx (${max})</button></div>`}</div>`;
       });
       body.innerHTML = html;
-      const c = body.querySelector('[data-collect]'); if (c) c.onclick = () => { Kitchen.collect(); render(); };
-      body.querySelectorAll('[data-cook]').forEach(b => b.onclick = () => { const inp = body.querySelector(`[data-qty="${b.dataset.cook}"]`); Kitchen.start(b.dataset.cook, +(inp?.value || 1)); render(); });
-      body.querySelectorAll('[data-cookmax]').forEach(b => b.onclick = () => { const r = Kitchen.recipe(b.dataset.cookmax); const m = Kitchen.maxQty(r); if (m > 0) Kitchen.start(r.id, m); else showToast('❌ Te faltan ingredientes', 'text-red-200'); render(); });
+      body.querySelectorAll('[data-collect]').forEach(x => x.onclick = () => { Kitchen.collect(+x.dataset.collect); render(); });
+      body.querySelectorAll('[data-cook]').forEach(x => x.onclick = () => { const inp = body.querySelector(`[data-qty="${x.dataset.cook}"]`); Kitchen.start(x.dataset.cook, +(inp?.value || 1)); render(); });
+      body.querySelectorAll('[data-cookmax]').forEach(x => x.onclick = () => { const r = Kitchen.recipe(x.dataset.cookmax); const m = Kitchen.maxQty(r); if (m > 0) Kitchen.start(r.id, m); else showToast('❌ Te faltan ingredientes', 'text-red-200'); render(); });
     };
     render();
-    const iv = setInterval(() => {   // refresca la cuenta atrás solo mientras ESTE panel siga abierto y visible
+    const iv = setInterval(() => {   // refresca solo mientras ESTE panel siga abierto y visible
       if (!body.isConnected || body.offsetParent === null || !body.querySelector('[data-kitchen-root]')) { clearInterval(iv); return; }
-      if (Kitchen.st) render();
+      if (Kitchen.q.length) render();
     }, 1000);
   });
 }
-setInterval(() => {   // aviso único cuando un lote termina
-  const k = GS.housing && GS.housing.kitchen;
-  if (k && !k.notified && SaveSystem.started && Date.now() >= k.readyAt) { k.notified = true; showToast('🍳 ¡La comida está lista! Recógela en tu cocina', 'text-white'); playBeep(880, 0.08, 'triangle'); }
+setInterval(() => {   // aviso único por lote terminado
+  if (!SaveSystem.started || !GS.housing) return;
+  const now = Date.now();
+  Kitchen.q.forEach(k => { if (!k.notified && now >= k.readyAt) { k.notified = true; showToast(`🍳 Tu ${ITEMS[Kitchen.recipe(k.recipe).out].name} está listo`, 'text-white'); playBeep(880, 0.08, 'triangle'); } });
 }, 1000);
 /* ===== v0.1 · HUD OBJETIVO 40M (Guía Sec. 0.2 P4: "un número imposible siempre visible") ===== */
 let _goalLast = -1;
@@ -3823,6 +3852,8 @@ DBG.goMine = (i = 0) => { const n = Mining.nodes[i]; if (!n) { console.warn('[DB
 DBG.mineReset = () => { GS.world.mineNodes = {}; Mining.restore(); DBG.save('debug_mine'); console.log('[DBG] Nodos de minería repuestos'); };
 DBG.rest = () => { GS.daily.restedUntil = dreamNow() + CFG.restedDurationDays * DAY_MS; DBG.save('debug_rest'); console.log('[DBG] Descansado activado'); };
 DBG.cookNow = () => { if (GS.housing.kitchen) { GS.housing.kitchen.readyAt = 0; console.log('[DBG] Cocina lista'); } else console.log('[DBG] La cocina está libre'); };
+DBG.house = (lv) => { GS.house.level = clamp(lv | 0, 0, 2); buildHouse(GS.house.level); DBG.save('debug_house'); console.log('[DBG] Casa nivel ' + GS.house.level); };
+DBG.cookNow = () => { Kitchen.q.forEach(k => k.readyAt = 0); console.log('[DBG] Lotes listos: ' + Kitchen.q.length); };
 </script>
 </body>
 </html>
