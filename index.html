@@ -414,7 +414,7 @@ function defaultGameState() {
        Los cooldowns de recursos/tiendas/frutas siguen siendo tiempo REAL (Date.now), como en v2. */
      daily: { dayCount: 1, clockMs: 28800000 /* 08:00 */, lastSettleDay: 0, freeRescueUsed: false, restedUntil: 0, lastSettleAt: 0, charityDay: 0, lastCharges: [] },
     needs: { hunger: 100 },                          // saciedad 0–100 (Sec. 4.3)
-     housing: { rentDebt: 0, sealed: false, graceDaysLeft: 5, mailbox: [], mailboxUnread: 0, showcase: [], showcaseRevenue: 0, lastRentDay: 0, sealedBuildings: [] },
+     housing: { rentDebt: 0, sealed: false, graceDaysLeft: 5, mailbox: [], mailboxUnread: 0, showcase: [], showcaseRevenue: 0, lastRentDay: 0, sealedBuildings: [], sealDebt: 0, unsealCount: 0 },
     debt: 0,                                         // Deuda Onírica de Sombra, interés diario (Sec. 4.7)
     /* ===== v3 · CONFIANZA (Sec. 3) — se puebla desde v0.2 ===== */
     trust: {},                                       // { [npcId]: { points, tradeToday, tradeDay, giftsToday, giftDay } }
@@ -1787,7 +1787,7 @@ function interactWith(obj) {
   if (it.type === 'npc') startDialog(npcId);
   else if (it.type === 'building') { if (state.missions[npcId].status === 2) openUnlockedApp(npcById[npcId].app); else startDialog(npcId); }
   else if (it.type === 'laptop') { if (!Object.values(state.missions).some(m => m.status >= 1)) showToast('Primero acepta una misión hablando con un NPC', 'text-white'); else openLaptop(); }
-  else if (it.type === 'house') openHousePanel();   // v0.3: panel Mi Casa (alquiler, deudas, buzón)
+  else if (it.type === 'house') { if (GS.housing.sealed) openSealedHousePanel(); else openHousePanel(); }   // v0.3 panel Mi Casa · S1.2 casa sellada (Sec. 6.4)
   else if (it.type === 'fruit') harvest(obj);
   else if (it.type === 'pickup') collectPickup(obj);
   else if (it.type === 'crate') { if (state.crateTaken) return; if (Inventory.add('merchant_crate', 1)) { state.crateTaken = true; crate.visible = false; playChime(); } }
@@ -1827,6 +1827,7 @@ function serviceBtns(npcId) {
   if (npcId === 'mayor' && typeof openLottery === 'function') btns.push(dialogButton('🎫 Lotería Municipal', 'bg-yellow-200 text-[#2b2b3d]', () => openLottery()));
   if (npcId === 'mayor' && typeof openMunicipalJob === 'function') btns.push(dialogButton('🏛️ Empleo Municipal', 'bg-blue-200 text-[#2b2b3d]', () => openMunicipalJob()));
   if (npcId === 'bear' && typeof bearCharityAvailable === 'function' && bearCharityAvailable()) btns.push(dialogButton('🥖 Pan del Pobre (gratis)', 'bg-orange-200 text-[#2b2b3d]', () => claimCharityBread()));   // v0.3: solo aparece si estás en apuros (Sec. 4.8)
+  if (npcId === 'mayor' && ((GS.housing.rentDebt || 0) > 0 || GS.housing.sealed)) btns.push(dialogButton('💼 Saldar cuentas', 'bg-emerald-200 text-[#2b2b3d]', () => GS.housing.sealed ? openSealedHousePanel() : openHousePanel()));   // S1.2 (Sec. 6.3)
   return btns;
 }
 
@@ -2357,6 +2358,7 @@ DailySystem.onSettle(() => {
       addLetter('🏛️ Ayuntamiento', daysOwed >= CFG.rentSealThreshold - 1
         ? `¡EJEM! Su deuda de alquiler (${fmt(GS.housing.rentDebt)} $T, ${daysOwed} días) está a UN PASO del SELLO de la vivienda por parte de Madame Sombra. ÚLTIMO AVISO.`
         : `¡Ejem! Consta un retraso en el alquiler. Deuda acumulada: ${fmt(GS.housing.rentDebt)} $T (${daysOwed} día(s)). Un retraso lo tiene cualquiera; regularícelo a la mayor brevedad.`);
+      if (daysOwed >= CFG.rentSealThreshold && !GS.housing.sealed && typeof sealHouse === 'function') sealHouse(GS.housing.rentDebt);   // S1.2: sello de runas (Sec. 6.4)
     }
   }
   /* 2) TASA DE RESIDENCIA ONÍRICA (1% del capital, mín. 10 $T) → el 100% alimenta el pozo de la lotería */
@@ -2440,6 +2442,7 @@ function payRentDebt(amount) {
   if (!Wallet.spend(amount, 'Pago deuda de alquiler')) return false;
   GS.housing.rentDebt -= amount;
   if (GS.housing.rentDebt <= 0) { GS.housing.rentDebt = 0; addLetter('🏛️ Ayuntamiento', '¡Ejem! Consta regularizada su situación de alquiler. El municipio agradece su diligencia. Formulario 12-R archivado.'); showToast('✅ Deuda de alquiler saldada', 'text-white'); }
+  if (GS.housing.rentDebt <= 0 && GS.housing.sealed && typeof tryUnsealHouse === 'function') tryUnsealHouse();   // S1.2: romper el sello al saldar
   SaveSystem.saveNow('pay-rent'); return true;
 }
 function payDebt(amount) {
@@ -2448,6 +2451,90 @@ function payDebt(amount) {
   GS.debt -= amount; updateEmbargo();
   if (GS.debt <= 0) { GS.debt = 0; showToast('🔮 Deuda con Sombra saldada. El velo te sonríe', 'text-white'); playChime(); }
   SaveSystem.saveNow('pay-debt'); return true;
+}
+/* ---- S1.2 · SELLO DE RUNAS DE LA CASA (Guía Sec. 6.3–6.4) ----
+   3 días de alquiler impagado → Sombra sella la casa. Se pausan: cocinar, dormir y escaparate.
+   Se conserva todo lo demás. Romper el sello = pagar la deuda completa.
+   1ª vez sin tarifa · desde la 2ª: CFG.unsealFeePct % de la deuda en el momento del sellado. */
+const houseSealed = () => !!GS.housing.sealed;
+const unsealFee = () => (GS.housing.unsealCount | 0) === 0 ? 0 : Math.ceil((GS.housing.sealDebt || GS.housing.rentDebt || 0) * CFG.unsealFeePct / 100);
+
+let _sealSprite = null;
+function sealSpriteTexture() {
+  const c = document.createElement('canvas'); c.width = c.height = 256; const ctx = c.getContext('2d');
+  const g = ctx.createRadialGradient(128, 128, 20, 128, 128, 124); g.addColorStop(0, 'rgba(190,120,255,.95)'); g.addColorStop(1, 'rgba(90,20,160,0)');
+  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(128, 128, 124, 0, 6.2832); ctx.fill();
+  ctx.lineWidth = 8; ctx.strokeStyle = '#e9d5ff'; ctx.beginPath(); ctx.arc(128, 128, 84, 0, 6.2832); ctx.stroke();
+  ctx.fillStyle = '#f5f3ff'; ctx.font = 'bold 34px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  const runes = ['ᚱ', 'ᚢ', 'ᚾ', 'ᛟ', 'ᛉ', 'ᚦ'];
+  runes.forEach((r, i) => { const a = i / runes.length * 6.2832; ctx.fillText(r, 128 + Math.cos(a) * 104, 128 + Math.sin(a) * 104); });
+  ctx.font = '72px serif'; ctx.fillText('🔒', 128, 134);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+}
+function updateHouseSealVisual() {
+  if (!houseSealed()) { if (_sealSprite) _sealSprite.visible = false; return; }
+  if (!house) return;
+  if (!_sealSprite) { _sealSprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: sealSpriteTexture(), transparent: true, depthWrite: false })); _sealSprite.scale.setScalar(2.4); scene.add(_sealSprite); }
+  if (_sealSprite.userData.houseRef !== house) {
+    const wp = new THREE.Vector3(); house.getWorldPosition(wp);
+    const lift = Math.max(2.6, new THREE.Box3().setFromObject(house).getSize(new THREE.Vector3()).length() * 0.45);
+    _sealSprite.position.copy(wp).addScaledVector(wp.clone().normalize(), lift);
+    _sealSprite.userData.houseRef = house;
+  }
+  _sealSprite.visible = true;
+}
+setInterval(() => { try { updateHouseSealVisual(); } catch (e) {} }, 2000);   // por si la casa se reconstruye al mejorar de nivel
+
+function sealHouse(debt) {
+  if (houseSealed()) return;
+  GS.housing.sealed = true; GS.housing.sealDebt = Math.max(0, Math.floor(debt || GS.housing.rentDebt || 0));
+  const fee = unsealFee();
+  addLetter('🔮 M. Sombra', `Tres noches sin pagar, soñador. He sellado tu casa con runas: sin cocina, sin cama, sin escaparate. Tus cosas siguen siendo tuyas; solo están… en pausa. Paga ${fmt(GS.housing.rentDebt)} $T y el sello se rompe.${fee ? ` Esta vez hay tarifa: ${fmt(fee)} $T.` : ''}`);
+  showToast('🔒 ¡Sombra ha SELLADO tu casa por impago!', 'text-red-200'); playBeep(220, 0.4, 'sine');
+  updateHouseSealVisual(); if (typeof updateMailboxBadge === 'function') updateMailboxBadge(); SaveSystem.save('house-sealed');
+}
+function tryUnsealHouse() {
+  if (!houseSealed()) return true;
+  if ((GS.housing.rentDebt || 0) > 0) return false;
+  const fee = unsealFee();
+  if (fee > 0 && !Wallet.spend(fee, 'Tarifa de desellado (Sombra)')) { showToast(`🔮 Falta la tarifa de desellado: ${fmt(fee)} $T`, 'text-red-200'); return false; }
+  const first = (GS.housing.unsealCount | 0) === 0;
+  GS.housing.sealed = false; GS.housing.sealDebt = 0; GS.housing.unsealCount = (GS.housing.unsealCount | 0) + 1;
+  addLetter('🔮 M. Sombra', first ? 'La primera lección del sueño es gratis, soñador. La segunda ya tiene tarifa.' : `Sello roto. Tarifa cobrada: ${fmt(fee)} $T. Mmm… el sueño no olvida, pero perdona.`);
+  showToast('✨ El sello de runas se disuelve: tu casa vuelve a estar abierta', 'text-white'); playChime();
+  updateHouseSealVisual(); if (typeof updateMailboxBadge === 'function') updateMailboxBadge(); SaveSystem.saveNow('house-unsealed'); return true;
+}
+function payAllAndUnseal() {
+  const debt = GS.housing.rentDebt || 0, fee = unsealFee(), total = debt + fee;
+  if (!Wallet.canAfford(total)) { showToast(`❌ Necesitas ${fmt(total)} $T (deuda ${fmt(debt)} + tarifa ${fmt(fee)})`, 'text-red-200'); return false; }
+  if (debt > 0) return payRentDebt(debt);   // al quedar en 0, payRentDebt llama a tryUnsealHouse()
+  return tryUnsealHouse();
+}
+function openSealedHousePanel() {
+  openApp('🔒 Casa sellada · Runas de Sombra', '', (body) => {
+    const render = () => {
+      if (!houseSealed()) { body.innerHTML = balanceBar() + `<div class="app-card p-3 text-sm text-emerald-700 font-bold">✨ El sello se ha roto. Tu casa vuelve a estar abierta.</div>`; return; }
+      const debt = GS.housing.rentDebt || 0, fee = unsealFee(), total = debt + fee;
+      body.innerHTML = balanceBar() + `
+        <div class="app-card p-3 mb-3">
+          <div class="font-bold text-purple-700 mb-1">🔒 Tu casa está sellada con runas</div>
+          <div class="text-sm text-slate-600">Mientras dure el sello no puedes <b>cocinar</b>, <b>dormir</b> ni usar el <b>escaparate</b> (las ventas se pausan, no se pierde nada). Tus muebles, construcciones y objetos siguen siendo tuyos.</div>
+          <div class="mt-2 text-sm">Deuda de alquiler: <b>${fmt(debt)} $T</b><br>Tarifa de desellado: <b>${fee ? fmt(fee) + ' $T' : 'gratis (primera vez)'}</b><br>Total para romper el sello: <b class="text-purple-700">${fmt(total)} $T</b></div>
+        </div>
+        <div class="flex flex-wrap gap-2">
+          <button data-unseal class="btn-game px-3 py-2 text-sm bg-emerald-300">💸 Pagar deuda (${fmt(total)} $T)</button>
+          <button data-sombra class="btn-game px-3 py-2 text-sm bg-purple-300">🔮 Hablar con Sombra</button>
+        </div>`;
+      body.querySelector('[data-unseal]').onclick = () => { payAllAndUnseal(); render(); };
+      body.querySelector('[data-sombra]').onclick = () => {
+        const obj = npcObjs.sombra; if (!obj) return; closeApp();
+        const up = obj.userData.up; const away = tangent(player.position.clone().sub(obj.position), up);
+        setMoveTarget(obj.position.clone().addScaledVector(away, 2).normalize()); state.pendingInteract = obj;
+        showToast('🧭 Viajando hacia Madame Sombra…', 'text-white');
+      };
+    };
+    render();
+  });
 }
 /* ---- Panel "Mi Casa" ---- */
 function openHousePanel() {
@@ -3069,6 +3156,7 @@ function applyGameStateToWorld() {
   UPGRADES.forEach(u => { if (hasItem(u.id) && u.id.startsWith('bag')) u.apply(); });                     // capacidad de mochila
   restoreBuildings();                                                                                       // construcciones del jugador (GS.world.buildings)
   if (typeof updateEmbargo === 'function') updateEmbargo();   // v0.3: re-aplicar runas si había embargo activo
+  if (typeof updateHouseSealVisual === 'function') updateHouseSealVisual();   // S1.2: runas sobre la casa sellada
   restorePickups(); refreshInvBadge();
   refreshAuraFromTrust();   // v0.2: el aura = reputación (tier) + estilo equipado (Sec. 3.6)
   setLaptopSkin(LAPTOP_SKINS[GS.cosmetics.laptopSkin] ? GS.cosmetics.laptopSkin : 'default');
