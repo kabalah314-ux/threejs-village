@@ -1625,13 +1625,34 @@ function buildStructure(id) {
 // --- Construcciones del jugador (persistentes) ---
 const placedBuildings = {};   // id → { group, collider }
 function placeBuilding(rec) {
-  if (placedBuildings[rec.id]) return;              // nunca duplicar
-  const def = buildableById[rec.type]; if (!def) return;
-  const g = makeBuildable(rec.type); const dir = new THREE.Vector3().fromArray(rec.dir).normalize();
+  if (!rec || !rec.id || placedBuildings[rec.id]) return;              // nunca duplicar
+  const def = buildableById[rec.type]; if (!def) { console.warn('[build] tipo desconocido', rec.type); return; }
+  if (!Array.isArray(rec.dir) || rec.dir.length !== 3 || rec.dir.some(n => !Number.isFinite(n))) { console.warn('[build] dir inválido', rec); return; }
+  const g = makeBuildable(rec.type); g.userData.recId = rec.id;
+  const dir = new THREE.Vector3().fromArray(rec.dir).normalize();
   placeOnPlanet(g, dir, rec.yaw || 0, 0, SITES.village.S); scene.add(g);
-  const col = { pos: g.position.clone(), r: def.r }; colliders.push(col); placedBuildings[rec.id] = { group: g, collider: col };
+  const col = { pos: g.position.clone(), r: def.r || 1 }; colliders.push(col);
+  placedBuildings[rec.id] = { group: g, collider: col };
 }
-function restoreBuildings() { GS.world.buildings ||= []; GS.world.buildings.forEach(placeBuilding); }
+function restoreBuildings() {
+  GS.world.buildings ||= [];
+  const seen = new Set();
+  GS.world.buildings = GS.world.buildings.filter(r => r && r.id && !seen.has(r.id) && seen.add(r.id));
+  GS.world.buildings.forEach(placeBuilding);
+}
+function removeBuilding(id, refund = 0.5) {
+  const p = placedBuildings[id]; const i = (GS.world.buildings || []).findIndex(r => r.id === id);
+  if (!p || i < 0) return false;
+  const rec = GS.world.buildings[i]; const def = buildableById[rec.type];
+  scene.remove(p.group);
+  p.group.traverse(o => { if (o.isPointLight) { const k = nightLights.indexOf(o); if (k >= 0) nightLights.splice(k, 1); } });
+  const ai = animatedBuilds.indexOf(p.group); if (ai >= 0) animatedBuilds.splice(ai, 1);
+  const ci = colliders.indexOf(p.collider); if (ci >= 0) colliders.splice(ci, 1);
+  delete placedBuildings[id]; GS.world.buildings.splice(i, 1);
+  if (def && refund > 0) { const back = Math.floor(def.cost * refund); if (back > 0) Wallet.add(back, `Demolición: ${def.name}`); }
+  showToast(`🧹 ${def ? def.icon + ' ' + def.name : 'Edificio'} retirado`, 'text-white');
+  SaveSystem.saveNow('demolish:' + rec.type); return true;
+}
 const buildZoneOk = (dir) => angleBetween(dir, SITES[BUILD_ZONE.site].dir) <= BUILD_ZONE.radius;
 function buildPlacementValid(def, dir) {
   if (!isLand(dir) || !buildZoneOk(dir)) return false;
@@ -4137,7 +4158,6 @@ DBG.toolDur = (id, n) => { const s = GS.inventory.slots.find(x => x.id === id); 
 DBG.goMine = (i = 0) => { const n = Mining.nodes[i]; if (!n) { console.warn('[DBG] hay ' + Mining.nodes.length + ' nodos'); return; } setMoveTarget(n.userData.dir.clone()); state.pendingInteract = n; console.log('[DBG] Caminando al nodo ' + i); };
 DBG.mineReset = () => { GS.world.mineNodes = {}; Mining.restore(); DBG.save('debug_mine'); console.log('[DBG] Nodos de minería repuestos'); };
 DBG.rest = () => { GS.daily.restedUntil = dreamNow() + CFG.restedDurationDays * DAY_MS; DBG.save('debug_rest'); console.log('[DBG] Descansado activado'); };
-DBG.cookNow = () => { if (GS.housing.kitchen) { GS.housing.kitchen.readyAt = 0; console.log('[DBG] Cocina lista'); } else console.log('[DBG] La cocina está libre'); };
 DBG.house = (lv) => { GS.house.level = clamp(lv | 0, 0, 2); buildHouse(GS.house.level); DBG.save('debug_house'); console.log('[DBG] Casa nivel ' + GS.house.level); };
 DBG.showcaseSettle = () => { Showcase.settle(); DBG.save('debug_showcase'); console.log('[DBG] Hucha: ' + (GS.housing.showcaseRevenue | 0)); };
 DBG.furniture = (id) => { if (!FURNITURE.some(f => f.id === id)) { console.warn('[DBG] muebles: ' + FURNITURE.map(f => f.id).join(', ')); return; } if (!hasFurniture(id)) GS.furniture.owned.push(id); DBG.save('debug_furniture'); console.log('[DBG] Mueble: ' + id); };
@@ -4145,6 +4165,8 @@ DBG.coffee = () => { Coffee.until = Date.now() + CFG.coffeeMs; console.log('[DBG
 DBG.star = () => { console.log(StarFall.spawn() ? '[DBG] Estrella caída cerca' : '[DBG] No hay tierra cerca'); };
 DBG.seals = (n = 7) => { const w = Weekly.roll(); for (let i = 0; i < 7; i++) w.seals[i] = i < n; DBG.save('debug_seals'); console.log('[DBG] Sellos: ' + Weekly.count()); };
 DBG.cookNow = () => { Kitchen.q.forEach(k => k.readyAt = 0); console.log('[DBG] Lotes listos: ' + Kitchen.q.length); };
+DBG.builds = () => console.table((GS.world.buildings || []).map(r => ({ id: r.id, type: r.type, placed: !!placedBuildings[r.id] })));
+DBG.demolish = (id, refund = 0.5) => removeBuilding(id ?? GS.world.buildings?.at(-1)?.id, refund);
 </script>
 </body>
 </html>
