@@ -363,6 +363,7 @@ const CFG = {
   restedDurationDays: 0.5,        // dura medio día onírico
   /* ===== v0.1 · OBJETIVO (Sec. 0.2 P4 · Sec. 1.6) ===== */
   ticketPrice: 40000000,          // precio del billete de vuelta (dream_ticket) · siempre visible en el HUD
+  act1Missions: 7,
   /* ===== S1.3 · CLIMA ONÍRICO (diseño propio, no definido en la Guía · calibrable) ===== */
   weatherChances: { clear: 50, rain: 30, fog: 15, stars: 5 },   // % por franja · 'stars' solo en la franja 14:00–24:00
   weatherRainSpeedMult: 0.9,      // lluvia: velocidad −10%
@@ -1960,6 +1961,51 @@ function refreshGoalHUD(pop = false) {
   const on = !!storyState().revealed; w.classList.toggle('hidden', !on);
   if (pop && on) { w.classList.remove('goal-pop'); void w.offsetWidth; w.classList.add('goal-pop'); }
 }
+const SOMBRA_REVEAL = [
+  'Mmm... te esperaba, soñador.',
+  'Sí, soñador: esto es un sueño, y tú lo sabes tan bien como yo.',
+  'Hay un vuelo de vuelta a tu mundo. Cuesta 40.000.000 $TOKEN. Nadie lo ha pagado jamás.',
+  'Pero tú tienes esa máquina... y tiempo. Todo el tiempo del sueño.'
+];
+const SOMBRA_ACT1 = ['Ya eres de aquí.', 'Ahora la pregunta es si quieres dejar de serlo.', '40 millones, soñador.'];
+function showStoryScene(icon, name, lines, onDone, theme = '#7e57c2') {
+  storyCSS(); if ($('storyScene')) return;
+  const o = document.createElement('div'); o.id = 'storyScene';
+  o.style.cssText = 'position:fixed;inset:0;z-index:9000;background:rgba(10,6,24,.72);display:flex;align-items:flex-end;justify-content:center;padding:18px;font-family:Fredoka,sans-serif';
+  o.innerHTML = `<div style="width:min(94vw,560px);background:#1c1530;border:2px solid ${theme};border-radius:18px;padding:18px 18px 14px;color:#ede7f6;box-shadow:0 0 40px ${theme}66">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px"><span style="font-size:34px">${icon}</span><b style="font-size:18px">${name}</b></div>
+    <p id="storyLine" style="min-height:64px;font-size:17px;line-height:1.45;margin:0"></p>
+    <div style="text-align:right;margin-top:10px"><button id="storyNext" style="padding:10px 22px;border-radius:999px;background:${theme};color:#fff;border:0;font:700 15px Fredoka,sans-serif;cursor:pointer">Continuar ▸</button></div></div>`;
+  document.body.appendChild(o); state.modalOpen = true;
+  let i = 0, typing = null;
+  const show = () => {
+    const el = $('storyLine'), txt = lines[i]; let k = 0; clearInterval(typing); el.textContent = '';
+    typing = setInterval(() => { el.textContent = txt.slice(0, ++k); if (k >= txt.length) clearInterval(typing); }, 28);
+    $('storyNext').textContent = i === lines.length - 1 ? 'Entendido ▸' : 'Continuar ▸';
+  };
+  $('storyNext').onclick = () => {
+    const el = $('storyLine');
+    if (el.textContent.length < lines[i].length) { clearInterval(typing); el.textContent = lines[i]; return; }
+    if (++i < lines.length) show(); else { clearInterval(typing); o.remove(); state.modalOpen = false; onDone && onDone(); }
+  };
+  show();
+}
+function maybeRevealDream(after) {
+  if ($('storyScene')) return true;
+  const s = storyState(); if (s.revealed) return false;
+  showStoryScene('🐈‍⬛', 'Madame Sombra', SOMBRA_REVEAL, () => {
+    s.revealed = true; refreshGoalHUD(true); SaveSystem.saveNow('story:reveal');
+    showToast('✈️ Nuevo objetivo: el vuelo de vuelta a tu mundo', 'text-purple-200');
+    after && setTimeout(after, 400);
+  });
+  return true;
+}
+function storyAct1Check() {
+  const s = storyState(); if (s.act1Done || missionsDoneCount() < CFG.act1Missions) return;
+  s.act1Done = true; s.revealed = true; refreshGoalHUD(true); SaveSystem.saveNow('story:act1');
+  setTimeout(() => showStoryScene('🐈‍⬛', 'Madame Sombra', SOMBRA_ACT1,
+    () => showToast('📜 Acto 1 completado · Empieza «El Comerciante»', 'text-purple-200')), 2500);
+}
 function showPrologue(onDone) {
   storyCSS(); if ($('prologue')) return;
   const o = document.createElement('div'); o.id = 'prologue';
@@ -1992,6 +2038,7 @@ function showPrologue(onDone) {
   };
 }
 function startDialog(npcId) {
+  if (npcId === 'sombra' && maybeRevealDream(() => startDialog('sombra'))) return;
   const n = npcById[npcId], obj = npcObjs[npcId], m = state.missions[npcId];
   state.mode = 'dialog'; state.dialogNpc = npcId;
   const up = obj.userData.up; const near = player.position.distanceTo(obj.position) < 8;
@@ -2174,7 +2221,7 @@ function completeMission(id) {
   const n = npcById[id], obj = npcObjs[id];
   if (GS.missions[id].status === 2) return; // nunca cobrar dos veces la misma recompensa
   GS.stats.missionsCompleted++;
-  setMissionStatus(id, 2); Trust.add(id, CFG.missionTrustReward, 'mission'); addTokens(n.reward, `Misión: ${n.mission.title}`); Inventory.add('gift_box', 1); UNLOCKS[id](); SaveSystem.saveNow('mission-complete:' + id);   // v0.2: +30 confianza por misión (Sec. 3.3)
+  setMissionStatus(id, 2); Trust.add(id, CFG.missionTrustReward, 'mission'); addTokens(n.reward, `Misión: ${n.mission.title}`); Inventory.add('gift_box', 1); UNLOCKS[id](); SaveSystem.saveNow('mission-complete:' + id); storyAct1Check();   // v0.2: +30 confianza por misión (Sec. 3.3)
   obj.userData.celebrateUntil = performance.now() + 3200;
   obj.userData.bubble.material.map = bubbleTexture('✓', '#7dffa8'); obj.userData.bubble.material.needsUpdate = true;
   spawnConfetti(obj.position.clone().addScaledVector(obj.userData.up, 2.5)); const b = buildings[id]; if (b) spawnConfetti(b.position.clone().addScaledVector(b.userData.up, 4));
@@ -3201,6 +3248,7 @@ function updatePlayer(dt) {
   player.position.copy(pd.dir).multiplyScalar(surfaceR(pd.dir) + bob);
   if (marker.material.opacity > 0) { marker.material.opacity -= dt * 0.8; marker.scale.addScalar(dt * 0.8); }
   const near = canControl() ? getNearbyInteractable() : null; ui.hint.classList.toggle('hidden', !near); if (near) ui.hintText.textContent = near.obj.userData.interact.label;
+  if (near && (near.obj.userData.npcId === 'sombra' || near.obj.id === 'sombra')) maybeRevealDream();
   if (IS_MOBILE) { document.getElementById('joystick').style.display = canControl() ? 'block' : 'none'; actionBtn.style.display = near ? 'flex' : 'none'; if (near) actionLabel.textContent = near.obj.userData.interact.label.replace('Hablar con ', '').replace('Cosechar Fruta Dorada', 'Cosechar'); }
   aura.rotation.y += dt * 2.2; aura.children.forEach(c => { if (c.isMesh && c.userData.i !== undefined) c.position.y = Math.sin(performance.now() * 0.004 + c.userData.i) * 0.15; });
 }
