@@ -202,6 +202,10 @@
       <div class="clickable rounded-2xl px-3 md:px-5 py-2 md:py-3 border-[3px] border-[#2b2b3d] bg-[#1c1b2e] shadow-[0_6px_0_#2b2b3d,0_0_30px_rgba(255,200,0,.35)]">
         <div class="pixel text-[8px] md:text-[9px] text-amber-300/80 mb-1 tracking-wide">$TOKEN</div>
         <div class="pixel text-sm md:text-2xl token-glow"><span class="coin">🪙</span> <span id="tokenValue">0</span></div>
+        <div id="goalWrap" class="mt-1.5" title="Billete de vuelta: 40.000.000 $TOKEN">
+          <div class="pixel text-[7px] md:text-[8px] text-amber-200/70 tracking-wide whitespace-nowrap">🎫 <span id="goalText">0 / 40.000.000</span><span id="goalPct" class="hidden md:inline"> · 0,00%</span></div>
+          <div class="h-1.5 md:h-2 mt-1 rounded-full bg-white/10 overflow-hidden"><div id="goalBar" class="h-full rounded-full bg-gradient-to-r from-amber-400 to-yellow-200" style="width:0%;transition:width .4s"></div></div>
+        </div>
       </div>
       <div id="toastArea" class="absolute left-1/2 -bottom-2"></div>
     </div>
@@ -355,6 +359,8 @@ const CFG = {
   restedSpeedMult: 1.1,           // buff Descansado: +10% velocidad
   restedPriceMult: 1.05,          // buff Descansado: +5% mejores precios
   restedDurationDays: 0.5,        // dura medio día onírico
+  /* ===== v0.1 · OBJETIVO (Sec. 0.2 P4 · Sec. 1.6) ===== */
+  ticketPrice: 40000000,          // precio del billete de vuelta (dream_ticket) · siempre visible en el HUD
 };
 /** Detección de dispositivo táctil → controles y calidad adaptados */
 const IS_MOBILE = matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window;
@@ -3022,11 +3028,24 @@ function updateTokens() { const money = GS.economy.money; if (state.tokensShown 
    19. BUCLE PRINCIPAL
    ========================================================= */
 const clock = new THREE.Clock();
+/* ===== v0.1 · HUD OBJETIVO 40M (Guía Sec. 0.2 P4: "un número imposible siempre visible") ===== */
+let _goalLast = -1;
+function updateGoalHUD() {
+  const goal = CFG.ticketPrice;
+  const shown = Math.max(0, Math.floor(typeof state.tokensShown === 'number' ? state.tokensShown : GS.economy.money));
+  if (shown === _goalLast) return;
+  _goalLast = shown;
+  const pct = Math.min(100, (shown / goal) * 100);
+  const t = document.getElementById('goalText'), p = document.getElementById('goalPct'), b = document.getElementById('goalBar');
+  if (t) t.textContent = `${shown.toLocaleString('es-ES')} / ${goal.toLocaleString('es-ES')}`;
+  if (p) p.textContent = ` · ${pct.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`;
+  if (b) b.style.width = (shown > 0 ? Math.max(pct, 0.6) : 0) + '%';
+}
 function animate() {
   requestAnimationFrame(animate);
   const dt = Math.min(clock.getDelta(), 0.05), t = clock.elapsedTime;
   updatePlayer(dt); Needs.update(dt); updateNPCs(dt, t); updateCamera(dt); updateSun(); updateNeon(dt, t); updateUnlocks(dt, t); updateShip(dt); updateConfetti(dt); updateWater(t);
-  clouds.children.forEach(p => p.rotateY(p.userData.speed * dt)); updateTokens();
+  clouds.children.forEach(p => p.rotateY(p.userData.speed * dt)); updateTokens(); updateGoalHUD();
   if (SaveSystem.started && !state.menuOpen) {
     GS.meta.playTimeSec += dt;
     GS.daily.clockMs += dt * 1000 * DAY_SCALE;                 // v0.1: el reloj onírico solo avanza jugando
