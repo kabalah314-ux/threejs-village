@@ -529,6 +529,8 @@ function moneyToast(text, kind) { const t = document.createElement('div'); t.cla
    ========================================================= */
 const CATEGORIES = {
   resource:   { name: 'Recursos',          icon: '🌾' },
+  ingredient: { name: 'Ingredientes',      icon: '🥣' },   // v0.4 (Sec. 5.2)
+  tool:       { name: 'Herramientas',      icon: '🛠️' },   // v0.4 (Sec. 5.2) · con durabilidad
   valuable:   { name: 'Objetos valiosos',  icon: '💎' },
   consumable: { name: 'Consumibles',       icon: '🍹' },
   cosmetic:   { name: 'Cosméticos',        icon: '🎨' },
@@ -558,6 +560,21 @@ const ITEMS = {
   gift_box:       defItem({ id: 'gift_box',       name: 'Caja Regalo',        icon: '🎁', cat: 'special',    rarity: 'rare',     sell: 0,  usable: true, desc: 'Un agradecimiento de los vecinos por tu ayuda. Ábrela para descubrir qué contiene.' }),
   merchant_crate: defItem({ id: 'merchant_crate', name: 'Carga del Mercante', icon: '📦', cat: 'special',    rarity: 'rare',     sell: 25, usable: true, desc: 'Mercancía traída por el barco de Salty Sam. Ábrela para obtener materiales u objetos valiosos.' }),
   poor_bread:     defItem({ id: 'poor_bread',     name: 'Pan del Pobre',      icon: '🥖', cat: 'special',    rarity: 'common',   sell: 0,  usable: true, desc: 'Un regalo del Oso para quien pasa penurias. Saciedad +30. No se vende: es dignidad, no mercancía.' }),
+  /* ===== v0.4 · OBJETOS NUEVOS (Guía Sec. 5.5 y 5.7) · maxDur = durabilidad máxima (herramientas) ===== */
+  dream_wheat:    defItem({ id: 'dream_wheat',    name: 'Trigo Onírico',         icon: '🌾', cat: 'ingredient', rarity: 'common',   sell: 3,   buy: 6, desc: 'Cosecha del Jardín (2/día). En el Molino, 2 Trigos se convierten en 1 Harina.' }),
+  flour:          defItem({ id: 'flour',          name: 'Harina',                icon: '🥣', cat: 'ingredient', rarity: 'common',   sell: 8,   desc: 'Sale del Molino. Ingrediente del Pan del Sueño y del Pastel Dorado.' }),
+  dream_bread:    defItem({ id: 'dream_bread',    name: 'Pan del Sueño',         icon: '🍞', cat: 'consumable', rarity: 'common',   sell: 0,   usable: true, desc: 'Se cocina con 2 Harinas. Saciedad +50: la comida más eficiente del sueño.' }),
+  golden_jam:     defItem({ id: 'golden_jam',     name: 'Mermelada Dorada',      icon: '🍯', cat: 'ingredient', rarity: 'uncommon', sell: 150, desc: 'Se cocina con 2 Frutas Doradas. Vale más que la fruta cruda y es un gran regalo.' }),
+  golden_cake:    defItem({ id: 'golden_cake',    name: 'Pastel Dorado',         icon: '🎂', cat: 'consumable', rarity: 'rare',     sell: 300, usable: true, desc: '1 Harina + 1 Mermelada Dorada. Saciedad +80 y velocidad +50% durante 60 s. Producto de lujo.' }),
+  fish:           defItem({ id: 'fish',           name: 'Pescado',               icon: '🐟', cat: 'resource',   rarity: 'common',   sell: 15,  desc: 'Se pesca en cualquier orilla con la Caña de Soñador.' }),
+  tropical_fish:  defItem({ id: 'tropical_fish',  name: 'Pez Tropical',          icon: '🐠', cat: 'resource',   rarity: 'uncommon', sell: 40,  desc: 'Colorido y escurridizo. A Sam le encanta.' }),
+  golden_fish:    defItem({ id: 'golden_fish',    name: 'Pez Dorado',            icon: '🐡', cat: 'resource',   rarity: 'rare',     sell: 150, desc: 'Muy raro. De noche pica tres veces más.' }),
+  old_boot:       defItem({ id: 'old_boot',       name: 'Bota Vieja',            icon: '🥾', cat: 'resource',   rarity: 'common',   sell: 1,   desc: 'Un clásico de la pesca. Sam la acepta como regalo: "arrr, un clásico".' }),
+  grilled_fish:   defItem({ id: 'grilled_fish',   name: 'Pescado a la Brasa',    icon: '🍢', cat: 'consumable', rarity: 'common',   sell: 12,  usable: true, desc: 'Se cocina con 1 Pescado. Saciedad +35.' }),
+  raw_gem:        defItem({ id: 'raw_gem',        name: 'Gema en Bruto',         icon: '💎', cat: 'valuable',   rarity: 'epic',     sell: 150, desc: 'Aparece al minar con pico (8% por nodo).' }),
+  star_shard:     defItem({ id: 'star_shard',     name: 'Fragmento de Estrella', icon: '🌠', cat: 'valuable',   rarity: 'epic',     sell: 200, desc: 'Cae del cielo de noche (1-3 por noche). Sombra paga más por él.' }),
+  fishing_rod:    defItem({ id: 'fishing_rod',    name: 'Caña de Soñador',       icon: '🎣', cat: 'tool',       sell: 60,  buy: 150, stack: 1, maxDur: 20, desc: 'Para pescar en la orilla. 20 usos. Reparación: Sam (40 $T) o tú mismo con 2 Troncos.' }),
+  pickaxe:        defItem({ id: 'pickaxe',        name: 'Pico de Glover',        icon: '⛏️', cat: 'tool',       sell: 80,  buy: 200, stack: 1, maxDur: 30, desc: 'Para minar los nodos de las zonas altas. 30 usos. Reparación: Glover (60 $T) o tú mismo con 1 Tronco + 1 Piedra.' }),
 };
 /** Tablas de botín (peso relativo) para objetos que se abren */
 const LOOT = {
@@ -578,6 +595,9 @@ const ITEM_EFFECTS = {
   gift_box:        () => openLootBox('gift_box', '🎁 Caja Regalo'),
   merchant_crate:  () => openLootBox('merchant_crate', '📦 Carga del Mercante'),
   poor_bread:      () => { Needs.eat(30); showToast('🥖 Pan humilde pero honesto: saciedad +30', 'text-white'); },
+  dream_bread:     () => { Needs.eat(50); showToast('🍞 Pan del Sueño: saciedad +50', 'text-white'); },
+  grilled_fish:    () => { Needs.eat(35); showToast('🍢 Pescado a la Brasa: saciedad +35', 'text-white'); },
+  golden_cake:     () => { Needs.eat(80); applyBuff(1.5, 60, '🎂 ¡Pastel Dorado! Velocidad +50% · saciedad +80'); },
 };
 function applyBuff(mult, seconds, msg) { state.buff = { mult, until: Date.now() + seconds * 1000 }; showToast(msg, 'text-white'); playBeep(988, 0.08, 'triangle'); }
 function openLootBox(id, label) {
@@ -3353,6 +3373,8 @@ const DBG = (() => {
   return { help, state, money, addMoney, day, time, hunger, trust, trustAll, save, reset, refresh };
 })();
 window.DBG = DBG;
+DBG.give = (id, qty = 1) => { if (!ITEMS[id]) { console.warn('[DBG] objeto desconocido: ' + id); return false; } const ok = Inventory.add(id, qty); if (ok) DBG.save('debug_give'); return ok; };
+DBG.items = () => console.table(Object.values(ITEMS).map(i => ({ id: i.id, nombre: i.name, cat: i.cat, rareza: i.rarity, sell: i.sell, buy: i.buy, stack: i.stack, maxDur: i.maxDur ?? '' })));
 </script>
 </body>
 </html>
