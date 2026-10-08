@@ -3502,6 +3502,81 @@ setInterval(() => {
   if (!el) { const gw = document.getElementById('goalWrap'); if (!gw) return; gw.insertAdjacentHTML('beforebegin', '<div id="restChip" class="pixel text-[7px] md:text-[8px] text-indigo-200/80 mt-1 whitespace-nowrap hidden"></div>'); el = document.getElementById('restChip'); }
   const on = SaveSystem.started && Rested.active(); el.classList.toggle('hidden', !on); if (on) el.textContent = '😴 Descansado · ' + Rested.leftText();
 }, 2000);
+/* ===== S3.2 · COCINA POR LOTES (Guía Sec. 5.3, 5.5 y 6.5) =====
+   GS.housing.kitchen = { recipe, qty, readyAt (tiempo real), notified } | null · bloqueada si la casa está sellada */
+const RECIPES = [
+  { id: 'dream_bread',  out: 'dream_bread',  qty: 1, in: [['flour', 2]] },
+  { id: 'grilled_fish', out: 'grilled_fish', qty: 1, in: [['fish', 1]] },
+  { id: 'golden_jam',   out: 'golden_jam',   qty: 1, in: [['golden_fruit', 2]] },
+  { id: 'golden_cake',  out: 'golden_cake',  qty: 1, in: [['flour', 1], ['golden_jam', 1]] },
+];
+const kitchenFmt = (ms) => { const s = Math.max(0, Math.ceil(ms / 1000)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
+const Kitchen = {
+  get st() { return GS.housing.kitchen || null; },
+  recipe(id) { return RECIPES.find(r => r.id === id); },
+  batchSecs(r, qty) { return Math.round(CFG.cookSecs[r.id] * (1 + CFG.cookBatchExtra * (qty - 1))); },
+  maxQty(r) { return Math.max(0, Math.min(CFG.cookMaxBatch, ...r.in.map(([id, q]) => Math.floor(Inventory.count(id) / q)))); },
+  ready() { return !!this.st && Date.now() >= this.st.readyAt; },
+  start(id, qty) {
+    if (houseSealed()) { showToast('🔒 Casa sellada: no puedes cocinar', 'text-red-200'); return false; }
+    if (this.st) { showToast('🍳 La cocina está ocupada: recoge primero', 'text-white'); return false; }
+    const r = this.recipe(id); if (!r) return false;
+    qty = clamp(Math.floor(qty) || 1, 1, CFG.cookMaxBatch);
+    if (this.maxQty(r) < qty) { showToast('❌ Te faltan ingredientes', 'text-red-200'); return false; }
+    r.in.forEach(([iid, q]) => Inventory.remove(iid, q * qty));
+    GS.housing.kitchen = { recipe: r.id, qty, readyAt: Date.now() + this.batchSecs(r, qty) * 1000, notified: false };
+    showToast(`🍳 Cocinando ${qty}× ${ITEMS[r.out].name}…`, 'text-white'); playBeep(700, 0.06, 'triangle'); SaveSystem.saveNow('cook-start'); return true;
+  },
+  collect() {
+    const k = this.st; if (!k) return false;
+    if (houseSealed()) { showToast('🔒 Casa sellada: la comida espera dentro', 'text-red-200'); return false; }
+    if (!this.ready()) { showToast('⏳ Aún no está listo', 'text-white'); return false; }
+    const r = this.recipe(k.recipe), n = k.qty * r.qty;
+    if (!Inventory.canAdd(r.out, n)) { showToast('🎒 Inventario lleno: haz hueco para recoger', 'text-red-200'); return false; }
+    Inventory.add(r.out, n, { silent: true }); GS.housing.kitchen = null;
+    GS.stats.dishesCooked = (GS.stats.dishesCooked || 0) + n;
+    showToast(`${ITEMS[r.out].icon} +${n} ${ITEMS[r.out].name}`, 'text-white'); playChime(); SaveSystem.saveNow('cook-collect'); return true;
+  },
+  statusText() {
+    const k = this.st; if (!k) return 'Libre. Cocina por lotes: cuantas más unidades a la vez, mejor rinde el tiempo.';
+    const r = this.recipe(k.recipe), it = ITEMS[r.out];
+    if (this.ready()) return `✅ Listo: <b>${k.qty * r.qty}× ${it.icon} ${esc(it.name)}</b>. Recógelo en la cocina.`;
+    return `⏳ Cocinando <b>${k.qty}× ${it.icon} ${esc(it.name)}</b> · listo en <b>${kitchenFmt(k.readyAt - Date.now())}</b>`;
+  },
+};
+function openKitchenPanel() {
+  openApp('🍳 Cocina', '', (body) => {
+    const render = () => {
+      let html = `<div data-kitchen-root></div>` + balanceBar();
+      if (houseSealed()) { body.innerHTML = html + `<div class="app-card p-3 text-sm text-purple-700 font-bold">🔒 Casa sellada: no puedes cocinar hasta romper el sello.</div>`; return; }
+      html += `<div class="app-card p-3 mb-3 text-sm text-slate-600">${Kitchen.statusText()}${Kitchen.ready() ? `<div><button data-collect class="btn-game px-3 py-1.5 text-xs mt-2 bg-emerald-300">🧺 Recoger</button></div>` : ''}</div>`;
+      const busy = !!Kitchen.st;
+      RECIPES.forEach(r => {
+        const it = ITEMS[r.out], max = Kitchen.maxQty(r), on = max > 0 && !busy;
+        const ing = r.in.map(([id, q]) => `${q}× ${ITEMS[id].icon} ${esc(ITEMS[id].name)} <span class="${Inventory.count(id) >= q ? 'text-emerald-600' : 'text-red-500'}">(${Inventory.count(id)})</span>`).join(' + ');
+        html += `<div class="app-card p-3 mb-2"><div class="flex items-center gap-2"><span class="text-2xl">${it.icon}</span><div class="flex-1 min-w-0"><div class="font-bold text-sm">${esc(it.name)}</div><div class="text-[11px] text-slate-500">${ing}</div><div class="text-[11px] text-slate-400">${CFG.cookSecs[r.id]} s · cada unidad extra del lote +${Math.round(CFG.cookBatchExtra * 100)}% · máx. ${CFG.cookMaxBatch}</div></div></div>
+          <div class="flex flex-wrap gap-2 mt-2 items-center">
+            <input data-qty="${r.id}" type="number" min="1" max="${Math.max(1, max)}" value="1" class="game w-16 text-xs">
+            <button data-cook="${r.id}" class="btn-game px-3 py-1.5 text-xs ${on ? 'bg-orange-200' : 'bg-slate-200 opacity-60'}">Cocinar</button>
+            <button data-cookmax="${r.id}" class="btn-game px-3 py-1.5 text-xs ${on ? 'bg-orange-200' : 'bg-slate-200 opacity-60'}">Máx (${max})</button>
+          </div></div>`;
+      });
+      body.innerHTML = html;
+      const c = body.querySelector('[data-collect]'); if (c) c.onclick = () => { Kitchen.collect(); render(); };
+      body.querySelectorAll('[data-cook]').forEach(b => b.onclick = () => { const inp = body.querySelector(`[data-qty="${b.dataset.cook}"]`); Kitchen.start(b.dataset.cook, +(inp?.value || 1)); render(); });
+      body.querySelectorAll('[data-cookmax]').forEach(b => b.onclick = () => { const r = Kitchen.recipe(b.dataset.cookmax); const m = Kitchen.maxQty(r); if (m > 0) Kitchen.start(r.id, m); else showToast('❌ Te faltan ingredientes', 'text-red-200'); render(); });
+    };
+    render();
+    const iv = setInterval(() => {   // refresca la cuenta atrás solo mientras ESTE panel siga abierto y visible
+      if (!body.isConnected || body.offsetParent === null || !body.querySelector('[data-kitchen-root]')) { clearInterval(iv); return; }
+      if (Kitchen.st) render();
+    }, 1000);
+  });
+}
+setInterval(() => {   // aviso único cuando un lote termina
+  const k = GS.housing && GS.housing.kitchen;
+  if (k && !k.notified && SaveSystem.started && Date.now() >= k.readyAt) { k.notified = true; showToast('🍳 ¡La comida está lista! Recógela en tu cocina', 'text-white'); playBeep(880, 0.08, 'triangle'); }
+}, 1000);
 /* ===== v0.1 · HUD OBJETIVO 40M (Guía Sec. 0.2 P4: "un número imposible siempre visible") ===== */
 let _goalLast = -1;
 function updateGoalHUD() {
@@ -3747,6 +3822,7 @@ DBG.toolDur = (id, n) => { const s = GS.inventory.slots.find(x => x.id === id); 
 DBG.goMine = (i = 0) => { const n = Mining.nodes[i]; if (!n) { console.warn('[DBG] hay ' + Mining.nodes.length + ' nodos'); return; } setMoveTarget(n.userData.dir.clone()); state.pendingInteract = n; console.log('[DBG] Caminando al nodo ' + i); };
 DBG.mineReset = () => { GS.world.mineNodes = {}; Mining.restore(); DBG.save('debug_mine'); console.log('[DBG] Nodos de minería repuestos'); };
 DBG.rest = () => { GS.daily.restedUntil = dreamNow() + CFG.restedDurationDays * DAY_MS; DBG.save('debug_rest'); console.log('[DBG] Descansado activado'); };
+DBG.cookNow = () => { if (GS.housing.kitchen) { GS.housing.kitchen.readyAt = 0; console.log('[DBG] Cocina lista'); } else console.log('[DBG] La cocina está libre'); };
 </script>
 </body>
 </html>
