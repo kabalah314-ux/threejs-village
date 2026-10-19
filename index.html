@@ -4185,7 +4185,7 @@ cam.dist = cam.tDist = 70; cam.pitch = cam.tPitch = 0.35; // vista desde el espa
 { const p = camPose(); applyLook(p.pos, p.target, p.up); }
 animate();
 // 🛠️ DEBUG (temporal, se eliminará en v1.0): permite inspeccionar y forzar el estado desde la consola F12
-window._dbg = { get GS() { return GS; }, set clock(fictMs) { GS.daily.clockMs = fictMs; }, set hunger(v) { GS.needs.hunger = v; } };
+window._dbg = { get GS() { return GS; }, Inventory, Wallet, Needs, Production, placedBuildings, settleDay, updateEmbargo, enterBuildMode, interactWith: (o) => interactWith(o), set clock(fictMs) { GS.daily.clockMs = fictMs; }, set hunger(v) { GS.needs.hunger = v; } };
 if (!SaveSystem.persistent) $('storageWarn').classList.remove('hidden');
 if (hadSave) {
   $('saveSummary').classList.remove('hidden');
