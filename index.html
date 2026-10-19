@@ -403,7 +403,9 @@ const CFG = {
   // v0.4 · Producción de construcciones (Sec. 5.11)
   gardenWheatPerDay: 2, gardenBouquetPerDay: 1,                        // Jardín: 2 Trigo + 1 Ramo al día (lluvia: + weatherRainGardenBonus)
   millWheatPerFlour: 2, millSecsPerBatch: 30, millMaxBatches: 5,       // Molino: 2 Trigo → 1 Harina, 30 s por lote
-  fountainWishCost: 1, fountainWishRange: [1, 10],                     // Fuente: lanzas 1 $T, el deseo devuelve 1–10 $T (1 vez al día)
+  fountainWishCost: 1, fountainWishRange: [1, 10],
+  // v0.5 · Tendencia del escaparate (rumor de los erizos, Sec. 6.7)
+  trendSaleMult: 2, trendPool: ['golden_jam', 'dream_bread', 'flower_bouquet', 'pearl', 'grilled_fish', 'golden_cake', 'coffee', 'raw_gem', 'star_shard', 'seashell', 'golden_fruit', 'tropical_fish'],                     // Fuente: lanzas 1 $T, el deseo devuelve 1–10 $T (1 vez al día)
   cookQueueBase: 1, cookQueueIronStove: 2, cookQueueVilla: 3,         // Sec. 6.6: lotes simultáneos
   showcaseSlotsByLevel: [0, 6, 12], piggyXlExtraSlots: 6,             // Sec. 6.2 y 6.8
   showcaseOdds: [[1.0, 0.8], [1.2, 0.5], [1.5, 0.25], [9999, 0.05]],  // Sec. 6.7: precio/valor → prob. de venta/día
@@ -835,6 +837,7 @@ const Trust = {
       const nm = (typeof npcById !== 'undefined' && npcById[id]) || null;
       showToast(`${nm?.emoji || '💜'} ${nm?.name || id} ahora te considera: ${TRUST_LEVELS[after].name} ${TRUST_LEVELS[after].heart}`, 'text-white'); playChime();
       if (id !== 'rocco' && typeof refreshAuraFromTrust === 'function') refreshAuraFromTrust();
+      if (after >= 4 && before < 4) sendMilestoneLetter(id);   // v0.5: carta de hito (Sec. 6.10)
     }
     SaveSystem.save('trust:' + id); return pts;
   },
@@ -1147,6 +1150,7 @@ placeAtSite(bakery, S_V, 6.2, -4.5, -0.55, -0.1); scene.add(bakery); colliders.p
 
 /** Casa del jugador con 3 niveles: Casa → Tienda → Villa */
 let house = null, houseCollider = { pos: new THREE.Vector3(), r: 2.8 }; colliders.push(houseCollider);
+let mailboxObj = null;
 function buildHouse(level) {
   if (house) scene.remove(house);
   const g = new THREE.Group();
@@ -1170,6 +1174,7 @@ function buildHouse(level) {
   mailBadge.position.set(1.9, 2.1, 1.9); mailBadge.scale.setScalar(0.9); mailBadge.renderOrder = 10; mailBadge.visible = false; g.add(mailBadge); g.userData.mailBadge = mailBadge;
   if (house) { const i = interactables.indexOf(house); if (i >= 0) interactables.splice(i, 1); }
   registerInteractable(g, { type: 'house', label: 'Tu casa' });
+  { const mb = new THREE.Object3D(); mb.position.set(1.9, 1.1, 1.9); g.add(mb); if (mailboxObj) { const k = interactables.indexOf(mailboxObj); if (k >= 0) interactables.splice(k, 1); } registerInteractable(mb, { type: 'mailbox', label: 'Abrir el buzón 📮' }); mailboxObj = mb; }   // v0.5: buzón independiente (Sec. 6.10)
   placeAtSite(g, S_V, -6.5, -3.5, 0.5, -0.1); scene.add(g); house = g;
   houseCollider.pos.copy(g.position); houseCollider.r = [2.8, 3.3, 4.2][level];
   if (GS.house.level !== level) { GS.house.level = level; SaveSystem.save('house'); }
@@ -1921,7 +1926,7 @@ window.addEventListener('keydown', (e) => {
 });
 document.getElementById('btnBackpack').onclick = () => { if (state.build) return; if (ui.appModal.style.display === 'flex' && ui.appTitle.textContent.startsWith('🎒')) closeApp(); else if (!state.modalOpen && !state.menuOpen) openInventory(); };
 window.addEventListener('keyup', (e) => state.keys[e.code] = false);
-function rangeFor(obj) { const t = obj.userData.interact.type; return t === 'building' ? CFG.interactDist + 2.4 : t === 'house' ? CFG.interactDist + 2 : t === 'fruit' ? 4 : t === 'pickup' ? 2.6 : CFG.interactDist; }
+function rangeFor(obj) { const t = obj.userData.interact.type; return t === 'mailbox' ? CFG.interactDist + 0.8 : t === 'building' ? CFG.interactDist + 2.4 : t === 'house' ? CFG.interactDist + 2 : t === 'fruit' ? 4 : t === 'pickup' ? 2.6 : CFG.interactDist; }
 const isAvailable = (obj) => obj.visible !== false && obj.userData.ready !== false;
 function handleClick(e) {
   if (state.build) { setBuildCursorFromPointer(e.clientX, e.clientY); if (!IS_MOBILE && state.build.valid) confirmBuild(); return; } // construcción: tap = mover · clic PC = construir
@@ -1956,7 +1961,8 @@ function interactWith(obj) {
   else if (it.type === 'fishing') Fishing.cast();   // S2.3
   else if (it.type === 'mine') Mining.hit(obj);   // S2.4
   else if (it.type === 'star') StarFall.collect(obj);   // S2.6
-  else if (it.type === 'production') Production.use(obj);   // v0.4 · Jardín / Molino / Fuente
+  else if (it.type === 'production') Production.use(obj);
+  else if (it.type === 'mailbox') { if (GS.housing.sealed) openSealedHousePanel(); else openHousePanel('mail'); }   // v0.5   // v0.4 · Jardín / Molino / Fuente
   else if (it.type === 'crate') { if (state.crateTaken) return; if (Inventory.add('merchant_crate', 1)) { state.crateTaken = true; crate.visible = false; playChime(); } }
   else if (it.type === 'vendor') startVendorDialog();
   else if (it.type === 'store') { if (!canControl()) return; openApp('🦝 Tienda de Rocco', '', (b) => mountItemShop(b, 'store')); }
@@ -2819,8 +2825,16 @@ function openSealedHousePanel() {
   });
 }
 /* ---- Panel "Mi Casa" ---- */
-function openHousePanel() {
+/* =========================================================
+   v0.5 · PANEL "MI CASA" CON PESTAÑAS (Guía Sec. 6.9)
+   📮 Buzón · 🏠 Alquiler · 🛏️ Dormir · 🍳 Cocina · 🏷️ Escaparate · 🪑 Muebles
+   Reutiliza openApp + los módulos existentes (Sleep, Kitchen, Showcase, FURNITURE).
+   ========================================================= */
+const HOUSE_TABS = [['mail', '📮 Buzón'], ['rent', '🏠 Alquiler'], ['sleep', '🛏️ Dormir'], ['kitchen', '🍳 Cocina'], ['showcase', '🏷️ Escaparate'], ['furniture', '🪑 Muebles']];
+let _houseTab = 'rent';
+function openHousePanel(tab) {
   const levelNames = ['🏠 Casa', '🏪 Tienda', '🏡 Villa $TOKEN'];
+  _houseTab = tab || ((GS.housing.mailboxUnread || 0) > 0 ? 'mail' : _houseTab);
   openApp(`${levelNames[clamp(GS.house.level | 0, 0, 2)]} · Mi Casa`, '', (body) => {
     const render = () => {
       const lvl = clamp(GS.house.level | 0, 0, 2), rent = CFG.rentByLevel[lvl];
@@ -2828,48 +2842,110 @@ function openHousePanel() {
       const debt = GS.debt || 0, embargo = debt >= CFG.debtEmbargoAt;
       const letters = GS.housing.mailbox || [], unread = GS.housing.mailboxUnread || 0;
       let html = balanceBar();
-      /* — ALQUILER — */
-      html += `<div class="app-card p-3 mb-3"><div class="font-bold text-[#2b2b3d] mb-1">🏠 Alquiler</div>`;
-      if (GS.housing.graceDaysLeft > 0) html += `<div class="text-sm text-slate-600">Período de gracia del municipio: te quedan <b>${GS.housing.graceDaysLeft} día(s)</b> gratis. Después: <b>${fmt(rent)} $T/día</b>.</div>`;
-      else html += `<div class="text-sm text-slate-600">Cuota: <b>${fmt(rent)} $T/día</b> · se cobra en la liquidación de medianoche.</div>`;
-      if (rentDebt > 0) html += `<div class="mt-2 p-2 rounded-lg ${daysOwed >= CFG.rentSealThreshold - 1 ? 'bg-red-100' : 'bg-amber-100'} text-sm">
-        <b class="${daysOwed >= CFG.rentSealThreshold - 1 ? 'text-red-700' : 'text-amber-700'}">⚠️ Deuda de alquiler: ${fmt(rentDebt)} $T (${daysOwed} día(s))</b>
-        <div class="text-xs text-slate-600 mt-0.5">A los ${CFG.rentSealThreshold} días de deuda, Sombra SELLARÁ la casa (perderás cocina, cama y escaparate hasta pagar).</div>
-        <div class="flex flex-wrap gap-2 mt-2 items-center"><input id="payRentAmt" type="number" min="1" max="${rentDebt}" class="game w-28 text-xs" placeholder="${rentDebt}"><button data-payrent class="btn-game px-3 py-1.5 text-xs bg-emerald-300">💸 Pagar</button><button data-payrent-all class="btn-game px-3 py-1.5 text-xs bg-emerald-300">Pagar todo (${fmt(rentDebt)})</button></div></div>`;
-      else html += `<div class="text-xs text-emerald-600 font-bold mt-1">✓ Sin deuda de alquiler</div>`;
-      html += `</div>`;
-      /* — DEUDA ONÍRICA — */
-      html += `<div class="app-card p-3 mb-3"><div class="font-bold text-[#2b2b3d] mb-1">🔮 Deuda Onírica (Madame Sombra)</div>`;
-      if (debt > 0) {
-        html += `<div class="text-sm text-slate-600">Debes <b class="text-purple-700">${fmt(debt)} $T</b> · interés ${CFG.debtInterestPct}%/día onírico.</div>`;
-        if (embargo) html += `<div class="mt-2 p-2 rounded-lg bg-purple-100 text-sm"><b class="text-purple-700">🔒 EMBARGO ACTIVO: tus construcciones están selladas con runas.</b><div class="text-xs text-slate-600 mt-0.5">Baja la deuda por debajo de ${fmt(CFG.debtEmbargoAt)} $T para levantarlo. La Estatua $TOKEN embargada no da su bonus de confianza.</div></div>`;
-        else html += `<div class="text-xs text-slate-500 mt-1">Si la deuda llega a ${fmt(CFG.debtEmbargoAt)} $T, Sombra embargará tus construcciones.</div>`;
-        html += `<div class="flex flex-wrap gap-2 mt-2 items-center"><input id="payDebtAmt" type="number" min="1" max="${debt}" class="game w-28 text-xs" placeholder="${debt}"><button data-paydebt class="btn-game px-3 py-1.5 text-xs bg-purple-300">🔮 Pagar</button><button data-paydebt-all class="btn-game px-3 py-1.5 text-xs bg-purple-300">Pagar todo (${fmt(debt)})</button></div>`;
-      } else html += `<div class="text-xs text-emerald-600 font-bold">✓ Sin deuda. Sombra aprueba… de momento. Mmm.</div>`;
-      html += `</div>`;
-      /* — BUZÓN — */
-      html += `<div class="app-card p-3 mb-3"><div class="flex items-center justify-between mb-1"><div class="font-bold text-[#2b2b3d]">📮 Buzón ${unread ? `<span class="text-xs text-red-600">(${unread} sin leer)</span>` : ''}</div>${letters.length ? `<button data-readall class="btn-game px-2 py-1 text-[11px] bg-slate-200">Marcar todo leído</button>` : ''}</div>`;
-      html += letters.length
-        ? `<div class="max-h-[30vh] overflow-auto divide-y divide-slate-100">` + letters.map((l, i) => `<button data-letter="${i}" class="block w-full text-left py-2 ${l.read ? 'opacity-55' : ''}"><div class="text-xs font-bold ${l.read ? 'text-slate-500' : 'text-[#2b2b3d]'}">${l.read ? '' : '🔴 '}${esc(l.from)} · día ${l.day}</div><div class="text-xs text-slate-600 leading-snug mt-0.5">${esc(l.text)}</div></button>`).join('') + '</div>'
-        : `<div class="text-sm text-slate-500">Sin cartas. El cartero onírico descansa.</div>`;
-      html += `</div>`;   // cierre de la tarjeta del buzón
-      html += (typeof homeActionsHTML === 'function') ? homeActionsHTML() : '';   // S3.1–S3.2: dormir y cocina (Sec. 6.5)
-      html += `<div class="text-[11px] text-slate-500">🏠 Fase 1: la vida doméstica se gestiona desde este panel (Sec. 6.9).</div>`;
+      html += `<div class="flex flex-wrap gap-1.5 mb-3">` + HOUSE_TABS.map(([id, label]) => `<button data-tab="${id}" class="btn-game px-2.5 py-1 text-xs ${_houseTab === id ? 'active' : 'bg-white'}">${label}${id === 'mail' && unread ? ` <span class="text-red-600">(${unread})</span>` : ''}${id === 'rent' && (rentDebt || debt) ? ' ⚠️' : ''}</button>`).join('') + `</div>`;
+      if (_houseTab === 'mail') {
+        html += `<div class="app-card p-3 mb-3"><div class="flex items-center justify-between mb-1"><div class="font-bold text-[#2b2b3d]">📮 Buzón ${unread ? `<span class="text-xs text-red-600">(${unread} sin leer)</span>` : ''}</div>${unread ? `<button data-readall class="btn-game px-2 py-1 text-[11px] bg-slate-200">Marcar todo leído</button>` : ''}</div>`;
+        html += letters.length
+          ? `<div class="max-h-[45vh] overflow-auto divide-y divide-slate-100">` + letters.map((l, i) => `<button data-letter="${i}" class="block w-full text-left py-2 ${l.read ? 'opacity-60' : ''}"><div class="text-xs font-bold ${l.read ? 'text-slate-500' : 'text-[#2b2b3d]'}">${l.read ? '' : '🔴 '}${esc(l.from)} · día ${l.day}</div><div class="text-xs text-slate-600 leading-snug mt-0.5 whitespace-pre-line">${esc(l.text)}</div></button>`).join('') + '</div>'
+          : `<div class="text-sm text-slate-500">Sin cartas. El cartero onírico descansa.</div>`;
+        html += `<div class="text-[11px] text-slate-500 mt-2">Llegan facturas, resultados de la lotería, ventas del escaparate, rumores (confianza ❤️ 3) y cartas de tus vecinos más cercanos (confianza 4).</div></div>`;
+      } else if (_houseTab === 'rent') {
+        html += `<div class="app-card p-3 mb-3"><div class="font-bold text-[#2b2b3d] mb-1">🏠 Alquiler</div>`;
+        if (GS.housing.graceDaysLeft > 0) html += `<div class="text-sm text-slate-600">Período de gracia del municipio: te quedan <b>${GS.housing.graceDaysLeft} día(s)</b> gratis. Después: <b>${fmt(rent)} $T/día</b>.</div>`;
+        else html += `<div class="text-sm text-slate-600">Cuota: <b>${fmt(rent)} $T/día</b> · se cobra en la liquidación de medianoche.</div>`;
+        if (rentDebt > 0) html += `<div class="mt-2 p-2 rounded-lg ${daysOwed >= CFG.rentSealThreshold - 1 ? 'bg-red-100' : 'bg-amber-100'} text-sm">
+          <b class="${daysOwed >= CFG.rentSealThreshold - 1 ? 'text-red-700' : 'text-amber-700'}">⚠️ Deuda de alquiler: ${fmt(rentDebt)} $T (${daysOwed} día(s))</b>
+          <div class="text-xs text-slate-600 mt-0.5">A los ${CFG.rentSealThreshold} días de deuda, Sombra SELLARÁ la casa (perderás cocina, cama y escaparate hasta pagar).</div>
+          <div class="flex flex-wrap gap-2 mt-2 items-center"><input id="payRentAmt" type="number" min="1" max="${rentDebt}" class="game w-28 text-xs" placeholder="${rentDebt}"><button data-payrent class="btn-game px-3 py-1.5 text-xs bg-emerald-300">💸 Pagar</button><button data-payrent-all class="btn-game px-3 py-1.5 text-xs bg-emerald-300">Pagar todo (${fmt(rentDebt)})</button></div></div>`;
+        else html += `<div class="text-xs text-emerald-600 font-bold mt-1">✓ Sin deuda de alquiler</div>`;
+        html += `</div><div class="app-card p-3 mb-3"><div class="font-bold text-[#2b2b3d] mb-1">🔮 Deuda Onírica (Madame Sombra)</div>`;
+        if (debt > 0) {
+          html += `<div class="text-sm text-slate-600">Debes <b class="text-purple-700">${fmt(debt)} $T</b> · interés ${CFG.debtInterestPct}%/día onírico.</div>`;
+          if (embargo) html += `<div class="mt-2 p-2 rounded-lg bg-purple-100 text-sm"><b class="text-purple-700">🔒 EMBARGO ACTIVO: tus construcciones están selladas con runas.</b><div class="text-xs text-slate-600 mt-0.5">Baja la deuda por debajo de ${fmt(CFG.debtEmbargoAt)} $T para levantarlo. Mientras tanto no produces, ni construyes, ni demueles.</div></div>`;
+          else html += `<div class="text-xs text-slate-500 mt-1">Si la deuda llega a ${fmt(CFG.debtEmbargoAt)} $T, Sombra embargará tus construcciones.</div>`;
+          html += `<div class="flex flex-wrap gap-2 mt-2 items-center"><input id="payDebtAmt" type="number" min="1" max="${debt}" class="game w-28 text-xs" placeholder="${debt}"><button data-paydebt class="btn-game px-3 py-1.5 text-xs bg-purple-300">🔮 Pagar</button><button data-paydebt-all class="btn-game px-3 py-1.5 text-xs bg-purple-300">Pagar todo (${fmt(debt)})</button></div>`;
+        } else html += `<div class="text-xs text-emerald-600 font-bold">✓ Sin deuda. Sombra aprueba… de momento. Mmm.</div>`;
+        html += `</div>`;
+      } else if (_houseTab === 'sleep') {
+        const can = Sleep.canSleep(), r = Rested.active();
+        html += `<div class="app-card p-3 mb-3"><div class="font-bold text-[#2b2b3d] mb-1">🛏️ Dormir</div>
+          <div class="text-sm text-slate-600">${r ? `😴 Descansado: quedan <b>${Rested.leftText()}</b> oníricas.` : `Duerme hasta las 06:00 y despierta <b>Descansado</b> (${lvl >= 2 ? 'todo el día' : 'medio día'}): +10% velocidad y +5% en precios.`}</div>
+          <button data-sleep class="btn-game px-3 py-1.5 text-xs mt-2 ${can.ok ? 'bg-indigo-300' : 'bg-slate-200 opacity-60'}">🛏️ ${can.ok ? 'Dormir hasta el amanecer' : esc(can.why)}</button>
+          <div class="text-[11px] text-slate-500 mt-2">Dormir no es obligatorio: es una decisión de tiempo. Requiere el alquiler al día.</div></div>`;
+      } else if (_houseTab === 'kitchen') {
+        html += `<div class="app-card p-3 mb-3"><div class="font-bold text-[#2b2b3d] mb-1">🍳 Cocina</div>
+          <div class="text-sm text-slate-600">${Kitchen.statusText()}</div>
+          <button data-kitchen class="btn-game px-3 py-1.5 text-xs mt-2 bg-orange-200">🍳 Abrir cocina</button>
+          <div class="text-[11px] text-slate-500 mt-2">Básica: pan, pescado a la brasa y mermelada. Gourmet (Villa): + Pastel Dorado. Cadena del pan: 🌷 Jardín → 🌾 Trigo → 🌬️ Molino → 🥣 Harina → 🍞 Pan.</div></div>`;
+      } else if (_houseTab === 'showcase') {
+        const tk = Trend.knownToday();
+        html += `<div class="app-card p-3 mb-3"><div class="font-bold text-[#2b2b3d] mb-1">🏷️ Escaparate</div>
+          <div class="text-sm text-slate-600">${Showcase.slots() ? `${Showcase.list.length}/${Showcase.slots()} huecos · 🐷 hucha: <b>${fmt(GS.housing.showcaseRevenue | 0)} $T</b>` : 'Llega con la mejora a Tienda (nivel 1).'}</div>
+          ${tk ? `<div class="mt-2 p-2 rounded-lg bg-fuchsia-50 text-xs font-semibold text-fuchsia-700">🔥 Tendencia de hoy (según los erizos): ${ITEMS[tk].icon} ${esc(ITEMS[tk].name)} · se vende el doble de fácil esta noche</div>` : ''}
+          <button data-showcase class="btn-game px-3 py-1.5 text-xs mt-2 bg-amber-200">🏷️ Abrir escaparate</button></div>`;
+      } else if (_houseTab === 'furniture') {
+        const canBuy = GS.missions?.glover?.status === 2;
+        html += FURNITURE.map(f => { const own = hasFurniture(f.id); return `<div class="app-card p-3 mb-2 flex items-center gap-3"><div class="text-3xl">${f.icon}</div><div class="flex-1 min-w-0"><div class="font-bold text-sm">${esc(f.name)}</div><div class="text-[11px] text-slate-500">${esc(f.desc)}</div></div>${own ? '<span class="text-emerald-600 font-bold text-xs whitespace-nowrap">✓ En casa</span>' : canBuy ? `<button data-buyfurn="${f.id}" class="btn-game px-3 py-1.5 text-xs ${Wallet.canAfford(f.price) ? 'bg-emerald-300' : 'bg-slate-200 opacity-60'}">${fmt(f.price)} $T</button>` : `<span class="text-[11px] text-slate-400 whitespace-nowrap">${fmt(f.price)} $T</span>`}</div>`; }).join('');
+        html += `<div class="text-[11px] text-slate-500">${canBuy ? 'Los fabrica Glover; te los trae a casa al momento.' : '🦫 Glover te venderá muebles cuando completes su misión.'} Sin interior 3D todavía: actúan desde este panel (Sec. 6.9).</div>`;
+      }
       body.innerHTML = html;
+      body.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => { _houseTab = b.dataset.tab; render(); });
       const amt = (id, max) => { const el = body.querySelector(id); const v = el && el.value ? +el.value : max; return clamp(Math.floor(v) || max, 1, max); };
       const q = (sel, fn) => { const b = body.querySelector(sel); if (b) b.onclick = () => { fn(); updateMailboxBadge(); render(); }; };
       q('[data-payrent]', () => payRentDebt(amt('#payRentAmt', rentDebt)));
       q('[data-payrent-all]', () => payRentDebt(rentDebt));
       q('[data-paydebt]', () => payDebt(amt('#payDebtAmt', debt)));
       q('[data-paydebt-all]', () => payDebt(debt));
-      q('[data-sleep]', () => { if (Sleep.canSleep().ok) closeApp(); Sleep.sleep(); });   // S3.1
-      q('[data-kitchen]', () => { closeApp(); if (typeof openKitchenPanel === 'function') openKitchenPanel(); });   // S3.2
-      q('[data-showcase]', () => { closeApp(); if (typeof openShowcasePanel === 'function') openShowcasePanel(); });   // S3.4
+      q('[data-sleep]', () => { if (Sleep.canSleep().ok) closeApp(); Sleep.sleep(); });
+      q('[data-kitchen]', () => { closeApp(); openKitchenPanel(); });
+      q('[data-showcase]', () => { closeApp(); openShowcasePanel(); });
       q('[data-readall]', () => { letters.forEach(l => l.read = true); GS.housing.mailboxUnread = 0; SaveSystem.save('mailbox-read'); });
+      body.querySelectorAll('[data-buyfurn]').forEach(b => b.onclick = () => { buyFurniture(b.dataset.buyfurn); render(); });
       body.querySelectorAll('[data-letter]').forEach(b => b.onclick = () => { const l = letters[+b.dataset.letter]; if (l && !l.read) { l.read = true; GS.housing.mailboxUnread = Math.max(0, (GS.housing.mailboxUnread || 0) - 1); SaveSystem.save('letter-read'); updateMailboxBadge(); render(); } });
     };
     render();
   });
+}
+/* =========================================================
+   v0.5 · RUMORES (confianza ❤️ 3) Y CARTAS DE HITO (confianza 4) · Sec. 6.10
+   - Tendencia del día (erizos): un objeto se vende el doble de fácil en el escaparate.
+     Existe siempre (determinista por día + partida); el rumor solo la revela.
+   - Pronóstico (Dax): el clima de mañana, que es determinista → la pista es real.
+   - Mayor: sus rumores de precios llegan con el mercado de la v0.8.
+   ========================================================= */
+const Trend = {
+  forDay(day) {
+    const pool = CFG.trendPool, sid = String(GS.meta.saveId || ''); let h = 0;
+    for (let i = 0; i < sid.length; i++) h = (Math.imul(h, 31) + sid.charCodeAt(i)) | 0;
+    return pool[Math.floor(mulberry32((day * 7919) ^ h)() * pool.length)];
+  },
+  knownToday() { return GS.housing.trendKnownDay === GS.daily.dayCount ? this.forDay(GS.daily.dayCount) : null; },
+};
+DailySystem.onSettle(() => {
+  const today = GS.daily.dayCount;   // ya es el día que empieza
+  if (Trust.level('hedgehogs') >= 3) {
+    const id = Trend.forDay(today); GS.housing.trendKnownDay = today;
+    addLetter('🦔 Barnaby Jr. & Pip', `¡BRO! Rumor exclusivo: hoy ${ITEMS[id].icon} ${ITEMS[id].name} está EN TENDENCIA. Si lo pones en tu escaparate esta noche se vende el doble de fácil. No se lo digas a nadie (bueno, a mamá sí).`);
+  }
+  if (Trust.level('dax') >= 3 && typeof Weather.forecast === 'function') {
+    const [a, b] = Weather.forecast(today + 1), wa = WEATHER_TYPES[a], wb = WEATHER_TYPES[b];
+    addLetter('🦎 Professor Dax', `Pronóstico onírico para mañana (día ${today + 1}): por la mañana ${wa.icon} ${wa.name}, por la tarde ${wb.icon} ${wb.name}. ${a === 'rain' || b === 'rain' ? 'Con lluvia el Jardín da más trigo y pican peces raros.' : b === 'stars' ? 'Noche de estrellas: más fragmentos.' : a === 'fog' || b === 'fog' ? 'Con niebla aparecen más perlas y gemas.' : 'Día tranquilo.'} ¡Precisión del 98,7%! (Lo calculé yo… creo.)`);
+  }
+});
+const MILESTONE_LETTERS = {
+  bear: '¡Hola, amigo! Quería decírtelo por escrito porque en persona me pongo colorado: desde que llegaste, la panadería huele mejor. Cada mañana guardo el primer croissant para ti, aunque no vengas. Si algún día te vas, guardaré dos.',
+  mayor: '¡Ejem! Por la presente certifico, con sello y todo, que usted es el ciudadano más ejemplar de este planeta. No hay formulario para lo que quiero decir de verdad, así que lo escribo a mano: gracias. — R.',
+  glover: 'No soy de cartas. Ni de planos que no he dibujado yo. Pero tú me enseñaste que pedir ayuda no te hace peor ingeniero. Te debo las ojeras que ya no tengo. Ni un milímetro de error en esto: eres mi amigo.',
+  sombra: 'Pocos soñadores llegan hasta aquí sin perderse, y menos aún sin perderme el respeto. Te he observado más de lo que crees. Guarda esta carta: cuando llegue la hora de decidir si despertar, léela otra vez.',
+  dax: '¡Querido colega! He calculado la probabilidad de encontrar a alguien como tú en un sueño y me salió un número tan pequeño que se me cayó del cuaderno. Gracias por cada experimento, incluso los que explotaron.',
+  sam: 'Arrr, grumete. Llevo media vida navegando hacia un horizonte que nunca llega. Contigo, por primera vez, no me importa no llegar. Si algún día subes a mi avión, el asiento de la ventanilla es tuyo.',
+  hedgehogs: 'bro. no es un meme. de verdad eres el mejor. mamá dice que te demos las gracias y tiene razón. (Pip quería poner un emoji pero Barnaby dice que esto va en serio.) — Barnaby Jr. & Pip',
+};
+function sendMilestoneLetter(id) {
+  const done = (GS.housing.milestoneLetters ||= []); if (done.includes(id) || !MILESTONE_LETTERS[id]) return;
+  done.push(id); const n = npcById[id];
+  addLetter(`💌 ${n?.emoji || ''} ${n?.name || id}`, MILESTONE_LETTERS[id]); updateMailboxBadge();
+  setTimeout(() => showToast(`💌 ${n?.name || id} te ha escrito una carta. Mira tu buzón 📮`, 'text-white'), 1200);
 }
 /* =========================================================
    17e. LA RULETA DE RUNAS · Madame Sombra (Guía Sec. 4.7)
@@ -3470,6 +3546,7 @@ const Weather = (() => {
   const is = (k) => _id === k;
   return {
     current, update, refreshChip,
+    forecast: (day) => [roll(day * 2), roll(day * 2 + 1)],   // v0.5: rumor de Dax (el clima es determinista por franja)
     id: () => _id || 'clear',
     speedMult: () => is('rain') ? CFG.weatherRainSpeedMult : 1,
     pearlMult: () => is('fog') ? CFG.weatherFogPearlMult : 1,
@@ -3860,7 +3937,8 @@ const Showcase = {
     if (!this.list.length) return;
     if (houseSealed()) { (GS.daily.lastCharges ||= []).push({ label: '🪟 Escaparate', note: 'en pausa (casa sellada)' }); return; }
     const sold = {}; let total = 0;
-    this.list.forEach(s => { if (s.qty > 0 && Math.random() < this.odds(s.price, s.id)) { s.qty--; total += s.price; sold[s.id] = (sold[s.id] || 0) + 1; } });
+    const trendId = Trend.forDay(GS.daily.dayCount - 1);   // v0.5: el día que se liquida (dayCount ya avanzó)
+    this.list.forEach(s => { if (s.qty > 0 && Math.random() < Math.min(1, this.odds(s.price, s.id) * (s.id === trendId ? CFG.trendSaleMult : 1))) { s.qty--; total += s.price; sold[s.id] = (sold[s.id] || 0) + 1; } });
     GS.housing.showcase = this.list.filter(s => s.qty > 0);
     if (!total) return;
     GS.housing.showcaseRevenue = (GS.housing.showcaseRevenue | 0) + total;
@@ -4179,13 +4257,14 @@ const hadSave = SaveSystem.load();
 if (!hadSave) SaveSystem.createNew();
 applyGameStateToWorld();
 updateHungerHUD(); updateClockHUD();
+NPCS.forEach(n => { if (Trust.level(n.id) >= 4) sendMilestoneLetter(n.id); });   // v0.5: cartas de hito retroactivas (partidas que ya tenían confianza 4)
 
 // ---- Menú ----
 cam.dist = cam.tDist = 70; cam.pitch = cam.tPitch = 0.35; // vista desde el espacio mientras se lee el menú
 { const p = camPose(); applyLook(p.pos, p.target, p.up); }
 animate();
 // 🛠️ DEBUG (temporal, se eliminará en v1.0): permite inspeccionar y forzar el estado desde la consola F12
-window._dbg = { get GS() { return GS; }, Inventory, Wallet, Needs, Production, placedBuildings, settleDay, updateEmbargo, enterBuildMode, interactWith: (o) => interactWith(o), set clock(fictMs) { GS.daily.clockMs = fictMs; }, set hunger(v) { GS.needs.hunger = v; } };
+window._dbg = { get GS() { return GS; }, Inventory, Wallet, Needs, Production, Trust, Trend, Weather, openHousePanel, placedBuildings, settleDay, updateEmbargo, enterBuildMode, interactWith: (o) => interactWith(o), set clock(fictMs) { GS.daily.clockMs = fictMs; }, set hunger(v) { GS.needs.hunger = v; } };
 if (!SaveSystem.persistent) $('storageWarn').classList.remove('hidden');
 if (hadSave) {
   $('saveSummary').classList.remove('hidden');
