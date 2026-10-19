@@ -207,6 +207,12 @@
           <div class="h-1.5 md:h-2 mt-1 rounded-full bg-white/10 overflow-hidden"><div id="goalBar" class="h-full rounded-full bg-gradient-to-r from-amber-400 to-yellow-200" style="width:0%;transition:width .4s"></div></div>
         </div>
       </div>
+      <!-- v0.1 · reloj onírico + día + saciedad 🍗 (Sec. 4.2–4.3) -->
+      <div id="dayHud" class="clickable mt-2 mx-auto w-max rounded-xl px-2.5 md:px-3 py-1 border-[3px] border-[#2b2b3d] bg-white/90 shadow-[0_4px_0_#2b2b3d] flex items-center gap-2 text-[11px] md:text-xs font-bold text-[#2b2b3d]">
+        <span id="clockText" class="whitespace-nowrap tabular-nums">☀️ Día 1 · 08:00</span>
+        <span class="w-px h-4 bg-slate-300"></span>
+        <span title="Saciedad" class="flex items-center gap-1">🍗<span class="block w-12 md:w-20 h-2.5 rounded-full bg-slate-200 border-2 border-[#2b2b3d] overflow-hidden"><span id="hungerBar" class="block h-full rounded-full bg-emerald-400" style="width:100%"></span></span><span id="hungerVal" class="w-6 text-right tabular-nums">100</span></span>
+      </div>
       <div id="toastArea" class="absolute left-1/2 -bottom-2"></div>
     </div>
     <div class="flex flex-col gap-2">
@@ -329,6 +335,7 @@ const CFG = {
   laptopHungryMult: 2,            // la laptop tarda ×2 con hambre (teatro justificado)
   rescueFeePct: 0.03,             // Tarifa de Rescate Onírico: 3% del capital (mín. rescueFeeMin) · la 1ª vez es gratis
   rescueFeeMin: 50,
+  rescueHunger: 35,               // saciedad con la que despiertas en la carpa de Sombra tras desmayarte
   /* ===== v0.3 · FACTURAS DIARIAS (Sec. 4.5–4.7) — definidos ya; se COBRAN desde v0.3 ===== */
   rentByLevel: [100, 250, 800],   // alquiler/día según nivel de casa
   rentGraceDays: 5,               // días de gracia iniciales
@@ -392,7 +399,11 @@ const CFG = {
   cookSecs: { dream_bread: 20, grilled_fish: 15, golden_jam: 40, golden_cake: 60 },   // Sec. 6.6 (tiempos de la guía)
   sleepWakeHour: 6,                                                   // Sec. 6.5: dormir avanza a las 06:00
   comfyBedSpeedMult: 1.15, comfyBedPriceMult: 1.08,                   // Sec. 6.8: Cama Mullida
-  kitchenMinLevel: 1, gourmetMinLevel: 2,                             // Sec. 6.2: Cocina Básica (Tienda) · Gourmet (Villa)
+  kitchenMinLevel: 0, gourmetMinLevel: 2,                             // Sec. 6.2: Cocina Básica desde la Casa (nivel 0) · Gourmet (Villa)
+  // v0.4 · Producción de construcciones (Sec. 5.11)
+  gardenWheatPerDay: 2, gardenBouquetPerDay: 1,                        // Jardín: 2 Trigo + 1 Ramo al día (lluvia: + weatherRainGardenBonus)
+  millWheatPerFlour: 2, millSecsPerBatch: 30, millMaxBatches: 5,       // Molino: 2 Trigo → 1 Harina, 30 s por lote
+  fountainWishCost: 1, fountainWishRange: [1, 10],                     // Fuente: lanzas 1 $T, el deseo devuelve 1–10 $T (1 vez al día)
   cookQueueBase: 1, cookQueueIronStove: 2, cookQueueVilla: 3,         // Sec. 6.6: lotes simultáneos
   showcaseSlotsByLevel: [0, 6, 12], piggyXlExtraSlots: 6,             // Sec. 6.2 y 6.8
   showcaseOdds: [[1.0, 0.8], [1.2, 0.5], [1.5, 0.25], [9999, 0.05]],  // Sec. 6.7: precio/valor → prob. de venta/día
@@ -455,7 +466,7 @@ function defaultGameState() {
     /* ===== v3 · DÍA ONÍRICO Y NECESIDADES (Guía Maestra Sec. 4 y 6) =====
        Convención de tiempos: el DÍA ONÍRICO solo avanza JUGANDO (daily.clockMs suma ms reales de partida).
        Los cooldowns de recursos/tiendas/frutas siguen siendo tiempo REAL (Date.now), como en v2. */
-     daily: { dayCount: 1, clockMs: 28800000 /* 08:00 */, lastSettleDay: 0, freeRescueUsed: false, restedUntil: 0, lastSettleAt: 0, charityDay: 0, lastCharges: [] },
+     daily: { dayCount: 1, clockMs: 28800000 /* 08:00 */, lastSettleDay: 0, freeRescueUsed: false, restedUntil: 0, lastSettleAt: 0, charityDay: 0, lastCharges: [], today: { earned: 0, spent: 0 } },   // today: contabilidad del día en curso (resumen de la liquidación)
     needs: { hunger: 100 },                          // saciedad 0–100 (Sec. 4.3)
      housing: { rentDebt: 0, sealed: false, graceDaysLeft: 5, mailbox: [], mailboxUnread: 0, showcase: [], showcaseRevenue: 0, lastRentDay: 0, sealedBuildings: [], sealDebt: 0, unsealCount: 0 },
     debt: 0,                                         // Deuda Onírica de Sombra, interés diario (Sec. 4.7)
@@ -468,9 +479,12 @@ function defaultGameState() {
     story: { prologueDone: false, revealed: false, farewellDone: false, ending: null, act1Done: false },
     weekly: { seals: [false, false, false, false, false, false, false], weekStart: null },  // Sello Semanal (Sec. 10.3)
     museum: { donated: [] },                         // Museo del Sueño (Sec. 10.5)
+    // Avatar (Sec. 8.8): config "clásica" = el look actual del prototipo (piel #ffd5b3, camiseta cian, vaqueros, pelo marrón, mochila naranja). Lo usa v0.7.
+    avatar: { skin: 0, hair: 0, hairColor: 0, eyes: 0, eyeColor: 0, top: 0, topColor: 2, pants: 0, pantsColor: 3, shoes: 0, shoesColor: 0, hat: null, glasses: null, backpack: 0, backpackColor: 1, wardrobe: [] },
      lottery: { pool: 0, nextDrawAt: null, tickets: [], lastDraw: null },   // Lotería semanal real (Anexo B) · tickets: [{ num, day }] · lastDraw: { num, at, winner, prize, myCount }
-    garden: { lastHarvestDay: 0 },                   // cosecha diaria del Jardín (Sec. 5.11)
-    fountain: { lastWishDay: 0 },                    // deseo diario de la Fuente (Sec. 5.11)
+    garden: { lastHarvestDay: 0, byId: {} },         // cosecha diaria del Jardín (Sec. 5.11) · byId: { recId: día de la última cosecha }
+    fountain: { lastWishDay: 0, byId: {} },          // deseo diario de la Fuente (Sec. 5.11) · byId: { recId: día del último deseo }
+    mill: {},                                        // v0.4 · Molino: { recId: { qty, readyAt } } (timestamps reales)
      ngplus: { count: 0, multiplier: 1 },             // Nuevo Sueño+ (Sec. 10.7)
      municipal: { job: null },                        // v0.3 · empleo municipal activo (Sec. 4.8)
   };
@@ -494,7 +508,12 @@ function migrate(save) {
       if (save.missions?.[id]?.status === 2) save.trust[id] = { points: 30, tradeToday: 0, tradeDay: 0, giftsToday: 0, giftDay: 0 };
     }
     // 3) Cortesía de alquiler: quien ya tenía la casa mejorada recibe 3 días de gracia para aprender el sistema (Sec. 6.12)
-    if ((save.house?.level | 0) >= 1) save.housing.graceDaysLeft = 3;
+    if ((save.house?.level | 0) >= 1) {
+      save.housing.graceDaysLeft = 3;
+      save.housing.mailbox.unshift({ from: '🐶 Mayor Reginald', text: '¡Ejem! Bienvenido al nuevo régimen de vivienda onírica. Tu casa ya está mejorada, así que desde ahora paga un alquiler diario en la liquidación de medianoche. Por cortesía tienes 3 días de gracia para organizarte. El Formulario 27-B lo exige.', day: save.daily?.dayCount || 1, read: false });
+      save.housing.mailboxUnread = (save.housing.mailboxUnread || 0) + 1;
+    }
+    // 4) Avatar (Sec. 8.8): deepMerge ya rellena el look "clásico" del prototipo; nadie amanece convertido en otro.
   }
   save.version = SAVE_VERSION; return save;
 }
@@ -547,7 +566,7 @@ const Wallet = {
   /** Ingreso. Devuelve la cantidad añadida. */
   add(n, label = 'Ingreso', { silent = false } = {}) {
     n = Math.max(0, Math.floor(n)); if (!n) return 0;
-    GS.economy.money += n; GS.economy.lifetimeEarned += n; this._log(n, label);
+    GS.economy.money += n; GS.economy.lifetimeEarned += n; GS.daily.today.earned += n; this._log(n, label);
     if (!silent) moneyToast(`+${n.toLocaleString('es-ES')} $TOKEN`, 'gain');
     SaveSystem.save('money+'); return n;
   },
@@ -555,7 +574,7 @@ const Wallet = {
   spend(n, label = 'Gasto', { silent = false } = {}) {
     n = Math.max(0, Math.floor(n));
     if (!this.canAfford(n)) { if (!silent) showToast('❌ No tienes suficientes $TOKEN', 'text-red-200'); return false; }
-    GS.economy.money -= n; GS.economy.lifetimeSpent += n; this._log(-n, label);
+    GS.economy.money -= n; GS.economy.lifetimeSpent += n; GS.daily.today.spent += n; this._log(-n, label);
     if (!silent && n) moneyToast(`-${n.toLocaleString('es-ES')} $TOKEN`, 'loss');
     SaveSystem.save('money-'); return true;
   },
@@ -605,9 +624,9 @@ const ITEMS = {
   poor_bread:     defItem({ id: 'poor_bread',     name: 'Pan del Pobre',      icon: '🥖', cat: 'special',    rarity: 'common',   sell: 0,  usable: true, desc: 'Un regalo del Oso para quien pasa penurias. Saciedad +30. No se vende: es dignidad, no mercancía.' }),
   /* ===== v0.4 · OBJETOS NUEVOS (Guía Sec. 5.5 y 5.7) · maxDur = durabilidad máxima (herramientas) ===== */
   dream_wheat:    defItem({ id: 'dream_wheat',    name: 'Trigo Onírico',         icon: '🌾', cat: 'ingredient', rarity: 'common',   sell: 3,   buy: 6, desc: 'Cosecha del Jardín (2/día). En el Molino, 2 Trigos se convierten en 1 Harina.' }),
-  flour:          defItem({ id: 'flour',          name: 'Harina',                icon: '🥣', cat: 'ingredient', rarity: 'common',   sell: 8,   desc: 'Sale del Molino. Ingrediente del Pan del Sueño y del Pastel Dorado.' }),
-  dream_bread:    defItem({ id: 'dream_bread',    name: 'Pan del Sueño',         icon: '🍞', cat: 'consumable', rarity: 'common',   sell: 0,   usable: true, desc: 'Se cocina con 2 Harinas. Saciedad +50: la comida más eficiente del sueño.' }),
-  golden_jam:     defItem({ id: 'golden_jam',     name: 'Mermelada Dorada',      icon: '🍯', cat: 'ingredient', rarity: 'uncommon', sell: 150, desc: 'Se cocina con 2 Frutas Doradas. Vale más que la fruta cruda y es un gran regalo.' }),
+  flour:          defItem({ id: 'flour',          name: 'Harina',                icon: '🥣', cat: 'ingredient', rarity: 'common',   sell: 5,   buy: 8, desc: 'Sale del Molino (2 Trigos → 1 Harina) y la vende el Oso. Ingrediente del Pan del Sueño y del Pastel Dorado.' }),
+  dream_bread:    defItem({ id: 'dream_bread',    name: 'Pan del Sueño',         icon: '🍞', cat: 'consumable', rarity: 'common',   sell: 8,   usable: true, desc: 'Se cocina con 2 Harinas. Saciedad +50: la comida más eficiente del sueño.' }),
+  golden_jam:     defItem({ id: 'golden_jam',     name: 'Mermelada Dorada',      icon: '🍯', cat: 'consumable', rarity: 'uncommon', sell: 150, desc: 'Se cocina con 2 Frutas Doradas. Vale más que la fruta cruda y es un gran regalo.' }),
   golden_cake:    defItem({ id: 'golden_cake',    name: 'Pastel Dorado',         icon: '🎂', cat: 'consumable', rarity: 'rare',     sell: 300, usable: true, desc: '1 Harina + 1 Mermelada Dorada. Saciedad +80 y velocidad +50% durante 60 s. Producto de lujo.' }),
   fish:           defItem({ id: 'fish',           name: 'Pescado',               icon: '🐟', cat: 'resource',   rarity: 'common',   sell: 15,  desc: 'Se pesca en cualquier orilla con la Caña de Soñador.' }),
   tropical_fish:  defItem({ id: 'tropical_fish',  name: 'Pez Tropical',          icon: '🐠', cat: 'resource',   rarity: 'uncommon', sell: 40,  desc: 'Colorido y escurridizo. A Sam le encanta.' }),
@@ -719,11 +738,11 @@ function refreshInvBadge() { const el = document.getElementById('invBadge'); if 
    sells: [{ id, stock, price? }]  · buys: lista de ids o 'all' (todo lo vendible) · buyMult: bonus de compra por objeto
    ========================================================= */
 const SHOPS = {
-  bear:   { name: 'Panadería del Oso', icon: '🐻', restockMin: 10, sells: [{ id: 'croissant', stock: 10 }, { id: 'cupcake', stock: 10 }, { id: 'strawberry_cake', stock: 4 }], buys: ['golden_fruit', 'seashell', 'pearl', 'wood_log'], buyMult: {} },
+  bear:   { name: 'Panadería del Oso', icon: '🐻', restockMin: 10, sells: [{ id: 'croissant', stock: 10 }, { id: 'cupcake', stock: 10 }, { id: 'strawberry_cake', stock: 4 }, { id: 'flour', stock: 8 }], buys: ['golden_fruit', 'seashell', 'pearl', 'wood_log'], buyMult: {} },
   sam:    { name: 'Mercado del Puerto', icon: '🦤', restockMin: 15, sells: [{ id: 'gasil_fuel', stock: 5 }, { id: 'wood_log', stock: 10 }, { id: 'stone', stock: 10 }, { id: 'fishing_rod', stock: 2 }], buys: 'all', buyMult: { seashell: 1.5, pearl: 1.2, merchant_crate: 1, gasil_fuel: 1.5 } },   // v0.4: Caña + Gasolina ×1.5 (Sec. 5.4)
   sombra: { name: 'Bazar Místico', icon: '🐈‍⬛', restockMin: 30, sells: [{ id: 'mystic_crystal', stock: 2 }, { id: 'coffee', stock: 3 }], buys: ['mystic_crystal', 'pearl', 'golden_fruit', 'star_shard'], buyMult: { mystic_crystal: 1.3, golden_fruit: 1.1, star_shard: 1.3 } },   // v0.4: Estrella ×1.3 · Café (Sec. 5.5)
   // 🏪 TIENDA FÍSICA de la aldea (Rocco el mapache): compra de todo lo vendible y venta de materiales/consumibles básicos
-  store:  { name: 'Tienda de Rocco', icon: '🦝', restockMin: 8, sells: [{ id: 'wood_log', stock: 12 }, { id: 'stone', stock: 12 }, { id: 'gasil_fuel', stock: 6 }, { id: 'croissant', stock: 6 }, { id: 'golden_fruit', stock: 2, price: 120 }], buys: 'all', buyMult: {} },
+  store:  { name: 'Tienda de Rocco', icon: '🦝', restockMin: 8, sells: [{ id: 'wood_log', stock: 12 }, { id: 'stone', stock: 12 }, { id: 'gasil_fuel', stock: 6 }, { id: 'croissant', stock: 6 }, { id: 'dream_wheat', stock: 12 }, { id: 'golden_fruit', stock: 2, price: 120 }], buys: 'all', buyMult: {} },
   glover: { name: 'Taller de Glover', icon: '🦫', restockMin: 30, sells: [{ id: 'pickaxe', stock: 2 }], buys: ['pickaxe', 'fishing_rod', 'wood_log', 'stone'], buyMult: {} },   // v0.4: herramientas (Sec. 5.7)
 };
 
@@ -736,10 +755,10 @@ const BUILDABLES = [
   { id: 'lamp',     name: 'Farola',           icon: '🏮', cost: 100,  mats: { stone: 1 },    r: 0.35, desc: 'Luz cálida para los caminos de la aldea.' },
   { id: 'tree',     name: 'Árbol',            icon: '🌳', cost: 50,   mats: {},              r: 0.6,  desc: 'Un árbol low‑poly. Da sombra y estilo.' },
   { id: 'bench',    name: 'Banco',            icon: '🪑', cost: 150,  mats: { wood_log: 2 }, r: 0.7,  desc: 'Para sentarse a mirar el planeta girar.' },
-  { id: 'garden',   name: 'Jardín',           icon: '🌷', cost: 200,  mats: {},              r: 0.9,  desc: 'Parterre de flores de colores.' },
+  { id: 'garden',   name: 'Jardín',           icon: '🌷', cost: 200,  mats: {},              r: 0.9,  desc: 'Da 2 🌾 Trigo + 1 💐 Ramo al día (pulsa E). Base de la cadena del pan.' },
   { id: 'flag',     name: 'Bandera $TOKEN',   icon: '🚩', cost: 80,   mats: { wood_log: 1 }, r: 0.3,  desc: 'Marca tu territorio con la bandera del token.' },
-  { id: 'fountain', name: 'Fuente',           icon: '⛲', cost: 300,  mats: { stone: 3 },    r: 1.8,  desc: 'Fuente animada con gotas brillantes.' },
-  { id: 'windmill', name: 'Molino de Viento', icon: '🌬️', cost: 500,  mats: { wood_log: 4 }, r: 1.6,  desc: 'Aspas giratorias. Requiere casa nivel 1.', unlock: () => GS.house.level >= 1, unlockText: 'Casa nivel 1 (Tienda)' },
+  { id: 'fountain', name: 'Fuente',           icon: '⛲', cost: 300,  mats: { stone: 3 },    r: 1.8,  desc: 'Deseo diario: lanzas 1 $T y te devuelve entre 1 y 10 $T.' },
+  { id: 'windmill', name: 'Molino de Viento', icon: '🌬️', cost: 500,  mats: { wood_log: 4 }, r: 1.6,  desc: 'Muele 2 🌾 Trigo → 1 🥣 Harina (30 s por lote). Requiere casa nivel 1.', unlock: () => GS.house.level >= 1, unlockText: 'Casa nivel 1 (Tienda)' },
   { id: 'statue',   name: 'Estatua $TOKEN',   icon: '🪙', cost: 1000, mats: { stone: 2, mystic_crystal: 1 }, r: 1.2, desc: 'Monumento dorado giratorio. Requiere casa nivel 2.', unlock: () => GS.house.level >= 2, unlockText: 'Casa nivel 2 (Villa)' },
 ];
 const buildableById = Object.fromEntries(BUILDABLES.map(b => [b.id, b]));
@@ -1634,6 +1653,7 @@ function placeBuilding(rec) {
   placeOnPlanet(g, dir, rec.yaw || 0, 0, SITES.village.S); scene.add(g);
   const col = { pos: g.position.clone(), r: def.r || 1 }; colliders.push(col);
   placedBuildings[rec.id] = { group: g, collider: col };
+  Production.register(g, rec);   // v0.4: Jardín / Molino / Fuente se usan con E
 }
 function restoreBuildings() {
   GS.world.buildings ||= [];
@@ -1641,7 +1661,9 @@ function restoreBuildings() {
   GS.world.buildings = GS.world.buildings.filter(r => r && r.id && !seen.has(r.id) && seen.add(r.id));
   GS.world.buildings.forEach(placeBuilding);
 }
+const embargoActive = () => (GS.debt || 0) >= CFG.debtEmbargoAt;   // v0.3 · Sec. 4.7: con embargo no se construye ni se demuele
 function removeBuilding(id, refund = 0.5) {
+  if (embargoActive()) { showToast('🔮 Embargo activo: Sombra no te deja tocar tus construcciones', 'text-red-200'); return false; }
   const p = placedBuildings[id]; const i = (GS.world.buildings || []).findIndex(r => r.id === id);
   if (!p || i < 0) return false;
   const rec = GS.world.buildings[i]; const def = buildableById[rec.type];
@@ -1650,6 +1672,8 @@ function removeBuilding(id, refund = 0.5) {
   const ai = animatedBuilds.indexOf(p.group); if (ai >= 0) animatedBuilds.splice(ai, 1);
   const ci = colliders.indexOf(p.collider); if (ci >= 0) colliders.splice(ci, 1);
   delete placedBuildings[id]; GS.world.buildings.splice(i, 1);
+  { const ii = interactables.indexOf(p.group); if (ii >= 0) interactables.splice(ii, 1); } if (GS.mill) delete GS.mill[id];
+  removeEmbargoVisual(id); { const sb = GS.housing.sealedBuildings || [], k = sb.indexOf(id); if (k >= 0) sb.splice(k, 1); }
   if (def && refund > 0) { const back = Math.floor(def.cost * refund); if (back > 0) Wallet.add(back, `Demolición: ${def.name}`); }
   showToast(`🧹 ${def ? def.icon + ' ' + def.name : 'Edificio'} retirado`, 'text-white');
   SaveSystem.saveNow('demolish:' + rec.type); return true;
@@ -1668,6 +1692,7 @@ const buildAffordable = (def) => Wallet.canAfford(def.cost) && buildMissing(def)
 let buildRing = null;
 function enterBuildMode(type) {
   const def = buildableById[type]; if (!def || state.build) return;
+  if (embargoActive()) { showToast(`🔮 Embargo activo: salda tu deuda por debajo de ${fmt(CFG.debtEmbargoAt)} $T para volver a construir`, 'text-red-200'); return; }
   if (!buildAffordable(def)) { showToast('❌ No cumples los requisitos para construir esto', 'text-red-200'); return; }
   closeApp(); if (state.mode === 'dialog') endDialog();
   const preview = makeBuildable(type); preview.traverse(o => { if (o.isMesh) { o.material = o.material.clone(); o.material.transparent = true; o.material.opacity = 0.65; o.castShadow = false; } });
@@ -1698,6 +1723,7 @@ function setBuildCursorFromPointer(clientX, clientY) {
 function confirmBuild() {
   const b = state.build; if (!b || !b.valid) return; const def = b.def;
   if (!buildAffordable(def)) { showToast('❌ Ya no cumples los requisitos', 'text-red-200'); return; }
+  if (embargoActive()) { showToast('🔮 Embargo activo: no puedes construir', 'text-red-200'); exitBuildMode(); return; }
   if (!Wallet.spend(def.cost, `Construcción: ${def.name}`)) return;
   Object.entries(def.mats).forEach(([id, q]) => Inventory.remove(id, q));
   const rec = { id: uid(), type: def.id, dir: b.dir.toArray(), yaw: b.yaw, t: Date.now() };
@@ -1707,6 +1733,53 @@ function confirmBuild() {
 }
 document.getElementById('buildRotate').onclick = () => { if (state.build) { state.build.yaw += Math.PI / 4; updateBuildPreview(); } };
 document.getElementById('buildConfirm').onclick = confirmBuild; document.getElementById('buildCancel').onclick = exitBuildMode;
+/* =========================================================
+   v0.4 · PRODUCCIÓN DE CONSTRUCCIONES (Guía Sec. 5.11)
+   🌷 Jardín: 2 Trigo + 1 Ramo al día · 🌬️ Molino: 2 Trigo → 1 Harina (30 s/lote)
+   ⛲ Fuente: deseo diario (lanzas 1 $T, vuelven 1–10 $T). Las construcciones
+   embargadas por Sombra no producen. Números en CFG.
+   ========================================================= */
+const Production = {
+  label(type) { return { garden: 'Cosechar el Jardín 🌷', windmill: 'Usar el Molino 🌬️', fountain: 'Pedir un deseo ⛲' }[type]; },
+  register(g, rec) { const l = this.label(rec.type); if (l) registerInteractable(g, { type: 'production', label: l }); },
+  use(obj) {
+    const recId = obj.userData.recId, rec = (GS.world.buildings || []).find(r => r.id === recId); if (!rec) return;
+    if ((GS.housing.sealedBuildings || []).includes(recId)) { showToast('🔮 Sellado por el embargo de Sombra: salda tu deuda para usarlo', 'text-red-200'); return; }
+    if (rec.type === 'garden') this.harvestGarden(recId);
+    else if (rec.type === 'windmill') this.useMill(recId);
+    else if (rec.type === 'fountain') this.wish(recId);
+  },
+  harvestGarden(recId) {
+    const g = GS.garden, day = GS.daily.dayCount; g.byId ||= {};
+    if (g.byId[recId] === day) { showToast('🌷 Este jardín ya dio su cosecha hoy. Vuelve mañana', 'text-white'); return; }
+    const bonus = Weather.gardenBonus(), wheat = CFG.gardenWheatPerDay + bonus, list = [['dream_wheat', wheat], ['flower_bouquet', CFG.gardenBouquetPerDay]];
+    if (!Inventory.canAddMany(list)) { showToast('🎒 Inventario lleno: libera espacio para cosechar', 'text-red-200'); return; }
+    list.forEach(([id, q]) => Inventory.add(id, q, { silent: true })); g.byId[recId] = day; g.lastHarvestDay = day;
+    showToast(`🌷 Cosecha: 🌾 ${wheat} Trigo Onírico${bonus ? ' (¡la lluvia ayuda!)' : ''} · 💐 ${CFG.gardenBouquetPerDay} Ramo`, 'text-white'); playChime(); SaveSystem.saveNow('garden');
+  },
+  useMill(recId) {
+    const m = (GS.mill ||= {}), job = m[recId], now = Date.now();
+    if (job) {
+      if (now < job.readyAt) { showToast(`🌬️ Moliendo ${job.qty} Harina… faltan ${Math.ceil((job.readyAt - now) / 1000)} s`, 'text-white'); return; }
+      if (!Inventory.add('flour', job.qty, { silent: true })) { showToast('🎒 Inventario lleno: libera espacio para recoger la harina', 'text-red-200'); return; }
+      delete m[recId]; showToast(`🥣 Recoges ${job.qty} Harina del Molino`, 'text-white'); playChime(); SaveSystem.saveNow('mill-collect'); return;
+    }
+    const lots = Math.min(CFG.millMaxBatches, Math.floor(Inventory.count('dream_wheat') / CFG.millWheatPerFlour));
+    if (!lots) { showToast(`🌬️ El Molino necesita ${CFG.millWheatPerFlour} 🌾 Trigo Onírico por cada Harina (cosecha tu Jardín o cómpralo a Rocco)`, 'text-white'); return; }
+    Inventory.remove('dream_wheat', lots * CFG.millWheatPerFlour);
+    m[recId] = { qty: lots, readyAt: now + lots * CFG.millSecsPerBatch * 1000 };
+    showToast(`🌬️ Molino en marcha: ${lots * CFG.millWheatPerFlour} 🌾 → ${lots} 🥣 en ${lots * CFG.millSecsPerBatch} s. Vuelve luego a recogerla`, 'text-white'); playBeep(523, 0.08, 'triangle'); SaveSystem.saveNow('mill-start');
+  },
+  wish(recId) {
+    const f = GS.fountain, day = GS.daily.dayCount; f.byId ||= {};
+    if (f.byId[recId] === day) { showToast('⛲ Ya pediste tu deseo de hoy en esta fuente', 'text-white'); return; }
+    if (!Wallet.spend(CFG.fountainWishCost, 'Deseo en la Fuente', { silent: true })) { showToast(`⛲ Necesitas ${CFG.fountainWishCost} $T para lanzar una moneda`, 'text-red-200'); return; }
+    const [lo, hi] = CFG.fountainWishRange, prize = lo + Math.floor(Math.random() * (hi - lo + 1));
+    Wallet.add(prize, 'Deseo cumplido (Fuente)', { silent: true }); f.byId[recId] = day; f.lastWishDay = day;
+    showToast(`⛲ Lanzas 🪙 ${CFG.fountainWishCost} $T… ¡el deseo te devuelve ${prize} $T! (azar simulado: entre ${lo} y ${hi}, todos igual de probables)`, 'text-white');
+    playBeep(1318, 0.07, 'triangle'); setTimeout(() => playBeep(1568, 0.08, 'triangle'), 90); SaveSystem.saveNow('fountain');
+  },
+};
 // --- Frutas doradas (Daily Claim) ---
 const fruits = [];
 function buildFarm() {
@@ -1883,6 +1956,7 @@ function interactWith(obj) {
   else if (it.type === 'fishing') Fishing.cast();   // S2.3
   else if (it.type === 'mine') Mining.hit(obj);   // S2.4
   else if (it.type === 'star') StarFall.collect(obj);   // S2.6
+  else if (it.type === 'production') Production.use(obj);   // v0.4 · Jardín / Molino / Fuente
   else if (it.type === 'crate') { if (state.crateTaken) return; if (Inventory.add('merchant_crate', 1)) { state.crateTaken = true; crate.visible = false; playChime(); } }
   else if (it.type === 'vendor') startVendorDialog();
   else if (it.type === 'store') { if (!canControl()) return; openApp('🦝 Tienda de Rocco', '', (b) => mountItemShop(b, 'store')); }
@@ -2457,18 +2531,20 @@ function playChime() { [523, 659, 784, 1046].forEach((f, i) => setTimeout(() => 
    - Saciedad 0: desmayo → rescate de Sombra (1ª vez gratis; luego 3% del capital, mín. 50; si no puedes pagar: DEUDA).
    NOTA v0.1: la natación con hambre no se bloquea, se penaliza ×0.5 extra (el "empuje a la orilla" queda en parking lot).
    ========================================================= */
+let _weakToastAt = 0;
+function weakSwimToast(back) { if (performance.now() - _weakToastAt < 2500) return; _weakToastAt = performance.now(); showToast(back ? '😵 Demasiado débil para nadar: el mar te devuelve a la orilla' : '😵 Demasiado débil para nadar: come algo primero', 'text-red-200'); }
 const Needs = {
   hungry() { return GS.needs.hunger < CFG.hungerDebuffAt; },
-  speedMult() { let m = this.hungry() ? CFG.hungerSlowMult : 1; if (this.hungry() && state.swimming) m *= 0.5; return m; },
+  speedMult() { return this.hungry() ? CFG.hungerSlowMult : 1; },   // con hambre además NO se puede nadar (Sec. 4.3, ver updatePlayer)
   priceMult() { return this.hungry() ? CFG.hungerPriceMult : 1; },
   laptopMult() { return this.hungry() ? CFG.laptopHungryMult : 1; },
-  eat(points) { GS.needs.hunger = clamp(GS.needs.hunger + points, 0, 100); if (typeof updateHungerHUD === 'function') updateHungerHUD(); },
+  eat(points) { GS.needs.hunger = clamp(GS.needs.hunger + points, 0, 100); updateHungerHUD(); },
   _wasHungry: false, _fainting: false,
   update(dt) {
     if (!SaveSystem.started || state.menuOpen) return;
     const secs = state.moving ? CFG.hungerSecsPerPointActive : CFG.hungerSecsPerPointIdle;
     GS.needs.hunger = clamp(GS.needs.hunger - dt / secs, 0, 100);
-    if (typeof updateHungerHUD === 'function' && Math.floor(GS.needs.hunger) !== this._lastShown) { this._lastShown = Math.floor(GS.needs.hunger); updateHungerHUD(); }
+    if (Math.floor(GS.needs.hunger) !== this._lastShown) { this._lastShown = Math.floor(GS.needs.hunger); updateHungerHUD(); }
     const h = this.hungry();
     if (h && !this._wasHungry) showToast('🍖 Tienes hambre: velocidad y precios reducidos. Come algo', 'text-red-200');
     if (!h && this._wasHungry) showToast('😋 ¡Qué aproveche! Ya estás a tope', 'text-white');
@@ -2482,7 +2558,7 @@ const Needs = {
     else {
       const fee = Math.max(CFG.rescueFeeMin, Math.floor(GS.economy.money * CFG.rescueFeePct));
       if (Wallet.spend(fee, 'Rescate Onírico', { silent: true })) msg = `🔮 Rescate Onírico: -${fee.toLocaleString('es-ES')} $TOKEN · Sombra: "Come, soñador."`;
-      else { GS.debt += fee; msg = `🔮 No puedes pagar el rescate: +${fee.toLocaleString('es-ES')} $TOKEN de DEUDA con Sombra.`; }
+      else { GS.debt += fee; updateEmbargo(); msg = `🔮 No puedes pagar el rescate: +${fee.toLocaleString('es-ES')} $TOKEN de DEUDA con Sombra.`; }
     }
     const ov = document.createElement('div');
     ov.style.cssText = 'position:fixed;inset:0;background:#000;opacity:0;transition:opacity .6s;z-index:70;pointer-events:none';
@@ -2490,7 +2566,7 @@ const Needs = {
     playBeep(196, 0.5, 'sine');
     setTimeout(() => {
       player.userData.dir.copy(siteDir(SITES.sombra, 2.5, 3)); player.userData.fwd.copy(frameAt(player.userData.dir, V_N).fwd);
-      GS.needs.hunger = 35; showToast(msg, 'text-white'); SaveSystem.saveNow('faint-rescue');
+      GS.needs.hunger = CFG.rescueHunger; state.swimming = false; updateHungerHUD(); showToast(msg, 'text-white'); SaveSystem.saveNow('faint-rescue');
       ov.style.opacity = '0'; setTimeout(() => { ov.remove(); this._fainting = false; }, 700);
     }, 900);
   },
@@ -2509,11 +2585,9 @@ function settleDay() {
   // 1) Hooks de la liquidación (v0.3: alquiler, tasa, intereses…). Van ANTES del resumen
   //    para que sus cargos (vía Wallet) cuenten en el cómputo del día.
   DailySystem._hooks.forEach(h => { try { h(); } catch (e) { console.warn('[Daily]', e); } });
-  // 2) Resumen económico del día que termina (desde el historial de Wallet por timestamp real)
-  const since = GS.daily.lastSettleAt || (Date.now() - CFG.dayLengthMs);
-  const ops = GS.economy.history.filter(e => e.t > since);
-  const earned = ops.reduce((a, e) => a + (e.amount > 0 ? e.amount : 0), 0);
-  const spent = ops.reduce((a, e) => a + (e.amount < 0 ? -e.amount : 0), 0);
+  // 2) Resumen económico del día que termina: contabilidad acumulada por Wallet (GS.daily.today), sin límite de operaciones
+  const { earned, spent } = GS.daily.today;
+  GS.daily.today = { earned: 0, spent: 0 };
   GS.daily.lastSettleAt = Date.now();
   // 3) Resumen visual (no bloqueante: no interrumpe la partida)
   showDaySummary(Math.max(1, GS.daily.dayCount - 1), earned, spent);
@@ -3232,13 +3306,17 @@ function updatePlayer(dt) {
       const wp = newDir.clone().multiplyScalar(surfaceR(newDir));
       for (const c of colliders) { const d = wp.clone().sub(c.pos); const dist = d.length(), min = c.r + 0.4; if (dist < min && dist > 1e-4) wp.addScaledVector(d.normalize(), min - dist); }
       const finalDir = wp.normalize();
+      if (Needs.hungry() && !isLand(finalDir) && isLand(up)) { finalDir.copy(up); weakSwimToast(false); state.moveTarget = null; state.pendingInteract = null; }   // v0.1 · Sec. 4.3: con hambre no se puede nadar
       if (state.moveTarget && angleBetween(finalDir, up) * R < 0.002) { state.moveTarget = null; state.pendingInteract = null; }
       pd.dir.copy(finalDir); pd.fwd.lerp(tangent(_move, pd.dir), Math.min(1, dt * 12));
     }
   }
   state.moving = moving;   // v0.1: Needs drena más saciedad en movimiento
   const wasSwimming = state.swimming; state.swimming = !isLand(pd.dir);
-  if (state.swimming && !wasSwimming) showToast(Needs.hungry() ? '🍖 Estás hambriento: nadas muy despacio. Come antes de cruzar el mar' : '🏊 ¡Nadando!', 'text-white');
+  // v0.1 · Sec. 4.3: si te entra el hambre nadando, "el mar te devuelve a la orilla"
+  if (state.swimming && Needs.hungry() && state.lastLandDir && !Needs._fainting) { pd.dir.copy(state.lastLandDir); state.swimming = false; weakSwimToast(true); }
+  if (!state.swimming) (state.lastLandDir ||= new THREE.Vector3()).copy(pd.dir);
+  if (state.swimming && !wasSwimming) showToast('🏊 ¡Nadando!', 'text-white');
   pd.fwd.copy(tangent(pd.fwd, pd.dir)); if (pd.fwd.lengthSq() < 1e-6) pd.fwd.copy(frameAt(pd.dir, V_N).fwd);
   quatFromFrame(frameAt(pd.dir, pd.fwd), player.quaternion);
   let bob;
@@ -4025,6 +4103,21 @@ function openWeeklyPanel(tab = 'week') {
   });
 }
 { const b = document.getElementById('btnWeekly'); if (b) b.onclick = () => { if (canControl()) openWeeklyPanel(); }; }
+/* ===== v0.1 · HUD reloj onírico + saciedad (Sec. 4.2–4.3) ===== */
+let _clockLast = '', _hungerCls = '';
+function updateClockHUD() {
+  const el = document.getElementById('clockText'); if (!el) return;
+  const h = (GS.daily.clockMs / 3600000) % 24, mins = Math.floor(h * 60);
+  const icon = h < 6 || h >= 20.5 ? '🌙' : h < 8 ? '🌅' : h < 18.5 ? '☀️' : '🌆';
+  const txt = `${icon} Día ${GS.daily.dayCount} · ${String(Math.floor(mins / 60)).padStart(2, '0')}:${String(mins % 60).padStart(2, '0')}`;
+  if (txt !== _clockLast) { _clockLast = txt; el.textContent = txt; }
+}
+function updateHungerHUD() {
+  const bar = document.getElementById('hungerBar'), val = document.getElementById('hungerVal'); if (!bar) return;
+  const h = GS.needs.hunger; bar.style.width = h.toFixed(1) + '%'; val.textContent = Math.ceil(h);
+  const cls = `block h-full rounded-full ${h < CFG.hungerDebuffAt ? 'bg-red-500 animate-pulse' : h < 60 ? 'bg-amber-400' : 'bg-emerald-400'}`;
+  if (cls !== _hungerCls) { _hungerCls = cls; bar.className = cls; }
+}
 /* ===== v0.1 · HUD OBJETIVO 40M (Guía Sec. 0.2 P4: "un número imposible siempre visible") ===== */
 let _goalLast = -1;
 function updateGoalHUD() {
@@ -4042,7 +4135,7 @@ function animate() {
   requestAnimationFrame(animate);
   const dt = Math.min(clock.getDelta(), 0.05), t = clock.elapsedTime;
   updatePlayer(dt); Needs.update(dt); updateNPCs(dt, t); updateCamera(dt); updateSun(); updateNeon(dt, t); updateUnlocks(dt, t); updateShip(dt); updateConfetti(dt); updateWater(t);
-  clouds.children.forEach(p => p.rotateY(p.userData.speed * dt)); updateTokens(); updateGoalHUD(); Weather.update(dt); Fishing.update(dt); Mining.update(dt); StarFall.update(dt);
+  clouds.children.forEach(p => p.rotateY(p.userData.speed * dt)); updateTokens(); updateGoalHUD(); updateClockHUD(); Weather.update(dt); Fishing.update(dt); Mining.update(dt); StarFall.update(dt);
   if (SaveSystem.started && !state.menuOpen) {
     GS.meta.playTimeSec += dt;
     GS.daily.clockMs += dt * 1000 * DAY_SCALE;                 // v0.1: el reloj onírico solo avanza jugando
@@ -4085,6 +4178,7 @@ SaveSystem.onBeforeSave(() => { GS.player.dir = player.userData.dir.toArray(); G
 const hadSave = SaveSystem.load();
 if (!hadSave) SaveSystem.createNew();
 applyGameStateToWorld();
+updateHungerHUD(); updateClockHUD();
 
 // ---- Menú ----
 cam.dist = cam.tDist = 70; cam.pitch = cam.tPitch = 0.35; // vista desde el espacio mientras se lee el menú
