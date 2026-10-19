@@ -191,7 +191,7 @@
       </div>
       <div class="panel px-3 md:px-4 py-2 clickable">
         <div class="flex items-center justify-between gap-2">
-          <div class="pixel text-[8px] md:text-[9px] text-slate-500">MISIONES <span id="missionCount">0/7</span></div>
+          <div class="pixel text-[8px] md:text-[9px] text-slate-500"><span id="missionLabel">MISIONES</span> <span id="missionCount">0/7</span></div>
           <button id="btnMissions" class="text-xs font-bold text-sky-600 hover:underline">📜</button>
         </div>
         <div id="missionText" class="text-xs md:text-sm font-semibold text-[#2b2b3d] mt-1 leading-tight">🐻 Habla con el Oso Panadero</div>
@@ -417,6 +417,13 @@ const CFG = {
   bouquetGiftPoints: 5,           // diseño propio: valor del Ramo como regalo universal (la guía no da cifra)
   cookBatchExtra: 0.25,
   cookMaxBatch: 10,
+  /* ===== v0.6 · ACTO 2 (Sec. 7.3) ===== */
+  act2BigJobs: 7,                 // Trabajos Mayores del Acto 2 (el HUD cuenta GS.bigJobs[id].status === 2)
+  /* ===== v0.7 · AVATAR Y MODA ONÍRICA (Sec. 8) — la ropa NUNCA da ventaja mecánica ===== */
+  boutiqueDailyCount: 4,          // Sec. 8.4: 4 piezas al día del pool de la Boutique Viral
+  boutiquePrices: { common: 50, uncommon: 150, rare: 400, epic: 900, legendary: 2000 },   // Sec. 8.4: 50–2.000 $T por rareza
+  importPrices: { uncommon: 300, rare: 600, epic: 1000, legendary: 1500 },                // Sec. 8.4: telas del muelle 300–1.500 $T (se venden desde v0.8)
+  fittingRotateSpeed: 0.012,      // probador: radianes por píxel arrastrado
 };
 /** Detección de dispositivo táctil → controles y calidad adaptados */
 const IS_MOBILE = matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window;
@@ -478,11 +485,11 @@ function defaultGameState() {
     /* ===== v3 · CONTENIDO FUTURO (defaults listos para no volver a migrar) ===== */
     bigJobs: {},                                     // Trabajos Mayores (Sec. 7.4)
     awakening: { step: 0, planeFueled: false, permit: false, permitDay: 0 },   // Cadena del Despertar (Sec. 7.5)
-    story: { prologueDone: false, revealed: false, farewellDone: false, ending: null, act1Done: false },
+    story: { prologueDone: false, revealed: false, farewellDone: false, ending: null, act1Done: false, creatorPending: false },   // v0.7: creatorPending = el creador inicial tras el prólogo sigue sin cerrarse
     weekly: { seals: [false, false, false, false, false, false, false], weekStart: null },  // Sello Semanal (Sec. 10.3)
     museum: { donated: [] },                         // Museo del Sueño (Sec. 10.5)
     // Avatar (Sec. 8.8): config "clásica" = el look actual del prototipo (piel #ffd5b3, camiseta cian, vaqueros, pelo marrón, mochila naranja). Lo usa v0.7.
-    avatar: { skin: 0, hair: 0, hairColor: 0, eyes: 0, eyeColor: 0, top: 0, topColor: 2, pants: 0, pantsColor: 3, shoes: 0, shoesColor: 0, hat: null, glasses: null, backpack: 0, backpackColor: 1, wardrobe: [] },
+    avatar: { skin: 0, hair: 0, hairColor: 0, eyes: 0, eyeColor: 0, top: 0, topColor: 2, pants: 0, pantsColor: 3, shoes: 0, shoesColor: 0, hat: null, hatColor: 5, glasses: null, glassesColor: 0, backpack: 0, backpackColor: 1, wardrobe: [] },   // v0.7: + hatColor/glassesColor · wardrobe: piezas desbloqueadas 'slot:id' (las base no se guardan: son de todos)
      lottery: { pool: 0, nextDrawAt: null, tickets: [], lastDraw: null },   // Lotería semanal real (Anexo B) · tickets: [{ num, day }] · lastDraw: { num, at, winner, prize, myCount }
     garden: { lastHarvestDay: 0, byId: {} },         // cosecha diaria del Jardín (Sec. 5.11) · byId: { recId: día de la última cosecha }
     fountain: { lastWishDay: 0, byId: {} },          // deseo diario de la Fuente (Sec. 5.11) · byId: { recId: día del último deseo }
@@ -837,7 +844,7 @@ const Trust = {
       const nm = (typeof npcById !== 'undefined' && npcById[id]) || null;
       showToast(`${nm?.emoji || '💜'} ${nm?.name || id} ahora te considera: ${TRUST_LEVELS[after].name} ${TRUST_LEVELS[after].heart}`, 'text-white'); playChime();
       if (id !== 'rocco' && typeof refreshAuraFromTrust === 'function') refreshAuraFromTrust();
-      if (after >= 4 && before < 4) sendMilestoneLetter(id);   // v0.5: carta de hito (Sec. 6.10)
+      if (after >= 4 && before < 4) { sendMilestoneLetter(id); grantInsignia(id); }   // v0.5: carta de hito (Sec. 6.10) · v0.7: prenda insignia (Sec. 8.5)
     }
     SaveSystem.save('trust:' + id); return pts;
   },
@@ -1150,7 +1157,7 @@ placeAtSite(bakery, S_V, 6.2, -4.5, -0.55, -0.1); scene.add(bakery); colliders.p
 
 /** Casa del jugador con 3 niveles: Casa → Tienda → Villa */
 let house = null, houseCollider = { pos: new THREE.Vector3(), r: 2.8 }; colliders.push(houseCollider);
-let mailboxObj = null;
+let mailboxObj = null, wardrobeObj = null;
 function buildHouse(level) {
   if (house) scene.remove(house);
   const g = new THREE.Group();
@@ -1175,6 +1182,14 @@ function buildHouse(level) {
   if (house) { const i = interactables.indexOf(house); if (i >= 0) interactables.splice(i, 1); }
   registerInteractable(g, { type: 'house', label: 'Tu casa' });
   { const mb = new THREE.Object3D(); mb.position.set(1.9, 1.1, 1.9); g.add(mb); if (mailboxObj) { const k = interactables.indexOf(mailboxObj); if (k >= 0) interactables.splice(k, 1); } registerInteractable(mb, { type: 'mailbox', label: 'Abrir el buzón 📮' }); mailboxObj = mb; }   // v0.5: buzón independiente (Sec. 6.10)
+  { // v0.7 · Armario 🪞 (Sec. 8.2 y 8.9): box + espejo, en los 3 niveles de casa. Abre el probador (cambiarse es gratis)
+    const wd = new THREE.Group(); wd.position.set(-[2.45, 2.95, 3.35][level], 0, 0.9);
+    wd.add(box(0.9, 1.7, 0.45, mat(0x8d6e63), 0, 0.85, 0)); wd.add(box(1.0, 0.1, 0.52, mat(0x6d4c41), 0, 1.74, 0));
+    wd.add(box(0.6, 1.1, 0.03, new THREE.MeshStandardMaterial({ color: 0xdff3ff, metalness: 0.9, roughness: 0.08, emissive: 0x9fd8ff, emissiveIntensity: 0.18 }), 0, 0.95, 0.24));
+    wd.add(sphere(0.04, mat(0xffd54f), 0.37, 0.9, 0.24, 6)); g.add(wd);
+    if (wardrobeObj) { const k = interactables.indexOf(wardrobeObj); if (k >= 0) interactables.splice(k, 1); }
+    registerInteractable(wd, { type: 'wardrobe', label: 'Armario 🪞 (probador)' }); wardrobeObj = wd;
+  }
   placeAtSite(g, S_V, -6.5, -3.5, 0.5, -0.1); scene.add(g); house = g;
   houseCollider.pos.copy(g.position); houseCollider.r = [2.8, 3.3, 4.2][level];
   if (GS.house.level !== level) { GS.house.level = level; SaveSystem.save('house'); }
@@ -1197,19 +1212,277 @@ for (let i = 0; i <= 10; i++) { const t = i / 10; const s = cyl(0.45 + Math.rand
 /* =========================================================
    8. JUGADOR + AURA
    ========================================================= */
-const player = (() => {
-  const g = new THREE.Group(); const skin = mat(0xffd5b3), shirt = mat(0x3fb1c9), pants = mat(0x3c4a7a);
-  const parts = {};
-  const legPivot = (x) => { const p = new THREE.Group(); p.position.set(x, 0.65, 0); p.add(box(0.26, 0.65, 0.26, pants, 0, -0.32, 0)); p.add(box(0.3, 0.12, 0.36, mat(0x2b2b3d), 0, -0.68, 0.04)); return p; };
-  const armPivot = (x) => { const p = new THREE.Group(); p.position.set(x, 1.4, 0); p.add(box(0.2, 0.3, 0.2, shirt, 0, -0.15, 0)); p.add(box(0.19, 0.4, 0.19, skin, 0, -0.5, 0)); return p; };
-  parts.legL = legPivot(-0.17); parts.legR = legPivot(0.17); parts.armL = armPivot(-0.47); parts.armR = armPivot(0.47);
-  g.add(box(0.72, 0.8, 0.42, shirt, 0, 1.05, 0), parts.legL, parts.legR, parts.armL, parts.armR);
-  g.add(sphere(0.38, skin, 0, 1.82, 0, 18)); g.add(mesh(new THREE.SphereGeometry(0.4, 18, 10, 0, 6.29, 0, Math.PI / 2.2), mat(0x4e342e), 0, 1.86, -0.02));
-  g.add(sphere(0.05, mat(0x2b2b3d), -0.13, 1.86, 0.34, 6)); g.add(sphere(0.05, mat(0x2b2b3d), 0.13, 1.86, 0.34, 6));
-  g.add(sphere(0.06, mat(0xff9aa2), -0.24, 1.76, 0.3, 6)); g.add(sphere(0.06, mat(0xff9aa2), 0.24, 1.76, 0.3, 6));
-  g.add(box(0.5, 0.55, 0.22, mat(0xff8f5a), 0, 1.1, -0.3));
-  g.userData.parts = parts; return g;
-})();
+/* ===== v0.7 · AVATAR PARAMÉTRICO (Guía Maestra Sec. 8) =====
+   - Todo con primitivas Three.js + CanvasTexture. La config es un JSON diminuto (GS.avatar) que
+     viaja como dato puro y se renderiza con buildAvatar(cfg) (principio del Anexo A, Sec. 8.6).
+   - Los ÍNDICES de AV_STYLES / paletas se guardan en GS: las listas son SOLO-AÑADIR (nunca reordenar).
+   - La ropa NUNCA da ventaja mecánica (Sec. 8.1 y 8.10): aquí no hay ni un multiplicador.
+   - Cambiar de look es gratis; solo se desbloquean piezas (GS.avatar.wardrobe = ['slot:id', …]). */
+const AV_SKINS = [   // 6 tonos (Sec. 8.3) · 0 = el del prototipo (#ffd5b3)
+  { hex: 0xffd5b3, name: 'Melocotón' }, { hex: 0xf3c39a, name: 'Arena' }, { hex: 0xe0a97c, name: 'Miel' },
+  { hex: 0xc68a5e, name: 'Canela' }, { hex: 0x8d5a3b, name: 'Cacao' }, { hex: 0x5e3a24, name: 'Ébano' },
+];
+const AV_HAIR_COLORS = [   // 8 colores · 0 = marrón del prototipo
+  { hex: 0x4e342e, name: 'Castaño' }, { hex: 0x1b1b1f, name: 'Negro' }, { hex: 0xf2d16b, name: 'Rubio' }, { hex: 0xc0582b, name: 'Pelirrojo' },
+  { hex: 0xe6e6e6, name: 'Plata' }, { hex: 0xff7fb0, name: 'Rosa onírico' }, { hex: 0x4fc3f7, name: 'Azul sueño' }, { hex: 0x9575cd, name: 'Lila' },
+];
+const AV_EYE_COLORS = [   // 6 colores · 0 = el del prototipo
+  { hex: 0x2b2b3d, name: 'Tinta' }, { hex: 0x5d4037, name: 'Marrón' }, { hex: 0x1e88e5, name: 'Azul' },
+  { hex: 0x43a047, name: 'Verde' }, { hex: 0x8e24aa, name: 'Violeta' }, { hex: 0xffb300, name: 'Ámbar' },
+];
+const AV_PALETTE = [   // paleta 12 de ropa (Sec. 8.9) · 0 botas, 1 mochila, 2 camiseta y 3 vaqueros del prototipo
+  { hex: 0x2b2b3d, name: 'Tinta' }, { hex: 0xff8f5a, name: 'Naranja' }, { hex: 0x3fb1c9, name: 'Cian' }, { hex: 0x3c4a7a, name: 'Vaquero' },
+  { hex: 0xf5f5f5, name: 'Blanco' }, { hex: 0xe53935, name: 'Rojo' }, { hex: 0xffd54f, name: 'Amarillo' }, { hex: 0x66bb6a, name: 'Verde' },
+  { hex: 0xba68c8, name: 'Lila' }, { hex: 0xff9ec4, name: 'Rosa' }, { hex: 0x8d6e63, name: 'Marrón' }, { hex: 0x90a4ae, name: 'Gris' },
+];
+const AV_FRAMES = [   // 4 colores de montura (gafas)
+  { hex: 0x2b2b3d, name: 'Negra' }, { hex: 0xd4af37, name: 'Dorada' }, { hex: 0xe53935, name: 'Roja' }, { hex: 0xf5f5f5, name: 'Blanca' },
+];
+/** 🚢 Telas imposibles (Sec. 8.4): 12 tejidos exclusivos que solo llegan en barco (Trabajo Mayor de Sam, v0.8).
+ *  Funcionan como "colores" extra en cualquier slot de la paleta (índice 12 + n). */
+const AV_FABRICS = [
+  { id: 'nebula',    name: 'Tela de Nebulosa',   hex: 0x5e35b1, fx: { emissive: 0x7c4dff, emissiveIntensity: 0.35 }, rarity: 'epic' },
+  { id: 'aurora',    name: 'Tela de Aurora',     hex: 0x26c6da, fx: { emissive: 0x00e5ff, emissiveIntensity: 0.3 }, rarity: 'epic' },
+  { id: 'gold_silk', name: 'Seda de Oro Líquido', hex: 0xffd54f, fx: { metalness: 0.8, roughness: 0.25 }, rarity: 'legendary' },
+  { id: 'moon_silver', name: 'Plata Lunar',      hex: 0xcfd8dc, fx: { metalness: 0.9, roughness: 0.2 }, rarity: 'rare' },
+  { id: 'lava',      name: 'Lana de Lava',       hex: 0xff5722, fx: { emissive: 0xff3d00, emissiveIntensity: 0.45 }, rarity: 'epic' },
+  { id: 'midnight',  name: 'Terciopelo Medianoche', hex: 0x1a237e, fx: { emissive: 0x304ffe, emissiveIntensity: 0.22 }, rarity: 'rare' },
+  { id: 'sakura',    name: 'Gasa de Sakura',     hex: 0xf8bbd0, fx: { emissive: 0xff80ab, emissiveIntensity: 0.18 }, rarity: 'rare' },
+  { id: 'jade',      name: 'Brocado de Jade',    hex: 0x00a86b, fx: { metalness: 0.35, roughness: 0.3 }, rarity: 'rare' },
+  { id: 'pearl',     name: 'Nácar de Perla',     hex: 0xfaf3e0, fx: { metalness: 0.45, roughness: 0.2, emissive: 0xfff3e0, emissiveIntensity: 0.08 }, rarity: 'epic' },
+  { id: 'coral',     name: 'Lino de Coral',      hex: 0xff7f6e, fx: { emissive: 0xff5252, emissiveIntensity: 0.12 }, rarity: 'uncommon' },
+  { id: 'star_ink',  name: 'Tinta Estelar',      hex: 0x111122, fx: { emissive: 0x3949ab, emissiveIntensity: 0.3 }, rarity: 'legendary' },
+  { id: 'mint_neon', name: 'Neón de Menta',      hex: 0x69f0ae, fx: { emissive: 0x00e676, emissiveIntensity: 0.4 }, rarity: 'uncommon' },
+];
+const AV_ORIGINS = {
+  base:     { icon: '🆓', name: 'Base · gratis para siempre' },
+  boutique: { icon: '🛍️', name: 'Boutique Viral (erizos)' },
+  import:   { icon: '🚢', name: 'Importación del mercante' },
+  insignia: { icon: '🏆', name: 'Prenda insignia' },
+  special:  { icon: '🌟', name: 'Especial' },
+};
+/** Config "clásica" = el look exacto del prototipo (Sec. 8.8 y 8.10: el clásico siempre existe). */
+const AVATAR_CLASSIC = { skin: 0, hair: 0, hairColor: 0, eyes: 0, eyeColor: 0, top: 0, topColor: 2, pants: 0, pantsColor: 3, shoes: 0, shoesColor: 0, hat: null, hatColor: 5, glasses: null, glassesColor: 0, backpack: 0, backpackColor: 1 };
+const AV_CFG_KEYS = Object.keys(AVATAR_CLASSIC);
+
+/* ---- Materiales y texturas cacheados (Sec. 8.9: matCache, no regenerar al recolorear) ---- */
+const _avMatCache = new Map();
+function avMat(hex, extra) { const k = hex + '|' + (extra ? JSON.stringify(extra) : ''); let m = _avMatCache.get(k); if (!m) { m = new THREE.MeshStandardMaterial({ color: hex, roughness: 0.85, metalness: 0, ...(extra || {}) }); _avMatCache.set(k, m); } return m; }
+const avCss = (hex) => '#' + (hex >>> 0).toString(16).padStart(6, '0');
+const avShade = (hex, f) => { const r = Math.min(255, Math.round(((hex >> 16) & 255) * f)), g = Math.min(255, Math.round(((hex >> 8) & 255) * f)), b = Math.min(255, Math.round((hex & 255) * f)); return (r << 16) | (g << 8) | b; };
+const avLight = (hex) => (((hex >> 16) & 255) * 0.3 + ((hex >> 8) & 255) * 0.59 + (hex & 255) * 0.11) > 170;
+const _avTexCache = new Map();
+/** Telas estampadas (CanvasTexture) teñidas con el color elegido · kind: hawaii | stripes | plaid | pajama | decal_token | decal_bro */
+function avPatternMat(kind, hex) {
+  const k = kind + '|' + hex; let m = _avTexCache.get(k); if (m) return m;
+  const decal = kind.startsWith('decal_'), c = document.createElement('canvas'); c.width = c.height = decal ? 128 : 64; const x = c.getContext('2d'); const S = c.width;
+  if (!decal) { x.fillStyle = avCss(hex); x.fillRect(0, 0, S, S); }
+  if (kind === 'hawaii') {
+    const fl = avLight(hex) ? '#e53935' : '#ffffff';
+    [[12, 12], [44, 20], [24, 44], [54, 52], [6, 58]].forEach(([cx, cy], i) => { x.fillStyle = i % 2 ? '#7cb342' : '#43a047'; x.beginPath(); x.ellipse(cx + 6, cy + 4, 7, 3, 0.6, 0, 7); x.fill(); x.fillStyle = fl; for (let p = 0; p < 5; p++) { const a = p * 1.2566; x.beginPath(); x.arc(cx + Math.cos(a) * 4, cy + Math.sin(a) * 4, 3.4, 0, 7); x.fill(); } x.fillStyle = '#ffd54f'; x.beginPath(); x.arc(cx, cy, 2.2, 0, 7); x.fill(); });
+  } else if (kind === 'stripes') { x.fillStyle = avLight(hex) ? '#2b2b3d' : '#ffffff'; for (let i = 0; i < 8; i += 2) x.fillRect(0, i * 8, S, 8); }
+  else if (kind === 'plaid') { x.globalAlpha = 0.35; x.fillStyle = avCss(avShade(hex, 0.45)); for (let i = 0; i < S; i += 16) { x.fillRect(i, 0, 6, S); x.fillRect(0, i, S, 6); } x.globalAlpha = 0.5; x.fillStyle = '#ffffff'; for (let i = 8; i < S; i += 16) { x.fillRect(i, 0, 1, S); x.fillRect(0, i, S, 1); } x.globalAlpha = 1; }
+  else if (kind === 'pajama') { x.fillStyle = '#ffe082'; [[8, 10], [40, 6], [26, 30], [52, 36], [12, 50], [44, 56]].forEach(([sx, sy]) => { x.beginPath(); for (let p = 0; p < 10; p++) { const r = p % 2 ? 2 : 5, a = p * Math.PI / 5 - Math.PI / 2; x.lineTo(sx + Math.cos(a) * r, sy + Math.sin(a) * r); } x.fill(); }); x.beginPath(); x.arc(56, 14, 5, 0, 7); x.fill(); x.fillStyle = avCss(hex); x.beginPath(); x.arc(58, 12, 4.5, 0, 7); x.fill(); }
+  else if (kind === 'decal_token') { x.fillStyle = '#ffc83d'; x.beginPath(); x.arc(64, 64, 54, 0, 7); x.fill(); x.lineWidth = 8; x.strokeStyle = '#b8860b'; x.stroke(); x.fillStyle = '#7a5300'; x.font = 'bold 52px Fredoka, sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText('$T', 64, 68); }
+  else if (kind === 'decal_bro') { x.fillStyle = avLight(hex) ? '#2b2b3d' : '#ffffff'; x.font = 'bold 54px Fredoka, sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText('bro', 64, 60); x.font = '30px sans-serif'; x.fillText('🕶️', 64, 104); }
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
+  m = new THREE.MeshStandardMaterial({ map: t, roughness: 0.85, transparent: decal }); _avTexCache.set(k, m); return m;
+}
+const _avHeartGeo = (() => { const s = new THREE.Shape(); s.moveTo(0, -0.075); s.bezierCurveTo(-0.02, -0.055, -0.095, -0.02, -0.095, 0.025); s.bezierCurveTo(-0.095, 0.075, -0.035, 0.085, 0, 0.045); s.bezierCurveTo(0.035, 0.085, 0.095, 0.075, 0.095, 0.025); s.bezierCurveTo(0.095, -0.02, 0.02, -0.055, 0, -0.075); return new THREE.ExtrudeGeometry(s, { depth: 0.02, bevelEnabled: false }); })();
+const _avGlass = () => avMat(0x9fe3ff, { transparent: true, opacity: 0.45, metalness: 0.2, roughness: 0.1 });
+
+/* ---- Helpers de construcción por slot (ctx = { g, parts, skin, legs, arms }) ---- */
+const avTorso = (ctx, m, w = 0.72, h = 0.8, d = 0.42, y = 1.05) => ctx.g.add(box(w, h, d, m, 0, y, 0));
+const avSleeves = (ctx, m, long = false) => ctx.arms.forEach(p => p.add(long ? box(0.21, 0.62, 0.21, m, 0, -0.31, 0) : box(0.2, 0.3, 0.2, m, 0, -0.15, 0)));
+const avFront = (ctx, w, h, m, x, y, z = 0.215, d = 0.02) => ctx.g.add(box(w, h, d, m, x, y, z));
+const avLegs = (ctx, m, w = 0.26) => ctx.legs.forEach(p => p.add(box(w, 0.65, w, m, 0, -0.32, 0)));
+const avFeet = (ctx, fn) => ctx.legs.forEach((p, i) => fn(p, i ? 1 : -1));
+const avCollar = (ctx, m) => [-1, 1].forEach(s => { const c = box(0.16, 0.07, 0.03, m, s * 0.09, 1.41, 0.22); c.rotation.z = -s * 0.5; ctx.g.add(c); });
+const avDecal = (ctx, kind, hex, w = 0.4, h = 0.4, y = 1.12) => { const p = mesh(new THREE.PlaneGeometry(w, h), avPatternMat(kind, hex), 0, y, 0.212, false); ctx.g.add(p); };
+const avHairCap = (ctx, m) => ctx.g.add(mesh(new THREE.SphereGeometry(0.4, 18, 10, 0, 6.29, 0, Math.PI / 2.2), m, 0, 1.86, -0.02));
+const avBuzzCap = (ctx, m) => ctx.g.add(mesh(new THREE.SphereGeometry(0.392, 18, 10, 0, 6.29, 0, Math.PI / 2.7), m, 0, 1.84, -0.01));
+const avDome = (ctx, m, r = 0.43, y = 1.92, sy = 1) => { const d = mesh(new THREE.SphereGeometry(r, 18, 10, 0, 6.29, 0, Math.PI / 2), m, 0, y, 0); d.scale.y = sy; ctx.g.add(d); return d; };
+const avRot = (o, x = 0, y = 0, z = 0) => { o.rotation.set(x, y, z); return o; };
+
+/** Catálogo de estilos por slot (Sec. 8.3) · origin: base | boutique | import | insignia | special
+ *  rarity → precio en CFG.boutiquePrices · colorable: usa la paleta del slot · deco(ctx, colorMat, colorHex) */
+const AV_STYLES = {
+  hair: [
+    { id: 'classic',  name: 'Clásico',      icon: '💇', origin: 'base', deco: (ctx, m) => avHairCap(ctx, m) },
+    { id: 'buzz',     name: 'Rapado',       icon: '🧑‍🦲', origin: 'base', deco: (ctx, m) => avBuzzCap(ctx, m) },
+    { id: 'ponytail', name: 'Coleta',       icon: '🎀', origin: 'base', deco: (ctx, m) => { avHairCap(ctx, m); ctx.g.add(sphere(0.14, m, 0, 1.92, -0.4, 10)); ctx.g.add(avRot(cyl(0.09, 0.04, 0.38, m, 0, 1.68, -0.45, 8), -0.25)); } },
+    { id: 'long',     name: 'Melena',       icon: '👩', origin: 'base', deco: (ctx, m) => { avHairCap(ctx, m); ctx.g.add(box(0.68, 0.62, 0.16, m, 0, 1.66, -0.27)); [-1, 1].forEach(s => ctx.g.add(box(0.1, 0.46, 0.3, m, s * 0.36, 1.72, -0.04))); } },
+    { id: 'curls',    name: 'Rizos',        icon: '🌀', origin: 'base', deco: (ctx, m) => { avBuzzCap(ctx, m); for (let i = 0; i < 12; i++) { const a = i / 12 * Math.PI * 2; if (Math.sin(a) > 0.55) continue; ctx.g.add(sphere(0.12, m, Math.cos(a) * 0.33, 2.0, Math.sin(a) * 0.33 - 0.03, 8)); } [[0, 2.17, 0], [-0.15, 2.12, -0.14], [0.15, 2.12, -0.14], [0, 2.1, -0.26]].forEach(([x, y, z]) => ctx.g.add(sphere(0.13, m, x, y, z, 8))); } },
+    { id: 'bun',      name: 'Moño',         icon: '🍡', origin: 'boutique', rarity: 'uncommon', deco: (ctx, m) => { avHairCap(ctx, m); ctx.g.add(sphere(0.17, m, 0, 2.27, -0.1, 12)); } },
+    { id: 'mohawk',   name: 'Cresta',       icon: '🦔', origin: 'boutique', rarity: 'rare', deco: (ctx, m) => { avBuzzCap(ctx, m); for (let k = 0; k < 5; k++) { const a = -0.55 + k * 0.42; ctx.g.add(avRot(box(0.08, 0.26, 0.13, m, 0, 1.82 + 0.44 * Math.cos(a), -0.44 * Math.sin(a)), -a)); } } },
+    { id: 'afro',     name: 'Afro onírico', icon: '☁️', origin: 'boutique', rarity: 'rare', deco: (ctx, m) => { const s = sphere(0.5, m, 0, 2.08, -0.16, 16); s.scale.set(1.12, 0.9, 1); ctx.g.add(s); } },
+    { id: 'spiky',    name: 'Puntas de anime', icon: '⚡', origin: 'boutique', rarity: 'epic', deco: (ctx, m) => { avBuzzCap(ctx, m); [[0, 0], [0.5, 0.9], [-0.5, 0.9], [0.55, 2.2], [-0.55, 2.2], [0.7, 3.14], [0.3, -0.6], [-0.3, -0.6]].forEach(([tilt, yaw]) => { const c = cyl(0, 0.1, 0.32, m, 0, 0, 0, 6); const dir = new THREE.Vector3(Math.sin(tilt) * Math.sin(yaw), Math.cos(tilt), Math.sin(tilt) * Math.cos(yaw) * -1); c.position.set(0, 1.84, 0).addScaledVector(dir, 0.44); c.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir); ctx.g.add(c); }); } },
+    { id: 'twintails', name: 'Coletas dobles', icon: '🎎', origin: 'boutique', rarity: 'uncommon', deco: (ctx, m) => { avHairCap(ctx, m); [-1, 1].forEach(s => { ctx.g.add(sphere(0.12, m, s * 0.42, 1.98, -0.1, 8)); ctx.g.add(avRot(cyl(0.08, 0.03, 0.42, m, s * 0.48, 1.74, -0.1, 8), 0, 0, s * 0.15)); }); } },
+  ],
+  eyes: [
+    { id: 'classic', name: 'Clásicos', icon: '👀', origin: 'base', deco: (ctx, m) => [-1, 1].forEach(s => ctx.g.add(sphere(0.05, m, s * 0.13, 1.86, 0.34, 6))) },
+    { id: 'happy',   name: 'Alegres ^^', icon: '😊', origin: 'base', deco: (ctx, m) => [-1, 1].forEach(s => ctx.g.add(mesh(new THREE.TorusGeometry(0.045, 0.016, 4, 8, Math.PI), m, s * 0.13, 1.85, 0.355))) },
+    { id: 'round',   name: 'Redondos', icon: '🥺', origin: 'base', deco: (ctx, m) => [-1, 1].forEach(s => { ctx.g.add(sphere(0.075, avMat(0xffffff), s * 0.13, 1.87, 0.32, 10)); ctx.g.add(sphere(0.042, m, s * 0.13, 1.865, 0.385, 8)); }) },
+    { id: 'sleepy',  name: 'Entrecerrados', icon: '😑', origin: 'base', deco: (ctx, m) => [-1, 1].forEach(s => ctx.g.add(box(0.11, 0.025, 0.03, m, s * 0.13, 1.85, 0.36))) },
+  ],
+  top: [
+    { id: 'tee',      name: 'Camiseta',  icon: '👕', origin: 'base', deco: (ctx, m) => { avTorso(ctx, m); avSleeves(ctx, m); } },
+    { id: 'shirt',    name: 'Camisa',    icon: '👔', origin: 'base', deco: (ctx, m, hex) => { avTorso(ctx, m); avSleeves(ctx, m, true); const w = avMat(avLight(hex) ? 0x2b2b3d : 0xffffff); avCollar(ctx, w); [1.28, 1.1, 0.92].forEach(y => ctx.g.add(sphere(0.025, w, 0, y, 0.215, 6))); } },
+    { id: 'tank',     name: 'Tirantes',  icon: '🎽', origin: 'base', deco: (ctx, m) => { avTorso(ctx, m); avSleeves(ctx, ctx.skin); avFront(ctx, 0.3, 0.12, ctx.skin, 0, 1.4, 0.212); } },
+    { id: 'hoodie',   name: 'Sudadera',  icon: '🧥', origin: 'base', deco: (ctx, m, hex) => { avTorso(ctx, m); avSleeves(ctx, m, true); const hood = cyl(0, 0.3, 0.42, m, 0, 1.55, -0.3, 10); hood.rotation.x = Math.PI + 0.35; ctx.g.add(hood); avFront(ctx, 0.42, 0.18, avMat(avShade(hex, 0.8)), 0, 0.84, 0.215); [-1, 1].forEach(s => ctx.g.add(cyl(0.012, 0.012, 0.2, avMat(0xffffff), s * 0.07, 1.3, 0.222, 4))); } },
+    { id: 'hawaiian', name: 'Hawaiana',  icon: '🌺', origin: 'boutique', rarity: 'uncommon', deco: (ctx, m, hex) => { const t = avPatternMat('hawaii', hex); avTorso(ctx, t); avSleeves(ctx, t); avCollar(ctx, avMat(avShade(hex, 0.75))); } },
+    { id: 'suit',     name: 'Traje chaqueta', icon: '🤵', origin: 'boutique', rarity: 'epic', deco: (ctx, m, hex) => { avTorso(ctx, m); avSleeves(ctx, m, true); avFront(ctx, 0.2, 0.62, avMat(0xffffff), 0, 1.1, 0.214); avFront(ctx, 0.07, 0.42, avMat(hex === 0xe53935 ? 0x2b2b3d : 0xe53935), 0, 1.12, 0.228); [-1, 1].forEach(s => { const l = box(0.06, 0.5, 0.02, avMat(avShade(hex, 0.7)), s * 0.13, 1.18, 0.226); l.rotation.z = s * 0.25; ctx.g.add(l); }); } },
+    { id: 'token_tee', name: 'Camiseta $TOKEN', icon: '🪙', origin: 'boutique', rarity: 'rare', deco: (ctx, m, hex) => { avTorso(ctx, m); avSleeves(ctx, m); avDecal(ctx, 'decal_token', hex, 0.34, 0.34); } },
+    { id: 'apron',    name: 'Delantal',  icon: '🧑‍🍳', origin: 'boutique', rarity: 'common', deco: (ctx, m) => { const w = avMat(0xf5f5f5); avTorso(ctx, w); avSleeves(ctx, w); avFront(ctx, 0.56, 0.95, m, 0, 0.93, 0.225, 0.03); [-1, 1].forEach(s => avFront(ctx, 0.05, 0.1, m, s * 0.2, 1.42, 0.225)); avFront(ctx, 0.3, 0.14, avMat(0xffffff), 0, 0.82, 0.243); } },
+    { id: 'stripes',  name: 'Jersey de rayas', icon: '🦓', origin: 'boutique', rarity: 'uncommon', deco: (ctx, m, hex) => { const t = avPatternMat('stripes', hex); avTorso(ctx, t); avSleeves(ctx, t, true); } },
+    { id: 'vest',     name: 'Chaleco',   icon: '🦺', origin: 'boutique', rarity: 'uncommon', deco: (ctx, m) => { const w = avMat(0xf5f5f5); avTorso(ctx, w); avSleeves(ctx, w, true); [-1, 1].forEach(s => avFront(ctx, 0.28, 0.72, m, s * 0.2, 1.06, 0.22, 0.03)); ctx.g.add(box(0.74, 0.72, 0.03, m, 0, 1.06, -0.22)); } },
+    { id: 'bro_tee',  name: 'Camiseta «bro»', icon: '🕶️', origin: 'boutique', rarity: 'common', deco: (ctx, m, hex) => { avTorso(ctx, m); avSleeves(ctx, m); avDecal(ctx, 'decal_bro', hex, 0.4, 0.4); } },
+    { id: 'raincoat', name: 'Chubasquero', icon: '🌧️', origin: 'boutique', rarity: 'common', deco: (ctx, m, hex) => { const s = avMat(hex, { roughness: 0.35 }); avTorso(ctx, s, 0.76, 0.86, 0.46, 1.03); avSleeves(ctx, s, true); const hood = mesh(new THREE.SphereGeometry(0.3, 12, 8, 0, 6.29, 0, Math.PI / 2), s, 0, 1.48, -0.3); hood.rotation.x = -1.2; ctx.g.add(hood); [1.3, 1.1, 0.9].forEach(y => ctx.g.add(sphere(0.03, avMat(0x2b2b3d), 0, y, 0.235, 6))); } },
+    { id: 'pajama',   name: 'Pijama del Soñador', icon: '🌙', origin: 'special', rarity: 'legendary', colorable: false, how: 'Nuevo Sueño+ (NG+)', deco: (ctx) => { const t = avPatternMat('pajama', 0x283593); avTorso(ctx, t); avSleeves(ctx, t, true); avCollar(ctx, avMat(0xffe082)); } },
+    { id: 'awake_suit', name: 'Traje del Mundo Despierto', icon: '💼', origin: 'special', rarity: 'legendary', colorable: false, how: 'Final A: despertar', deco: (ctx) => { const g = avMat(0x616161); avTorso(ctx, g); avSleeves(ctx, g, true); avFront(ctx, 0.2, 0.62, avMat(0xffffff), 0, 1.1, 0.214); avFront(ctx, 0.07, 0.42, avMat(0x1565c0), 0, 1.12, 0.228); avFront(ctx, 0.12, 0.16, avMat(0x80cbc4, { emissive: 0x80cbc4, emissiveIntensity: 0.3 }), 0.22, 1.2, 0.228); } },
+  ],
+  pants: [
+    { id: 'jeans',  name: 'Vaquero',   icon: '👖', origin: 'base', deco: (ctx, m) => avLegs(ctx, m) },
+    { id: 'shorts', name: 'Cortos',    icon: '🩳', origin: 'base', deco: (ctx, m) => ctx.legs.forEach(p => { p.add(box(0.27, 0.3, 0.27, m, 0, -0.15, 0)); p.add(box(0.21, 0.36, 0.21, ctx.skin, 0, -0.46, 0)); }) },
+    { id: 'joggers', name: 'Chándal',  icon: '🏃', origin: 'base', deco: (ctx, m, hex) => { avLegs(ctx, m); const w = avMat(avLight(hex) ? 0x2b2b3d : 0xffffff); avFeet(ctx, (p, s) => { p.add(box(0.02, 0.58, 0.05, w, s * 0.135, -0.3, 0)); p.add(box(0.27, 0.06, 0.27, avMat(avShade(hex, 0.75)), 0, -0.6, 0)); }); } },
+    { id: 'skirt',  name: 'Falda',     icon: '👗', origin: 'base', deco: (ctx, m) => { ctx.legs.forEach(p => p.add(box(0.2, 0.65, 0.2, ctx.skin, 0, -0.32, 0))); ctx.g.add(cyl(0.36, 0.52, 0.46, m, 0, 0.53, 0, 14)); } },
+    { id: 'formal', name: 'Elegante',  icon: '🎩', origin: 'boutique', rarity: 'uncommon', deco: (ctx, m, hex) => { avLegs(ctx, m, 0.24); ctx.legs.forEach(p => p.add(box(0.015, 0.6, 0.01, avMat(avShade(hex, 0.7)), 0, -0.31, 0.123))); ctx.g.add(box(0.73, 0.06, 0.43, avMat(0x2b2b3d), 0, 0.67, 0)); } },
+    { id: 'baggy',  name: 'Bombacho',  icon: '🎈', origin: 'boutique', rarity: 'uncommon', deco: (ctx, m, hex) => ctx.legs.forEach(p => { p.add(box(0.33, 0.5, 0.33, m, 0, -0.26, 0)); p.add(box(0.23, 0.12, 0.23, avMat(avShade(hex, 0.75)), 0, -0.56, 0)); }) },
+    { id: 'plaid',  name: 'Cuadros',   icon: '🏁', origin: 'boutique', rarity: 'rare', deco: (ctx, m, hex) => avLegs(ctx, avPatternMat('plaid', hex)) },
+    { id: 'bell',   name: 'Campana setentera', icon: '🕺', origin: 'boutique', rarity: 'rare', deco: (ctx, m) => ctx.legs.forEach(p => { p.add(box(0.24, 0.46, 0.24, m, 0, -0.23, 0)); p.add(cyl(0.13, 0.21, 0.22, m, 0, -0.55, 0, 10)); }) },
+  ],
+  shoes: [
+    { id: 'boots',    name: 'Botas',       icon: '🥾', origin: 'base', deco: (ctx, m) => avFeet(ctx, p => p.add(box(0.3, 0.12, 0.36, m, 0, -0.68, 0.04))) },
+    { id: 'sneakers', name: 'Deportivas',  icon: '👟', origin: 'base', deco: (ctx, m) => avFeet(ctx, p => { p.add(box(0.3, 0.1, 0.38, m, 0, -0.66, 0.05)); p.add(box(0.31, 0.04, 0.39, avMat(0xffffff), 0, -0.72, 0.05)); }) },
+    { id: 'sandals',  name: 'Sandalias',   icon: '🩴', origin: 'boutique', rarity: 'common', deco: (ctx, m) => avFeet(ctx, p => { p.add(box(0.3, 0.04, 0.38, m, 0, -0.72, 0.05)); p.add(box(0.24, 0.06, 0.32, ctx.skin, 0, -0.67, 0.05)); p.add(box(0.31, 0.04, 0.08, m, 0, -0.65, 0.12)); }) },
+    { id: 'formal',   name: 'Elegantes',   icon: '👞', origin: 'boutique', rarity: 'uncommon', deco: (ctx, m, hex) => avFeet(ctx, p => p.add(box(0.28, 0.11, 0.4, avMat(hex, { metalness: 0.3, roughness: 0.3 }), 0, -0.68, 0.06))) },
+    { id: 'rain',     name: 'Botas de lluvia', icon: '☔', origin: 'boutique', rarity: 'uncommon', deco: (ctx, m, hex) => avFeet(ctx, p => p.add(box(0.3, 0.32, 0.34, avMat(hex, { roughness: 0.3 }), 0, -0.58, 0.03))) },
+    { id: 'bunny',    name: 'Zapatillas conejito', icon: '🐰', origin: 'boutique', rarity: 'epic', deco: (ctx, m) => avFeet(ctx, p => { const b = sphere(0.17, m, 0, -0.66, 0.06, 10); b.scale.set(1, 0.6, 1.3); p.add(b); [-1, 1].forEach(s => p.add(avRot(box(0.05, 0.16, 0.03, m, s * 0.06, -0.54, 0.16), 0, 0, s * 0.2))); p.add(sphere(0.02, avMat(0x2b2b3d), 0.05, -0.62, 0.27, 5)); p.add(sphere(0.02, avMat(0x2b2b3d), -0.05, -0.62, 0.27, 5)); }) },
+    { id: 'clogs',    name: 'Zuecos',      icon: '🪵', origin: 'boutique', rarity: 'common', deco: (ctx, m) => avFeet(ctx, p => { p.add(box(0.3, 0.15, 0.4, m, 0, -0.66, 0.06)); p.add(box(0.31, 0.05, 0.41, avMat(0x6d4c41), 0, -0.73, 0.06)); }) },
+  ],
+  hat: [   // null = ninguno
+    { id: 'cap',      name: 'Gorra',          icon: '🧢', origin: 'base', deco: (ctx, m) => { avDome(ctx, m, 0.42, 1.93, 0.8); ctx.g.add(box(0.5, 0.04, 0.3, m, 0, 1.95, 0.44)); } },
+    { id: 'beanie',   name: 'Gorro de lana',  icon: '🧶', origin: 'base', deco: (ctx, m, hex) => { avDome(ctx, m, 0.42, 1.93, 1.0); ctx.g.add(cyl(0.43, 0.43, 0.13, avMat(avShade(hex, 0.8)), 0, 1.96, 0, 18)); ctx.g.add(sphere(0.1, avMat(0xffffff), 0, 2.37, 0, 8)); } },
+    { id: 'bandana',  name: 'Pañuelo',        icon: '🏴‍☠️', origin: 'base', deco: (ctx, m) => { ctx.g.add(cyl(0.405, 0.41, 0.13, m, 0, 1.99, 0, 18)); ctx.g.add(sphere(0.06, m, 0, 1.98, -0.42, 6)); [-1, 1].forEach(s => ctx.g.add(avRot(box(0.06, 0.18, 0.02, m, s * 0.05, 1.88, -0.43), 0, 0, s * 0.4))); } },
+    { id: 'headband', name: 'Diadema',        icon: '👑', origin: 'base', deco: (ctx, m) => ctx.g.add(mesh(new THREE.TorusGeometry(0.41, 0.03, 6, 24, Math.PI), m, 0, 1.86, 0.06)) },
+    { id: 'flower',   name: 'Flor',           icon: '🌸', origin: 'base', deco: (ctx, m) => { for (let p = 0; p < 5; p++) { const a = p * 1.2566; ctx.g.add(sphere(0.06, m, 0.28 + Math.cos(a) * 0.07, 2.1 + Math.sin(a) * 0.07, 0.17, 6)); } ctx.g.add(sphere(0.045, avMat(0xffd54f), 0.28, 2.1, 0.2, 6)); } },
+    // 🏆 Prendas insignia (Sec. 8.5): solo se GANAN con confianza 4 (Aliado). Colores fijos.
+    { id: 'chef',     name: 'Gorro de Chef',  icon: '👨‍🍳', origin: 'insignia', npc: 'bear', rarity: 'legendary', colorable: false, deco: (ctx) => { const w = avMat(0xffffff); ctx.g.add(cyl(0.34, 0.31, 0.32, w, 0, 2.2, 0, 16)); ctx.g.add(sphere(0.22, w, 0, 2.48, 0, 12)); for (let i = 0; i < 4; i++) { const a = i * Math.PI / 2 + 0.4; ctx.g.add(sphere(0.16, w, Math.cos(a) * 0.17, 2.42, Math.sin(a) * 0.17, 10)); } } },
+    { id: 'tophat',   name: 'Sombrero de Copa Municipal', icon: '🎩', origin: 'insignia', npc: 'mayor', rarity: 'legendary', colorable: false, deco: (ctx) => { const k = avMat(0x1b1b24); ctx.g.add(cyl(0.48, 0.48, 0.04, k, 0, 2.2, 0, 20)); ctx.g.add(cyl(0.28, 0.28, 0.5, k, 0, 2.46, 0, 16)); ctx.g.add(cyl(0.285, 0.285, 0.09, avMat(0xc62828), 0, 2.27, 0, 16)); ctx.g.add(box(0.08, 0.08, 0.02, avMat(0xffd54f, { metalness: 0.7, roughness: 0.3 }), 0, 2.27, 0.29)); } },
+    { id: 'hardhat',  name: 'Casco de Obra Amarillo', icon: '⛑️', origin: 'insignia', npc: 'glover', rarity: 'legendary', colorable: false, deco: (ctx) => { const y = avMat(0xffd600, { roughness: 0.4 }); avDome(ctx, y, 0.44, 1.93, 0.95); ctx.g.add(cyl(0.52, 0.52, 0.04, y, 0, 1.95, 0.03, 20)); ctx.g.add(box(0.07, 0.07, 0.8, y, 0, 2.33, 0)); } },
+    { id: 'veil',     name: 'Capucha del Velo', icon: '🟣', origin: 'insignia', npc: 'sombra', rarity: 'legendary', colorable: false, deco: (ctx) => { const v = avMat(0x7e57c2, { emissive: 0x7c4dff, emissiveIntensity: 0.35, side: THREE.DoubleSide }); ctx.g.add(mesh(new THREE.SphereGeometry(0.46, 18, 10, Math.PI / 2 + 0.95, Math.PI * 2 - 1.9, 0, Math.PI * 0.62), v, 0, 1.84, -0.03)); ctx.g.add(mesh(new THREE.CylinderGeometry(0.4, 0.6, 0.75, 14, 1, true, Math.PI / 2, Math.PI), v, 0, 1.12, -0.04)); } },
+    { id: 'sailor',   name: 'Gorro de Marinero', icon: '⚓', origin: 'insignia', npc: 'sam', rarity: 'legendary', colorable: false, deco: (ctx) => { const w = avMat(0xffffff), n = avMat(0x1a237e); ctx.g.add(cyl(0.4, 0.38, 0.16, w, 0, 2.1, 0, 18)); ctx.g.add(cyl(0.405, 0.405, 0.05, n, 0, 2.04, 0, 18)); ctx.g.add(cyl(0.43, 0.43, 0.04, w, 0, 2.19, 0, 18)); [-1, 1].forEach(s => ctx.g.add(avRot(box(0.06, 0.24, 0.02, n, s * 0.06, 1.92, -0.41), 0, 0, s * 0.25))); } },
+    // 🛍️ Boutique (añadidos al final: índices estables)
+    { id: 'beret',    name: 'Boina',          icon: '🎨', origin: 'boutique', rarity: 'uncommon', deco: (ctx, m) => { ctx.g.add(avRot(cyl(0.44, 0.38, 0.09, m, 0.04, 2.17, 0, 18), 0, 0, -0.22)); ctx.g.add(cyl(0.02, 0.02, 0.06, m, 0.06, 2.24, 0, 5)); } },
+    { id: 'straw',    name: 'Sombrero de paja', icon: '👒', origin: 'boutique', rarity: 'uncommon', deco: (ctx, m) => { const p = avMat(0xe8c66a); ctx.g.add(cyl(0.64, 0.64, 0.04, p, 0, 2.06, 0, 22)); ctx.g.add(cyl(0.32, 0.37, 0.24, p, 0, 2.19, 0, 16)); ctx.g.add(cyl(0.375, 0.375, 0.07, m, 0, 2.11, 0, 16)); } },
+    { id: 'party',    name: 'Gorro de fiesta', icon: '🥳', origin: 'boutique', rarity: 'common', deco: (ctx, m) => { ctx.g.add(cyl(0, 0.22, 0.5, m, 0, 2.45, 0, 12)); ctx.g.add(sphere(0.07, avMat(0xffffff), 0, 2.72, 0, 8)); } },
+    { id: 'crown',    name: 'Corona de cartón', icon: '🤴', origin: 'boutique', rarity: 'epic', colorable: false, deco: (ctx) => { const gld = avMat(0xffc83d, { metalness: 0.4, roughness: 0.4, side: THREE.DoubleSide }); ctx.g.add(mesh(new THREE.CylinderGeometry(0.36, 0.36, 0.18, 12, 1, true), gld, 0, 2.24, 0)); for (let i = 0; i < 6; i++) { const a = i * Math.PI / 3; ctx.g.add(cyl(0, 0.07, 0.16, gld, Math.cos(a) * 0.34, 2.41, Math.sin(a) * 0.34, 4)); ctx.g.add(sphere(0.03, avMat(0xe53935), Math.cos(a) * 0.365, 2.24, Math.sin(a) * 0.365, 5)); } } },
+    { id: 'cat_ears', name: 'Orejas de gato', icon: '🐱', origin: 'boutique', rarity: 'rare', deco: (ctx, m) => [-1, 1].forEach(s => { ctx.g.add(avRot(cyl(0, 0.13, 0.26, m, s * 0.24, 2.22, -0.02, 4), 0, 0, -s * 0.35)); ctx.g.add(avRot(cyl(0, 0.07, 0.15, avMat(0xff9ec4), s * 0.235, 2.2, 0.04, 4), 0, 0, -s * 0.35)); }) },
+    { id: 'antennae', name: 'Antenas',        icon: '👽', origin: 'boutique', rarity: 'rare', deco: (ctx, m) => [-1, 1].forEach(s => { ctx.g.add(avRot(cyl(0.015, 0.015, 0.36, m, s * 0.14, 2.36, 0, 5), 0, 0, -s * 0.3)); ctx.g.add(sphere(0.065, avMat(0xb2ff59, { emissive: 0x76ff03, emissiveIntensity: 0.8 }), s * 0.195, 2.53, 0, 8)); }) },
+    { id: 'viking',   name: 'Casco vikingo',  icon: '🪓', origin: 'boutique', rarity: 'epic', colorable: false, deco: (ctx) => { const st = avMat(0x9e9e9e, { metalness: 0.7, roughness: 0.35 }), hr = avMat(0xfff3e0); avDome(ctx, st, 0.43, 1.93); ctx.g.add(cyl(0.44, 0.44, 0.08, avMat(0x8d6e63), 0, 1.95, 0, 18)); [-1, 1].forEach(s => ctx.g.add(avRot(cyl(0, 0.08, 0.36, hr, s * 0.47, 2.16, 0, 8), 0, 0, -s * 0.9))); } },
+    { id: 'wizard',   name: 'Gorro de mago',  icon: '🧙', origin: 'boutique', rarity: 'epic', deco: (ctx, m) => { ctx.g.add(cyl(0.56, 0.56, 0.03, m, 0, 2.15, 0, 20)); ctx.g.add(avRot(cyl(0, 0.36, 0.75, m, 0, 2.5, -0.03, 14), -0.12)); [[0.12, 2.4, 0.26], [-0.1, 2.6, 0.19], [0.05, 2.75, 0.1]].forEach(([x, y, z]) => ctx.g.add(sphere(0.035, avMat(0xffe082, { emissive: 0xffd54f, emissiveIntensity: 0.8 }), x, y, z, 5))); } },
+  ],
+  glasses: [   // null = ningunas
+    { id: 'round',   name: 'Redondas',      icon: '👓', origin: 'base', deco: (ctx, m) => { [-1, 1].forEach(s => { ctx.g.add(mesh(new THREE.TorusGeometry(0.085, 0.015, 6, 16), m, s * 0.13, 1.86, 0.4)); ctx.g.add(box(0.015, 0.015, 0.3, m, s * 0.33, 1.87, 0.22)); }); ctx.g.add(box(0.09, 0.015, 0.015, m, 0, 1.87, 0.4)); } },
+    { id: 'sun',     name: 'De sol',        icon: '🕶️', origin: 'boutique', rarity: 'uncommon', deco: (ctx, m) => { const l = avMat(0x111111, { metalness: 0.5, roughness: 0.2 }); [-1, 1].forEach(s => { ctx.g.add(box(0.2, 0.11, 0.03, l, s * 0.13, 1.86, 0.4)); ctx.g.add(box(0.015, 0.02, 0.3, m, s * 0.33, 1.89, 0.22)); }); ctx.g.add(box(0.5, 0.03, 0.035, m, 0, 1.92, 0.405)); } },
+    { id: 'heart',   name: 'Corazón',       icon: '😍', origin: 'boutique', rarity: 'rare', deco: (ctx, m) => { [-1, 1].forEach(s => { ctx.g.add(mesh(_avHeartGeo, m, s * 0.13, 1.86, 0.39)); ctx.g.add(box(0.015, 0.015, 0.3, m, s * 0.33, 1.88, 0.22)); }); ctx.g.add(box(0.07, 0.015, 0.015, m, 0, 1.88, 0.405)); } },
+    { id: 'lab',     name: 'De laboratorio', icon: '🥽', origin: 'base', deco: (ctx, m) => { [-1, 1].forEach(s => { ctx.g.add(avRot(cyl(0.085, 0.085, 0.06, m, s * 0.13, 1.86, 0.39, 12), Math.PI / 2)); ctx.g.add(avRot(cyl(0.07, 0.07, 0.065, _avGlass(), s * 0.13, 1.86, 0.395, 12), Math.PI / 2)); }); ctx.g.add(avRot(mesh(new THREE.TorusGeometry(0.39, 0.02, 6, 24), m, 0, 1.86, 0), Math.PI / 2)); } },
+    { id: 'science', name: 'Gafas de CIENCIA', icon: '🥽', origin: 'insignia', npc: 'dax', rarity: 'legendary', colorable: false, deco: (ctx) => { const t = avMat(0x1de9b6, { emissive: 0x00e5a0, emissiveIntensity: 0.7 }), gl = avMat(0xa7ffeb, { transparent: true, opacity: 0.55, emissive: 0x64ffda, emissiveIntensity: 0.6 }); [-1, 1].forEach(s => { ctx.g.add(avRot(cyl(0.095, 0.095, 0.07, t, s * 0.14, 1.87, 0.39, 14), Math.PI / 2)); ctx.g.add(avRot(cyl(0.078, 0.078, 0.075, gl, s * 0.14, 1.87, 0.397, 14), Math.PI / 2)); }); ctx.g.add(avRot(mesh(new THREE.TorusGeometry(0.39, 0.025, 6, 24), t, 0, 1.87, 0), Math.PI / 2)); } },
+    { id: 'viral',   name: 'Gafas de Sol Virales', icon: '🕶️', origin: 'insignia', npc: 'hedgehogs', rarity: 'legendary', colorable: false, deco: (ctx) => { const f = avMat(0xff4fa3, { emissive: 0xff1f8e, emissiveIntensity: 0.6 }), l = avMat(0x1b0f2e, { metalness: 0.6, roughness: 0.15, emissive: 0x4ff0ff, emissiveIntensity: 0.12 }); [-1, 1].forEach(s => { ctx.g.add(box(0.22, 0.12, 0.03, l, s * 0.135, 1.86, 0.4)); ctx.g.add(box(0.02, 0.025, 0.3, f, s * 0.34, 1.89, 0.22)); ctx.g.add(sphere(0.022, avMat(0xffd54f, { emissive: 0xffd54f, emissiveIntensity: 1 }), s * 0.24, 1.93, 0.42, 5)); }); ctx.g.add(box(0.54, 0.04, 0.04, f, 0, 1.925, 0.405)); } },
+    { id: 'monocle', name: 'Monóculo',      icon: '🧐', origin: 'boutique', rarity: 'rare', deco: (ctx, m) => { ctx.g.add(mesh(new THREE.TorusGeometry(0.09, 0.016, 6, 16), m, 0.13, 1.86, 0.4)); ctx.g.add(mesh(new THREE.CircleGeometry(0.08, 14), _avGlass(), 0.13, 1.86, 0.4)); ctx.g.add(cyl(0.006, 0.006, 0.5, m, 0.2, 1.6, 0.33, 4)); } },
+    { id: 'pixel',   name: 'Gafas pixeladas', icon: '😎', origin: 'boutique', rarity: 'epic', deco: (ctx, m) => { ctx.g.add(box(0.56, 0.05, 0.03, m, 0, 1.9, 0.41)); [-1, 1].forEach(s => [[0, 0.2], [-0.05, 0.13], [-0.1, 0.06]].forEach(([dy, w]) => ctx.g.add(box(w, 0.05, 0.03, m, s * 0.13 - s * (0.2 - w) / 2, 1.9 + dy - 0.05, 0.41)))); } },
+    { id: 'diving',  name: 'Gafas de buceo', icon: '🤿', origin: 'boutique', rarity: 'common', deco: (ctx, m) => { ctx.g.add(box(0.5, 0.19, 0.08, m, 0, 1.86, 0.38)); ctx.g.add(box(0.42, 0.13, 0.085, _avGlass(), 0, 1.86, 0.39)); ctx.g.add(avRot(mesh(new THREE.TorusGeometry(0.39, 0.025, 6, 24), m, 0, 1.86, 0), Math.PI / 2)); ctx.g.add(cyl(0.025, 0.025, 0.5, avMat(0xffd54f), 0.36, 1.95, 0.12, 6)); } },
+  ],
+  backpack: [
+    { id: 'classic', name: 'Clásica',       icon: '🎒', origin: 'base', deco: (ctx, m) => ctx.g.add(box(0.5, 0.55, 0.22, m, 0, 1.1, -0.3)) },
+    { id: 'big',     name: 'Grande',        icon: '🏕️', origin: 'base', deco: (ctx, m, hex) => { ctx.g.add(box(0.56, 0.75, 0.3, m, 0, 1.12, -0.36)); ctx.g.add(avRot(cyl(0.11, 0.11, 0.62, avMat(avShade(hex, 0.7)), 0, 1.58, -0.36, 10), 0, 0, Math.PI / 2)); ctx.g.add(box(0.36, 0.22, 0.06, avMat(avShade(hex, 0.85)), 0, 0.92, -0.53)); } },
+    { id: 'fanny',   name: 'Mini-riñonera', icon: '👝', origin: 'base', deco: (ctx, m) => { ctx.g.add(box(0.74, 0.05, 0.44, avMat(0x2b2b3d), 0, 0.74, 0)); ctx.g.add(box(0.36, 0.16, 0.12, m, 0.08, 0.74, 0.27)); } },
+    { id: 'wings',   name: 'Alas de cartón', icon: '🪽', origin: 'boutique', rarity: 'epic', deco: (ctx, m) => [-1, 1].forEach(s => { const w = box(0.55, 0.32, 0.03, m, s * 0.36, 1.32, -0.3); w.rotation.set(0, s * 0.45, s * 0.45); ctx.g.add(w); }) },
+    { id: 'shell',   name: 'Caparazón',     icon: '🐢', origin: 'boutique', rarity: 'rare', deco: (ctx, m, hex) => { const s = sphere(0.4, m, 0, 1.08, -0.3, 14); s.scale.set(1, 1.15, 0.55); ctx.g.add(s); [[0, 1.1], [0.14, 1.3], [-0.14, 1.3], [0.14, 0.9], [-0.14, 0.9]].forEach(([x, y]) => ctx.g.add(avRot(cyl(0.08, 0.08, 0.02, avMat(avShade(hex, 0.7)), x, y, -0.52, 6), Math.PI / 2))); } },
+    { id: 'rocket',  name: 'Mochila cohete', icon: '🚀', origin: 'boutique', rarity: 'legendary', deco: (ctx, m) => [-1, 1].forEach(s => { ctx.g.add(cyl(0.12, 0.12, 0.6, m, s * 0.14, 1.12, -0.33, 10)); ctx.g.add(cyl(0, 0.12, 0.18, avMat(0xe53935), s * 0.14, 1.51, -0.33, 10)); ctx.g.add(avRot(cyl(0, 0.08, 0.22, avMat(0xffab40, { emissive: 0xff6d00, emissiveIntensity: 1.2 }), s * 0.14, 0.72, -0.33, 8), Math.PI)); }) },
+  ],
+};
+/** Definición de slots (UI + datos) · style: clave de estilo en la config · color: clave de color + lista */
+const AVATAR_SLOTS = [
+  { id: 'skin',     name: 'Piel',     icon: '🖐️', style: null,       color: 'skin',          colors: AV_SKINS },
+  { id: 'hair',     name: 'Pelo',     icon: '💇', style: 'hair',     color: 'hairColor',     colors: AV_HAIR_COLORS },
+  { id: 'eyes',     name: 'Ojos',     icon: '👀', style: 'eyes',     color: 'eyeColor',      colors: AV_EYE_COLORS },
+  { id: 'top',      name: 'Top',      icon: '👕', style: 'top',      color: 'topColor',      colors: AV_PALETTE, fabrics: true },
+  { id: 'pants',    name: 'Pantalón', icon: '👖', style: 'pants',    color: 'pantsColor',    colors: AV_PALETTE, fabrics: true },
+  { id: 'shoes',    name: 'Zapatos',  icon: '👟', style: 'shoes',    color: 'shoesColor',    colors: AV_PALETTE, fabrics: true },
+  { id: 'hat',      name: 'Cabeza',   icon: '🎩', style: 'hat',      color: 'hatColor',      colors: AV_PALETTE, fabrics: true, nullable: true },
+  { id: 'glasses',  name: 'Gafas',    icon: '👓', style: 'glasses',  color: 'glassesColor',  colors: AV_FRAMES, nullable: true },
+  { id: 'backpack', name: 'Mochila',  icon: '🎒', style: 'backpack', color: 'backpackColor', colors: AV_PALETTE, fabrics: true },
+];
+/** Catálogo plano de piezas (Sec. 8.9: id, slot, decorador, rareza, precio, origen) — patrón ITEMS/BUILDABLES */
+const AVATAR_PARTS = [
+  ...Object.entries(AV_STYLES).flatMap(([slot, list]) => list.map((s, idx) => ({ rarity: 'common', colorable: true, ...s, slot, idx, key: `${slot}:${s.id}` }))),
+  ...AV_FABRICS.map((f, i) => ({ id: f.id, name: f.name, icon: '🧵', slot: 'fabric', idx: i, key: `fabric:${f.id}`, origin: 'import', rarity: f.rarity, colorable: false })),
+];
+const AV_PART_BY_KEY = Object.fromEntries(AVATAR_PARTS.map(p => [p.key, p]));
+/** ¿Es tuya la pieza? Base = siempre · el resto = GS.avatar.wardrobe */
+function avOwns(key, wardrobe = GS.avatar?.wardrobe) { const p = AV_PART_BY_KEY[key]; return !!p && (p.origin === 'base' || (Array.isArray(wardrobe) && wardrobe.includes(key))); }
+/** Color de un slot de paleta: índice 0–11 = paleta, 12+ = tela imposible (si es tuya) */
+function avColor(slot, idx) {
+  if (slot.fabrics && idx >= AV_PALETTE.length) { const f = AV_FABRICS[idx - AV_PALETTE.length]; return { hex: f.hex, m: avMat(f.hex, f.fx) }; }
+  const c = slot.colors[idx] || slot.colors[0]; return { hex: c.hex, m: avMat(c.hex) };
+}
+/** Normaliza una config: índices válidos y SOLO piezas que posees (si no, vuelve a la clásica de ese slot). */
+function avSanitize(src, wardrobe = GS.avatar?.wardrobe) {
+  const a = { ...AVATAR_CLASSIC, ...(src || {}) }, out = {};
+  for (const s of AVATAR_SLOTS) {
+    if (s.style) {
+      let i = a[s.style], list = AV_STYLES[s.style];
+      if (s.nullable && (i === null || i === undefined || i === -1)) i = null;
+      else if (!Number.isInteger(i) || !list[i] || !avOwns(`${s.style}:${list[i].id}`, wardrobe)) i = s.nullable ? null : AVATAR_CLASSIC[s.style];
+      out[s.style] = i;
+    }
+    let c = a[s.color]; const max = s.colors.length + (s.fabrics ? AV_FABRICS.length : 0);
+    if (!Number.isInteger(c) || c < 0 || c >= max || (c >= s.colors.length && !avOwns(`fabric:${AV_FABRICS[c - s.colors.length].id}`, wardrobe))) c = AVATAR_CLASSIC[s.color];
+    out[s.color] = c;
+  }
+  return out;
+}
+/** Nº de combinaciones posibles (Sec. 8.3: >100 millones). ownedOnly = solo con lo que ya tienes. */
+function avatarCombinations({ ownedOnly = false, wardrobe = GS.avatar?.wardrobe } = {}) {
+  let total = 1;
+  for (const s of AVATAR_SLOTS) {
+    const nColors = s.colors.length + (s.fabrics ? AV_FABRICS.filter(f => !ownedOnly || avOwns(`fabric:${f.id}`, wardrobe)).length : 0);
+    if (!s.style) { total *= s.colors.length; continue; }
+    let n = s.nullable ? 1 : 0;
+    AV_STYLES[s.style].forEach(st => { if (ownedOnly && !avOwns(`${s.style}:${st.id}`, wardrobe)) return; n += st.colorable === false ? 1 : nColors; });
+    total *= n;
+  }
+  return total;
+}
+/** Construye el cuerpo del avatar a partir de datos puros. Devuelve un Group con userData.parts (pivots legL/legR/armL/armR). */
+function buildAvatar(cfgIn, wardrobe) {
+  const cfg = avSanitize(cfgIn, wardrobe), g = new THREE.Group(), parts = {};
+  const skin = avMat(AV_SKINS[cfg.skin].hex);
+  const pivot = (x, y) => { const p = new THREE.Group(); p.position.set(x, y, 0); return p; };
+  parts.legL = pivot(-0.17, 0.65); parts.legR = pivot(0.17, 0.65); parts.armL = pivot(-0.47, 1.4); parts.armR = pivot(0.47, 1.4);
+  g.add(parts.legL, parts.legR, parts.armL, parts.armR);
+  parts.armL.add(box(0.19, 0.4, 0.19, skin, 0, -0.5, 0)); parts.armR.add(box(0.19, 0.4, 0.19, skin, 0, -0.5, 0));   // antebrazos
+  g.add(sphere(0.38, skin, 0, 1.82, 0, 18));                                                                    // cabeza
+  g.add(sphere(0.06, avMat(0xff9aa2), -0.24, 1.76, 0.3, 6)); g.add(sphere(0.06, avMat(0xff9aa2), 0.24, 1.76, 0.3, 6));   // mofletes
+  const ctx = { g, parts, skin, legs: [parts.legL, parts.legR], arms: [parts.armL, parts.armR], cfg };
+  for (const s of AVATAR_SLOTS) {
+    if (!s.style || cfg[s.style] === null) continue;
+    const st = AV_STYLES[s.style][cfg[s.style]], col = avColor(s, cfg[s.color]);
+    st.deco(ctx, col.m, col.hex);
+  }
+  g.userData.parts = parts; g.userData.cfg = cfg; return g;
+}
+/** El jugador es un contenedor fijo: el cuerpo (buildAvatar) se sustituye en caliente; aura y demás hijos se conservan. */
+const player = new THREE.Group();
+function applyAvatar(cfg, wardrobe) {
+  const old = player.userData.body, rotY = old ? old.rotation.y : 0;
+  if (old) { player.remove(old); old.traverse(o => { if (o.isMesh && o.geometry !== _avHeartGeo) o.geometry.dispose(); }); }   // materiales cacheados: no se liberan
+  const body = buildAvatar(cfg, wardrobe); body.rotation.y = rotY;
+  player.add(body); player.userData.body = body; player.userData.parts = body.userData.parts;
+  return body;
+}
+applyAvatar(AVATAR_CLASSIC);
 player.userData.dir = siteDir(S_V, -2.5, 3.5); player.userData.fwd = frameAt(player.userData.dir, V_N).fwd;
 scene.add(player);
 const aura = new THREE.Group(); aura.position.y = 0.9; player.add(aura);
@@ -1962,6 +2235,7 @@ function interactWith(obj) {
   else if (it.type === 'mine') Mining.hit(obj);   // S2.4
   else if (it.type === 'star') StarFall.collect(obj);   // S2.6
   else if (it.type === 'production') Production.use(obj);
+  else if (it.type === 'wardrobe') Fitting.open('wardrobe');   // v0.7 · probador gratis (Sec. 8.2)
   else if (it.type === 'mailbox') { if (GS.housing.sealed) openSealedHousePanel(); else openHousePanel('mail'); }   // v0.5   // v0.4 · Jardín / Molino / Fuente
   else if (it.type === 'crate') { if (state.crateTaken) return; if (Inventory.add('merchant_crate', 1)) { state.crateTaken = true; crate.visible = false; playChime(); } }
   else if (it.type === 'vendor') startVendorDialog();
@@ -2004,6 +2278,7 @@ function serviceBtns(npcId) {
   if (npcId === 'glover') btns.push(dialogButton('⛏️ Taller de Glover', 'bg-orange-200 text-[#2b2b3d]', () => openApp('🦫 Taller de Glover', '', (b) => mountItemShop(b, 'glover'))));   // S2.2
   if (npcId === 'sam' || npcId === 'glover') btns.push(dialogButton('🔧 Reparar herramientas', 'bg-amber-200 text-[#2b2b3d]', () => openToolsPanel(npcId)));   // S2.2 (Sec. 5.7)
   if (npcId === 'glover' && typeof openFurnitureShop === 'function') btns.push(dialogButton('🛋️ Muebles', 'bg-emerald-200 text-[#2b2b3d]', () => openFurnitureShop()));   // S3.5 (Sec. 6.8)
+  if (npcId === 'hedgehogs' && GS.missions?.hedgehogs?.status === 2) btns.push(dialogButton('🕶️ Boutique Viral', 'bg-fuchsia-200 text-[#2b2b3d]', () => Boutique.open()));   // v0.7 (Sec. 8.4 y 8.9): tras su misión
   if (npcId === 'sombra') btns.push(dialogButton('🎫 Billete del Despertar', 'bg-yellow-200 text-[#2b2b3d]', () => openDreamTicketPanel()));   // S2.5 (Sec. 5.10)
   return btns;
 }
@@ -2026,7 +2301,10 @@ function storyCSS() {
   @keyframes goalPop { 0% { transform: scale(.4); opacity: 0 } 60% { transform: scale(1.15); opacity: 1 } 100% { transform: scale(1) } }
   .st-z { position: absolute; font: 700 22px Fredoka, sans-serif; color: #c5cae9; animation: zzz 3s linear infinite }
   .st-cursor { animation: stBlink 1s steps(1) infinite }
-  .goal-pop { animation: goalPop .9s ease-out }`;
+  .goal-pop { animation: goalPop .9s ease-out }
+  #goalWrap.goal-act2 .pixel { font-size: 9px; color: #fde68a; text-shadow: 0 0 8px rgba(251,191,36,.6) }
+  #goalWrap.goal-act2 #goalBar { box-shadow: 0 0 10px #fbbf24 }
+  #goalWrap.goal-act2 > div:last-child { height: 10px }`;
   document.head.appendChild(st);
 }
 function storyFade(color, ms, cb) {
@@ -2039,6 +2317,7 @@ function fmtDots(n) { return String(Math.floor(Math.max(0, n || 0))).replace(/\B
 function refreshGoalHUD(pop = false) {
   const w = $('goalWrap'); if (!w) return; storyCSS();
   const on = !!storyState().revealed; w.classList.toggle('hidden', !on);
+  w.classList.toggle('goal-act2', on && !!storyState().act1Done);   // v0.6 · Sec. 7.3: en el Acto 2 el contador ✈️ pasa a ser el protagonista visual
   if (pop && on) { w.classList.remove('goal-pop'); void w.offsetWidth; w.classList.add('goal-pop'); }
 }
 const SOMBRA_REVEAL = [
@@ -2048,8 +2327,9 @@ const SOMBRA_REVEAL = [
   'Pero tú tienes esa máquina... y tiempo. Todo el tiempo del sueño.'
 ];
 const SOMBRA_ACT1 = ['Ya eres de aquí.', 'Ahora la pregunta es si quieres dejar de serlo.', '40 millones, soñador.'];
+const _storyQueue = [];   // v0.7: las escenas que coinciden (insignia + cierre del Acto 1…) se encolan en vez de perderse
 function showStoryScene(icon, name, lines, onDone, theme = '#7e57c2') {
-  storyCSS(); if ($('storyScene')) return;
+  storyCSS(); if ($('storyScene')) { _storyQueue.push([icon, name, lines, onDone, theme]); return; }
   const o = document.createElement('div'); o.id = 'storyScene';
   o.style.cssText = 'position:fixed;inset:0;z-index:9000;background:rgba(10,6,24,.72);display:flex;align-items:flex-end;justify-content:center;padding:18px;font-family:Fredoka,sans-serif';
   o.innerHTML = `<div style="width:min(94vw,560px);background:#1c1530;border:2px solid ${theme};border-radius:18px;padding:18px 18px 14px;color:#ede7f6;box-shadow:0 0 40px ${theme}66">
@@ -2066,7 +2346,7 @@ function showStoryScene(icon, name, lines, onDone, theme = '#7e57c2') {
   $('storyNext').onclick = () => {
     const el = $('storyLine');
     if (el.textContent.length < lines[i].length) { clearInterval(typing); el.textContent = lines[i]; return; }
-    if (++i < lines.length) show(); else { clearInterval(typing); o.remove(); state.modalOpen = false; onDone && onDone(); }
+    if (++i < lines.length) show(); else { clearInterval(typing); o.remove(); state.modalOpen = false; onDone && onDone(); const nx = _storyQueue.shift(); if (nx) setTimeout(() => showStoryScene(...nx), 350); }
   };
   show();
 }
@@ -2082,7 +2362,7 @@ function maybeRevealDream(after) {
 }
 function storyAct1Check() {
   const s = storyState(); if (s.act1Done || missionsDoneCount() < CFG.act1Missions) return;
-  s.act1Done = true; s.revealed = true; refreshGoalHUD(true); SaveSystem.saveNow('story:act1');
+  s.act1Done = true; s.revealed = true; refreshGoalHUD(true); state.missionTab = 'big'; refreshMissionUI(); SaveSystem.saveNow('story:act1');   // v0.6: el HUD pasa a «ACTO 2: Trabajos Mayores»
   setTimeout(() => showStoryScene('🐈‍⬛', 'Madame Sombra', SOMBRA_ACT1,
     () => showToast('📜 Acto 1 completado · Empieza «El Comerciante»', 'text-purple-200')), 2500);
 }
@@ -2110,10 +2390,10 @@ function showPrologue(onDone) {
   $('btnSleep').onclick = () => {
     $('btnSleep').disabled = true;
     storyFade('#ffffff', 1400, () => {
-      o.remove(); storyState().prologueDone = true;
+      o.remove(); storyState().prologueDone = true; storyState().creatorPending = true;   // v0.7: tras el prólogo llega el creador (Sec. 8.2)
       onDone && onDone();
       SaveSystem.saveNow('story:prologue');
-      setTimeout(() => showToast('🐻 "¡Eh, eh! ¿Estás bien? ¡Por fin llegó el humano de la laptop!"', 'text-white'), 1600);
+      // el saludo del Oso ahora suena al cerrar el creador de personaje (ver maybeOpenCreator)
     });
   };
 }
@@ -2172,14 +2452,41 @@ function openGiftPicker(npcId) {
   });
 }
 function setMissionStatus(id, status) { GS.missions[id].status = status; if (status === 2) GS.missions[id].completedAt = Date.now(); refreshMissionUI(); SaveSystem.save('mission:' + id); }
+/* ===== v0.6 · HUD de misiones por actos (Sec. 7.3 y 7.9) =====
+   Acto 1: MISIONES n/7. Al completarlas: «ACTO 2 · TRABAJOS MAYORES n/7» (lee GS.bigJobs[id].status, que rellenará v0.8).
+   Pestañas: Principales · Trabajos Mayores · Encargos de hoy. La pestaña elegida es solo UI (state). */
+const BIG_JOB_TEASERS = { bear: 'OsoExpress', mayor: 'Censo Digital', glover: 'El Puente del Horizonte', sombra: 'El Oráculo de los Mercados', dax: 'El Climatizador Onírico', sam: 'Rutas del Horizonte', hedgehogs: 'Agencia Viral' };   // títulos de Sec. 7.4 (v0.8 aportará BIG_JOBS completos)
+const bigJobsDoneCount = () => NPCS.filter(n => GS.bigJobs?.[n.id]?.status === 2).length;
+const MISSION_TABS = [['main', '📜 Principales'], ['big', '🏗️ Trabajos Mayores'], ['enc', '📋 Encargos de hoy']];
 function refreshMissionUI() {
-  const done = NPCS.filter(n => state.missions[n.id].status === 2).length; ui.missionCount.textContent = `${done}/${NPCS.length}`;
-  const next = NPCS.find(n => state.missions[n.id].status === 1) || NPCS.find(n => state.missions[n.id].status === 0);
-  ui.missionText.textContent = done === NPCS.length ? '🏆 ¡Todas las misiones completadas!' : next ? `${next.emoji} ${state.missions[next.id].status === 1 ? next.mission.title + ' (usa la laptop)' : 'Habla con ' + next.name}` : '';
-  ui.missionList.innerHTML = NPCS.map(n => { const s = state.missions[n.id].status; const gate = s === 0 && !missionGateOk(n.id); const gateTxt = gate ? ` · 🔒 ${TRUST_LEVELS[NPC_SOCIAL[n.id]?.trustRequired ?? 0].name}` : ''; return `<div class="flex items-center gap-2 text-xs font-semibold p-1.5 rounded-lg ${s === 2 ? 'bg-emerald-100' : s === 1 ? 'bg-amber-100' : 'bg-slate-100'}"><span class="text-base">${n.emoji}</span><div class="flex-1 min-w-0"><div class="truncate">${n.mission.title}</div><div class="text-[10px] text-slate-500">${n.name} ${trustLvIcon(n.id)}${gateTxt} · +${n.reward} $TOKEN</div></div><span>${s === 2 ? '✅' : s === 1 ? '⏳' : gate ? '🔒' : '❗'}</span><button data-go="${n.id}" class="btn-game px-2 py-0.5 bg-sky-200 text-[10px]">Ir</button></div>`; }).join('');
+  const done = NPCS.filter(n => state.missions[n.id].status === 2).length, act2 = !!GS.story?.act1Done;
+  const lbl = document.getElementById('missionLabel');
+  if (act2) {
+    const bj = bigJobsDoneCount(), cur = NPCS.find(n => GS.bigJobs?.[n.id]?.status === 1);
+    if (lbl) lbl.textContent = 'ACTO 2 · TRABAJOS MAYORES'; ui.missionCount.textContent = `${bj}/${CFG.act2BigJobs}`;
+    ui.missionText.textContent = bj >= CFG.act2BigJobs ? '🏆 ¡Todos los Trabajos Mayores completados!' : cur ? `🏗️ ${cur.emoji} ${BIG_JOB_TEASERS[cur.id]} (usa la laptop)` : '🏗️ Pronto: los vecinos te encargarán Trabajos Mayores';
+  } else {
+    if (lbl) lbl.textContent = 'MISIONES'; ui.missionCount.textContent = `${done}/${NPCS.length}`;
+    const next = NPCS.find(n => state.missions[n.id].status === 1) || NPCS.find(n => state.missions[n.id].status === 0);
+    ui.missionText.textContent = done === NPCS.length ? '🏆 ¡Todas las misiones completadas!' : next ? `${next.emoji} ${state.missions[next.id].status === 1 ? next.mission.title + ' (usa la laptop)' : 'Habla con ' + next.name}` : '';
+  }
+  const tab = state.missionTab || (act2 ? 'big' : 'main');
+  let html = `<div class="flex flex-wrap gap-1 mb-1">` + MISSION_TABS.map(([id, label]) => `<button data-mtab="${id}" class="btn-game px-2 py-0.5 text-[10px] ${tab === id ? 'active' : 'bg-white'}">${label}${id === 'main' ? ` ${done}/${NPCS.length}` : id === 'big' ? ` ${bigJobsDoneCount()}/${CFG.act2BigJobs}` : ''}</button>`).join('') + `</div>`;
+  if (tab === 'big') {
+    html += NPCS.map(n => { const st = GS.bigJobs?.[n.id]?.status | 0, mOk = state.missions[n.id].status === 2, tOk = Trust.level(n.id) >= 3; const ready = mOk && tOk;
+      return `<div class="flex items-center gap-2 text-xs font-semibold p-1.5 rounded-lg ${st === 2 ? 'bg-emerald-100' : st === 1 ? 'bg-amber-100' : 'bg-slate-100'}"><span class="text-base">${n.emoji}</span><div class="flex-1 min-w-0"><div class="truncate">${BIG_JOB_TEASERS[n.id]}</div><div class="text-[10px] text-slate-500">${mOk ? '✅' : '▫️'} misión · ${tOk ? '✅' : '▫️'} ${TRUST_LEVELS[3].heart} ${TRUST_LEVELS[3].name}</div></div><span>${st === 2 ? '✅' : st === 1 ? '⏳' : ready ? '🔜' : '🔒'}</span></div>`; }).join('');
+    html += `<div class="text-[10px] text-slate-500 mt-1 leading-snug">${act2 ? 'Los vecinos están preparando encargos de nivel empresarial. Pronto podrás generarlos en la laptop.' : 'Se abren en el Acto 2: completa las 7 misiones principales.'} Requisitos: su misión principal + confianza ${TRUST_LEVELS[3].name} ${TRUST_LEVELS[3].heart}.</div>`;
+  } else if (tab === 'enc') {
+    const rows = NPCS.map(n => { const cur = currentEncargo(n.id); const it = cur && cur.q && ITEMS[cur.q.item]; if (!it) return '';
+      return `<div class="flex items-center gap-2 text-xs font-semibold p-1.5 rounded-lg ${cur.done ? 'bg-emerald-100' : 'bg-slate-100'}"><span class="text-base">${n.emoji}</span><div class="flex-1 min-w-0"><div class="truncate">${it.icon} ${cur.q.qty}× ${esc(it.name)} <span class="text-slate-400">(${Inventory.count(cur.q.item)}/${cur.q.qty})</span></div><div class="text-[10px] text-slate-500">${n.name} · +${cur.q.tokens} $TOKEN · +${cur.q.trust} confianza</div></div><span>${cur.done ? '✅' : '📋'}</span>${cur.done ? '' : `<button data-go="${n.id}" class="btn-game px-2 py-0.5 bg-sky-200 text-[10px]">Ir</button>`}</div>`; }).join('');
+    html += rows || `<div class="text-[11px] text-slate-500 p-1.5">Aún nadie te hace encargos. Los vecinos te los piden desde ${TRUST_LEVELS[2].heart} ${TRUST_LEVELS[2].name} (y el Oso tiene uno de bienvenida).</div>`;
+    html += `<div class="text-[10px] text-slate-500 mt-1">Caducan a medianoche onírica: mañana, otros.</div>`;
+  } else html += NPCS.map(n => { const s = state.missions[n.id].status; const gate = s === 0 && !missionGateOk(n.id); const gateTxt = gate ? ` · 🔒 ${TRUST_LEVELS[NPC_SOCIAL[n.id]?.trustRequired ?? 0].name}` : ''; return `<div class="flex items-center gap-2 text-xs font-semibold p-1.5 rounded-lg ${s === 2 ? 'bg-emerald-100' : s === 1 ? 'bg-amber-100' : 'bg-slate-100'}"><span class="text-base">${n.emoji}</span><div class="flex-1 min-w-0"><div class="truncate">${n.mission.title}</div><div class="text-[10px] text-slate-500">${n.name} ${trustLvIcon(n.id)}${gateTxt} · +${n.reward} $TOKEN</div></div><span>${s === 2 ? '✅' : s === 1 ? '⏳' : gate ? '🔒' : '❗'}</span><button data-go="${n.id}" class="btn-game px-2 py-0.5 bg-sky-200 text-[10px]">Ir</button></div>`; }).join('');
+  ui.missionList.innerHTML = html;
+  ui.missionList.querySelectorAll('[data-mtab]').forEach(b => b.onclick = (e) => { e.stopPropagation(); state.missionTab = b.dataset.mtab; refreshMissionUI(); });
   ui.missionList.querySelectorAll('[data-go]').forEach(b => b.onclick = () => { const obj = npcObjs[b.dataset.go]; const up = obj.userData.up; const away = tangent(player.position.clone().sub(obj.position), up); setMoveTarget(obj.position.clone().addScaledVector(away, 2).normalize()); state.pendingInteract = obj; showToast(`🧭 Viajando hacia ${npcById[b.dataset.go].name}…`, 'text-white'); });
 }
-ui.btnMissions.onclick = () => ui.missionList.classList.toggle('hidden');
+ui.btnMissions.onclick = () => { ui.missionList.classList.toggle('hidden'); if (!ui.missionList.classList.contains('hidden')) refreshMissionUI(); };
 
 /* ===== v0.2 · ENCARGOS DIARIOS (Guía Maestra Sec. 3.4 y 7.6) =====
    Motor de encargos. Los DATOS viven en NPC_SOCIAL[id].encargos.
@@ -2830,7 +3137,7 @@ function openSealedHousePanel() {
    📮 Buzón · 🏠 Alquiler · 🛏️ Dormir · 🍳 Cocina · 🏷️ Escaparate · 🪑 Muebles
    Reutiliza openApp + los módulos existentes (Sleep, Kitchen, Showcase, FURNITURE).
    ========================================================= */
-const HOUSE_TABS = [['mail', '📮 Buzón'], ['rent', '🏠 Alquiler'], ['sleep', '🛏️ Dormir'], ['kitchen', '🍳 Cocina'], ['showcase', '🏷️ Escaparate'], ['furniture', '🪑 Muebles']];
+const HOUSE_TABS = [['mail', '📮 Buzón'], ['rent', '🏠 Alquiler'], ['sleep', '🛏️ Dormir'], ['kitchen', '🍳 Cocina'], ['showcase', '🏷️ Escaparate'], ['furniture', '🪑 Muebles'], ['wardrobe', '🪞 Armario']];   // v0.7: + Armario (Sec. 8.2)
 let _houseTab = 'rent';
 function openHousePanel(tab) {
   const levelNames = ['🏠 Casa', '🏪 Tienda', '🏡 Villa $TOKEN'];
@@ -2887,6 +3194,8 @@ function openHousePanel(tab) {
         const canBuy = GS.missions?.glover?.status === 2;
         html += FURNITURE.map(f => { const own = hasFurniture(f.id); return `<div class="app-card p-3 mb-2 flex items-center gap-3"><div class="text-3xl">${f.icon}</div><div class="flex-1 min-w-0"><div class="font-bold text-sm">${esc(f.name)}</div><div class="text-[11px] text-slate-500">${esc(f.desc)}</div></div>${own ? '<span class="text-emerald-600 font-bold text-xs whitespace-nowrap">✓ En casa</span>' : canBuy ? `<button data-buyfurn="${f.id}" class="btn-game px-3 py-1.5 text-xs ${Wallet.canAfford(f.price) ? 'bg-emerald-300' : 'bg-slate-200 opacity-60'}">${fmt(f.price)} $T</button>` : `<span class="text-[11px] text-slate-400 whitespace-nowrap">${fmt(f.price)} $T</span>`}</div>`; }).join('');
         html += `<div class="text-[11px] text-slate-500">${canBuy ? 'Los fabrica Glover; te los trae a casa al momento.' : '🦫 Glover te venderá muebles cuando completes su misión.'} Sin interior 3D todavía: actúan desde este panel (Sec. 6.9).</div>`;
+      } else if (_houseTab === 'wardrobe') {
+        html += wardrobeSummaryHTML();   // v0.7 · Sec. 8.2: el Armario, mismo probador, coste 0
       }
       body.innerHTML = html;
       body.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => { _houseTab = b.dataset.tab; render(); });
@@ -2899,6 +3208,7 @@ function openHousePanel(tab) {
       q('[data-sleep]', () => { if (Sleep.canSleep().ok) closeApp(); Sleep.sleep(); });
       q('[data-kitchen]', () => { closeApp(); openKitchenPanel(); });
       q('[data-showcase]', () => { closeApp(); openShowcasePanel(); });
+      { const b = body.querySelector('[data-fitting]'); if (b) b.onclick = () => { closeApp(); Fitting.open('wardrobe'); }; }   // v0.7
       q('[data-readall]', () => { letters.forEach(l => l.read = true); GS.housing.mailboxUnread = 0; SaveSystem.save('mailbox-read'); });
       body.querySelectorAll('[data-buyfurn]').forEach(b => b.onclick = () => { buyFurniture(b.dataset.buyfurn); render(); });
       body.querySelectorAll('[data-letter]').forEach(b => b.onclick = () => { const l = letters[+b.dataset.letter]; if (l && !l.read) { l.read = true; GS.housing.mailboxUnread = Math.max(0, (GS.housing.mailboxUnread || 0) - 1); SaveSystem.save('letter-read'); updateMailboxBadge(); render(); } });
@@ -4138,7 +4448,7 @@ const Weekly = {
     if (!Inventory.canAddMany(items)) { showToast('🎒 Haz hueco en la mochila para el premio', 'text-red-200'); return false; }
     items.forEach(([id, q]) => Inventory.add(id, q, { silent: true }));
     if (n === 5) w.trustBoost = true;
-    if (n === 7) { Titles.grant('Vecino Ejemplar'); GS.weekly.pendingFashion = (GS.weekly.pendingFashion | 0) + 1; }
+    if (n === 7) { Titles.grant('Vecino Ejemplar'); GS.weekly.pendingFashion = (GS.weekly.pendingFashion | 0) + 1; deliverPendingFashion(); }   // v0.7: la prenda llega al armario
     w.claimed[n] = true; showToast(`🎁 Premio de ${n} sellos recogido`, 'text-white'); playChime(); SaveSystem.saveNow('weekly-claim'); return true;
   },
   weekendBoost() { const w = this.roll(), d = new Date().getDay(); return !!w.trustBoost && (d === 0 || d === 6); },
@@ -4169,7 +4479,7 @@ function openWeeklyPanel(tab = 'week') {
         const w = Weekly.roll(), today = (new Date().getDay() + 6) % 7, n = Weekly.count();
         let html = tabs + `<div class="app-card p-3 mb-3"><div class="text-sm text-slate-600 mb-2">Cada día real con al menos 1 actividad económica (vender, cobrar, recoger, cosechar, pescar…) se sella solo. La semana termina el domingo: no se rompe nada.</div><div class="grid grid-cols-7 gap-1">` +
           WEEK_DAYS.map((d, i) => `<div class="rounded-lg border-2 ${i === today ? 'border-amber-400' : 'border-slate-200'} p-2 text-center"><div class="text-[10px] font-bold text-slate-500">${d}</div><div class="text-xl">${w.seals[i] ? '✅' : '▫️'}</div></div>`).join('') + `</div></div>`;
-        const desc = { 3: 'Caja Regalo + 2 Cafés', 5: 'Caja Regalo Dorada + fin de semana con +10% confianza', 7: '2 Cajas Regalo Doradas + título «Vecino Ejemplar» + 1 prenda (llega con el avatar)' };
+        const desc = { 3: 'Caja Regalo + 2 Cafés', 5: 'Caja Regalo Dorada + fin de semana con +10% confianza', 7: '2 Cajas Regalo Doradas + título «Vecino Ejemplar» + 1 prenda sorpresa de la Boutique Viral para tu armario 🪞' };
         html += [3, 5, 7].map(k => { const got = w.claimed?.[k], can = n >= k && !got; return `<div class="app-card p-3 mb-2 flex items-center gap-3"><div class="pixel text-xs">${k}✅</div><div class="flex-1 text-sm">${desc[k]}</div>${got ? '<span class="text-emerald-600 font-bold text-xs">✓ Recogido</span>' : `<button data-claim="${k}" class="btn-game px-3 py-1.5 text-xs ${can ? 'bg-emerald-300' : 'bg-slate-200 opacity-60'}">Recoger</button>`}</div>`; }).join('');
         if (Weekly.weekendBoost()) html += `<div class="text-xs text-emerald-700 font-bold">💜 Fin de semana activo: +10% a la confianza que ganes.</div>`;
         body.innerHTML = html;
@@ -4223,6 +4533,261 @@ function animate() {
 }
 window.addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
 /* =========================================================
+   19b. v0.7 · QUIÉN ERES EN EL SUEÑO (Guía Maestra Sec. 8)
+   Prendas insignia · Probador/Creador/Armario · Boutique Viral · prenda del Sello Semanal.
+   Reglas (Sec. 8.10): expresión sí, ventaja no · lo desbloqueado es permanente ·
+   el probador usa el personaje real en el mundo real · las insignias no se venden ni se regalan.
+   ========================================================= */
+/** 🏆 Las 7 prendas insignia (Sec. 8.5): regalo automático al alcanzar confianza 4 (Aliado). */
+const INSIGNIAS = {
+  bear:      { key: 'hat:chef',        line: 'La familia lleva gorro. Tú eres familia.' },
+  mayor:     { key: 'hat:tophat',      line: '¡Ejem! Le nombro Ciudadano Honorario de Primera. Con sombrero.' },
+  glover:    { key: 'hat:hardhat',     line: 'Tolerancia cero, como el mío. Cuídalo.' },
+  sombra:    { key: 'hat:veil',        line: 'Pocos la han llevado despiertos. Ninguno tan despierto como tú.' },
+  dax:       { key: 'glasses:science', line: '¡¡COAUTOR CON GAFAS!! ¡Es oficial!' },
+  sam:       { key: 'hat:sailor',      line: 'Arrr… el mar reconoce a los suyos, grumete.' },
+  hedgehogs: { key: 'glasses:viral',   line: 'Bro. Las gafas. Es… (se emociona) …es nuestro símbolo, bro.' },
+};
+function anyModalOpen() { return ui.appModal.style.display === 'flex' || ui.laptopModal.style.display === 'flex' || Fitting.isOpen; }
+/** Entrega la insignia de un NPC (idempotente). silent = sin escena (concesión retroactiva al cargar). */
+function grantInsignia(npcId, { silent = false } = {}) {
+  const ins = INSIGNIAS[npcId], p = ins && AV_PART_BY_KEY[ins.key]; if (!p || Trust.level(npcId) < 4) return false;   // solo se GANA con Aliado: nunca se compra ni se transfiere
+  const w = (GS.avatar.wardrobe ||= []); if (w.includes(ins.key)) return false;
+  w.push(ins.key); SaveSystem.save('insignia:' + npcId);
+  if (!silent) {
+    const n = npcById[npcId];
+    playChime(); spawnConfetti(player.position.clone().addScaledVector(player.userData.dir, 2.2), 70);
+    showToast(`🏆 Prenda insignia: ${p.icon} ${p.name}`, 'text-amber-200');
+    setTimeout(() => showStoryScene(n.emoji, n.name, [ins.line, `🏆 Te entrega ${p.icon} ${p.name}. No se compra ni se regala: certifica vuestra relación. Pruébatela en el Armario 🪞 de tu casa.`],
+      () => { state.modalOpen = anyModalOpen(); }, '#f59e0b'), 900);
+  }
+  return true;
+}
+const insigniasOwned = () => Object.values(INSIGNIAS).filter(i => (GS.avatar.wardrobe || []).includes(i.key)).length;
+
+/** Cómo se consigue una pieza que aún no tienes (texto para la UI) */
+function avHowToGet(p) {
+  if (p.origin === 'boutique') return `🛍️ Boutique Viral · ${fmt(Boutique.price(p))} $T (si sale en los drops del día)`;
+  if (p.origin === 'insignia') return `🏆 Se gana con ${TRUST_LEVELS[4].heart} ${TRUST_LEVELS[4].name}: ${npcById[p.npc]?.name || p.npc}`;
+  if (p.origin === 'import') return '🚢 Llega en barco con las Rutas del Horizonte de Sam';
+  if (p.origin === 'special') return `🌟 Especial · ${p.how || 'secreto'}`;
+  return '';
+}
+
+/* ---------- 🪞 PROBADOR (creador inicial + armario) · Sec. 8.2 y 8.7 ---------- */
+const Fitting = (() => {
+  let open = false, mode = 'wardrobe', draft = null, slotId = 'top', panel = null, onClose = null, drag = null;
+  function css() {
+    if (document.getElementById('fitCSS')) return;
+    const st = document.createElement('style'); st.id = 'fitCSS';
+    st.textContent = `
+    #fitPanel { position: fixed; z-index: 60; background: #fffdf5; border: 3px solid #2b2b3d; box-shadow: 0 6px 0 #2b2b3d; display: flex; flex-direction: column; font-family: Fredoka, sans-serif; color: #2b2b3d; }
+    @media (min-width: 768px) { #fitPanel { right: 16px; top: 84px; bottom: 16px; width: 400px; border-radius: 18px; } }
+    @media (max-width: 767px) { #fitPanel { left: 0; right: 0; bottom: 0; height: 54vh; border-radius: 18px 18px 0 0; border-bottom: 0; box-shadow: 0 -4px 0 #2b2b3d; } }
+    #fitPanel .fit-body { flex: 1; overflow: auto; padding: 8px 12px; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
+    #fitPanel .fit-cats { display: flex; gap: 4px; overflow-x: auto; padding: 4px 10px 6px; border-bottom: 2px solid #2b2b3d22; scrollbar-width: thin; }
+    #fitPanel .fit-cat { flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; min-width: 54px; padding: 4px 6px; border-radius: 12px; border: 2px solid transparent; background: #fff; font-size: 20px; line-height: 1.1; cursor: pointer; }
+    #fitPanel .fit-cat small { font-size: 10px; font-weight: 700; }
+    #fitPanel .fit-cat.on { border-color: #2b2b3d; background: #fde68a; }
+    #fitPanel .fit-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 6px; }
+    #fitPanel .fit-opt { border: 2px solid #cbd5e1; border-radius: 12px; background: #fff; padding: 6px 4px; text-align: center; cursor: pointer; }
+    #fitPanel .fit-opt.on { border-color: #2b2b3d; background: #e0f7fa; box-shadow: 0 3px 0 #2b2b3d; }
+    #fitPanel .fit-opt.locked { opacity: .45; filter: grayscale(.6); }
+    #fitPanel .fit-sw { width: 32px; height: 32px; border-radius: 999px; border: 3px solid #fff; box-shadow: 0 0 0 2px #2b2b3d33; cursor: pointer; position: relative; font-size: 13px; }
+    #fitPanel .fit-sw.on { box-shadow: 0 0 0 3px #2b2b3d; }
+    #fitPanel .fit-foot { display: flex; gap: 6px; padding: 8px 10px calc(8px + env(safe-area-inset-bottom)); border-top: 2px solid #2b2b3d22; }
+    #fitPanel .fit-foot button { flex: 1; padding: 9px 6px; font-size: 13px; }`;
+    document.head.appendChild(st);
+  }
+  /** Pose de cámara del probador (patrón dialogPose): de frente, con el personaje a un lado del panel */
+  function pose() {
+    const pd = player.userData, up = pd.dir.clone().normalize(), fwd = pd.fwd.clone().normalize(), base = player.position.clone();
+    const sheet = innerWidth < 768;
+    const pos = base.clone().addScaledVector(fwd, sheet ? 5.6 : 4.4).addScaledVector(up, sheet ? 2.1 : 1.55);
+    const hp = heightAt(pos.clone().normalize()) + 0.6; if (pos.length() < hp) pos.setLength(hp);
+    const target = base.clone().addScaledVector(up, 1.15);
+    const right = new THREE.Vector3().crossVectors(target.clone().sub(pos), up).normalize();
+    if (sheet) target.addScaledVector(up, -1.05); else target.addScaledVector(right, 1.05);
+    return { pos, target, up };
+  }
+  const slotDef = () => AVATAR_SLOTS.find(s => s.id === slotId);
+  const colorChoices = (s) => s.colors.map((_, i) => i).concat(s.fabrics ? AV_FABRICS.map((f, i) => avOwns(`fabric:${f.id}`) ? s.colors.length + i : -1).filter(i => i >= 0) : []);
+  const ownedStyles = (s) => { const list = AV_STYLES[s.style].map((st, i) => i).filter(i => avOwns(`${s.style}:${AV_STYLES[s.style][i].id}`)); return s.nullable ? [null, ...list] : list; };
+  function live() { applyAvatar(draft); }
+  function cycle(dir) {
+    const s = slotDef();
+    if (!s.style) { const c = colorChoices(s), k = c.indexOf(draft[s.color]); draft[s.color] = c[(k + dir + c.length) % c.length]; }
+    else { const o = ownedStyles(s), k = o.indexOf(draft[s.style]); draft[s.style] = o[(k + dir + o.length) % o.length]; }
+    live(); render();
+  }
+  function randomize() {
+    for (const s of AVATAR_SLOTS) {
+      if (s.style) { const o = ownedStyles(s).filter(i => i !== null); let pick = o[Math.floor(Math.random() * o.length)]; if (s.nullable && Math.random() < 0.35) pick = null; draft[s.style] = pick; }
+      const c = colorChoices(s); draft[s.color] = c[Math.floor(Math.random() * c.length)];
+    }
+    live(); render(); playBeep(660 + Math.random() * 400, 0.06, 'triangle');
+  }
+  function render() {
+    if (!panel) return;
+    const s = slotDef(), creator = mode === 'creator';
+    let html = `<div style="padding:10px 12px 4px" class="flex items-start justify-between gap-2"><div class="min-w-0">
+      <div class="font-bold text-base">${creator ? '✨ ¿Quién eres en el sueño?' : '🪞 Armario · Probador'}</div>
+      <div class="text-[11px] text-slate-500 leading-snug">${creator ? 'El sueño se forma a tu alrededor… ¿y tú? ¿Cómo te sueñas? Todo se puede cambiar después gratis en el Armario 🪞 de tu casa.' : 'Cambiarte es siempre gratis: solo se paga por desbloquear piezas.'} <span class="whitespace-nowrap">↔️ Arrastra para girar.</span></div></div>
+      <button data-fx class="btn-game px-2.5 py-1 text-xs bg-slate-200 shrink-0" title="Salir sin guardar">✕</button></div>`;
+    html += `<div class="fit-cats">` + AVATAR_SLOTS.map(c => `<button data-slot="${c.id}" class="fit-cat ${c.id === slotId ? 'on' : ''}">${c.icon}<small>${c.name}</small></button>`).join('') + `</div><div class="fit-body">`;
+    const curName = !s.style ? s.colors[draft[s.color]]?.name : draft[s.style] === null ? 'Ninguno' : AV_STYLES[s.style][draft[s.style]].name;
+    html += `<div class="flex items-center justify-between gap-2 mb-2"><button data-cyc="-1" class="btn-game px-3 py-1 text-sm bg-white">‹</button><div class="text-sm font-bold text-center truncate">${s.icon} ${esc(curName || '')}</div><button data-cyc="1" class="btn-game px-3 py-1 text-sm bg-white">›</button></div>`;
+    if (s.style) {
+      const list = AV_STYLES[s.style].map((st, i) => ({ st, i, key: `${s.style}:${st.id}` })).filter(o => !creator || avOwns(o.key));
+      const opts = (s.nullable ? [{ st: { name: s.id === 'glasses' ? 'Ningunas' : 'Ninguno', icon: '🚫', origin: 'base' }, i: null, key: null }] : []).concat(list);
+      html += `<div class="fit-grid">` + opts.map(o => { const owned = o.key === null || avOwns(o.key), on = draft[s.style] === o.i, rar = RARITY[o.st.rarity] || RARITY.common;
+        const badge = !owned ? '🔒' : o.st.origin === 'base' ? '' : AV_ORIGINS[o.st.origin].icon;
+        return `<button data-style="${o.i === null ? 'none' : o.i}" class="fit-opt ${on ? 'on' : ''} ${owned ? '' : 'locked'}" style="${o.st.origin !== 'base' && owned ? `border-color:${rar.color}` : ''}" title="${esc(owned ? (AV_ORIGINS[o.st.origin]?.name || '') : avHowToGet(AV_PART_BY_KEY[o.key]))}"><div class="text-2xl leading-none">${o.st.icon}</div><div class="text-[11px] font-bold leading-tight mt-1">${esc(o.st.name)}</div>${badge ? `<div class="text-[10px]">${badge}</div>` : ''}</button>`; }).join('') + `</div>`;
+    }
+    const st = s.style && draft[s.style] !== null ? AV_STYLES[s.style][draft[s.style]] : null;
+    if (!s.style || (st && st.colorable !== false)) {
+      html += `<div class="text-[11px] font-bold text-slate-500 mt-3 mb-1">${!s.style ? 'Tono' : 'Color'}</div><div class="flex flex-wrap gap-2">` +
+        colorChoices(s).map(i => { const fab = i >= s.colors.length, c = fab ? AV_FABRICS[i - s.colors.length] : s.colors[i];
+          return `<button data-col="${i}" class="fit-sw ${draft[s.color] === i ? 'on' : ''}" title="${esc(c.name)}" style="background:${avCss(c.hex)}">${fab ? '✨' : ''}</button>`; }).join('') + `</div>`;
+      if (s.fabrics) { const n = AV_FABRICS.filter(f => avOwns(`fabric:${f.id}`)).length; html += `<div class="text-[10px] text-slate-500 mt-1">🚢 Telas imposibles: ${n}/${AV_FABRICS.length} · llegan por barco con las Rutas del Horizonte de Sam.</div>`; }
+    } else if (st) html += `<div class="text-[11px] text-slate-500 mt-3">${st.origin === 'insignia' ? '🏆 Prenda insignia: sus colores son los de su dueño original.' : 'Esta pieza tiene sus propios colores.'}</div>`;
+    html += `<div class="text-[10px] text-slate-400 mt-3">🧬 ${fmt(avatarCombinations())} combinaciones posibles · la ropa nunca da ventajas: es pura expresión.</div></div>`;
+    html += `<div class="fit-foot"><button data-rand class="btn-game bg-fuchsia-200">🎲 Aleatorio</button><button data-save class="btn-game bg-emerald-300">${creator ? '✨ Así estoy bien' : '💾 Guardar'}</button><button data-exit class="btn-game bg-slate-200">✕ Salir sin guardar</button></div>`;
+    const scroll = panel.querySelector('.fit-body')?.scrollTop || 0, cs = panel.querySelector('.fit-cats')?.scrollLeft || 0;
+    panel.innerHTML = html;
+    const fb = panel.querySelector('.fit-body'); if (fb) fb.scrollTop = scroll; const fc = panel.querySelector('.fit-cats'); if (fc) fc.scrollLeft = cs;
+    panel.querySelectorAll('[data-slot]').forEach(b => b.onclick = () => { slotId = b.dataset.slot; render(); const f = panel.querySelector('.fit-body'); if (f) f.scrollTop = 0; });
+    panel.querySelectorAll('[data-cyc]').forEach(b => b.onclick = () => cycle(+b.dataset.cyc));
+    panel.querySelectorAll('[data-style]').forEach(b => b.onclick = () => {
+      const v = b.dataset.style === 'none' ? null : +b.dataset.style;
+      if (v !== null) { const key = `${s.style}:${AV_STYLES[s.style][v].id}`; if (!avOwns(key)) { showToast(`🔒 ${avHowToGet(AV_PART_BY_KEY[key])}`, 'text-white'); return; } }
+      draft[s.style] = v; live(); render();
+    });
+    panel.querySelectorAll('[data-col]').forEach(b => b.onclick = () => { draft[s.color] = +b.dataset.col; live(); render(); });
+    panel.querySelector('[data-rand]').onclick = randomize;
+    panel.querySelector('[data-save]').onclick = () => close(true);
+    panel.querySelector('[data-exit]').onclick = () => close(false);
+    panel.querySelector('[data-fx]').onclick = () => close(false);
+  }
+  function openRoom(m = 'wardrobe', cb) {
+    if (open) return false; css();
+    open = true; mode = m; onClose = cb || null; drag = null;
+    draft = avSanitize(GS.avatar); slotId = m === 'creator' ? 'skin' : 'top';
+    // de espaldas a la casa, para que la cámara no acabe dentro de un edificio
+    if (house && player.position.distanceTo(house.position) < 9) { const away = tangent(player.position.clone().sub(house.position), player.userData.dir); if (away.lengthSq() > 1e-6) player.userData.fwd.copy(away.normalize()); }
+    state.moveTarget = null; state.pendingInteract = null; ui.dialog.classList.add('hidden'); ui.hint.classList.add('hidden');
+    state.modalOpen = true; state.mode = 'dialog';
+    state.dialogPose = pose(); tweenCamera(state.dialogPose, 0.9);
+    panel = document.createElement('div'); panel.id = 'fitPanel'; document.body.appendChild(panel);
+    ['pointerdown', 'wheel', 'touchstart'].forEach(ev => panel.addEventListener(ev, e => e.stopPropagation(), { passive: true }));
+    render(); return true;
+  }
+  function close(saveIt) {
+    if (!open) return;
+    if (saveIt) {
+      const c = avSanitize(draft); AV_CFG_KEYS.forEach(k => { GS.avatar[k] = c[k]; });
+      SaveSystem.saveNow(mode === 'creator' ? 'avatar:creator' : 'avatar'); playChime();
+      showToast(mode === 'creator' ? '✨ ¡Así te sueñas! (cámbialo gratis en el Armario 🪞 de casa)' : '💾 Look guardado', 'text-white');
+    }
+    applyAvatar(GS.avatar); if (player.userData.body) player.userData.body.rotation.y = 0;
+    open = false; drag = null; if (panel) panel.remove(); panel = null;
+    state.modalOpen = anyModalOpen(); tweenCamera(camPose(), 0.7, () => { if (!open) state.mode = 'player'; });
+    const cb = onClose; onClose = null; cb && cb(!!saveIt);
+  }
+  // Girar el personaje arrastrando sobre el mundo (ratón o dedo)
+  canvas.addEventListener('pointerdown', (e) => { if (open) drag = { x: e.clientX }; });
+  window.addEventListener('pointermove', (e) => { if (!open || !drag) return; const b = player.userData.body; if (b) b.rotation.y += (e.clientX - drag.x) * CFG.fittingRotateSpeed; drag.x = e.clientX; });
+  window.addEventListener('pointerup', () => { drag = null; }); window.addEventListener('pointercancel', () => { drag = null; });
+  window.addEventListener('keydown', (e) => { if (!open || (e.target && e.target.tagName === 'INPUT')) return; if (e.code === 'Escape') close(false); else if (e.code === 'ArrowLeft' || e.code === 'ArrowRight') cycle(e.code === 'ArrowLeft' ? -1 : 1); });
+  window.addEventListener('resize', () => { if (open && state.mode === 'dialog') state.dialogPose = pose(); });
+  return { open: openRoom, close, randomize, get isOpen() { return open; }, get mode() { return mode; }, get draft() { return draft; } };
+})();
+/** Creador inicial (Sec. 8.2): solo partidas NUEVAS, una vez, justo después del prólogo. Sobrevive a recargas (GS.story.creatorPending). */
+function maybeOpenCreator(after) {
+  if (!storyState().creatorPending || Fitting.isOpen) { after && after(false); return false; }
+  return Fitting.open('creator', () => { storyState().creatorPending = false; SaveSystem.saveNow('avatar:creator-done'); after && after(true); });
+}
+
+/* ---------- 🕶️ BOUTIQUE VIRAL (erizos) · Sec. 8.4 ---------- */
+const Boutique = {
+  pool() { return AVATAR_PARTS.filter(p => p.origin === 'boutique'); },
+  /** Catálogo DETERMINISTA: mulberry32(día onírico + saveId). Mismo día = mismos drops; recargar no cambia nada. */
+  catalog(day = GS.daily.dayCount) {
+    const pool = this.pool(), rnd = mulberry32(_hashStr(GS.meta.saveId + ':boutique:' + day)), out = [];
+    while (out.length < Math.min(CFG.boutiqueDailyCount, pool.length)) out.push(pool.splice(Math.floor(rnd() * pool.length), 1)[0]);
+    return out;
+  },
+  price(p) { return CFG.boutiquePrices[p.rarity] ?? CFG.boutiquePrices.common; },
+  buy(key) {
+    const p = AV_PART_BY_KEY[key];
+    if (!p || p.origin !== 'boutique') { showToast('🦔 "Bro, eso no se vende. Hay cosas que se ganan."', 'text-white'); return false; }   // insignias, especiales e importaciones: nunca aquí
+    if (avOwns(key)) { showToast('✓ Ya es tuya', 'text-white'); return false; }
+    if (!this.catalog().some(q => q.key === key)) { showToast('🦔 "Ese drop no es de hoy, bro."', 'text-white'); return false; }
+    if (!Wallet.spend(this.price(p), `Boutique Viral: ${p.name}`)) return false;
+    (GS.avatar.wardrobe ||= []).push(key); GS.stats.itemsBought++;
+    playChime(); showToast(`🛍️ ${p.icon} ${p.name} → a tu armario 🪞`, 'text-white'); SaveSystem.saveNow('boutique:' + key); return true;
+  },
+  /** Ponérsela al momento (cambiarse es gratis; la pieza ya es tuya) */
+  wear(key) {
+    const p = AV_PART_BY_KEY[key]; if (!p || !avOwns(key) || !AV_STYLES[p.slot]) return false;
+    GS.avatar[p.slot] = p.idx; applyAvatar(GS.avatar); SaveSystem.save('avatar:wear'); showToast(`🪞 Te pones ${p.icon} ${p.name}`, 'text-white'); return true;
+  },
+  open() {
+    openApp('🕶️ Boutique Viral · drops del día', '', (body) => {
+      const render = () => {
+        const day = GS.daily.dayCount, cat = this.catalog(day), slotName = (p) => AVATAR_SLOTS.find(s => s.id === p.slot)?.name || p.slot;
+        body.innerHTML = balanceBar() +
+          `<div class="app-card p-3 mb-3 text-sm text-slate-600"><b class="text-[#2b2b3d]">🦔 Barnaby Jr.:</b> “¡Drops del día, bro! ${CFG.boutiqueDailyCount} piezas. Mañana, otras. ¿Volverán? Nadie lo sabe.” <b class="text-[#2b2b3d]">Pip:</b> “(Es una ruleta con estilo.)”
+           <div class="text-[11px] text-slate-500 mt-1">Catálogo rotativo · día onírico ${day} · cambia cada medianoche. La ropa nunca da ventajas: lo que compras es tuyo para siempre y cambiarte en el Armario 🪞 es gratis.</div></div>` +
+          `<div class="grid grid-cols-2 md:grid-cols-4 gap-2">` + cat.map(p => { const own = avOwns(p.key), price = this.price(p), rar = RARITY[p.rarity] || RARITY.common;
+            return `<div class="app-card p-3 flex flex-col items-center text-center" style="border-color:${rar.color}"><div class="text-4xl leading-none">${p.icon}</div><div class="text-sm font-bold text-[#2b2b3d] mt-1 leading-tight">${esc(p.name)}</div><div class="text-[11px] text-slate-500">${slotName(p)} · <span style="color:${rar.color}" class="font-bold">${rar.name}</span></div>
+              ${own ? `<div class="text-emerald-600 font-bold text-xs mt-2">✓ Es tuya</div><button data-wear="${p.key}" class="btn-game px-3 py-1 text-xs bg-cyan-200 mt-1">🪞 Ponérmela</button>`
+                : `<button data-buy="${p.key}" class="btn-game px-3 py-1.5 text-xs mt-2 ${Wallet.canAfford(price) ? 'bg-amber-300' : 'bg-slate-200 opacity-60'}">${fmt(price)} $T</button>`}</div>`; }).join('') + `</div>` +
+          `<div class="text-[11px] text-slate-500 mt-3">👗 Tu colección de la Boutique: ${this.pool().filter(p => avOwns(p.key)).length}/${this.pool().length} · 🏆 Insignias: ${insigniasOwned()}/7 (esas no se venden, bro).</div>`;
+        body.querySelectorAll('[data-buy]').forEach(b => b.onclick = () => { this.buy(b.dataset.buy); render(); });
+        body.querySelectorAll('[data-wear]').forEach(b => b.onclick = () => { this.wear(b.dataset.wear); render(); });
+      };
+      render();
+    });
+  },
+};
+/** 📅 Premio de 7 sellos (Sec. 10.3): «1 prenda» → una pieza sorpresa de la Boutique que aún no tengas (determinista). */
+function deliverPendingFashion() {
+  const w = GS.weekly; let n = w.pendingFashion | 0; if (n <= 0) return 0;
+  const own = (GS.avatar.wardrobe ||= []); let given = 0;
+  while (n > 0) {
+    const cand = AVATAR_PARTS.filter(p => p.origin === 'boutique' && !own.includes(p.key)); if (!cand.length) break;
+    const p = cand[Math.floor(mulberry32(_hashStr(GS.meta.saveId + ':fashion:' + own.length))() * cand.length)];
+    own.push(p.key); n--; given++;
+    addLetter('🦔 Barnaby Jr. & Pip', `bro. siete sellos seguidos. eso es constancia, bro. te hemos guardado un drop exclusivo: ${p.icon} ${p.name}. ya está en tu armario 🪞. (Pip dice que te queda mejor que a él.)`);
+  }
+  w.pendingFashion = n;
+  if (given) { if (typeof updateMailboxBadge === 'function') updateMailboxBadge(); SaveSystem.save('fashion-gift'); }
+  return given;
+}
+/** 🚢 Gancho para v0.8 (Rutas del Horizonte · loot del crate): concede una tela imposible que aún no tengas. Devuelve la pieza o null. */
+function grantRandomImport(rnd = Math.random) {
+  const own = (GS.avatar.wardrobe ||= []), cand = AVATAR_PARTS.filter(p => p.origin === 'import' && !own.includes(p.key)); if (!cand.length) return null;
+  const p = cand[Math.floor(rnd() * cand.length)]; own.push(p.key); showToast(`🚢 Tela imposible: ${p.name} → a tu armario 🪞`, 'text-white'); SaveSystem.save('import:' + p.key); return p;
+}
+/** 🌟 Gancho para v0.9: piezas especiales (Pijama del Soñador en NG+, Traje del Mundo Despierto en el Final A). */
+function grantSpecialPiece(key) { const p = AV_PART_BY_KEY[key]; if (!p || p.origin !== 'special') return false; const own = (GS.avatar.wardrobe ||= []); if (own.includes(key)) return false; own.push(key); SaveSystem.save('special:' + key); return true; }
+/** Pestaña 🪞 Armario del panel Mi Casa */
+function wardrobeSummaryHTML() {
+  const w = GS.avatar.wardrobe || [], extra = AVATAR_PARTS.filter(p => p.origin !== 'base'), owned = extra.filter(p => w.includes(p.key)).length;
+  const byOrigin = ['boutique', 'import', 'insignia', 'special'].map(o => { const all = extra.filter(p => p.origin === o); return `<span class="whitespace-nowrap">${AV_ORIGINS[o].icon} ${all.filter(p => w.includes(p.key)).length}/${all.length}</span>`; }).join(' · ');
+  return `<div class="app-card p-3 mb-3"><div class="font-bold text-[#2b2b3d] mb-1">🪞 Armario</div>
+      <div class="text-sm text-slate-600">El mismo probador del principio, coste 0. Cambiarse antes de una feria es comportamiento esperado y fomentado.</div>
+      <button data-fitting class="btn-game px-3 py-1.5 text-sm mt-2 bg-cyan-300">🪞 Abrir el probador</button></div>
+    <div class="app-card p-3 mb-3"><div class="font-bold text-[#2b2b3d] mb-1">🏆 Prendas insignia · ${insigniasOwned()}/7</div><div class="grid grid-cols-1 sm:grid-cols-2 gap-1">` +
+      Object.entries(INSIGNIAS).map(([id, i]) => { const p = AV_PART_BY_KEY[i.key], got = w.includes(i.key), n = npcById[id];
+        return `<div class="flex items-center gap-2 text-xs p-1.5 rounded-lg ${got ? 'bg-amber-100' : 'bg-slate-100'}"><span class="text-lg">${got ? p.icon : '🔒'}</span><div class="min-w-0"><div class="font-bold truncate">${esc(p.name)}</div><div class="text-[10px] text-slate-500">${n.emoji} ${n.name} · ${got ? '✓ ganada' : `${trustLvIcon(id)} → ${TRUST_LEVELS[4].heart} ${TRUST_LEVELS[4].name}`}</div></div></div>`; }).join('') +
+      `</div><div class="text-[11px] text-slate-500 mt-1">Se ganan al llegar a ${TRUST_LEVELS[4].heart} ${TRUST_LEVELS[4].name} con cada vecino. No se compran, no se regalan, no se intercambian.</div></div>
+    <div class="app-card p-3"><div class="font-bold text-[#2b2b3d] mb-1">👗 Colección</div><div class="text-sm text-slate-600">Piezas desbloqueadas: <b>${owned}/${extra.length}</b> (más todo lo base, gratis para siempre)</div><div class="text-xs text-slate-500 mt-1">${byOrigin}</div>
+      <div class="text-[11px] text-slate-500 mt-1">🛍️ La Boutique Viral de los erizos renueva sus drops cada día onírico${GS.missions?.hedgehogs?.status === 2 ? '' : ' (abre cuando completes su misión)'} · 🚢 las telas imposibles llegarán por barco.</div></div>`;
+}
+
+/* =========================================================
    20. MENÚ DE ENTRADA → PLAY
    ========================================================= */
 const $ = (id) => document.getElementById(id);
@@ -4232,6 +4797,7 @@ const missionsDone = () => NPCS.filter(n => GS.missions[n.id].status === 2).leng
 /** Reconstruye el mundo 3D a partir de GS (una sola vez al arrancar). Todo lo que llama debe ser idempotente. */
 function applyGameStateToWorld() {
   storyMigrateLegacy();
+  applyAvatar(GS.avatar);   // v0.7: el look guardado (las partidas antiguas traen el clásico vía deepMerge)
   refreshGoalHUD();
   NPCS.forEach(n => { GS.missions[n.id] ||= { status: 0, generated: false, completedAt: null }; });
   buildHouse(clamp(GS.house.level | 0, 0, 2));
@@ -4258,13 +4824,15 @@ if (!hadSave) SaveSystem.createNew();
 applyGameStateToWorld();
 updateHungerHUD(); updateClockHUD();
 NPCS.forEach(n => { if (Trust.level(n.id) >= 4) sendMilestoneLetter(n.id); });   // v0.5: cartas de hito retroactivas (partidas que ya tenían confianza 4)
+const retroInsignias = NPCS.filter(n => Trust.level(n.id) >= 4 && grantInsignia(n.id, { silent: true }));   // v0.7: insignias retroactivas (Aliados de antes)
+deliverPendingFashion();   // v0.7: prendas del Sello Semanal que esperaban al avatar
 
 // ---- Menú ----
 cam.dist = cam.tDist = 70; cam.pitch = cam.tPitch = 0.35; // vista desde el espacio mientras se lee el menú
 { const p = camPose(); applyLook(p.pos, p.target, p.up); }
 animate();
 // 🛠️ DEBUG (temporal, se eliminará en v1.0): permite inspeccionar y forzar el estado desde la consola F12
-window._dbg = { get GS() { return GS; }, Inventory, Wallet, Needs, Production, Trust, Trend, Weather, openHousePanel, placedBuildings, settleDay, updateEmbargo, enterBuildMode, interactWith: (o) => interactWith(o), set clock(fictMs) { GS.daily.clockMs = fictMs; }, set hunger(v) { GS.needs.hunger = v; } };
+window._dbg = { get GS() { return GS; }, AvatarParts: AVATAR_PARTS, AV_STYLES, AVATAR_SLOTS, buildAvatar, applyAvatar, avSanitize, avatarCombinations, Fitting, Boutique, INSIGNIAS, grantInsignia, deliverPendingFashion, grantRandomImport, grantSpecialPiece, maybeOpenCreator, refreshMissionUI, Inventory, Wallet, Needs, Production, Trust, Trend, Weather, openHousePanel, placedBuildings, settleDay, updateEmbargo, enterBuildMode, interactWith: (o) => interactWith(o), set clock(fictMs) { GS.daily.clockMs = fictMs; }, set hunger(v) { GS.needs.hunger = v; } };
 if (!SaveSystem.persistent) $('storageWarn').classList.remove('hidden');
 if (hadSave) {
   $('saveSummary').classList.remove('hidden');
@@ -4279,7 +4847,15 @@ const startGameFromMenu = () => {
   playChime();
   SaveSystem.started = true; SaveSystem.saveNow(hadSave ? 'session-start' : 'new-game');
   cam.rate = 1.7; cam.tDist = 9; cam.tPitch = 0.42; // zoom cinematográfico desde el espacio hasta el personaje
-  setTimeout(() => { state.menuOpen = false; cam.rate = 10; showToast(hadSave ? '💾 Partida restaurada · ¡bienvenido de nuevo!' : '🐻 Busca al Oso Panadero: tiene un “!” sobre la cabeza', 'text-white'); }, 2600);
+  setTimeout(() => {
+    state.menuOpen = false; cam.rate = 10;
+    const welcome = () => {
+      showToast(hadSave ? '💾 Partida restaurada · ¡bienvenido de nuevo!' : '🐻 Busca al Oso Panadero: tiene un “!” sobre la cabeza', 'text-white');
+      if (retroInsignias.length) setTimeout(() => showToast(`🏆 Tus Aliados te guardaban ${retroInsignias.length} prenda(s) insignia: mira el Armario 🪞`, 'text-amber-200'), 1800);
+    };
+    // v0.7 · Sec. 8.2: partida nueva → creador de personaje tras el prólogo (y antes de despertar del todo)
+    maybeOpenCreator((wasCreator) => { if (wasCreator && !hadSave) showToast('🐻 "¡Eh, eh! ¿Estás bien? ¡Por fin llegó el humano de la laptop!"', 'text-white'); setTimeout(welcome, wasCreator && !hadSave ? 2200 : 0); });   // sin creador pendiente → welcome al momento
+  }, 2600);
 };
 btnPlay.onclick = () => (storyState().prologueDone ? startGameFromMenu() : showPrologue(startGameFromMenu));
 
@@ -4408,6 +4984,17 @@ const DBG = (() => {
       'DBG.trustAll(pts)         -> fija confianza de los 7 NPC',
       'DBG.save()                -> guarda ahora',
       'DBG.reset()               -> borra la partida y recarga',
+      '--- v0.6 / v0.7 ---',
+      'DBG.act2(on)              -> fuerza/quita el HUD del Acto 2 (sin tocar misiones)',
+      "DBG.bigJob('bear', 2)     -> fija el estado de un Trabajo Mayor (0/1/2) para probar el contador",
+      'DBG.creator()             -> abre el creador inicial (como tras el prólogo)',
+      'DBG.wardrobe()            -> abre el probador del Armario',
+      'DBG.avatar({hair:6})      -> cambia la config del avatar y la aplica · DBG.avatarClassic()',
+      'DBG.combos()              -> nº de combinaciones (todas / con lo que tienes)',
+      'DBG.boutique() · DBG.boutiqueDays(dia, n) -> tienda / catálogos deterministas',
+      'DBG.unlockAll(insignias)  -> desbloquea todas las piezas (true = también insignias)',
+      "DBG.ally('dax')           -> sube a Aliado vía Trust.add (entrega la insignia)",
+      'DBG.insignias()           -> tabla de insignias · DBG.fashion() -> prenda de 7 sellos',
       'IDs NPC: ' + NPC_IDS.join(', ')
     ].join('\n'));
   }
@@ -4453,10 +5040,25 @@ DBG.coffee = () => { Coffee.until = Date.now() + CFG.coffeeMs; console.log('[DBG
 DBG.star = () => { console.log(StarFall.spawn() ? '[DBG] Estrella caída cerca' : '[DBG] No hay tierra cerca'); };
 DBG.seals = (n = 7) => { const w = Weekly.roll(); for (let i = 0; i < 7; i++) w.seals[i] = i < n; DBG.save('debug_seals'); console.log('[DBG] Sellos: ' + Weekly.count()); };
 DBG.cookNow = () => { Kitchen.q.forEach(k => k.readyAt = 0); console.log('[DBG] Lotes listos: ' + Kitchen.q.length); };
-DBG.prologue = () => { storyState().prologueDone = false; showPrologue(() => {}); };
+DBG.prologue = () => { storyState().prologueDone = false; showPrologue(() => setTimeout(() => maybeOpenCreator(), 600)); };   // v0.7: tras el prólogo, el creador
 DBG.reveal = (on = true) => { storyState().revealed = on; refreshGoalHUD(on); };
 DBG.builds = () => console.table((GS.world.buildings || []).map(r => ({ id: r.id, type: r.type, placed: !!placedBuildings[r.id] })));
 DBG.demolish = (id, refund = 0.5) => removeBuilding(id ?? GS.world.buildings?.at(-1)?.id, refund);
+// ---- v0.6 · Acto 2 en el HUD ----
+DBG.act2 = (on = true) => { const s = storyState(); s.act1Done = !!on; if (on) s.revealed = true; refreshGoalHUD(true); state.missionTab = null; refreshMissionUI(); DBG.save('debug_act2'); console.log('[DBG] act1Done = ' + s.act1Done + ' · HUD: ' + document.getElementById('missionLabel').textContent + ' ' + ui.missionCount.textContent); };
+DBG.bigJob = (id, status = 2) => { if (!npcById[id]) { console.warn('[DBG] NPC desconocido'); return; } GS.bigJobs[id] = { ...(GS.bigJobs[id] || {}), status: status | 0, generated: status >= 1, completedAt: status === 2 ? Date.now() : null }; refreshMissionUI(); DBG.save('debug_bigjob'); console.log('[DBG] Trabajos Mayores: ' + bigJobsDoneCount() + '/' + CFG.act2BigJobs); };
+// ---- v0.7 · Avatar, armario, Boutique, insignias ----
+DBG.creator = () => { storyState().creatorPending = true; maybeOpenCreator(() => console.log('[DBG] creador cerrado · creatorPending = ' + storyState().creatorPending)); };
+DBG.wardrobe = () => Fitting.open('wardrobe');
+DBG.avatar = (partial = {}) => { Object.assign(GS.avatar, partial); applyAvatar(GS.avatar); DBG.save('debug_avatar'); console.log('[DBG] avatar (normalizado):', avSanitize(GS.avatar)); };
+DBG.avatarClassic = () => DBG.avatar({ ...AVATAR_CLASSIC });
+DBG.combos = () => { const all = avatarCombinations(), mine = avatarCombinations({ ownedOnly: true }); console.log(`[DBG] Combinaciones posibles: ${fmt(all)} (${all > 1e8 ? '✅ > 100 M' : '❌ < 100 M'}) · con tu armario: ${fmt(mine)}`); return all; };
+DBG.boutique = () => Boutique.open();
+DBG.boutiqueDays = (from = GS.daily.dayCount, n = 3) => { for (let d = from; d < from + n; d++) console.log(`[DBG] Día ${d}: ` + Boutique.catalog(d).map(p => `${p.icon} ${p.name} (${p.rarity}, ${Boutique.price(p)} $T)`).join(' · ')); };
+DBG.unlockAll = (insignias = false) => { const w = (GS.avatar.wardrobe ||= []); AVATAR_PARTS.forEach(p => { if (p.origin !== 'base' && (insignias || p.origin !== 'insignia') && !w.includes(p.key)) w.push(p.key); }); DBG.save('debug_wardrobe'); console.log('[DBG] Armario: ' + w.length + ' piezas desbloqueadas'); };
+DBG.ally = (id) => { if (!INSIGNIAS[id]) { console.warn('[DBG] NPC: ' + Object.keys(INSIGNIAS).join(', ')); return; } const need = CFG.trustThresholds[3] - Trust.points(id); if (need > 0) Trust.add(id, need, 'debug'); console.log('[DBG] ' + id + ' nivel ' + Trust.level(id) + ' · insignia: ' + (GS.avatar.wardrobe || []).includes(INSIGNIAS[id].key)); };
+DBG.insignias = () => console.table(Object.entries(INSIGNIAS).map(([id, i]) => ({ npc: id, nivel: Trust.level(id), pieza: AV_PART_BY_KEY[i.key].name, key: i.key, ganada: (GS.avatar.wardrobe || []).includes(i.key), enBoutique: Boutique.pool().some(p => p.key === i.key) })));
+DBG.fashion = () => { GS.weekly.pendingFashion = (GS.weekly.pendingFashion | 0) + 1; console.log('[DBG] Prendas entregadas: ' + deliverPendingFashion()); };
 </script>
 </body>
 </html>
