@@ -1,1 +1,6 @@
 .vercel
+# Guía maestra y documentos internos: solo locales, no se suben
+guia_maestra_completa.*
+*guia maestra*.txt
+anexo*guia*.txt
+*.pdf
