@@ -575,7 +575,7 @@ const CFG = {
     // QW7 · variación de color del planeta (calculada al cargar, coste 0 en juego)
     planet: { noise: 1, slopeDark: 0.12, slopeCol: 0x5fae48, wetSand: 0xd8c48a, wetRel: 0.03, snowTint: 0xe9e6f7, snowMix: 0.35 },
     // QW9 · agua sin shader
-    water: { color: 0x46c2e8, roughness: 0.12, metalness: 0, opacity: 0.8 },
+    water: { color: 0x46c2e8, roughness: 0.15, metalness: 0, opacity: 0.8, deep: 0x2a8fd6, shallow: 0x7fe3e0, foam: 0xfffdf5, shoreDepth: 0.6, opacityShoreDeep: [0.78, 0.92] },   // v1.5 · Etapa 4: degradado de profundidad + espuma
     // QW10 · halo atmosférico del planeta (opacidad de cerca → en Modo Planeta/menú)
     halo: { scale: 1.09, pow: 3, near: 0.35, far: 0.8, nearDist: 14, farDist: 30 },
     // QW11 · viñeta CSS (opacidad en menú / en juego)
@@ -1655,8 +1655,43 @@ const planet = (() => {
   m.receiveShadow = true; m.castShadow = true; m.material.userData.envI = CFG.gfx.env.planet; return m;
 })();
 scene.add(planet);
-const waterGeo = new THREE.SphereGeometry(1, 84, 60); const waterBase = waterGeo.attributes.position.array.slice();
-const water = new THREE.Mesh(waterGeo, new THREE.MeshStandardMaterial({ color: CFG.gfx.water.color, roughness: CFG.gfx.water.roughness, metalness: CFG.gfx.water.metalness, transparent: true, opacity: CFG.gfx.water.opacity }));   // v1.4 · QW9: sin flatShading (el wobble facetado parpadeaba)
+/* v1.5 · Etapa 4 · AGUA EN GPU: el oleaje (misma fórmula de antes) se mueve en el vertex shader → fuera el bucle de CPU con computeVertexNormals.
+   aShore (calculado al cargar: 1 en la orilla, 0 en lo hondo) da el degradado turquesa, la espuma que respira y la transparencia de la orilla.
+   Fresnel con el cielo, destello del sol (HDR → bloom) y reflejo de la luna; anillos al nadar. Sin texturas de profundidad: vale también en Baja. */
+const WATER_SEG = GFX.id === 'high' ? [128, 96] : GFX.id === 'low' ? [72, 52] : [96, 70];
+const waterGeo = new THREE.SphereGeometry(1, ...WATER_SEG);
+{ const p = waterGeo.attributes.position, sh = new Float32Array(p.count), d = new THREE.Vector3();
+  for (let i = 0; i < p.count; i++) { d.fromBufferAttribute(p, i).normalize(); const h = heightAt(d); sh[i] = h >= SEA ? 1 : clamp(1 - (SEA - h) / CFG.gfx.water.shoreDepth, 0, 1); }
+  waterGeo.setAttribute('aShore', new THREE.BufferAttribute(sh, 1)); waterGeo.boundingSphere = new THREE.Sphere(new THREE.Vector3(), SEA + 0.3); }
+const WATER_U = { uTime: { value: 0 }, uSea: { value: SEA }, uDeep: { value: new THREE.Color(CFG.gfx.water.deep) }, uShallow: { value: new THREE.Color(CFG.gfx.water.shallow) }, uFoam: { value: new THREE.Color(CFG.gfx.water.foam) },
+  uSkyTop: { value: null }, uSunV: { value: new THREE.Vector3(0, 1, 0) }, uSunC: { value: new THREE.Color(1, 1, 1) }, uDay: { value: 1 }, uPlayer: { value: new THREE.Vector3() }, uSwim: { value: 0 }, uFancy: { value: GFX.id === 'low' ? 0 : 1 }, uOp: { value: new THREE.Vector2(...CFG.gfx.water.opacityShoreDeep) } };
+const waterMat = new THREE.MeshStandardMaterial({ color: CFG.gfx.water.color, roughness: CFG.gfx.water.roughness, metalness: CFG.gfx.water.metalness, transparent: true, opacity: CFG.gfx.water.opacity, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 });
+waterMat.customProgramCacheKey = () => 'water-v15';
+waterMat.onBeforeCompile = (sh) => {
+  Object.assign(sh.uniforms, WATER_U);
+  sh.vertexShader = `attribute float aShore; uniform float uTime, uSea; varying float vShore; varying vec3 vOP;
+    float wv(vec3 n){ return 0.07 * sin(n.x * 9.0 + n.y * 4.0 + uTime * 1.4) + 0.06 * cos(n.z * 8.0 + n.y * 6.0 - uTime); }
+` + sh.vertexShader
+    .replace('#include <beginnormal_vertex>', `vec3 n0 = normalize(position); float ca = cos(n0.x * 9.0 + n0.y * 4.0 + uTime * 1.4), sb = sin(n0.z * 8.0 + n0.y * 6.0 - uTime);
+      vec3 gw = vec3(0.63 * ca, 0.28 * ca - 0.36 * sb, -0.48 * sb); gw -= n0 * dot(gw, n0); vec3 objectNormal = normalize(n0 - gw / uSea);
+      #ifdef USE_TANGENT
+        vec3 objectTangent = vec3(tangent.xyz);
+      #endif`)
+    .replace('#include <begin_vertex>', `vec3 transformed = n0 * (uSea + wv(n0)); vShore = aShore; vOP = transformed;`);
+  sh.fragmentShader = `uniform float uTime, uDay, uSwim, uFancy; uniform vec3 uDeep, uShallow, uFoam, uSkyTop, uSunV, uSunC, uPlayer; uniform vec2 uOp; varying float vShore; varying vec3 vOP;
+` + sh.fragmentShader
+    .replace('vec4 diffuseColor = vec4( diffuse, opacity );', `vec4 diffuseColor = vec4(mix(uDeep, uShallow, pow(vShore, 1.5)), mix(uOp.y, uOp.x, vShore));
+      float foam = smoothstep(0.82, 0.9, vShore + 0.06 * sin(uTime * 2.0 + vOP.x * 30.0) * sin(vOP.z * 27.0));
+      foam = max(foam, smoothstep(0.02, 0.0, abs(vShore - (0.62 + 0.08 * sin(uTime * 1.3 + vOP.y * 3.0)))) * 0.75);   // ola que llega a la orilla
+      float pd = distance(vOP, uPlayer), ring = uSwim * max(sin(pd * 20.0 - uTime * 6.0), 0.0) * exp(-pd * 3.0);
+      diffuseColor.rgb = mix(diffuseColor.rgb, uFoam, clamp(foam + ring * 0.8, 0.0, 1.0)); diffuseColor.a = max(diffuseColor.a, foam * 0.95);`)
+    .replace('#include <opaque_fragment>', `{ vec3 V = normalize(vViewPosition); float F = pow(1.0 - max(dot(normal, V), 0.0), 3.0) * uFancy;
+        outgoingLight = mix(outgoingLight, uSkyTop, F * 0.35);
+        vec3 Rf = reflect(-uSunV, normal); outgoingLight += uSunC * pow(max(dot(Rf, V), 0.0), 120.0) * 1.5 * uDay * uFancy;   // destello (pasa de 1 → bloom)
+        vec3 Rm = reflect(uSunV, normal); outgoingLight += vec3(0.75, 0.82, 1.0) * pow(max(dot(Rm, V), 0.0), 90.0) * 0.6 * (1.0 - uDay) * uFancy; }   // luna
+      #include <opaque_fragment>`);
+};
+const water = new THREE.Mesh(waterGeo, waterMat);
 water.receiveShadow = true; water.material.userData.envI = CFG.gfx.env.water; scene.add(water);
 /* v1.4 · QW10 · halo atmosférico del planeta (menú y Modo Planeta): esfera BackSide aditiva con el color del horizonte del cielo */
 const atmo = new THREE.Mesh(new THREE.SphereGeometry(R * CFG.gfx.halo.scale, GFX.id === 'low' ? 48 : 64, GFX.id === 'low' ? 32 : 40), new THREE.ShaderMaterial({
@@ -4551,7 +4586,11 @@ function updateConfetti(dt) {
     const ground = Math.max(heightAt(up), SEA) + 0.05; if (c.m.position.length() < ground) { c.m.position.setLength(ground); c.vel.set(0, 0, 0); c.rot.set(0, 0, 0); }
     if (c.life <= 0) { scene.remove(c.m); c.m.material.dispose(); confetti.splice(i, 1); } }
 }
-function updateWater(t) { const p = waterGeo.attributes.position; for (let i = 0; i < p.count; i++) { const x = waterBase[i * 3], y = waterBase[i * 3 + 1], z = waterBase[i * 3 + 2]; const r = SEA + 0.07 * Math.sin(x * 9 + y * 4 + t * 1.4) + 0.06 * Math.cos(z * 8 + y * 6 - t); p.setXYZ(i, x * r, y * r, z * r); } p.needsUpdate = true; waterGeo.computeVertexNormals(); }
+function updateWater(t) {   // v1.5 · Etapa 4: solo uniforms (el oleaje va en la GPU)
+  const U = WATER_U; U.uTime.value = t; U.uSkyTop.value = sky.material.uniforms.topColor.value; U.uDay.value = state.dayAmt ?? 1; U.uSunC.value.copy(sun.color);
+  U.uSunV.value.copy(sky.material.uniforms.sunDir.value).transformDirection(camera.matrixWorldInverse); U.uPlayer.value.copy(player.position);
+  U.uSwim.value += ((state.swimming && !Interiors.active ? 1 : 0) - U.uSwim.value) * 0.08;
+}
 /* ===== v0.1 · DÍA/NOCHE (Guía Maestra Sec. 4.2) =====
    El reloj onírico (GS.daily.clockMs) usa milisegundos FICTICIOS 0..DAY_MS;
    un día completo dura CFG.dayLengthMs ms REALES de juego (escala ×72). */
