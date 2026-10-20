@@ -447,7 +447,22 @@ const CFG = {
   toolRepair: {
     fishing_rod: { npc: 'sam',    fee: 40, diy: [['wood_log', 2]] },
     pickaxe:     { npc: 'glover', fee: 60, diy: [['wood_log', 1], ['stone', 1]] },
+    axe:         { npc: 'glover', fee: 45, diy: [['wood_log', 1], ['stone', 1]] },   // v1.6
+    shovel:      { npc: 'glover', fee: 45, diy: [['wood_log', 2]] },
+    detector:    { npc: 'sombra', fee: 120, diy: [['stone', 2], ['seashell', 2]] },
+    bug_net:     { npc: 'sam',    fee: 30, diy: [['wood_log', 1], ['seashell', 1]] },
   },
+  /* ===== v1.6 · ANIMACIÓN DE HERRAMIENTAS (s) · momento del «impacto» (0–1) ===== */
+  toolAnim: { dur: { pickaxe: 0.9, axe: 0.9, shovel: 1.0, bug_net: 0.55, fishing_rod: 0.6, detector: 0.8, studio: 2.4 }, hitAt: { pickaxe: 0.8, axe: 0.8, shovel: 0.85, bug_net: 0.6, fishing_rod: 0.7, detector: 0.9, studio: 0.95 } },
+  /* ===== v1.6 · RECOLECCIÓN NUEVA ===== */
+  gather: {
+    chop: { fruit: 0.05, sap: 0.12 },
+    dig: { perDay: 8, ang: 0.55, loot: [['stone', 30, [1, 2]], ['seashell', 18, 1], ['old_coin', 22, [1, 2]], ['dream_sap', 10, 1], ['fossil', 6, 1], ['pearl', 4, 1], ['raw_gem', 3, 1]] },
+    detect: { perDay: 3, ang: 0.9, range: 7, loot: [['old_coin', 30, [2, 4]], ['fossil', 22, 1], ['buried_chest', 18, 1], ['raw_gem', 14, 1], ['pearl', 10, 1], ['star_shard', 6, 1]] },
+    bug: { day: 5, night: 7, perDay: 10, rare: 0.06, escape: 0.15, lifeS: 60 },
+  },
+  /* ===== v1.6 · ESTUDIO DEL PERFIL ===== */
+  studio: { pos: [-2.8, -7.8], perDay: 3, secs: 2.4, hunger: 4, maint: 9, fixFee: 80, fixMats: [['wood_log', 2], ['stone', 1]], bonusP: 0.35, inspireP: 0.12 },
   /* ===== v0.4 · PESCA (Sec. 5.5–5.6) ===== */
   fishTable: { fish: 65, tropical_fish: 25, golden_fish: 5, old_boot: 5 },   // % base
   fishNightGoldenMult: 3,         // Pez Dorado ×3 de noche
@@ -751,7 +766,7 @@ const CFG = {
     barter: { needBonus: 1.25, nativeDisc: 0.85 },                      // demo: valoración del bot en el trueque (lo que necesita ×1,25 · sus nativos ×0,85)
     dorado: { aura: 3, netWorth: 1000000 },                             // Doc 2: aura 3+ o patrimonio de 1M+
     // demo: el cupo diario de la Spec (spawn) se reparte entre las actividades del Doc 3 · [probabilidad, unidades, materiales preferidos (j)]
-    spawnSrc: { pickup: [0.6, 1, [0, 1]], mine: [1, 2, [1, 3]], fish: [0.5, 1, [2, 0]], garden: [1, 2, [0, 2]], crate: [1, 2, [3, 1]] },
+    spawnSrc: { pickup: [0.6, 1, [0, 1]], mine: [1, 2, [1, 3]], fish: [0.5, 1, [2, 0]], garden: [1, 2, [0, 2]], crate: [1, 2, [3, 1]], studio: [1, 1, [0, 1]], chop: [0.35, 1, [0, 1]], dig: [0.7, 1, [0, 2]], detect: [1, 1, [3, 2]], bug: [0.5, 1, [1, 2]] },   // v1.6: estudio, hacha, pala, detector y red
     craftFee: { manufactura: 40, mejora: 1000 },                        // Doc 8: «coste fijo por receta en el taller» (demo)
     up: { coralRare: 1.5, coralWearEvery: 2, voltGem: 2, chipLaptop: 0.5, magmaSlots: 1, magmaTime: 0.6, fertWheat: 2, nimbusSlots: 20, bootsSpeed: 1.15, cloudSam: 2, paperSafe: 0.10, crystalSlots: 4 },   // Doc 4: efectos de las mejoras con uso real
     histDays: 14, tapeMax: 12, kpiDays: 90, stashMax: 40, logMax: 14, botContractsMax: 6,   // demo: topes de lo que se guarda en localStorage
@@ -1021,48 +1036,72 @@ const ITEMS = {
   sky_compass:    defItem({ id: 'sky_compass',    name: 'Brújula del Cielo',  icon: '🧭', cat: 'valuable', rarity: 'rare',      sell: 300, desc: 'Importación de Ultramar. Apunta hacia arriba. Sam dice que la suya también.' }),
   timeless_clock: defItem({ id: 'timeless_clock', name: 'Reloj sin Horas',    icon: '⏱️', cat: 'valuable', rarity: 'epic',      sell: 500, desc: 'Objeto de colección de Ultramar. Siempre marca la misma hora de una mañana que no recuerdas.' }),
   edge_map:       defItem({ id: 'edge_map',       name: 'Mapa del Borde',     icon: '🗺️', cat: 'valuable', rarity: 'legendary', sell: 900, desc: 'Objeto de colección de Ultramar. Dibuja el lugar donde el mar se acaba. Los coleccionistas pagan lo que haga falta.' }),
+  /* ===== v1.6 · HERRAMIENTAS Y HALLAZGOS NUEVOS ===== */
+  axe:            defItem({ id: 'axe',            name: 'Hacha de Leñador',    icon: '🪓', cat: 'tool', sell: 50, buy: 120, stack: 1, maxDur: 25, desc: 'Tala árboles (uno por árbol y día): troncos, a veces savia o fruta dorada… y objetos de tu perfil. Reparación: Glover (45 ) o tú con 1 Tronco + 1 Piedra.' }),
+  shovel:         defItem({ id: 'shovel',         name: 'Pala de Soñador',     icon: '⚒️', cat: 'tool', sell: 55, buy: 140, stack: 1, maxDur: 25, desc: 'Excava los montículos que aparecen cada día y las señales del detector. Reparación: Glover (45 ) o tú con 2 Troncos.' }),
+  detector:       defItem({ id: 'detector',       name: 'Detector Onírico',    icon: '🧲', cat: 'tool', sell: 160, buy: 420, stack: 1, maxDur: 30, desc: 'Muestra señales enterradas a menos de 7 pasos (3 al día). Se cavan con la pala: monedas, fósiles, cofres… y la joya de tu perfil. Reparación: M. Sombra (120 ) o tú con 2 Piedras + 2 Conchas.' }),
+  bug_net:        defItem({ id: 'bug_net',        name: 'Red Cazamariposas',   icon: '🦋', cat: 'tool', sell: 40, buy: 100, stack: 1, maxDur: 25, desc: 'Mariposas de día y luciérnagas de noche (10 al día). Reparación: Sam (30 ) o tú con 1 Tronco + 1 Concha.' }),
+  old_coin:       defItem({ id: 'old_coin',       name: 'Moneda Antigua',      icon: '💰', cat: 'valuable', rarity: 'uncommon', sell: 45, desc: 'Sale al excavar. De un país que no existe… todavía.' }),
+  fossil:         defItem({ id: 'fossil',         name: 'Fósil Soñado',        icon: '🦴', cat: 'valuable', rarity: 'rare', sell: 140, desc: 'Un hueso de un animal que nadie ha soñado aún. El Museo y los coleccionistas lo adoran.' }),
+  dream_sap:      defItem({ id: 'dream_sap',      name: 'Savia Onírica',       icon: '🍯', cat: 'material', rarity: 'uncommon', sell: 25, desc: 'Gotea de algunos árboles al talarlos. Dulce, pegajosa y muy pedida.' }),
+  dream_butterfly: defItem({ id: 'dream_butterfly', name: 'Mariposa Soñada',   icon: '🦋', cat: 'resource', rarity: 'common', sell: 22, desc: 'Se caza con red de día. Los erizos las coleccionan.' }),
+  rainbow_butterfly: defItem({ id: 'rainbow_butterfly', name: 'Mariposa Arcoíris', icon: '🌈', cat: 'valuable', rarity: 'epic', sell: 260, desc: 'Muy rara (6 %). Cambia de color según quién la mire.' }),
+  firefly_jar:    defItem({ id: 'firefly_jar',    name: 'Luciérnaga en Bote',  icon: '🏮', cat: 'resource', rarity: 'uncommon', sell: 35, desc: 'Se caza con red de noche. Da luz y buena suerte (eso dice Sombra).' }),
+  buried_chest:   defItem({ id: 'buried_chest',   name: 'Cofre Enterrado',     icon: '🧰', cat: 'special', rarity: 'rare', sell: 60, usable: true, desc: 'Lo encuentra el detector. Ábrelo: monedas, perlas, gemas, fósiles…' }),
   golden_gift_box: defItem({ id: 'golden_gift_box', name: 'Caja Regalo Dorada', icon: '🎁', cat: 'special', rarity: 'epic', sell: 0, usable: true, desc: 'Premio del Sello Semanal. Botín mejorado: perlas, gemas, estrellas, mermelada…' }),
 };
 /* ===== v1.3 · 🌐 RED DEL SUEÑO: 8 Orígenes Oníricos (Doc Sec. 3), 32 materiales + 8 joyas y manufacturas (Doc Sec. 4) =====
    Anexo C.4: el origen es un campo OPCIONAL de ITEMS (`origin`), nunca de GS → las partidas no migran.
    Índice de material m (NetEco): 0–31 nativos (origen·4 + j, j = abundancia 0…3) y 32–39 joyas. El anillo de orígenes define la distancia 1–4. */
-CATEGORIES.origin = { name: 'Materiales de origen', icon: '🌐' };
+CATEGORIES.origin = { name: 'Objetos de perfil', icon: '🌐' };
 CATEGORIES.manufacture = { name: 'Manufacturas', icon: '🏭' };
+/* v1.6 · PERFILES DE JUGADOR: los 8 orígenes pasan a ser 8 oficios que soñó el jugador. Los ids internos de los materiales se conservan
+   (las partidas no migran); cambian nombre, icono y descripción. El orden es el anillo de distancias: los oficios vecinos se parecen
+   (sus objetos valen menos entre ellos) y los opuestos se necesitan (valen hasta ×12). */
 const NET_ORIGINS = [
-  { id: 'volcan',   icon: '🌋', name: 'Volcán de Miel',       color: 0xff8a65, mats: [['hot_amber', 'Ámbar Caliente', '🔶'], ['sweet_obsidian', 'Obsidiana Dulce', '🖤'], ['lava_pepper', 'Pimienta de Lava', '🌶️'], ['golden_ash', 'Ceniza Dorada', '✨']], jewel: ['magma_heart', 'Corazón de Magma', '🌋'] },
-  { id: 'bosque',   icon: '🌙', name: 'Bosque Lunar',         color: 0x9575cd, mats: [['moon_wood', 'Madera de Luna', '🌲'], ['silver_moss', 'Musgo Plateado', '🌿'], ['night_mushroom', 'Seta Nocturna', '🍄'], ['moon_resin', 'Resina Lunar', '🍯']], jewel: ['moon_tear', 'Lágrima de Luna', '💧'] },
-  { id: 'arrecife', icon: '🌺', name: 'Arrecife de Cristal',  color: 0x4dd0e1, mats: [['prism_coral', 'Coral Prisma', '🌺'], ['glass_sand', 'Arena Vítrea', '🧂'], ['neon_algae', 'Alga Neón', '🦠'], ['spiral_shell', 'Concha Espiral', '🐌']], jewel: ['black_pearl', 'Perla Negra', '⚫'] },
-  { id: 'desierto', icon: '⏳', name: 'Desierto de Relojes',  color: 0xffd54f, mats: [['slow_sand', 'Arena Lenta', '⌛'], ['fossil_gear', 'Engranaje Fósil', '⚙️'], ['clock_cactus', 'Cactus Reloj', '🌵'], ['second_dust', 'Polvo de Segundo', '🕰️']], jewel: ['eternal_minute', 'Minuto Eterno', '♾️'] },
-  { id: 'tundra',   icon: '⚡', name: 'Tundra Eléctrica',     color: 0x64b5f6, mats: [['volt_ice', 'Hielo Voltaico', '❄️'], ['static_feather', 'Pluma Estática', '🍃'], ['spark_moss', 'Musgo Chispa', '⚡'], ['blue_quartz', 'Cuarzo Azul', '🔷']], jewel: ['bottled_aurora', 'Aurora Embotellada', '🌌'] },
-  { id: 'nube',     icon: '☁️', name: 'Archipiélago Nube',    color: 0xb3e5fc, mats: [['nimbus_cotton', 'Algodón Nimbo', '☁️'], ['floating_drop', 'Gota Flotante', '💦'], ['wind_feather', 'Pluma de Viento', '🍃'], ['air_seed', 'Semilla de Aire', '🌰']], jewel: ['sleeping_bolt', 'Rayo Dormido', '🌩️'] },
-  { id: 'pantano',  icon: '🐸', name: 'Pantano Murmullo',     color: 0x81c784, mats: [['echo_mud', 'Barro Eco', '🌰'], ['whisper_reed', 'Junco Susurro', '🎍'], ['purple_peat', 'Turba Morada', '💜'], ['slow_firefly', 'Luciérnaga Lenta', '🐞']], jewel: ['bottled_secret', 'Secreto Embotellado', '🍾'] },
-  { id: 'papel',    icon: '📜', name: 'Ciudad de Papel',      color: 0xffccbc, mats: [['living_papyrus', 'Papiro Vivo', '📜'], ['wandering_ink', 'Tinta Errante', '🖋️'], ['origami_card', 'Cartón Origami', '🦢'], ['ancient_seal', 'Sello Antiguo', '🧧']], jewel: ['blank_page', 'Página en Blanco', '📄'] },
+  { id: 'dev',      icon: '🤖', name: 'Dev de IA',      short: 'Dev',      color: 0x7c4dff, act: 'Programar',    station: '💻', tag: 'Entrenas modelos y automatizas lo que haga falta',
+    mats: [['hot_amber', 'Línea de Código', '⌨️'], ['sweet_obsidian', 'Dataset Limpio', '🗂️'], ['lava_pepper', 'Prompt Maestro', '🪄'], ['golden_ash', 'Modelo Entrenado', '🧠']], jewel: ['magma_heart', 'Chip Neuronal', '💠'] },
+  { id: 'inventor', icon: '🔬', name: 'Inventor/a',     short: 'Inventor', color: 0x26a69a, act: 'Experimentar', station: '🧪', tag: 'Conviertes cualquier chatarra en un prototipo',
+    mats: [['moon_wood', 'Tornillo Cuántico', '🔩'], ['silver_moss', 'Fórmula Garabateada', '📐'], ['night_mushroom', 'Prototipo Chispeante', '🔋'], ['moon_resin', 'Patente Soñada', '📜']], jewel: ['moon_tear', 'Motor Perpetuo', '⚙️'] },
+  { id: 'chef',     icon: '👩‍🍳', name: 'Chef',          short: 'Chef',     color: 0xff7043, act: 'Cocinar',      station: '🍳', tag: 'Tus platos hacen que el sueño huela bien',
+    mats: [['prism_coral', 'Especia Rara', '🌶️'], ['glass_sand', 'Salsa Madre', '🥫'], ['neon_algae', 'Receta Secreta', '📖'], ['spiral_shell', 'Trufa de Nube', '🍄']], jewel: ['black_pearl', 'Estrella de Cocina', '⭐'] },
+  { id: 'atleta',   icon: '⚽', name: 'Atleta',         short: 'Atleta',   color: 0x43a047, act: 'Entrenar',     station: '🏃', tag: 'Corres, saltas y no te rindes nunca',
+    mats: [['slow_sand', 'Zapatilla Veloz', '👟'], ['fossil_gear', 'Bebida Isotónica', '🧃'], ['clock_cactus', 'Medalla de Plata', '🥈'], ['second_dust', 'Récord Mundial', '⏱️']], jewel: ['eternal_minute', 'Copa del Campeón', '🏆'] },
+  { id: 'actor',    icon: '🎭', name: 'Actor/Actriz',   short: 'Actor',    color: 0xe53935, act: 'Ensayar',      station: '🎬', tag: 'Cada vecino es tu público y cada día, un estreno',
+    mats: [['volt_ice', 'Guion Doblado', '📃'], ['static_feather', 'Vestuario', '👗'], ['spark_moss', 'Ovación', '👏'], ['blue_quartz', 'Papel Protagonista', '🌟']], jewel: ['bottled_aurora', 'Estatuilla Dorada', '🏅'] },
+  { id: 'cantante', icon: '🎤', name: 'Cantante',       short: 'Cantante', color: 0xec407a, act: 'Componer',     station: '🎸', tag: 'Tarareas y el planeta entero lleva el ritmo',
+    mats: [['nimbus_cotton', 'Nota Suelta', '🎵'], ['floating_drop', 'Estribillo', '🎶'], ['wind_feather', 'Maqueta', '💿'], ['air_seed', 'Disco de Oro', '📀']], jewel: ['sleeping_bolt', 'Micrófono de Diamante', '🎙️'] },
+  { id: 'youtuber', icon: '🎥', name: 'Youtuber',       short: 'Youtuber', color: 0xff1744, act: 'Grabar',       station: '📹', tag: 'Todo lo que pasa en el sueño acaba en un vídeo',
+    mats: [['echo_mud', 'Miniatura', '🖼️'], ['whisper_reed', 'Clip Divertido', '🎞️'], ['purple_peat', 'Colaboración', '🤝'], ['slow_firefly', 'Vídeo Viral', '🔥']], jewel: ['bottled_secret', 'Placa de Diamante', '💎'] },
+  { id: 'artista',  icon: '🎨', name: 'Artista',        short: 'Artista',  color: 0xffb300, act: 'Pintar',       station: '🖌️', tag: 'Ves colores donde los demás ven paredes',
+    mats: [['living_papyrus', 'Pigmento', '🧴'], ['wandering_ink', 'Boceto', '✏️'], ['origami_card', 'Lienzo', '🖼️'], ['ancient_seal', 'Obra Maestra', '🏛️']], jewel: ['blank_page', 'Musa Embotellada', '🫙'] },
 ];
 const NET_MATS = [];   // m → id de ITEMS
 NET_ORIGINS.forEach((o, oi) => o.mats.forEach(([id, name, icon], j) => {
   NET_MATS[oi * 4 + j] = id;
   ITEMS[id] = defItem({ id, name, icon, cat: 'origin', rarity: ['common', 'common', 'uncommon', 'rare'][j], sell: CFG.net.base[j], origin: o.id, net: { m: oi * 4 + j, o: oi },
-    desc: `Material nativo de ${o.icon} ${o.name}. En su origen vale poco; en otros sueños, de 3 a 12 veces más. Caduca a los ${CFG.net.decayDays} días.` });
+    desc: `Objeto de ${o.icon} ${o.name} (nivel ${j + 1} de 5). Para ese perfil vale poco; para los demás, de 3 a 12 veces más. Caduca a los ${CFG.net.decayDays} días.` });
 }));
 NET_ORIGINS.forEach((o, oi) => { const [id, name, icon] = o.jewel; NET_MATS[32 + oi] = id;
   ITEMS[id] = defItem({ id, name, icon, cat: 'origin', rarity: 'legendary', sell: CFG.net.jewelBase, origin: o.id, jewel: true, net: { m: 32 + oi, o: oi },
-    desc: `Joya nativa de ${o.icon} ${o.name}: muy rara. No caduca y no se fabrica: va a la Casa de Subastas, a los Grandes Pedidos o a la Lente Lunar.` }); });
+    desc: `Joya legendaria de ${o.icon} ${o.name} (nivel 5): muy rara. No caduca y no se fabrica: va a la Casa de Subastas, a los Grandes Pedidos o a la Lente del Oráculo.` }); });
 const NET_M = Object.fromEntries(NET_MATS.map((id, m) => [id, m]));
 /** 🏭 Manufacturas (Doc 4): productos intermedios con recetas de 2–3 orígenes · se fabrican en el Taller de Glover, el laboratorio de Dax o la cocina */
-const NET_MANUFACTURES = [
-  ['lunar_glass',  'Vidrio Lunar',       '🖼️', 'Ventanas de la Villa, lentes del Oráculo y escaparates.'],
-  ['volt_gear',    'Engranaje Voltaico', '🔩', 'Motores, relojes y chips: la pieza que lo mueve todo.'],
-  ['nimbus_cloth', 'Tela Nimbo',         '🧵', 'Moda y mochilas: abriga como una nube y no pesa nada.'],
-  ['lava_ink',     'Tinta de Lava',      '🖍️', 'Contratos y licencias de tienda (quema un poco el papel).'],
-  ['neon_bait',    'Cebo Neón',          '🐛', 'Pesca rara de noche. Los peces dicen que no lo comen. Mienten.'],
-  ['ash_brick',    'Ladrillo de Ceniza', '🧱', 'Construcciones nuevas. Glover lo acaricia cuando cree que nadie mira.'],
-  ['prism_paper',  'Papel Prisma',       '📃', 'Cartas de recomendación e invitaciones al Distrito Dorado.'],
-  ['edge_compass', 'Brújula del Borde',  '🎯', 'Rutas de Sam mejoradas: apunta a donde el mar se acaba.'],
+const NET_MANUFACTURES = [   // v1.6: productos que juntan dos o tres perfiles (los ids se conservan)
+  ['lunar_glass',  'Gadget de Cocina',  '🍳', 'Chef + Inventor/a. Ventanas, lentes del Oráculo y escaparates de alta gama.'],
+  ['volt_gear',    'Anuncio Deportivo', '📺', 'Atleta + Actor/Actriz. La pieza que mueve motores, relojes y chips.'],
+  ['nimbus_cloth', 'Sintetizador',      '🎹', 'Cantante + Inventor/a. Moda de gira y mochilas que no pesan nada.'],
+  ['lava_ink',     'Arte Generativo',   '🖼️', 'Artista + Dev de IA. Contratos y licencias de tienda con estilo.'],
+  ['neon_bait',    'Vídeo de Recetas',  '🍜', 'Chef + Youtuber. Cebo de pesca rara: hasta los peces lo ven.'],
+  ['ash_brick',    'Canal con IA',      '🤖', 'Dev de IA + Youtuber. Material para construir lo que venga.'],
+  ['prism_paper',  'Plato de Autor',    '🍽️', 'Artista + Chef. Cartas de recomendación e invitaciones al Distrito Dorado.'],
+  ['edge_compass', 'Gira Mundial',      '🌍', 'Anuncio Deportivo + Maqueta + Trufa de Nube. Rutas de Sam a donde el mar se acaba.'],
 ];
 NET_MANUFACTURES.forEach(([id, name, icon, use]) => { ITEMS[id] = defItem({ id, name, icon, cat: 'manufacture', rarity: 'uncommon', sell: 0, manufacture: true, desc: `Manufactura de la Red del Sueño. Uso: ${use}` }); });
 /** Tablas de botín (peso relativo) para objetos que se abren */
 const LOOT = {
   gift_box:       [['wood_log', 3, 40], ['stone', 3, 40], ['croissant', 2, 30], ['seashell', 2, 30], ['strawberry_cake', 1, 15], ['pearl', 1, 8], ['mystic_crystal', 1, 5]],
+  buried_chest:   [['old_coin', 3, 40], ['pearl', 1, 18], ['fossil', 1, 12], ['raw_gem', 1, 10], ['golden_fruit', 1, 10], ['star_shard', 1, 5]],   // v1.6
   merchant_crate: [['wood_log', 4, 35], ['stone', 4, 35], ['gasil_fuel', 1, 25], ['seashell', 3, 20], ['pearl', 1, 12], ['mystic_crystal', 1, 6]],
 };
 function rollLoot(table, n = 2) {
@@ -1078,6 +1117,7 @@ const ITEM_EFFECTS = {
   gasil_fuel:      () => { showToast(`⛽ Entrégasela a Sam: su avión necesita ${CFG.planeFuelNeeded} bidones (vehículos: aún no existen)`, 'text-white'); return false; },   // v0.9 · Sec. 5.4
   gift_box:        () => openLootBox('gift_box', '🎁 Caja Regalo'),
   merchant_crate:  () => openLootBox('merchant_crate', '📦 Carga del Mercante'),
+  buried_chest:    () => openLootBox('buried_chest', '🧰 Cofre Enterrado'),   // v1.6
   poor_bread:      () => { Needs.eat(30); showToast('🥖 Pan humilde pero honesto: saciedad +30', 'text-white'); },
   dream_bread:     () => { Needs.eat(50); showToast('🍞 Pan del Sueño: saciedad +50', 'text-white'); },
   grilled_fish:    () => { Needs.eat(35); showToast('🍢 Pescado a la Brasa: saciedad +35', 'text-white'); },
@@ -1157,11 +1197,11 @@ function refreshInvBadge() { const el = document.getElementById('invBadge'); if 
    ========================================================= */
 const SHOPS = {
   bear:   { name: 'Panadería del Oso', icon: '🐻', restockMin: 10, sells: [{ id: 'croissant', stock: 10 }, { id: 'cupcake', stock: 10 }, { id: 'strawberry_cake', stock: 4 }, { id: 'flour', stock: 8 }], buys: ['golden_fruit', 'seashell', 'pearl', 'wood_log'], buyMult: {} },
-  sam:    { name: 'Mercado del Puerto', icon: '🐦', restockMin: 15, sells: [{ id: 'gasil_fuel', stock: 5 }, { id: 'wood_log', stock: 10 }, { id: 'stone', stock: 10 }, { id: 'fishing_rod', stock: 2 }], buys: 'all', buyMult: { seashell: 1.5, pearl: 1.2, merchant_crate: 1, gasil_fuel: 1.5 } },   // v0.4: Caña + Gasolina ×1.5 (Sec. 5.4)
-  sombra: { name: 'Bazar Místico', icon: '🐈', restockMin: 30, sells: [{ id: 'mystic_crystal', stock: 2 }, { id: 'coffee', stock: 3 }], buys: ['mystic_crystal', 'pearl', 'golden_fruit', 'star_shard'], buyMult: { mystic_crystal: 1.3, golden_fruit: 1.1, star_shard: 1.3 } },   // v0.4: Estrella ×1.3 · Café (Sec. 5.5)
+  sam:    { name: 'Mercado del Puerto', icon: '🐦', restockMin: 15, sells: [{ id: 'gasil_fuel', stock: 5 }, { id: 'wood_log', stock: 10 }, { id: 'stone', stock: 10 }, { id: 'fishing_rod', stock: 2 }, { id: 'bug_net', stock: 2 }], buys: 'all', buyMult: { seashell: 1.5, pearl: 1.2, merchant_crate: 1, gasil_fuel: 1.5 } },   // v0.4: Caña + Gasolina ×1.5 (Sec. 5.4)
+  sombra: { name: 'Bazar Místico', icon: '🐈', restockMin: 30, sells: [{ id: 'mystic_crystal', stock: 2 }, { id: 'coffee', stock: 3 }, { id: 'detector', stock: 1 }], buys: ['mystic_crystal', 'pearl', 'golden_fruit', 'star_shard'], buyMult: { mystic_crystal: 1.3, golden_fruit: 1.1, star_shard: 1.3 } },   // v0.4: Estrella ×1.3 · Café (Sec. 5.5)
   // 🏪 TIENDA FÍSICA de la aldea (Rocco el mapache): compra de todo lo vendible y venta de materiales/consumibles básicos
   store:  { name: 'Tienda de Rocco', icon: '🦝', restockMin: 8, sells: [{ id: 'wood_log', stock: 12 }, { id: 'stone', stock: 12 }, { id: 'gasil_fuel', stock: 6 }, { id: 'croissant', stock: 6 }, { id: 'dream_wheat', stock: 12 }, { id: 'golden_fruit', stock: 2, price: 120 }], buys: 'all', buyMult: {} },
-  glover: { name: 'Taller de Glover', icon: '🐿️', restockMin: 30, sells: [{ id: 'pickaxe', stock: 2 }], buys: ['pickaxe', 'fishing_rod', 'wood_log', 'stone'], buyMult: {} },   // v0.4: herramientas (Sec. 5.7)
+  glover: { name: 'Taller de Glover', icon: '🐿️', restockMin: 30, sells: [{ id: 'pickaxe', stock: 2 }, { id: 'axe', stock: 2 }, { id: 'shovel', stock: 2 }], buys: ['pickaxe', 'fishing_rod', 'axe', 'shovel', 'bug_net', 'detector', 'wood_log', 'stone', 'dream_sap'], buyMult: {} },   // v1.6: hacha y pala   // v0.4: herramientas (Sec. 5.7)
 };
 
 /* =========================================================
@@ -3002,7 +3042,7 @@ function updateCamera(dt) {
   ui.btnPlanet.classList.toggle('active', cam.dist > 30); ui.btnPlayer.classList.toggle('active', cam.dist <= 30);
 }
 const pointers = new Map(); let pinchDist = 0, downPos = null;
-const canControl = () => !state.menuOpen && !state.modalOpen && state.mode !== 'dialog' && !state.camTween;
+const canControl = () => !state.menuOpen && !state.modalOpen && state.mode !== 'dialog' && !state.camTween && !state.toolBusy;   // v1.6: quieto mientras usas una herramienta
 
 /* ---- Joystick virtual (móvil) ---- */
 {
@@ -3098,6 +3138,7 @@ function interactWith(obj) {
   else if (it.type === 'store') { if (!canControl()) return; openApp('🦝 Tienda de Rocco', '', (b) => mountItemShop(b, 'store')); }
   else if (it.type === 'museum') Museum.open(it.set);   // v1.0 · Museo del Sueño (Sec. 10.5)
   else if (it.type === 'fair') Fair.open();             // v1.0 · Feria del Sábado (Sec. 10.6)
+  else if (it.type === 'gather') it.fn(obj);            // v1.6 · hacha, pala, detector, red y estudio del perfil
 }
 /** RECOGER FRUTA → INVENTARIO (se vende después en las tiendas por 50 $TOKEN) */
 function harvest(f) {
@@ -3134,7 +3175,7 @@ function serviceBtns(npcId) {
   if (npcId === 'bear' && typeof bearCharityAvailable === 'function' && bearCharityAvailable()) btns.push(dialogButton('🥖 Pan del Pobre (gratis)', 'bg-orange-200 text-[#2b2b3d]', () => claimCharityBread()));   // v0.3: solo aparece si estás en apuros (Sec. 4.8)
   if (npcId === 'mayor' && ((GS.housing.rentDebt || 0) > 0 || GS.housing.sealed)) btns.push(dialogButton('💼 Saldar cuentas', 'bg-emerald-200 text-[#2b2b3d]', () => GS.housing.sealed ? openSealedHousePanel() : openHousePanel()));   // S1.2 (Sec. 6.3)
   if (npcId === 'glover') btns.push(dialogButton('⛏️ Taller de Glover', 'bg-orange-200 text-[#2b2b3d]', () => openApp('🐿️ Taller de Glover', '', (b) => mountItemShop(b, 'glover'))));   // S2.2
-  if (npcId === 'sam' || npcId === 'glover') btns.push(dialogButton('🔧 Reparar herramientas', 'bg-amber-200 text-[#2b2b3d]', () => openToolsPanel(npcId)));   // S2.2 (Sec. 5.7)
+  if (npcId === 'sam' || npcId === 'glover' || npcId === 'sombra') btns.push(dialogButton('🔧 Reparar herramientas', 'bg-amber-200 text-[#2b2b3d]', () => openToolsPanel(npcId)));   // S2.2 (Sec. 5.7)
   if (npcId === 'glover' && typeof openFurnitureShop === 'function') btns.push(dialogButton('🛋️ Muebles', 'bg-emerald-200 text-[#2b2b3d]', () => openFurnitureShop()));   // S3.5 (Sec. 6.8)
   if (npcId === 'hedgehogs' && GS.missions?.hedgehogs?.status === 2) btns.push(dialogButton('🕶️ Boutique Viral', 'bg-fuchsia-200 text-[#2b2b3d]', () => Boutique.open()));   // v0.7 (Sec. 8.4 y 8.9): tras su misión
   if (npcId === 'sombra') btns.push(dialogButton('🎫 Billete del Despertar', 'bg-yellow-200 text-[#2b2b3d]', () => openDreamTicketPanel()));   // S2.5 (Sec. 5.10)
@@ -4955,12 +4996,21 @@ function shopSellTool(shopId, itemId) {
   const owner = SHOP_OWNER[shopId]; if (owner && typeof Trust !== 'undefined') Trust.addTrade(owner, total);
   showToast(`✓ Vendido ${ITEMS[itemId].icon} ${ITEMS[itemId].name} (${d}/${max}) por ${fmt(total)} $T`, 'text-white'); playBeep(1046, 0.06, 'triangle'); SaveSystem.saveNow('sell:' + itemId); return true;
 }
+const TOOL_CATALOG = [   // v1.6
+  { id: 'pickaxe', what: 'mina rocas: piedra, gemas y objetos de perfil', where: '🐿️ Taller de Glover' },
+  { id: 'fishing_rod', what: 'pesca en la orilla', where: '🐦 Mercado del Puerto (Sam)' },
+  { id: 'axe', what: 'tala árboles: troncos y savia', where: '🐿️ Taller de Glover' },
+  { id: 'shovel', what: 'excava montículos y señales', where: '🐿️ Taller de Glover' },
+  { id: 'bug_net', what: 'caza mariposas y luciérnagas', where: '🐦 Mercado del Puerto (Sam)' },
+  { id: 'detector', what: 'encuentra tesoros enterrados', where: '🐈 Bazar Místico (Sombra)' },
+];
 function openToolsPanel(npcId = null) {
   openApp(npcId ? `🔧 Reparaciones · ${npcById[npcId]?.name || npcId}` : '🛠️ Mis herramientas', '', (body) => {
     const render = () => {
       const list = GS.inventory.slots.map((s, i) => ({ s, i })).filter(o => Tools.isTool(o.s.id));
       let html = balanceBar();
-      if (!list.length) html += `<div class="app-card p-3 text-sm text-slate-600">No llevas herramientas. La 🎣 Caña de Soñador se compra en el Mercado del Puerto (Sam) y el ⛏️ Pico en el Taller de Glover.</div>`;
+      const missing = TOOL_CATALOG.filter(t => !Tools.owned(t.id));   // v1.6: catálogo de herramientas (qué hace cada una y dónde se compra)
+      if (!list.length) html += `<div class="app-card p-3 mb-2 text-sm text-slate-600">No llevas herramientas todavía.</div>`;
       list.forEach(({ s, i }) => {
         const it = ITEMS[s.id], max = Tools.max(s.id), d = Tools.dur(s), pct = Math.round(d / max * 100), rep = CFG.toolRepair[s.id];
         const broken = d <= 0, full = d >= max;
@@ -4979,7 +5029,8 @@ function openToolsPanel(npcId = null) {
             <button data-diy="${i}" class="btn-game px-2 py-1 text-[11px] ${diyOk ? 'bg-sky-200' : 'bg-slate-200 opacity-60'}" ${full ? 'disabled' : ''}>Tú mismo (${diyTxt})</button>
           </div></div>`;
       });
-      if (npcId) html += `<div class="text-[11px] text-slate-500">${npcId === 'sam' ? '🐦 Sam repara Cañas.' : '🐿️ Glover repara Picos.'} Hacerlo tú mismo cuesta materiales.</div>`;
+      if (missing.length) html += `<div class="text-xs font-bold text-slate-500 mt-3 mb-1">TE FALTAN</div>` + missing.map(t => `<div class="app-card p-2 mb-1.5 flex items-center gap-3 text-xs"><span class="text-2xl" style="filter:grayscale(.6);opacity:.7">${ITEMS[t.id].icon}</span><div class="flex-1"><b>${ITEMS[t.id].name}</b> · ${t.what}<div class="text-slate-500">Se compra en ${t.where} · ${fmt(ITEMS[t.id].buy)} $T</div></div></div>`).join('');
+      if (npcId) html += `<div class="text-[11px] text-slate-500 mt-2">${npcById[npcId]?.emoji || '🔧'} Aquí reparan: ${Object.entries(CFG.toolRepair).filter(([, r]) => r.npc === npcId).map(([id]) => ITEMS[id].icon + ' ' + ITEMS[id].name).join(', ')}. Hacerlo tú mismo cuesta materiales.</div>`;
       body.innerHTML = html;
       body.querySelectorAll('[data-diy]').forEach(b => b.onclick = () => { Tools.repairDIY(+b.dataset.diy); render(); });
       body.querySelectorAll('[data-npcfix]').forEach(b => b.onclick = () => { Tools.repairAt(+b.dataset.npcfix, npcId); render(); });
@@ -5587,10 +5638,185 @@ function updateGoalHUD() {
   if (p) p.textContent = ` · ${pct.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%${(GS.ngplus?.count | 0) > 0 ? ` · 🌙 NG+ ×${String(GS.ngplus.multiplier).replace('.', ',')}` : ''}`;
   if (b) b.style.width = (shown > 0 ? Math.max(pct, 0.6) : 0) + '%';
 }
+/* ===== v1.6 · 🛠️ ANIMACIÓN DE HERRAMIENTAS =====
+   El avatar saca la herramienta (pieza en la mano derecha) y hace el gesto: golpe (pico/hacha), cavar (pala), barrido (red), lanzar (caña),
+   barrer el suelo (detector) o trabajar en el estudio. Mientras dura, no te mueves. Al «impacto» se ejecuta la acción real. */
+const ToolAnim = (() => {
+  const C = CFG.toolAnim, W = mat(0x8d6e63), M = mat(0x9ea7b3, { metalness: 0.4, roughness: 0.4 }), props = {};
+  const mk = (id) => {
+    const g = new THREE.Group(), add = (m) => { m.castShadow = false; m.raycast = () => {}; g.add(m); return m; };
+    add(cyl(0.035, 0.035, 0.9, W, 0, -0.45, 0, 6));   // mango (hacia abajo desde la mano)
+    if (id === 'pickaxe') { const h = add(box(0.62, 0.08, 0.08, M, 0, -0.88, 0)); h.rotation.z = 0.15; }
+    else if (id === 'axe') add(box(0.06, 0.28, 0.24, M, 0, -0.82, 0.12));
+    else if (id === 'shovel') { add(box(0.24, 0.3, 0.03, M, 0, -1.02, 0)); }
+    else if (id === 'bug_net') { const r = add(new THREE.Mesh(new THREE.TorusGeometry(0.2, 0.02, 6, 16), mat(0xffffff))); r.position.set(0, -1.05, 0); const n = add(new THREE.Mesh(new THREE.SphereGeometry(0.19, 10, 8, 0, 6.29, 0, 1.6), new THREE.MeshStandardMaterial({ color: 0xe3f2fd, transparent: true, opacity: 0.6, side: THREE.DoubleSide }))); n.position.set(0, -1.05, 0); n.rotation.x = Math.PI; }
+    else if (id === 'fishing_rod') { g.children[0].scale.y = 1.6; g.children[0].position.y = -0.72; }
+    else if (id === 'detector') { add(new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 0.03, 16), mat(0xffd54f))).position.set(0, -0.95, 0.08); }
+    g.userData.noOutline = true; g.traverse(o => { o.userData.noOutline = true; }); return g;
+  };
+  let cur = null;
+  const api = {
+    get busy() { return !!cur; },
+    /** kind: herramienta (id de ITEMS) o 'studio' · onHit: acción real · dur en s */
+    play(kind, onHit, dur = C.dur[kind] ?? 0.9) {
+      if (cur) return false;
+      const parts = player.userData.parts; if (!parts?.armR) { onHit && onHit(); return true; }
+      let prop = null; if (kind !== 'studio') { prop = props[kind] ||= mk(kind); parts.armR.add(prop); prop.position.set(0, -0.62, 0.05); prop.rotation.set(0, 0, 0); }
+      cur = { kind, onHit, dur, t: 0, hit: false, prop }; state.toolBusy = true;
+      return true;
+    },
+    update(dt) {
+      if (!cur) return;
+      const c = cur, p = player.userData.parts; c.t += dt; const k = Math.min(1, c.t / c.dur), s = Math.sin(k * Math.PI);
+      const swing = (n) => { const ph = (k * n) % 1; return ph < 0.6 ? -2.6 * (ph / 0.6) : -2.6 + 3.1 * ((ph - 0.6) / 0.4); };   // levantar → golpear
+      if (c.kind === 'pickaxe' || c.kind === 'axe') { p.armR.rotation.set(swing(2), 0, 0); p.armL.rotation.x = -0.4 * s; }
+      else if (c.kind === 'shovel') { p.armR.rotation.set(-0.6 - 0.9 * Math.abs(Math.sin(k * Math.PI * 3)), 0, 0); p.armL.rotation.x = -0.9; }
+      else if (c.kind === 'bug_net') { p.armR.rotation.set(-1.6, 0, -1.2 + 2.4 * k); }
+      else if (c.kind === 'fishing_rod') { p.armR.rotation.set(k < 0.5 ? -2.8 * (k / 0.5) : -2.8 + 2.2 * ((k - 0.5) / 0.5), 0, 0); }
+      else if (c.kind === 'detector') { p.armR.rotation.set(-0.7, 0, Math.sin(k * Math.PI * 4) * 0.6); }
+      else if (c.kind === 'studio') { p.armR.rotation.set(-2.6 + Math.sin(c.t * 9) * 0.4, 0, 0); p.armL.rotation.set(-2.6 - Math.sin(c.t * 9) * 0.4, 0, 0); }
+      if (!c.hit && k >= (C.hitAt[c.kind] ?? 0.75)) { c.hit = true; try { c.onHit && c.onHit(); } catch (e) { console.warn('[ToolAnim]', e); } }
+      if (k >= 1) { if (c.prop) c.prop.parent?.remove(c.prop); p.armR.rotation.set(0, 0, 0); p.armL.rotation.set(0, 0, 0); cur = null; state.toolBusy = false; }
+    },
+  };
+  return api;
+})();
+
+/* ===== v1.6 · 🌱 RECOLECCIÓN NUEVA: hacha (árboles), pala (montículos), detector (tesoros ocultos), red (mariposas y luciérnagas) y estudio de perfil =====
+   Todo es determinista por (partida, día): los montículos y señales se reparten cada día y lo cogido se guarda en GS.world.gather.
+   Cada herramienta se gasta (durabilidad) y se repara en su tienda o a mano (mantenimiento). Y todo puede dar objetos de tu perfil (Net.grant). */
+const Gather = (() => {
+  const G = CFG.gather, _v = new THREE.Vector3(), _wp = new THREE.Vector3();
+  const st = () => { const w = GS.world; w.gather ||= {}; const g = w.gather; const d = GS.daily.dayCount | 0; if (g.day !== d) { g.day = d; g.dug = []; g.chopped = []; g.found = []; g.bugs = 0; } return g; };
+  const rngDay = (tag) => mulberry32(_hashStr(GS.meta.saveId + ':' + tag + ':' + (GS.daily.dayCount | 0)));
+  const nearVillage = (r, maxAng) => { for (let i = 0; i < 40; i++) { const d = siteDir(S_V, (r() - 0.5) * 2 * maxAng * R, (r() - 0.5) * 2 * maxAng * R); if (isLand(d) && !colliders.some(c => c.pos.distanceTo(_v.copy(d).multiplyScalar(heightAt(d))) < c.r + 0.8)) return d; } return null; };
+  const roll = (tbl) => { let s = Math.random() * tbl.reduce((a, x) => a + x[1], 0); for (const [id, w, q] of tbl) if ((s -= w) < 0) return [id, typeof q === 'number' ? q : q[0] + Math.floor(Math.random() * (q[1] - q[0] + 1))]; return null; };
+  const give = (list, label) => { const ok = list.filter(Boolean); if (!Inventory.canAddMany(ok, null)) { showToast('🎒 Inventario lleno', 'text-red-200'); return false; } ok.forEach(([id, q]) => Inventory.add(id, q, { silent: true })); if (ok.length) showToast(`${label} → ${ok.map(([id, q]) => `${ITEMS[id].icon} ${ITEMS[id].name} ×${q}`).join(' · ')}`, 'text-white'); return true; };
+  const needTool = (id) => { if (Tools.usable(id)) return true; showToast(Tools.needMsg(id), 'text-red-200'); return false; };
+  const sfx = () => { playBeep(320 + Math.random() * 80, 0.06, 'square'); };
+
+  /* --- 🪓 Hacha: el árbol más cercano (1 vez por árbol y día) --- */
+  const chopSpot = new THREE.Group(); chopSpot.visible = false; scene.add(chopSpot); let chopIdx = -1;
+  registerInteractable(chopSpot, { type: 'gather', label: 'Talar 🪓', fn: () => chop() });
+  function chop() {
+    if (!needTool('axe')) return; const g = st(), i = chopIdx; if (i < 0 || g.chopped.includes(i)) return;
+    ToolAnim.play('axe', () => { sfx(); if (!g.chopped.includes(i)) g.chopped.push(i); Tools.wear('axe');
+      const got = [['wood_log', 1 + (Math.random() < 0.5 ? 1 : 0)]]; if (Math.random() < G.chop.fruit) got.push(['golden_fruit', 1]); if (Math.random() < G.chop.sap) got.push(['dream_sap', 1]);
+      give(got, '🪓 Talas el árbol'); Net.grant('chop'); chopSpot.visible = false; SaveSystem.save('chop'); });
+  }
+  /* --- 🕳️ Pala: montículos del día · 🧲 Detector: señales enterradas que solo ves con él (y se cavan con la pala) --- */
+  const moundMat = mat(0x8d6e63, { flatShading: true }), sparkMat = new THREE.SpriteMaterial({ map: DOT_TEX, color: 0xfff3b0, transparent: true, depthWrite: false });
+  const ringMat = new THREE.MeshBasicMaterial({ color: 0x7dffa8, transparent: true, opacity: 0.7, side: THREE.DoubleSide, depthWrite: false });
+  const mounds = [], signals = []; let builtDay = -1;
+  function clearAll() { [...mounds, ...signals].forEach(m => { scene.remove(m); const k = interactables.indexOf(m); if (k >= 0) interactables.splice(k, 1); }); mounds.length = 0; signals.length = 0; }
+  function build() {
+    clearAll(); const g = st(); builtDay = g.day;
+    const r = rngDay('mounds'); for (let i = 0; i < G.dig.perDay; i++) { const d = nearVillage(r, G.dig.ang); if (!d) continue; const key = 'm' + i; if (g.dug.includes(key)) continue;
+      const m = new THREE.Group(); const hill = mesh(new THREE.SphereGeometry(0.42, 8, 5, 0, 6.29, 0, 1.5), moundMat, 0, -0.08, 0); hill.scale.y = 0.55; m.add(hill);
+      const sp = new THREE.Sprite(sparkMat); sp.scale.setScalar(0.35); sp.position.y = 0.45; m.add(sp); m.userData.spark = sp;
+      placeOnPlanet(m, d, r() * 6); m.userData.key = key; scene.add(m); registerInteractable(m, { type: 'gather', label: 'Excavar el montículo 🕳️', fn: (o) => dig(o, false) }); mounds.push(m); }
+    const r2 = rngDay('signals'); for (let i = 0; i < G.detect.perDay; i++) { const d = nearVillage(r2, G.detect.ang); if (!d) continue; const key = 's' + i; if (g.dug.includes(key)) continue;
+      const s = new THREE.Group(); const ring = new THREE.Mesh(new THREE.RingGeometry(0.35, 0.48, 24).rotateX(-Math.PI / 2), ringMat); ring.position.y = 0.04; ring.raycast = () => {}; s.add(ring); s.userData.ring = ring;
+      placeOnPlanet(s, d, 0); s.userData.key = key; s.visible = false; scene.add(s); registerInteractable(s, { type: 'gather', label: 'Cavar la señal del detector 🧲', fn: (o) => dig(o, true) }); signals.push(s); }
+  }
+  function dig(o, treasure) {
+    if (!needTool('shovel')) return; const g = st(), key = o.userData.key; if (g.dug.includes(key)) return;
+    ToolAnim.play('shovel', () => { sfx(); g.dug.push(key); Tools.wear('shovel'); if (treasure) Tools.wear('detector');
+      const T = treasure ? G.detect.loot : G.dig.loot, got = [roll(T)]; if (Math.random() < (treasure ? 0.5 : 0.25)) got.push(roll(T));
+      give(got, treasure ? '🧲 ¡Tesoro enterrado!' : '🕳️ Excavas el montículo'); Net.grant(treasure ? 'detect' : 'dig');
+      scene.remove(o); const k = interactables.indexOf(o); if (k >= 0) interactables.splice(k, 1); SaveSystem.save('dig'); if (treasure) playChime(); });
+  }
+  /* --- 🦋 Red: mariposas de día, luciérnagas de noche, revoloteando cerca de ti --- */
+  const bugTex = {}; const tex = (e) => bugTex[e] ||= (() => { const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d'); x.font = '48px "Segoe UI Emoji","Apple Color Emoji","Noto Color Emoji",sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(e, 32, 36); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.userData.shared = true; return t; })();
+  const bugs = [];
+  function spawnBug(night) {
+    const up = player.userData.dir, a = Math.random() * 6.283, dist = (6 + Math.random() * 6) / R, t1 = _v.set(0, 1, 0).cross(up); if (t1.lengthSq() < 1e-4) t1.set(1, 0, 0); t1.normalize(); const t2 = new THREE.Vector3().crossVectors(up, t1);
+    const d = up.clone().multiplyScalar(Math.cos(dist)).addScaledVector(t1, Math.sin(dist) * Math.cos(a)).addScaledVector(t2, Math.sin(dist) * Math.sin(a)).normalize(); if (!isLand(d)) return;
+    const rare = Math.random() < G.bug.rare;
+    const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex(night ? '🟡' : '🦋'), color: night ? 0xfff59d : rare ? 0xff80ab : 0xffffff, transparent: true, depthWrite: false, fog: false }));
+    if (night) { s.material.map = DOT_TEX; s.material.blending = THREE.AdditiveBlending; }
+    s.scale.setScalar(night ? 0.32 : 0.5); s.userData = { dir: d, ph: Math.random() * 6, rare, night, life: G.bug.lifeS };
+    const holder = new THREE.Group(); holder.add(s); scene.add(holder); holder.userData = s.userData; holder.userData.sprite = s;
+    registerInteractable(holder, { type: 'gather', label: night ? 'Cazar la luciérnaga ✨' : rare ? 'Cazar la mariposa arcoíris 🌈' : 'Cazar la mariposa 🦋', fn: (o) => catchBug(o) });
+    bugs.push(holder);
+  }
+  function removeBug(o) { scene.remove(o); o.userData.sprite.material.dispose(); const k = interactables.indexOf(o); if (k >= 0) interactables.splice(k, 1); const j = bugs.indexOf(o); if (j >= 0) bugs.splice(j, 1); }
+  function catchBug(o) {
+    if (!needTool('bug_net')) return; const g = st(); if (g.bugs >= G.bug.perDay) { showToast(`🦋 Por hoy ya has cazado ${G.bug.perDay}: deja algunas para mañana`, 'text-white'); return; }
+    ToolAnim.play('bug_net', () => { if (!o.parent) return; const u = o.userData; Tools.wear('bug_net'); g.bugs++;
+      if (Math.random() < G.bug.escape) { showToast('💨 ¡Se te ha escapado!', 'text-white'); removeBug(o); return; }
+      give([[u.night ? 'firefly_jar' : u.rare ? 'rainbow_butterfly' : 'dream_butterfly', 1]], u.night ? '✨ Atrapas una luciérnaga' : '🦋 Atrapas una mariposa'); Net.grant('bug'); removeBug(o); SaveSystem.save('bug'); });
+  }
+  /* --- bucle --- */
+  let acc = 0; const pos = new THREE.Vector3();
+  function update(dt, t) {
+    if (!SaveSystem.started || Interiors.active) return;
+    const g = st(); if (builtDay !== g.day) build();
+    mounds.forEach((m, i) => { const sp = m.userData.spark; sp.material.opacity = 0.5 + 0.5 * Math.sin(t * 3 + i); sp.position.y = 0.45 + Math.sin(t * 2 + i) * 0.06; });
+    const hasDet = Tools.usable('detector');
+    signals.forEach(s => { s.getWorldPosition(_wp); const near = hasDet && player.position.distanceTo(_wp) < G.detect.range; s.visible = near; if (near) { const k = (t * 1.5) % 1; s.userData.ring.scale.setScalar(0.6 + k * 1.2); ringMat.opacity = 0.8 * (1 - k); } });
+    // mariposas / luciérnagas
+    const night = isNightNow(), want = Weather.id() === 'rain' || Weather.id() === 'storm' ? 0 : night ? G.bug.night : G.bug.day;
+    for (let i = bugs.length - 1; i >= 0; i--) { const b = bugs[i], u = b.userData; u.life -= dt; if (u.life <= 0 || u.night !== night || b.position.distanceTo(player.position) > 22) { removeBug(b); continue; }
+      u.ph += dt; const lift = 1.1 + Math.sin(u.ph * 2.2) * 0.35; placeOnPlanet(b, u.dir, 0, lift); u.dir.applyAxisAngle(pos.set(Math.sin(u.ph * 0.7), Math.cos(u.ph * 0.5), Math.sin(u.ph * 0.3)).normalize(), dt * 0.02); u.sprite.material.rotation = Math.sin(u.ph * 8) * 0.25; }
+    acc += dt; if (acc > 1.2) { acc = 0; if (bugs.length < want) spawnBug(night); }
+    // hacha: árbol más cercano
+    let best = -1, bd = 2.6; if (Tools.owned('axe') && !state.swimming) for (let i = 0; i < treeDirs.length; i++) { _v.copy(treeDirs[i]).multiplyScalar(heightAt(treeDirs[i])); const d = _v.distanceTo(player.position); if (d < bd && !g.chopped.includes(i)) { bd = d; best = i; } }
+    chopIdx = best; chopSpot.visible = best >= 0; if (best >= 0) chopSpot.position.copy(treeDirs[best]).multiplyScalar(heightAt(treeDirs[best]) + 0.5);
+  }
+  return { update, build, chop, dig, catchBug, bugs, mounds, signals };
+})();
+
+/* ===== v1.6 · 🏠 ESTUDIO DEL PERFIL (junto a casa): tu acción propia (Programar, Cocinar, Grabar…), 3 veces al día,
+   con mantenimiento: tras N sesiones hay que repararlo (materiales o $TOKEN). Da objetos de tu perfil de niveles 1–3. ===== */
+const Studio = (() => {
+  const S = CFG.studio; let obj = null, icon = null;
+  const ss = () => { const n = Net.st(); n.studio ||= { day: -1, used: 0, wear: 0 }; const s = n.studio; const d = GS.daily.dayCount | 0; if (s.day !== d) { s.day = d; s.used = 0; } return s; };
+  const iconTex = (e, col) => { const c = document.createElement('canvas'); c.width = c.height = 128; const x = c.getContext('2d'); x.fillStyle = '#2b2b3d'; x.beginPath(); x.arc(64, 64, 60, 0, 6.29); x.fill(); x.fillStyle = col; x.beginPath(); x.arc(64, 64, 53, 0, 6.29); x.fill(); x.font = '70px "Segoe UI Emoji","Apple Color Emoji","Noto Color Emoji",sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(e, 64, 70); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t; };
+  function label() { const o = NET_ORIGINS[Net.origin()], s = ss(); if (s.wear >= S.maint) return `🔧 Mantenimiento del estudio (${S.fixFee} $T o materiales)`; return `${o.station} ${o.act} (${S.perDay - s.used}/${S.perDay} hoy)`; }
+  function place() {
+    if (obj || !Number.isInteger(Net.origin())) return; const o = NET_ORIGINS[Net.origin()], col = '#' + o.color.toString(16).padStart(6, '0');
+    const g = new THREE.Group();
+    g.add(cyl(1.25, 1.3, 0.12, mat(0xf3e5ab), 0, 0.06, 0, 20));                                   // tarima
+    g.add(box(1.4, 0.08, 0.7, mat(0xa1887f), 0, 0.82, -0.25)); [-0.6, 0.6].forEach(x => g.add(box(0.08, 0.76, 0.6, mat(0x8d6e63), x, 0.42, -0.25)));   // mesa
+    g.add(box(0.5, 0.36, 0.05, mat(o.color, { emissive: o.color, emissiveIntensity: 0.35 }), 0, 1.06, -0.45));   // «pantalla/obra» con el color del perfil
+    const awn = box(2.0, 0.08, 1.2, mat(o.color), 0, 2.05, -0.1); awn.rotation.x = 0.18; g.add(awn); [-0.95, 0.95].forEach(x => g.add(cyl(0.05, 0.05, 2.0, mat(0xffffff), x, 1.0, -0.62, 6)));
+    icon = new THREE.Sprite(new THREE.SpriteMaterial({ map: iconTex(o.station, col + 'cc'), transparent: true, depthWrite: false })); icon.scale.setScalar(0.9); icon.position.y = 2.75; g.add(icon);
+    placeAtSite(g, S_V, ...S.pos, 0); scene.add(g); colliders.push({ pos: g.position.clone(), r: 1.2 });
+    registerInteractable(g, { type: 'gather', label: label(), fn: () => work() }); obj = g;
+    if (typeof Decor !== 'undefined') Decor.clearAround(g.position.clone().normalize(), 1.6 / R);
+  }
+  function work() {
+    const s = ss(), o = NET_ORIGINS[Net.origin()];
+    if (s.wear >= S.maint) { maintain(); return; }
+    if (s.used >= S.perDay) { showToast(`${o.station} Por hoy ya has ${o.act === 'Pintar' ? 'pintado' : 'trabajado'} bastante: vuelve mañana`, 'text-white'); return; }
+    if (GS.needs.hunger < S.hunger + 5) { showToast('🍞 Tienes demasiada hambre para concentrarte', 'text-red-200'); return; }
+    ToolAnim.play('studio', () => {
+      s.used++; s.wear++; Needs.eat(-S.hunger);
+      const got = Net.grant('studio'); if (Math.random() < S.bonusP) got.push(...Net.grant('studio'));
+      if (!got.length) showToast(`${o.station} Hoy tu mundo ya no da más de lo tuyo (cupo agotado): mañana habrá más`, 'text-white');
+      if (Math.random() < S.inspireP) { const id = o.mats[2][0]; Inventory.add(id, 1, { silent: true }); Net.lotsAdd(id, 1, Net.today()); showToast(`💡 ¡Inspiración! ${ITEMS[id].icon} ${ITEMS[id].name}`, 'text-amber-200'); }
+      for (let i = 0; i < 6; i++) spawnConfetti(obj.position.clone().addScaledVector(obj.userData.dir, 2.4), 3);
+      if (s.wear === S.maint) showToast('🔧 Tu estudio necesita mantenimiento antes de la próxima sesión', 'text-amber-200');
+      SaveSystem.save('studio');
+    }, S.secs);
+  }
+  function maintain() {
+    const s = ss(), hasMats = S.fixMats.every(([id, q]) => Inventory.has(id, q));
+    if (hasMats) S.fixMats.forEach(([id, q]) => Inventory.remove(id, q)); else if (!Wallet.spend(S.fixFee, 'Mantenimiento del estudio')) return;
+    s.wear = 0; showToast(`🔧 Estudio a punto (${hasMats ? S.fixMats.map(([id, q]) => `${q} ${ITEMS[id].icon}`).join(' + ') : S.fixFee + ' $T'})`, 'text-white'); playBeep(660, 0.08, 'triangle'); SaveSystem.saveNow('studio-fix');
+  }
+  function update(t) { if (!obj) return; obj.userData.interact.label = label(); if (icon) icon.position.y = 2.75 + Math.sin(t * 2) * 0.08; }
+  return { place, work, maintain, update, get obj() { return obj; } };
+})();
+
+// v1.6: el pico y la caña también se animan
+{ const _hit = Mining.hit; Mining.hit = (g) => { if (state.toolBusy || !Tools.usable('pickaxe')) return _hit.call(Mining, g); ToolAnim.play('pickaxe', () => _hit.call(Mining, g)); }; }
+{ const _cast = Fishing.cast; Fishing.cast = () => { if (state.toolBusy || !Tools.usable('fishing_rod')) return _cast.call(Fishing); ToolAnim.play('fishing_rod', () => _cast.call(Fishing)); }; }
 function animate() {
   requestAnimationFrame(animate);
   const rawDt = clock.getDelta(), dt = Math.min(rawDt, 0.05), t = clock.elapsedTime; GFX.update(dt, rawDt);   // v1.4: gobernador de FPS + viñeta
-  updatePlayer(dt); if (!state.cinematic) Needs.update(dt); updateNPCs(dt, t); Awakening.update(dt, t); /* v0.9: el sueño se detiene durante la escena del puerto */ updateCamera(dt); updateSun(); updateNeon(dt, t); updateUnlocks(dt, t); updateShip(dt); updateConfetti(dt); updateWater(t); V10.update(dt, t); ShootingStars.update(dt, 1 - (state.dayAmt ?? 1)); WIND_U.uTime.value = t; { const w = Weather.id(), tw = (w === 'storm' ? 2.8 : w === 'rain' ? 2 : 1) * lerp(0.5, 1, state.dayAmt ?? 1); WIND_U.uWind.value += (tw - WIND_U.uWind.value) * Math.min(1, dt * 0.8); }
+  updatePlayer(dt); ToolAnim.update(dt); Gather.update(dt, t); Studio.update(t); if (!state.cinematic) Needs.update(dt); updateNPCs(dt, t); Awakening.update(dt, t); /* v0.9: el sueño se detiene durante la escena del puerto */ updateCamera(dt); updateSun(); updateNeon(dt, t); updateUnlocks(dt, t); updateShip(dt); updateConfetti(dt); updateWater(t); V10.update(dt, t); ShootingStars.update(dt, 1 - (state.dayAmt ?? 1)); WIND_U.uTime.value = t; { const w = Weather.id(), tw = (w === 'storm' ? 2.8 : w === 'rain' ? 2 : 1) * lerp(0.5, 1, state.dayAmt ?? 1); WIND_U.uWind.value += (tw - WIND_U.uWind.value) * Math.min(1, dt * 0.8); }
   clouds.children.forEach(p => { p.rotateY(p.userData.speed * dt); const c = p.userData.bob; if (c) c.position.z = c.userData.z0 + Math.sin(t * 0.3 + c.userData.ph) * 0.25; });   // v1.5: las nubes «respiran» arriba y abajo
   updateTokens(); updateGoalHUD(); updateClockHUD(); Weather.update(dt); Fishing.update(dt); Mining.update(dt); StarFall.update(dt); Net.update(dt);
   if (SaveSystem.started && !state.menuOpen && !state.cinematic) {
@@ -8499,16 +8725,16 @@ const NET_RECIPES = [
 ];
 /** Mejoras (Doc 4): se instalan una vez y su efecto es permanente en esta partida (GS.net.up). Efectos: CFG.net.up. */
 const NET_UPGRADES = [
-  { id: 'coral_rod',        icon: '🎣', name: 'Caña de Coral',          station: 'glover', in: [['prism_coral', 5], ['moon_wood', 5], ['volt_ice', 5]], fx: 'Pesca rara ×1,5 y la caña dura el doble' },
-  { id: 'volt_pick',        icon: '⛏️', name: 'Pico Voltaico',          station: 'glover', in: [['blue_quartz', 5], ['sweet_obsidian', 5], ['fossil_gear', 5]], fx: 'Gemas ×2 y el pico no se gasta con niebla' },
+  { id: 'coral_rod',        icon: '🎣', name: 'Caña Profesional',          station: 'glover', in: [['prism_coral', 5], ['moon_wood', 5], ['volt_ice', 5]], fx: 'Pesca rara ×1,5 y la caña dura el doble' },
+  { id: 'volt_pick',        icon: '⛏️', name: 'Pico Turbo',          station: 'glover', in: [['blue_quartz', 5], ['sweet_obsidian', 5], ['fossil_gear', 5]], fx: 'Gemas ×2 y el pico no se gasta con niebla' },
   { id: 'laptop_chip',      icon: '💾', name: 'Chip de Laptop',         station: 'dax',    in: [['volt_gear', 2], ['wandering_ink', 5], ['nimbus_cotton', 5]], fx: 'La laptop genera el doble de rápido' },
-  { id: 'magma_oven',       icon: '🔥', name: 'Horno de Magma',         station: 'glover', in: [['sweet_obsidian', 5], ['ash_brick', 2], ['hot_amber', 5]], fx: '+1 lote de cocina y lotes un 40 % más rápidos' },
-  { id: 'lunar_fert',       icon: '🌱', name: 'Fertilizante Lunar',     station: 'dax',    in: [['silver_moss', 5], ['purple_peat', 5], ['floating_drop', 5]], fx: 'El jardín da el doble de trigo' },
-  { id: 'nimbus_pack',      icon: '🎒', name: 'Mochila Nimbo',          station: 'glover', in: [['nimbus_cloth', 2], ['static_feather', 5]], fx: '+20 huecos de inventario' },
-  { id: 'spark_boots',      icon: '👢', name: 'Botas Chispa',           station: 'glover', in: [['spark_moss', 5], ['slow_sand', 5], ['whisper_reed', 5]], fx: '+15 % de velocidad permanente' },
-  { id: 'cloud_engine',     icon: '⛵', name: 'Motor de Nube',          station: 'dax',    in: [['volt_gear', 2], ['air_seed', 5], ['prism_coral', 5]], fx: '+2 importaciones de Sam al día (pedidos de Ultramar)' },
-  { id: 'lunar_lens',       icon: '🔭', name: 'Lente Lunar',            station: 'dax',    in: [['lunar_glass', 2], ['second_dust', 5], ['bottled_secret', 1]], fx: 'El Oráculo muestra su confianza real de ese día (no sube el acierto)' },
-  { id: 'paper_safe',       icon: '🗃️', name: 'Caja Fuerte Papel',      station: 'glover', in: [['ancient_seal', 5], ['origami_card', 5], ['sweet_obsidian', 5]], fx: 'Otro 10 % del capital exento de la tasa diaria' },
+  { id: 'magma_oven',       icon: '🔥', name: 'Horno de Chef',         station: 'glover', in: [['sweet_obsidian', 5], ['ash_brick', 2], ['hot_amber', 5]], fx: '+1 lote de cocina y lotes un 40 % más rápidos' },
+  { id: 'lunar_fert',       icon: '🌱', name: 'Fertilizante Inteligente',     station: 'dax',    in: [['silver_moss', 5], ['purple_peat', 5], ['floating_drop', 5]], fx: 'El jardín da el doble de trigo' },
+  { id: 'nimbus_pack',      icon: '🎒', name: 'Mochila de Gira',          station: 'glover', in: [['nimbus_cloth', 2], ['static_feather', 5]], fx: '+20 huecos de inventario' },
+  { id: 'spark_boots',      icon: '👢', name: 'Botas de Atleta',           station: 'glover', in: [['spark_moss', 5], ['slow_sand', 5], ['whisper_reed', 5]], fx: '+15 % de velocidad permanente' },
+  { id: 'cloud_engine',     icon: '⛵', name: 'Motor de Gira',          station: 'dax',    in: [['volt_gear', 2], ['air_seed', 5], ['prism_coral', 5]], fx: '+2 importaciones de Sam al día (pedidos de Ultramar)' },
+  { id: 'lunar_lens',       icon: '🔭', name: 'Lente del Oráculo',            station: 'dax',    in: [['lunar_glass', 2], ['second_dust', 5], ['bottled_secret', 1]], fx: 'El Oráculo muestra su confianza real de ese día (no sube el acierto)' },
+  { id: 'paper_safe',       icon: '🗃️', name: 'Caja Fuerte de Artista',      station: 'glover', in: [['ancient_seal', 5], ['origami_card', 5], ['sweet_obsidian', 5]], fx: 'Otro 10 % del capital exento de la tasa diaria' },
   { id: 'crystal_showcase', icon: '🖼️', name: 'Escaparate de Cristal',  station: 'glover', in: [['lunar_glass', 2], ['prism_coral', 5], ['ash_brick', 2]], fx: '+4 huecos de escaparate en casa (Tienda o Villa)' },
   { id: 'net_antenna',      icon: '📡', name: 'Antena de la Red',       station: 'dax',    in: [['static_feather', 5], ['volt_gear', 2], ['whisper_reed', 5]], fx: 'Ves el Índice de la Red desde el PC de casa' },
 ];
@@ -8563,7 +8789,7 @@ const Crafting = {
   },
 };
 /* ---------- 🙋 Net · el jugador en la Red (y su origen en el sueño offline) ---------- */
-const NET_NPC_PREF = { bear: [0, 1, 5], glover: [3, 6, 0], sombra: [1, 6, 2], dax: [4, 3, 2], sam: [2, 5, 4], mayor: [7, 3, 1], hedgehogs: null };   // Doc 5: cada vecino pide según su personalidad (orígenes preferidos)
+const NET_NPC_PREF = { bear: [2, 6, 5], glover: [1, 0, 3], sombra: [7, 4, 5], dax: [0, 1, 6], sam: [2, 3, 5], mayor: [4, 7, 6], hedgehogs: null };   // v1.6: perfiles que más le interesan a cada vecino   // Doc 5: cada vecino pide según su personalidad (orígenes preferidos)
 const NET_REQ_TEXT = {
   bear: (l) => `¡Eh, eh! Para mi receta nueva necesito ${l}. ¡En la Red seguro que alguien lo tiene!`,
   glover: (l) => `Obra nueva, socio: me hacen falta ${l}. Material de verdad, no de catálogo.`,
@@ -8596,7 +8822,7 @@ const Net = {
     if (!(Array.isArray(st.aff) && st.aff.length === 2 && st.aff.every(m => netOrig(m) !== st.origin))) st.aff = others.slice(0, 2).map(o => o * 4 + Math.floor(r() * 4));
     NetEco.create(st.seed, bots, { playerOrigin: st.origin }); st.w = NetEco.W;
     st.on = true; st.startDay = this.today(); st.reqDay = 0; this.genRequests(); this.rollSpawn(true);
-    if (!silent) addLetter('🐈 M. Sombra', `Mmm… te has dormido delante de la pantalla, soñador. Bienvenido a la Red del Sueño (modo demo: los demás comerciantes son bots, y lo sé porque los soñé yo).\n\nTu Origen Onírico es ${NET_ORIGINS[st.origin].icon} ${NET_ORIGINS[st.origin].name}. Desde hoy tu sueño da sus materiales: en tu mundo valen poco, en otros mucho. Comercia.`);
+    if (!silent) addLetter('🐈 M. Sombra', `Mmm… te has dormido delante de la pantalla, soñador. Bienvenido a la Red del Sueño (modo demo: los demás comerciantes son bots, y lo sé porque los soñé yo).\n\nSé lo que eras: ${NET_ORIGINS[st.origin].icon} ${NET_ORIGINS[st.origin].name}. Tu sueño da sus objetos: a ti te sobran, a otros les faltan. Comercia.`);
     SaveSystem.saveNow('net-activate'); return true;
   },
   /** Al cargar (applyGameStateToWorld): re-engancha el mundo, sin volver a dentro (se despierta en casa) */
@@ -8634,8 +8860,8 @@ const Net = {
       if (pick[2] === 'aff') sp.aff[pick[0]]--; else sp.rem[pick[0]]--;
       this.lotsAdd(id, 1, this.today()); got.push(id);
     }
-    if (sp.jewel > 0 && (src === 'crate' || src === 'mine')) { const jid = NET_MATS[32 + st.origin]; if (Inventory.add(jid, 1, { silent: true })) { sp.jewel = 0; got.push(jid); } }
-    if (got.length) { const o = NET_ORIGINS[st.origin], c = {}; got.forEach(id => c[id] = (c[id] || 0) + 1); showToast(`${o.icon} Tu origen: ${Object.entries(c).map(([id, q]) => `${ITEMS[id].icon} +${q} ${ITEMS[id].name}`).join(' · ')}`, ITEMS[got[0]].jewel || got.some(id => ITEMS[id].jewel) ? 'text-amber-200' : 'text-white'); GS.stats.netSpawned = (GS.stats.netSpawned || 0) + got.length; SaveSystem.save('net-spawn'); }
+    if (sp.jewel > 0 && (src === 'crate' || src === 'mine' || src === 'detect')) { const jid = NET_MATS[32 + st.origin]; if (Inventory.add(jid, 1, { silent: true })) { sp.jewel = 0; got.push(jid); } }
+    if (got.length) { const o = NET_ORIGINS[st.origin], c = {}; got.forEach(id => c[id] = (c[id] || 0) + 1); showToast(`${o.icon} ${o.short}: ${Object.entries(c).map(([id, q]) => `${ITEMS[id].icon} +${q} ${ITEMS[id].name}`).join(' · ')}`, ITEMS[got[0]].jewel || got.some(id => ITEMS[id].jewel) ? 'text-amber-200' : 'text-white'); GS.stats.netSpawned = (GS.stats.netSpawned || 0) + got.length; SaveSystem.save('net-spawn'); }
     return got;
   },
   /* ---------- ⏳ Caducidad (5 días; las joyas no) · lotes por día de llegada, FIFO ---------- */
@@ -8771,7 +8997,7 @@ const Net = {
   barterEval(i, give, get) {
     const W = this.W(); if (!W || !W.bots[i]) return { ok: false, why: 'Ese comerciante no está' };
     const b = W.bots[i], s = NetEco.S[i];
-    for (const [id, q] of Object.entries(give.items || {})) { if (NET_M[id] === undefined) return { ok: false, why: 'Solo se truecan materiales y joyas de origen' }; if (!Inventory.has(id, q)) return { ok: false, why: `No tienes ${q}× ${ITEMS[id].name}` }; }
+    for (const [id, q] of Object.entries(give.items || {})) { if (NET_M[id] === undefined) return { ok: false, why: 'Solo se truecan objetos de perfil' }; if (!Inventory.has(id, q)) return { ok: false, why: `No tienes ${q}× ${ITEMS[id].name}` }; }
     for (const [id, q] of Object.entries(get || {})) { const m = NET_M[id]; if ((b.inv[m] || 0) < q) return { ok: false, why: `${s.name} no tiene ${q}× ${ITEMS[id].name}` }; }
     const money = Math.max(0, Math.floor(give.money || 0)), vin = Object.entries(give.items || {}).reduce((a, [id, q]) => a + this.botValue(i, NET_M[id], true) * q, 0) + money;
     const vout = Object.entries(get || {}).reduce((a, [id, q]) => a + this.botValue(i, NET_M[id], false) * q, 0);
@@ -8980,7 +9206,7 @@ const Net = {
     this._pending = [];
     this.shopSettle(charges);
     NetEco.endDay();
-    const lost = this.decay(), nLost = Object.values(lost).reduce((a, b) => a + b, 0); if (nLost) charges.push({ label: `⏳ Red: caducaron ${nLost} materiales de origen`, note: '5 días' });
+    const lost = this.decay(), nLost = Object.values(lost).reduce((a, b) => a + b, 0); if (nLost) charges.push({ label: `⏳ Red: caducaron ${nLost} objetos de perfil`, note: '5 días' });
     this.genRequests(); NetEco.startDay(); NetEco.tick(0); this.rollSpawn();
     const sh = st.shop; if (sh.tier && sh.box >= 1) charges.push({ label: `🏪 Red: caja de tu tienda`, note: `${fmt(Math.floor(sh.box))} $T por recoger` });
     this._flush();
@@ -9161,7 +9387,7 @@ const NetWorld = {
         { type: 'facade', x: 9.2, z: -9.0, o: { w: 6, text: 'OFICINA DE CONTRATOS', color: 0xe8f5e9, roof: 0x2e7d32, icon: '📜' }, act: 'contratos', label: '📜 Oficina de Contratos', range: 1.4 },
         { type: 'facade', x: -12.4, z: 3.6, rot: Math.PI / 2, o: { w: 5, h: 3.6, text: 'ADUANA', color: 0xe3f2fd, roof: 0x1565c0, icon: '🛃' }, act: 'aduana', label: '🛃 Aduana (traer lo comprado a tu sueño)', range: 1.4 },
         { type: 'kiosk', x: 6.2, z: 5.6, rot: -0.5, o: { text: 'PEDIDOS', color: 0xffcc80, icon: '📦' }, act: 'pedidos', label: '📦 Pedidos de Ultramar de tus vecinos' },
-        { type: 'kiosk', x: -6.2, z: 5.6, rot: 0.5, o: { text: 'TU ORIGEN', color: 0xd1c4e9, icon: NET_ORIGINS[Net.origin() ?? 0].icon }, act: 'origen', label: '🌐 Tu Origen Onírico (ficha)' },
+        { type: 'kiosk', x: -6.2, z: 5.6, rot: 0.5, o: { text: 'TU PERFIL', color: 0xd1c4e9, icon: NET_ORIGINS[Net.origin() ?? 0].icon }, act: 'origen', label: '👤 Tu perfil (ficha)' },
         { type: 'portal_bed', x: 0, z: 11.2, rot: Math.PI, act: 'wake', label: '🌙 Despertar (volver al PC de casa)', range: 1.2 },
         { type: 'tram_stop', x: 4.6, z: 11.6, rot: Math.PI, act: 'tram', label: `🚋 Tranvía onírico (${CFG.net.tram} $T)` },
         { type: 'arch', x: 14.2, z: 0, rot: -Math.PI / 2, o: { text: '⛺ EL MERCADILLO →', color: 0xffab91 }, act: 'walk', label: '🚶 Caminar a El Mercadillo', solid: false, range: 1.6, to: 'mercadillo' },
@@ -9301,14 +9527,14 @@ const NetUI = {
         <div class="text-[10px] text-slate-500 mt-1">La demo es del modo offline: 50–100 comerciantes bot, solo $TOKEN del juego. Nada de token real (ni compras ni premios).</div></div>`;
       if (on) {
         const reqs = Net.genRequests(), sh = st.shop, T = Net.shopDef(), open = Net.myOrders();
-        html += `<div class="app-card p-3 mb-2 flex items-center gap-2"><span class="text-3xl">${o.icon}</span><div class="flex-1 text-xs"><b>Tu origen: ${o.name}</b><br>${o.mats.map(m => ITEMS[m[0]].icon).join(' ')} + ${ITEMS[o.jewel[0]].icon} · afinidades ${st.aff.map(m => netItem(m).icon).join(' ')}</div><button data-origin class="btn-game px-2 py-1 text-xs bg-violet-200">Ficha</button></div>`;
+        html += `<div class="app-card p-3 mb-2 flex items-center gap-2"><span class="text-3xl">${o.icon}</span><div class="flex-1 text-xs"><b>Tu perfil: ${o.name}</b><br>${o.mats.map(m => ITEMS[m[0]].icon).join(' ')} + ${ITEMS[o.jewel[0]].icon} · afinidades ${st.aff.map(m => netItem(m).icon).join(' ')}</div><button data-origin class="btn-game px-2 py-1 text-xs bg-violet-200">Ficha</button></div>`;
         html += `<div class="app-card p-3 mb-2"><div class="font-bold text-sm mb-1">📦 Pedidos de Ultramar (${reqs.length})</div>${reqs.map(q => `<div class="text-[11px] py-0.5">${npcById[q.npc]?.emoji || '📦'} ${q.k === 'diario' ? 'Diario' : q.k === 'raro' ? '⭐ Raro' : '🏆 Gran Pedido'} · ${Object.entries(q.need).map(([id, n]) => `${n}× ${ITEMS[id].icon}`).join(' ')} → <b>${fmt(q.r)} $T</b></div>`).join('') || '<div class="text-[11px] text-slate-500">Hoy nadie pide nada.</div>'}<button data-reqs class="btn-game px-2 py-1 text-xs mt-1 bg-orange-200">Ver y entregar</button></div>`;
         html += `<div class="app-card p-3 mb-2 text-xs"><div class="font-bold text-sm mb-1">📋 Tus órdenes y tu tienda</div>Órdenes abiertas: <b>${open.length}</b>/${CFG.net.maxOrders}${open.length ? ' · ' + open.map(x => `${x.side === 'b' ? 'compra' : 'venta'} ${x.q}× ${netItem(x.m).icon} a ${fmt(x.p)}`).join(' · ') : ''}<br>Consigna de la Aduana: <b>${st.stash.reduce((a, e) => a + e.q, 0)}</b> objeto(s)<br>${T ? `${T.icon} Tu ${T.name}: ${sh.sealed ? '<b class="text-purple-700">🔮 sellada</b>' : 'abierta'} · caja <b>${fmt(Math.floor(sh.box))} $T</b> <button data-box class="btn-game px-2 py-0.5 text-[11px] bg-emerald-200">Recoger</button>` : 'Sin tienda (licencias en el Mercadillo).'}</div>`;
         html += NetUp.has('net_antenna') ? `<div class="app-card p-3 mb-2"><div class="font-bold text-sm mb-1">📡 Índice de la Red (Antena)</div>${this.indexTable(8)}</div>` : `<div class="app-card p-2 mb-2 text-[11px] text-slate-500">📡 Con la <b>Antena de la Red</b> (laboratorio de Dax) verías aquí el índice de precios sin entrar.</div>`;
         html += st.log.length ? `<div class="app-card p-3 text-[11px] text-slate-600"><div class="font-bold text-sm mb-1">📰 Novedades</div>${st.log.slice(0, 8).map(l => `<div>· ${esc(l.t)}</div>`).join('')}</div>` : '';
       }
       body.innerHTML = html;
-      this.on(body, '[data-demo]', () => { if (!Net.on() && !st.intro) { st.intro = true; Net.activate(); closeApp(); this.originCard(() => NetWorld.enter()); return; } closeApp(); NetWorld.enter(); });
+      this.on(body, '[data-demo]', () => { closeApp(); if (!Number.isInteger(st.origin)) { Profiles.ensure(() => NetWorld.enter()); return; } if (!Net.on()) { st.intro = true; Net.activate({ origin: st.origin }); this.originCard(() => NetWorld.enter()); return; } NetWorld.enter(); });   // v1.6: el perfil se elige, no se sortea
       this.on(body, '[data-origin]', () => this.originCard());
       this.on(body, '[data-reqs]', () => this.requests());
       this.on(body, '[data-box]', () => { const n = Net.collectBox(); showToast(n ? `💰 +${fmt(n)} $T de la caja de tu tienda` : 'La caja está vacía', 'text-white'); re(); });
@@ -9320,15 +9546,15 @@ const NetUI = {
     rows.sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]));
     return `<div class="text-[11px]">${rows.slice(0, n).map(([m, g]) => `<div class="flex justify-between py-0.5"><span>${netLabel(m)}</span><span><b>${fmt(Math.round(W.price[m]))}</b> $T <span class="${g >= 0 ? 'text-emerald-600' : 'text-red-500'}">${g >= 0 ? '▲' : '▼'}${Math.abs(g * 100).toFixed(0)}%</span></span></div>`).join('')}</div>`;
   },
-  /** 🌐 Ficha del Origen Onírico (Doc 3) */
-  originCard(after = null) {
+  /** 👤 Ficha del perfil (v1.6; antes «Origen Onírico») · old = partida anterior con perfil sorteado */
+  originCard(after = null, old = false) {
     const st = Net.st(); if (st.origin === null) return;
     const o = NET_ORIGINS[st.origin], C = CFG.net, W = NetEco.W;
-    openApp(`${o.icon} Tu Origen Onírico`, '', (body) => {
-      body.innerHTML = `<div class="app-card p-4 mb-2 text-center" style="background:linear-gradient(180deg,#${o.color.toString(16).padStart(6, '0')}55,#fff)"><div class="text-5xl">${o.icon}</div><div class="font-bold text-lg text-[#2b2b3d]">${o.name}</div><div class="text-xs text-slate-600">Asignado al azar equilibrando la Red · es fijo</div></div>
-        <div class="app-card p-3 mb-2"><div class="font-bold text-sm mb-1">🌱 Tus 4 materiales nativos (abundantes)</div>${o.mats.map(([id], j) => `<div class="flex justify-between text-xs py-0.5"><span>${ITEMS[id].icon} ${ITEMS[id].name}</span><span>~${C.spawn[j]}/día · base ${C.base[j]} $T · tu NPC paga ${netRound(C.base[j] * C.nativeMult, 1)}${W ? ` · Red <b>${fmt(Math.round(W.price[NET_M[id]]))}</b>` : ''}</span></div>`).join('')}</div>
-        <div class="app-card p-3 mb-2 text-xs"><b>💎 Joya nativa:</b> ${ITEMS[o.jewel[0]].icon} ${ITEMS[o.jewel[0]].name} (muy rara: ${Math.round(C.jewelP * 100)} % al día; no caduca)<br><b>🧭 Afinidades:</b> ${st.aff.map(m => `${netLabel(m)} (${NET_ORIGINS[netOrig(m)].icon})`).join(' · ')} (de vez en cuando, en las cajas de Sam)</div>
-        <div class="app-card p-3 mb-2 text-[11px] text-slate-600">Brotan como objetos del suelo, salen al minar y pescar, crecen en el jardín y llegan en las cajas de Sam. En tu mundo valen poco; en otros, de ×3 a ×12 (según la distancia entre orígenes). Si un mundo recibe mucho de un material, su NPC paga menos ese día (saturación). Los materiales de origen <b>caducan a los ${C.decayDays} días</b>.</div>
+    openApp(`${o.icon} Tu perfil: ${o.name}`, '', (body) => {
+      body.innerHTML = `<div class="app-card p-4 mb-2 text-center" style="background:linear-gradient(180deg,#${o.color.toString(16).padStart(6, '0')}55,#fff)"><div class="text-5xl">${o.icon}</div><div class="font-bold text-lg text-[#2b2b3d]">${o.name}</div><div class="text-xs text-slate-600">${old ? 'Novedad: los orígenes del sueño ahora son perfiles. El tuyo se queda así en esta partida.' : o.tag}</div></div>
+        <div class="app-card p-3 mb-2"><div class="font-bold text-sm mb-1">🌱 Tus objetos (niveles 1–4, abundantes para ti)</div>${o.mats.map(([id], j) => `<div class="flex justify-between text-xs py-0.5"><span>${ITEMS[id].icon} ${ITEMS[id].name}</span><span>~${C.spawn[j]}/día · base ${C.base[j]} $T · tu NPC paga ${netRound(C.base[j] * C.nativeMult, 1)}${W ? ` · Red <b>${fmt(Math.round(W.price[NET_M[id]]))}</b>` : ''}</span></div>`).join('')}</div>
+        <div class="app-card p-3 mb-2 text-xs"><b>💎 Nivel 5 (legendario):</b> ${ITEMS[o.jewel[0]].icon} ${ITEMS[o.jewel[0]].name} (muy rara: ${Math.round(C.jewelP * 100)} % al día; no caduca)<br><b>🧭 Afinidades:</b> ${st.aff.map(m => `${netLabel(m)} (${NET_ORIGINS[netOrig(m)].icon})`).join(' · ')} (de vez en cuando, en las cajas de Sam)</div>
+        <div class="app-card p-3 mb-2 text-[11px] text-slate-600">Salen en tu estudio ${o.station} (${o.act.toLowerCase()}), al minar, pescar, talar, excavar y cazar, en el jardín y en las cajas de Sam. Para ti valen poco; para otros perfiles, de ×3 a ×12 (cuanto más distinto el oficio, más). Si un mundo recibe mucho de un material, su NPC paga menos ese día (saturación). Tus objetos de perfil <b>caducan a los ${C.decayDays} días</b> (la joya no).</div>
         ${this.demoTag()}<button data-go class="btn-game px-3 py-2 text-sm w-full bg-violet-300">${after ? '🌙 Dormirme delante de la pantalla' : 'Entendido'}</button>`;
       body.querySelector('[data-go]').onclick = () => { closeApp(); if (after) after(); };
     });
@@ -9341,7 +9567,7 @@ const NetUI = {
       const dc = W.decree;
       let html = balanceBar() + this.demoTag() + `<div class="app-card p-2 mb-2 text-[11px] text-slate-700">📜 <b>Decreto de la Semana</b>${dc ? ` (día ${dc.d}: la masa ${dc.g >= 0 ? 'creció' : 'bajó'} ${Math.abs(dc.g * 100).toFixed(1)} %)` : ' (el primero, el 2.º domingo)'}: comisión de venta <b>${pctTxt(W.fee.sale)}</b> (2–6 %) · publicar <b>1 %</b> · tasa de los bots ${pctTxt(W.fee.tax, 2)} · recompensas ×${String(W.fee.rew).replace('.', ',')}</div>`;
       if (m === null || m === undefined) {
-        html += NET_ORIGINS.map((o, oi) => `<div class="app-card p-2 mb-1.5"><div class="text-xs font-bold mb-1">${o.icon} ${o.name}${oi === st.origin ? ' <span class="text-[10px] text-violet-700">(tu origen)</span>' : ''}</div>${o.mats.map(([id]) => { const mm = NET_M[id], h = this.hist(mm), g = h.length > 1 ? W.price[mm] / Math.max(0.01, h[0]) - 1 : 0, bb = NetEco.best(mm); return `<button data-m="${mm}" class="w-full flex items-center justify-between text-[11px] py-0.5 hover:bg-slate-50"><span>${ITEMS[id].icon} ${ITEMS[id].name}${st.aff.includes(mm) ? ' 🧭' : ''} <span class="text-slate-400">(${Inventory.count(id)})</span></span><span><b>${fmt(Math.round(W.price[mm]))}</b> <span class="${g >= 0 ? 'text-emerald-600' : 'text-red-500'}">${g >= 0 ? '▲' : '▼'}${Math.abs(g * 100).toFixed(0)}%</span> · ${bb.bid ? fmt(Math.round(bb.bid)) : '—'}/${bb.ask ? fmt(Math.round(bb.ask)) : '—'}</span></button>`; }).join('')}</div>`).join('');
+        html += NET_ORIGINS.map((o, oi) => `<div class="app-card p-2 mb-1.5"><div class="text-xs font-bold mb-1">${o.icon} ${o.name}${oi === st.origin ? ' <span class="text-[10px] text-violet-700">(tu perfil)</span>' : ''}</div>${o.mats.map(([id]) => { const mm = NET_M[id], h = this.hist(mm), g = h.length > 1 ? W.price[mm] / Math.max(0.01, h[0]) - 1 : 0, bb = NetEco.best(mm); return `<button data-m="${mm}" class="w-full flex items-center justify-between text-[11px] py-0.5 hover:bg-slate-50"><span>${ITEMS[id].icon} ${ITEMS[id].name}${st.aff.includes(mm) ? ' 🧭' : ''} <span class="text-slate-400">(${Inventory.count(id)})</span></span><span><b>${fmt(Math.round(W.price[mm]))}</b> <span class="${g >= 0 ? 'text-emerald-600' : 'text-red-500'}">${g >= 0 ? '▲' : '▼'}${Math.abs(g * 100).toFixed(0)}%</span> · ${bb.bid ? fmt(Math.round(bb.bid)) : '—'}/${bb.ask ? fmt(Math.round(bb.ask)) : '—'}</span></button>`; }).join('')}</div>`).join('');
       } else {
         const id = NET_MATS[m], it = ITEMS[id], bb = NetEco.best(m), dp = NetEco.depth(m, 5), npcP = Net.npcUnitPrice(id), mine = Net.myOrders().filter(o => o.m === m);
         html += `<div class="app-card p-3 mb-2"><div class="flex items-center gap-2"><span class="text-3xl">${it.icon}</span><div class="flex-1"><div class="font-bold">${it.name}</div><div class="text-[11px] text-slate-500">${NET_ORIGINS[netOrig(m)].icon} ${NET_ORIGINS[netOrig(m)].name} · base ${netBase(m)} $T · tienes ${Inventory.count(id)}</div></div><button data-back class="btn-game px-2 py-1 text-xs bg-slate-200">← Lista</button></div>
@@ -9511,6 +9737,126 @@ INTERIOR_LAYOUTS.net = (o = {}) => NetWorld.layout(o.zone || 'plaza', o);
 INTERIOR_LAYOUTS.netshop = (o = {}) => NetWorld.shopLayout(o);
 Interiors.hooks.dreamNet = () => NetUI.pc();
 DailySystem.onSettle(() => Net.settle());
+/* ===== v1.6 · 👤 PERFILES DE JUGADOR · elección, intro con respuestas y ficha =====
+   El perfil (GS.net.origin, 0–7) decide qué objetos aparecen en TU mundo: abundan para ti y escasean en los demás → comercio.
+   Se elige al empezar (tras el prólogo) o la primera vez que abres una partida anterior a v1.6. Es fijo en esta partida (en NG+ se conserva). */
+const PROFILE_INTROS = [
+  { hello: '¡Eh, eh! Te has quedado dormido encima del teclado… ¿Eres de esos que hablan con las máquinas?', q: '¿Y a qué te dedicas exactamente?',
+    a: [['Entreno modelos de IA', '¡Uf! Como Dax, pero con más café. Aquí vas a encajar.'], ['Automatizo tareas aburridas', '¿Podrías automatizar amasar pan? Es broma… o no.'], ['Creo apps a base de prompts', '¡Como la laptop mágica! Los vecinos te van a adorar.']] },
+  { hello: '¡Eh, eh! Llevas tornillos hasta en el pelo. ¿Eres inventor de los de verdad?', q: '¿Qué estabas inventando antes de dormirte?',
+    a: [['Un robot que hace la cama', 'Glover va a querer uno. Bueno, dos.'], ['Una máquina del tiempo', 'Aquí el tiempo ya es raro, ten cuidado.'], ['Nada, pero tengo 300 ideas', '¡Eso es lo importante! Las ideas valen oro en este sueño.']] },
+  { hello: '¡Eh, eh! Hueles a especias y a cocina buena. ¿No serás chef?', q: '¿Cuál es tu especialidad?',
+    a: [['Postres imposibles', '¡Competencia! Pero de la buena, de la que se comparte.'], ['Cocina del mundo', 'Sam te traerá ingredientes de Ultramar, ya verás.'], ['Lo que haya en la nevera', 'El mejor tipo de chef: el que no se rinde.']] },
+  { hello: '¡Eh, eh! Te he visto correr en sueños, levantabas polvo. ¿Eres atleta?', q: '¿Qué deporte es lo tuyo?',
+    a: [['Fútbol', '¡Los erizos juegan cada tarde! Bueno, lo intentan.'], ['Atletismo', 'Pues este planeta se rodea en un minuto. Récord asegurado.'], ['Un poco de todo', 'Polivalente. Eso aquí se agradece mucho.']] },
+  { hello: '¡Eh, eh! Hasta dormido declamabas. ¿Eres actor? ¿Actriz?', q: '¿Qué tipo de papeles haces?',
+    a: [['Comedia', 'Necesitamos risas. El Alcalde lleva tres años serio.'], ['Drama', 'Madame Sombra querrá conocerte. Le encanta el drama.'], ['De todo, soy versátil', '¡Perfecto! En un sueño cada día es un estreno.']] },
+  { hello: '¡Eh, eh! Tarareabas una canción preciosa mientras dormías. ¿Eres cantante?', q: '¿Qué música haces?',
+    a: [['Pop pegadizo', 'Ya me la sé. Me la vas a pegar todo el día.'], ['Rock', '¡Que tiemble la panadería! Pero sin romper nada.'], ['Lo que me inspire', 'Aquí te van a sobrar musas.']] },
+  { hello: '¡Eh, eh! Has dicho «suscríbete» tres veces en sueños. ¿Eres youtuber?', q: '¿De qué va tu canal?',
+    a: [['Retos y vlogs', 'Este planeta es un reto en sí mismo. Grábalo todo.'], ['Tutoriales', 'Enséñame a hacer croissants más rápido, ¡porfa!'], ['Gaming', '¿Sabes que ahora mismo estás dentro de un juego? Más o menos.']] },
+  { hello: '¡Eh, eh! Tienes pintura hasta en las cejas. ¿Eres artista?', q: '¿Con qué te expresas mejor?',
+    a: [['Pintura', 'El cielo de aquí cambia de color cada hora. Te va a encantar.'], ['Ilustración digital', 'Dax tiene pantallas de sobra, si se las pides bonito.'], ['Escultura', 'Glover te prestará herramientas. Si se las devuelves.']] },
+];
+const PROFILE_Q2 = { q: 'Y aquí en el sueño, ¿qué es lo primero que quieres hacer?', a: [
+  ['🛠️ Ponerme a crear cosas', 'items', 'Toma, se te cayó esto del bolsillo al llegar. Es tuyo.'],
+  ['💰 Hacer negocio', 'money', '¡Me gusta! Toma 200 $TOKEN para empezar con buen pie.'],
+  ['🤝 Conocer a los vecinos', 'trust', '¡Pues empieza por mí! Ya somos amigos.'],
+] };
+const Profiles = {
+  css() {
+    if (document.getElementById('cxCss')) return; const st = document.createElement('style'); st.id = 'cxCss';
+    st.textContent = `.cx-veil{position:fixed;inset:0;z-index:9000;display:flex;align-items:center;justify-content:center;padding:14px;background:radial-gradient(ellipse at 50% 20%,rgba(169,220,255,.55),rgba(20,24,60,.82));font-family:Fredoka,system-ui,sans-serif;animation:fadeIn .35s}
+.cx-card{width:min(940px,96vw);max-height:94vh;overflow:auto;background:var(--paper,#fffdf5);border:3px solid #2b2b3d;border-radius:24px;box-shadow:0 6px 0 #2b2b3d,0 24px 60px rgba(0,0,0,.35);padding:20px}
+.cx-h{font-weight:700;font-size:clamp(20px,3vw,28px);color:#2b2b3d;text-align:center;margin:0}
+.cx-sub{text-align:center;color:#64748b;font-size:13px;margin:4px 0 14px}
+.cx-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+@media (max-width:760px){.cx-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.cx-p{border:3px solid #2b2b3d;border-radius:18px;padding:12px 10px;text-align:center;cursor:pointer;background:#fff;box-shadow:0 4px 0 #2b2b3d;transition:transform .12s}
+.cx-p:hover{transform:translateY(-3px)} .cx-p:active{transform:translateY(3px);box-shadow:0 1px 0 #2b2b3d}
+.cx-p .i{font-size:40px;line-height:1.1} .cx-p .n{font-weight:700;color:#2b2b3d;margin-top:2px} .cx-p .t{font-size:11px;color:#64748b;line-height:1.25;margin-top:3px;min-height:28px} .cx-p .m{font-size:16px;margin-top:6px;letter-spacing:2px}
+.cx-row{display:flex;align-items:center;gap:10px;padding:7px 10px;border-radius:12px;background:#fff;border:2px solid #e2e8f0;margin-bottom:6px;font-size:13px;color:#2b2b3d}
+.cx-lv{font-family:'Press Start 2P',monospace;font-size:8px;padding:3px 5px;border-radius:6px;color:#fff;white-space:nowrap}
+.cx-btns{display:flex;gap:8px;justify-content:center;margin-top:12px;flex-wrap:wrap}
+.cx-say{width:min(620px,96vw);background:#fffdf5;border:3px solid #2b2b3d;border-radius:22px;box-shadow:0 6px 0 #2b2b3d,0 24px 60px rgba(0,0,0,.35);padding:16px 18px;align-self:flex-end;margin-bottom:4vh}
+.cx-who{display:flex;align-items:center;gap:10px;font-weight:700;color:#2b2b3d;font-size:17px} .cx-who span{font-size:34px}
+.cx-line{min-height:52px;font-size:16px;line-height:1.45;color:#2b2b3d;margin:8px 0 4px}
+.cx-ch{display:flex;flex-direction:column;gap:7px;margin-top:8px}
+.cx-ch button{text-align:left;padding:10px 14px;border:3px solid #2b2b3d;border-radius:14px;background:#fff;font:600 14px Fredoka,sans-serif;color:#2b2b3d;cursor:pointer;box-shadow:0 3px 0 #2b2b3d}
+.cx-ch button:hover{background:#fff6c2} .cx-ch button:active{transform:translateY(3px);box-shadow:none}`;
+    document.head.appendChild(st);
+  },
+  LV: [['NV1', '#94a3b8'], ['NV2', '#22c55e'], ['NV3', '#3b82f6'], ['NV4', '#a855f7'], ['NV5', '#f59e0b']],
+  itemsOf(i) { const o = NET_ORIGINS[i]; return [...o.mats.map(m => m[0]), o.jewel[0]]; },
+  levelRow(id, j) { const C = CFG.net, it = ITEMS[id], [lv, col] = this.LV[j];
+    return `<div class="cx-row"><span class="cx-lv" style="background:${col}">${lv}</span><span style="font-size:20px">${it.icon}</span><b style="flex:1">${it.name}</b><span class="text-[11px] text-slate-500">${j < 4 ? `~${C.spawn[j]}/día · base ${C.base[j]} $T` : `${Math.round(C.jewelP * 100)} %/día · ${C.jewelBase} $T`}</span></div>`; },
+  /** Pantalla de elección (8 tarjetas → detalle → confirmar) */
+  pick(onPick) {
+    this.css(); state.modalOpen = true;
+    const v = document.createElement('div'); v.className = 'cx-veil'; document.body.appendChild(v);
+    const grid = () => {
+      v.innerHTML = `<div class="cx-card"><h2 class="cx-h">¿Qué eras antes de dormirte?</h2><div class="cx-sub">Tu perfil decide qué objetos aparecen en tu mundo. Para ti abundan; en los demás mundos escasean y se pagan caros. Elige bien: es para toda la partida.</div>
+        <div class="cx-grid">${NET_ORIGINS.map((o, i) => `<div class="cx-p" data-i="${i}" style="background:linear-gradient(180deg,#${o.color.toString(16).padStart(6, '0')}22,#fff 60%)"><div class="i">${o.icon}</div><div class="n">${o.name}</div><div class="t">${o.tag}</div><div class="m">${this.itemsOf(i).map(id => ITEMS[id].icon).join('')}</div></div>`).join('')}</div></div>`;
+      v.querySelectorAll('[data-i]').forEach(el => el.onclick = () => detail(+el.dataset.i));
+    };
+    const detail = (i) => {
+      const o = NET_ORIGINS[i];
+      v.innerHTML = `<div class="cx-card" style="width:min(560px,96vw)"><div style="text-align:center"><div style="font-size:56px">${o.icon}</div><h2 class="cx-h">${o.name}</h2><div class="cx-sub">${o.tag}</div></div>
+        <div class="text-xs font-bold text-slate-500 mb-1">TUS OBJETOS (5 NIVELES · cuanto más alto, más escaso)</div>${this.itemsOf(i).map((id, j) => this.levelRow(id, j)).join('')}
+        <div class="cx-row" style="background:#f5f3ff;border-color:#ddd6fe"><span style="font-size:20px">${o.station}</span><span><b>Acción propia: ${o.act}</b> en tu estudio, junto a casa. También salen al minar, pescar, excavar, en el jardín y en las cajas de Sam.</span></div>
+        <div class="cx-row" style="background:#fffbeb;border-color:#fde68a"><span style="font-size:20px">🔁</span><span>Los perfiles vecinos (${NET_ORIGINS[(i + 7) % 8].icon} ${NET_ORIGINS[(i + 1) % 8].icon}) pagan ×3 por tus objetos; el opuesto (${NET_ORIGINS[(i + 4) % 8].icon}) hasta ×12.</span></div>
+        <div class="cx-btns"><button data-back class="btn-game px-4 py-2 bg-slate-200 text-sm">◀ Ver otros</button><button data-ok class="btn-play" style="font-size:12px;padding:12px 22px">ELEGIR ${o.short.toUpperCase()}</button></div></div>`;
+      v.querySelector('[data-back]').onclick = grid;
+      v.querySelector('[data-ok]').onclick = () => { v.remove(); state.modalOpen = false; onPick(i); };
+    };
+    grid();
+  },
+  /** Diálogo con respuestas (el Oso te encuentra): typewriter + botones */
+  talk(icon, name, steps, onDone) {
+    this.css(); state.modalOpen = true;
+    const v = document.createElement('div'); v.className = 'cx-veil'; v.style.background = 'linear-gradient(transparent 40%,rgba(20,24,60,.55))'; v.style.alignItems = 'flex-end'; document.body.appendChild(v);
+    v.innerHTML = `<div class="cx-say"><div class="cx-who"><span>${icon}</span>${name}</div><div class="cx-line"></div><div class="cx-ch"></div></div>`;
+    const line = v.querySelector('.cx-line'), ch = v.querySelector('.cx-ch'); let k = 0, tm = null;
+    const type = (txt, done) => { clearInterval(tm); let n = 0; line.textContent = ''; tm = setInterval(() => { line.textContent = txt.slice(0, ++n); if (n >= txt.length) { clearInterval(tm); done && done(); } }, 22); };
+    const step = () => {
+      const s = steps[k++]; ch.innerHTML = '';
+      if (!s) { v.remove(); state.modalOpen = false; onDone && onDone(); return; }
+      type(s.text, () => {
+        const opts = s.choices || [['Continuar ▸', null]];
+        opts.forEach(([label, fn]) => { const b = document.createElement('button'); b.textContent = label; b.onclick = () => { const reply = fn && fn(); if (reply) { ch.innerHTML = ''; type(reply, () => { const c = document.createElement('button'); c.textContent = 'Continuar ▸'; c.onclick = step; ch.appendChild(c); }); } else step(); }; ch.appendChild(b); });
+      });
+    };
+    step();
+  },
+  /** Intro según el perfil: 2 preguntas con respuestas (la 2.ª da un regalo de bienvenida) */
+  intro(i, onDone) {
+    const o = NET_ORIGINS[i], P = PROFILE_INTROS[i], st = Net.st(); st.persona = st.persona || {};
+    const gift = (fx) => {
+      if (fx === 'items') { Inventory.add(o.mats[0][0], 3, { silent: true }); Inventory.add(o.mats[1][0], 1, { silent: true }); Net.lotsAdd(o.mats[0][0], 3, Net.today()); Net.lotsAdd(o.mats[1][0], 1, Net.today()); showToast(`🎁 +3 ${ITEMS[o.mats[0][0]].icon} ${ITEMS[o.mats[0][0]].name} · +1 ${ITEMS[o.mats[1][0]].icon} ${ITEMS[o.mats[1][0]].name}`, 'text-white'); }
+      else if (fx === 'money') Wallet.add(200, `Bienvenida (${o.short})`, { noMult: true });
+      else if (fx === 'trust') Trust.add('bear', 5, 'Primera charla');
+      st.persona.start = fx; SaveSystem.saveNow('profile-intro');
+    };
+    this.talk('🐻', 'Oso Panadero', [
+      { text: P.hello, choices: [[`Sí, soy ${o.name.toLowerCase()} ${o.icon}`, () => null]] },
+      { text: P.q, choices: P.a.map(([label, reply], k) => [label, () => { st.persona.q1 = k; return reply; }]) },
+      { text: PROFILE_Q2.q, choices: PROFILE_Q2.a.map(([label, fx, reply]) => [label, () => { gift(fx); return reply; }]) },
+      { text: `Junto a tu casa te espera tu estudio ${o.station}. Ahí podrás ${o.act.toLowerCase()} y sacar ${ITEMS[o.mats[0][0]].name.toLowerCase()} y cosas mucho mejores. En otros sueños lo pagan caro… ¡pero primero vamos a ponerte guapo!` },
+    ], onDone);
+  },
+  /** Punto de entrada al empezar una sesión: elige perfil si falta (y hace la intro); si ya lo tenía al azar (v1.3), lo enseña una vez */
+  ensure(after) {
+    const st = Net.st();
+    if (Number.isInteger(st.origin) && !Net.on()) { Net.activate({ origin: st.origin, silent: true }); Studio.place(); }   // NG+ o perfil ya elegido: tu mundo vuelve a dar lo tuyo
+    if (!Number.isInteger(st.origin)) {
+      this.pick((i) => { Net.activate({ origin: i }); st.profileChosen = true; Studio.place(); this.intro(i, () => after && after()); });
+      return;
+    }
+    if (!st.profileChosen) { st.profileChosen = true; SaveSystem.saveNow('profile-seen'); NetUI.originCard(() => after && after(), true); return; }
+    after && after();
+  },
+};
+
 /** Botones de los vecinos: fabricación multiorigen (Glover y Dax) cuando ya tienes origen */
 function netServiceBtns(npcId) {
   const out = []; if (!Net.on()) return out;
@@ -9546,7 +9892,8 @@ function applyGameStateToWorld() {
   V10.apply();         // v1.0: museo (pedestales + piezas + trofeos), puestos de la feria, logros retroactivos, HUD del calendario
   if (Array.isArray(GS.player.dir) && GS.player.dir.length === 3) { player.userData.dir.fromArray(GS.player.dir).normalize(); if (Array.isArray(GS.player.fwd)) player.userData.fwd.fromArray(GS.player.fwd); }
   PlanetAO.bake();     // v1.5 · Etapa 1: AO horneado (med/alta)
-  Net.apply();         // v1.3: Red del Sueño (re-engancha el mundo de bots; si recargaste dentro, despiertas en casa)
+  Net.apply();         // v1.3
+  Studio.place();      // v1.6: estudio del perfil junto a casa (si ya tienes perfil): Red del Sueño (re-engancha el mundo de bots; si recargaste dentro, despiertas en casa)
   state.tokensShown = GS.economy.money; ui.tokenValue.textContent = state.tokensShown.toLocaleString('es-ES');
   refreshMissionUI();
 }
@@ -9601,7 +9948,7 @@ const startGameFromMenu = () => {
       if (retroInsignias.length) setTimeout(() => showToast(`🏆 Tus Aliados te guardaban ${retroInsignias.length} prenda(s) insignia: mira el Armario 👗`, 'text-amber-200'), 1800);
     };
     // v0.7 · Sec. 8.2: partida nueva → creador de personaje tras el prólogo (y antes de despertar del todo)
-    maybeOpenCreator((wasCreator) => { if (wasCreator && !hadSave) showToast('🐻 "¡Eh, eh! ¿Estás bien? ¡Por fin llegó el humano de la laptop!"', 'text-white'); setTimeout(welcome, wasCreator && !hadSave ? 2200 : 0); });   // sin creador pendiente → welcome al momento
+    Profiles.ensure(() => maybeOpenCreator((wasCreator) => { if (wasCreator && !hadSave) showToast('🐻 "¡Eh, eh! ¿Estás bien? ¡Por fin llegó el humano de la laptop!"', 'text-white'); setTimeout(welcome, wasCreator && !hadSave ? 2200 : 0); }));   // v1.6: antes, el perfil (y su intro) · sin creador pendiente → welcome al momento
   }, 2600);
 };
 btnPlay.onclick = () => (storyState().ending === 'A' ? Awakening.resumeFinalA() : storyState().prologueDone ? startGameFromMenu() : showPrologue(startGameFromMenu));   // v0.9: un Final A sin cerrar vuelve a los créditos → NG+
@@ -9793,7 +10140,7 @@ const DBG = (() => {
       "DBG.netEnter('plaza'|'mercadillo'|'paseo'|'dorado') -> entra en la Red (o cambia de zona si ya estás) · DBG.netExit() -> despiertas frente al PC",
       'DBG.netBots(n)            -> regenera el mundo con n bots (50–100, semilla determinista, devuelve tus depósitos)',
       'DBG.netDays(n)            -> avanza n días la economía de bots (sin tocar tus días oníricos) y saca el informe',
-      "DBG.netOrigin(id|0-7)     -> fija tu Origen Onírico ('volcan','bosque','arrecife','desierto','tundra','nube','pantano','papel')",
+      "DBG.netOrigin(id|0-7)     -> fija tu perfil ('dev','inventor','chef','atleta','actor','cantante','youtuber','artista')",
       'DBG.netReport()           -> masa monetaria por bot, IPC, grifo/sumidero, Gini, margen de arbitraje y amortización de tiendas',
       'DBG.netKit()              -> te da los materiales del pedido de Ultramar de hoy y de 2 recetas (para probar)',
       'DBG.refs                  -> referencias internas (window._dbg solo existe con ?debug=1)',
