@@ -575,7 +575,7 @@ const CFG = {
     // QW7 · variación de color del planeta (calculada al cargar, coste 0 en juego)
     planet: { noise: 1, slopeDark: 0.12, slopeCol: 0x5fae48, wetSand: 0xd8c48a, wetRel: 0.03, snowTint: 0xe9e6f7, snowMix: 0.35 },
     // QW9 · agua sin shader
-    water: { color: 0x46c2e8, roughness: 0.15, metalness: 0, opacity: 0.8, deep: 0x2a8fd6, shallow: 0x7fe3e0, foam: 0xfffdf5, shoreDepth: 0.6, opacityShoreDeep: [0.78, 0.92] },   // v1.5 · Etapa 4: degradado de profundidad + espuma
+    water: { color: 0x46c2e8, roughness: 0.15, metalness: 0, opacity: 0.8, deep: 0x2a8fd6, shallow: 0x7fe3e0, foam: 0xfffdf5, shoreDepth: 1.1, opacityShoreDeep: [0.78, 0.92] },   // v1.5 · Etapa 4: degradado de profundidad + espuma
     // QW10 · halo atmosférico del planeta (opacidad de cerca → en Modo Planeta/menú)
     halo: { scale: 1.09, pow: 3, near: 0.35, far: 0.8, nearDist: 14, farDist: 30 },
     // QW11 · viñeta CSS (opacidad en menú / en juego)
@@ -1680,9 +1680,9 @@ waterMat.onBeforeCompile = (sh) => {
     .replace('#include <begin_vertex>', `vec3 transformed = n0 * (uSea + wv(n0)); vShore = aShore; vOP = transformed;`);
   sh.fragmentShader = `uniform float uTime, uDay, uSwim, uFancy; uniform vec3 uDeep, uShallow, uFoam, uSkyTop, uSunV, uSunC, uPlayer; uniform vec2 uOp; varying float vShore; varying vec3 vOP;
 ` + sh.fragmentShader
-    .replace('vec4 diffuseColor = vec4( diffuse, opacity );', `vec4 diffuseColor = vec4(mix(uDeep, uShallow, pow(vShore, 1.5)), mix(uOp.y, uOp.x, vShore));
-      float foam = smoothstep(0.82, 0.9, vShore + 0.06 * sin(uTime * 2.0 + vOP.x * 30.0) * sin(vOP.z * 27.0));
-      foam = max(foam, smoothstep(0.02, 0.0, abs(vShore - (0.62 + 0.08 * sin(uTime * 1.3 + vOP.y * 3.0)))) * 0.75);   // ola que llega a la orilla
+    .replace('vec4 diffuseColor = vec4( diffuse, opacity );', `float sh = clamp(vShore, 0.0, 1.0); vec4 diffuseColor = vec4(mix(uDeep, uShallow, sh * sqrt(sh)), mix(uOp.y, uOp.x, sh));
+      float foam = smoothstep(0.86, 0.94, sh + 0.05 * sin(uTime * 2.0 + vOP.x * 30.0) * sin(vOP.z * 27.0));
+      foam = max(foam, smoothstep(0.025, 0.0, abs(sh - (0.7 + 0.07 * sin(uTime * 1.3 + vOP.y * 3.0)))) * 0.6);   // ola que llega a la orilla
       float pd = distance(vOP, uPlayer), ring = uSwim * max(sin(pd * 20.0 - uTime * 6.0), 0.0) * exp(-pd * 3.0);
       diffuseColor.rgb = mix(diffuseColor.rgb, uFoam, clamp(foam + ring * 0.8, 0.0, 1.0)); diffuseColor.a = max(diffuseColor.a, foam * 0.95);`)
     .replace('#include <opaque_fragment>', `{ vec3 V = normalize(vViewPosition); float F = pow(1.0 - max(dot(normal, V), 0.0), 3.0) * uFancy;
@@ -9818,6 +9818,7 @@ DBG.refs = DBG_REFS;
 if (/[?&]debug=1\b/.test(location.search)) window._dbg = DBG_REFS;   // v1.0: ya no es global por defecto
 /* v1.1 · Interior caminable de la casa (Sec. 6.9 Fase 2) */
 /** v1.5 · capturas: DBG.tp(x, z) lleva al jugador a (x, z) del pueblo · DBG.view(dist, pitch, yaw) fija la cámara · DBG.shot('B'|'C'|'D'|'G'|'H') prepara la escena del protocolo */
+DBG.g = { scene, renderer, camera, cam, sky, water, atmo, clouds, PostFX, SkyEnv, PlanetAO, WATER_U, POST_U };   // v1.5: referencias gráficas para depurar
 DBG.post = (v = !PostFX.active) => { PostFX.active = !!v; POST_U.uPost.value = v ? 1 : 0; return PostFX.active; };
 DBG.env = (v = !SkyEnv.enabled) => SkyEnv.setEnabled(v);
 DBG.ao = (v = true) => { if (!PlanetAO.on) return false; if (v) PlanetAO.bake(); else { const c = planet.geometry.attributes.color; PlanetAO.reset(); c.needsUpdate = true; } return v; };
