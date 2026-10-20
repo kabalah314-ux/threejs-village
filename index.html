@@ -265,7 +265,8 @@ body.mobile .zone-banner { top: 70px; font-size: 13px; padding: 6px 14px; }
   .money-toast { position: fixed; left: 50%; top: 96px; transform: translateX(-50%); z-index: 25; font-family:'Fredoka',sans-serif;font-weight:600; font-size: 14px; padding: 8px 14px; border-radius: 12px; border:1px solid rgba(35,36,74,.12); box-shadow:0 2px 8px rgba(23,22,60,.12); pointer-events: none; animation: floatUp 1.8s ease forwards; }
   .money-toast.gain { background: #fff6d6; color: #b45309; } .money-toast.loss { background: #ffe4e6; color: #b91c1c; }
   body.mobile #btnBackpack { padding: 10px 12px; font-size: 18px; }
-  body.build #actionBtn, body.build #hint { display: none !important; }
+  body.build #actionBtn, body.build #hint, body.build #ctrlHint { display: none !important; }   /* v2.9.3: la ayuda de controles tapaba los botones del panel de construir/decorar */
+  body.deco #btnInteriorExit, body.deco #btnInteriorPanel, body.deco #btnInteriorDeco, body.deco #btnBackpack, body.deco #btnMenu, body.deco #btnPlayer { visibility: hidden; }   /* v2.9.3: decorando, solo el panel de decorar */
   /* ===== v2.1 · UI profesional: tokens, tipografía (Fredoka títulos · Nunito texto), superficies suaves sin contorno negro, iconos Phosphor ===== */
   :root {
     --ink:#23244a; --ink-2:#4b4d72; --ink-3:#8587a6; --paper:#f7f5fc; --paper-2:#efecf8; --mist:#e6e2f3; --line:rgba(35,36,74,.12); --line-2:rgba(35,36,74,.2);
@@ -434,6 +435,7 @@ body.mobile .zone-banner { top: 70px; font-size: 13px; padding: 6px 14px; }
       <button id="btnPlayer" class="btn-game clickable px-3 md:px-4 py-2 bg-emerald-300 text-[#2b2b3d] text-sm active">🎮<span class="hidden md:inline"> Modo Jugador</span></button>
       <button id="btnInteriorExit" class="btn-game clickable px-3 md:px-4 py-2 bg-rose-200 text-[#2b2b3d] text-sm hidden" title="Salir por la puerta">🚪<span class="hidden md:inline"> Salir</span></button>
       <button id="btnInteriorPanel" class="btn-game clickable px-3 md:px-4 py-2 bg-teal-200 text-[#2b2b3d] text-sm hidden" title="Panel Mi Casa">📋<span class="hidden md:inline"> Mi Casa</span></button>
+      <button id="btnInteriorDeco" class="btn-game clickable px-3 md:px-4 py-2 bg-amber-200 text-[#2b2b3d] text-sm hidden" title="Decorar: mover, girar y guardar muebles">🪑<span class="hidden md:inline"> Decorar</span></button>
       <button id="btnMenu" class="btn-game clickable px-3 md:px-4 py-2 bg-[#fff6c2] text-[#2b2b3d] text-sm" title="Menú (M)">☰<span class="hidden md:inline"> Menú</span><span id="menuDot" class="hidden ml-1 inline-block w-2 h-2 rounded-full bg-red-500 align-middle"></span></button>
       <button id="btnSettingsGame" class="btn-game clickable px-3 md:px-4 py-2 bg-slate-200 text-[#2b2b3d] text-sm hidden" title="Ajustes y guardado">⚙️<span class="hidden md:inline"> Ajustes</span></button>
       <button id="btnBackpack" class="btn-game clickable px-3 md:px-4 py-2 bg-amber-300 text-[#2b2b3d] text-sm" title="Mochila (B)">🎒<span class="hidden md:inline"> Mochila</span> <span id="invBadge" class="pixel text-[8px] bg-[#2b2b3d] text-yellow-300 px-1.5 py-0.5 rounded ml-1">0/20</span></button>
@@ -446,10 +448,11 @@ body.mobile .zone-banner { top: 70px; font-size: 13px; padding: 6px 14px; }
   <div id="buildHud" class="absolute bottom-16 md:bottom-4 left-1/2 -translate-x-1/2 hidden w-[min(560px,94vw)]">
     <div class="panel px-4 py-3 clickable">
       <div class="flex items-center justify-between gap-2 flex-wrap">
-        <div><div class="pixel text-[9px] text-slate-500">MODO CONSTRUCCIÓN</div><div id="buildName" class="font-bold text-[#2b2b3d]"></div><div id="buildStatus" class="text-xs font-semibold"></div></div>
-        <div class="flex gap-2"><button id="buildRotate" class="btn-game px-3 py-2 bg-sky-200 text-[#2b2b3d] text-sm">🔄 Rotar</button><button id="buildConfirm" class="btn-game px-3 py-2 bg-emerald-300 text-[#2b2b3d] text-sm">✅ Construir</button><button id="buildCancel" class="btn-game px-3 py-2 bg-red-300 text-[#2b2b3d] text-sm">✖ Cancelar</button></div>
+        <div><div id="buildMode" class="pixel text-[9px] text-slate-500">MODO CONSTRUCCIÓN</div><div id="buildName" class="font-bold text-[#2b2b3d]"></div><div id="buildStatus" class="text-xs font-semibold"></div></div>
+        <div class="flex flex-wrap gap-2"><button id="buildRotate" class="btn-game px-3 py-2 bg-sky-200 text-[#2b2b3d] text-sm">🔄 Rotar</button><button id="buildConfirm" class="btn-game px-3 py-2 bg-emerald-300 text-[#2b2b3d] text-sm">✅ Construir</button><button id="buildStore" class="btn-game px-3 py-2 bg-amber-200 text-[#2b2b3d] text-sm hidden">📦 Guardar</button><button id="buildCancel" class="btn-game px-3 py-2 bg-red-300 text-[#2b2b3d] text-sm">✖ Cancelar</button></div>
       </div>
       <div id="buildHelp" class="text-[11px] text-slate-500 mt-1"></div>
+      <div id="decoStore" class="hidden flex flex-wrap items-center gap-1 mt-1.5"></div>
     </div>
   </div>
 
@@ -3590,6 +3593,7 @@ actionBtn.addEventListener('pointerdown', (e) => e.stopPropagation());
 actionBtn.onclick = () => { if (!canControl()) return; const near = getNearbyInteractable(); if (near) interactWith(near.obj); };
 canvas.addEventListener('pointerdown', (e) => { pointers.set(e.pointerId, { x: e.clientX, y: e.clientY }); canvas.setPointerCapture(e.pointerId); if (pointers.size === 1) downPos = { x: e.clientX, y: e.clientY }; if (pointers.size === 2) { const [a, b] = [...pointers.values()]; pinchDist = Math.hypot(a.x - b.x, a.y - b.y); } });
 canvas.addEventListener('pointermove', (e) => {
+  if (state.deco && !IS_MOBILE && pointers.size === 0) { Decorate.hover(e.clientX, e.clientY); return; }   // v2.9.3: el mueble sigue al ratón
   if (state.build && !IS_MOBILE && pointers.size === 0) { setBuildCursorFromPointer(e.clientX, e.clientY); return; } // vista previa sigue al ratón
   if (!pointers.has(e.pointerId)) return; const prev = pointers.get(e.pointerId); const dx = e.clientX - prev.x, dy = e.clientY - prev.y; pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
   if (!canControl()) return;
@@ -3612,6 +3616,7 @@ const raycaster = new THREE.Raycaster(); const pointer = new THREE.Vector2();
 window.addEventListener('keydown', (e) => {
   if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA')) return; // no interferir al escribir
   state.keys[e.code] = true;
+  if (state.deco) { Decorate.key(e.code); return; }   // v2.9.3 · MODO DECORAR (R gira · Enter coloca · G guarda · Esc devuelve/termina)
   if (state.build) { // MODO CONSTRUCCIÓN
     if (e.code === 'Escape') exitBuildMode(); else if (e.code === 'KeyR') { state.build.yaw += Math.PI / 4; updateBuildPreview(); } else if (e.code === 'Enter' || e.code === 'Space') confirmBuild();
     return;
@@ -3623,11 +3628,12 @@ window.addEventListener('keydown', (e) => {
   if (e.code === 'Escape') { if (state.modalOpen) { closeLaptop(); closeApp(); } else if (state.mode === 'dialog') endDialog(); else if (canControl()) Hub.open(); }   // v1.6: Esc sin nada abierto = menú
   if (e.code === 'KeyM' && !state.menuOpen && state.mode !== 'dialog' && !state.camTween) { if (ui.appModal.style.display === 'flex' && (ui.appTitle.dataset.raw || '').startsWith('☰')) closeApp(); else if (!state.modalOpen) Hub.open(); return; }
 });
-document.getElementById('btnBackpack').onclick = () => { if (state.build) return; if (ui.appModal.style.display === 'flex' && (ui.appTitle.dataset.raw || '').startsWith('🎒')) closeApp(); else if (!state.modalOpen && !state.menuOpen) openInventory(); };
+document.getElementById('btnBackpack').onclick = () => { if (state.build || state.deco) return; if (ui.appModal.style.display === 'flex' && (ui.appTitle.dataset.raw || '').startsWith('🎒')) closeApp(); else if (!state.modalOpen && !state.menuOpen) openInventory(); };
 window.addEventListener('keyup', (e) => state.keys[e.code] = false);
 function rangeFor(obj) { const t = obj.userData.interact.type; return t === 'mailbox' ? CFG.interactDist + 0.8 : t === 'building' ? CFG.interactDist + 2.4 : t === 'house' ? CFG.interactDist + 2 : t === 'fruit' ? 4 : t === 'pickup' ? 2.6 : CFG.interactDist; }
 const isAvailable = (obj) => obj.visible !== false && obj.userData.ready !== false;
 function handleClick(e) {
+  if (state.deco) { Decorate.tap(e.clientX, e.clientY); return; }   // v2.9.3: tocar = coger / mover
   if (state.build) { setBuildCursorFromPointer(e.clientX, e.clientY); if (!IS_MOBILE && state.build.valid) confirmBuild(); return; } // construcción: tap = mover · clic PC = construir
   if (!canControl()) return;
   pointer.set((e.clientX / innerWidth) * 2 - 1, -(e.clientY / innerHeight) * 2 + 1); raycaster.setFromCamera(pointer, camera);
@@ -5258,6 +5264,8 @@ function openHousePanel(tab) {
           <button data-showcase class="btn-game px-3 py-1.5 text-xs mt-2 bg-amber-200">🏷️ Abrir escaparate</button></div>`;
       } else if (_houseTab === 'furniture') {
         const canBuy = GS.missions?.glover?.status === 2;
+        { const L = Interiors.houseState().layout || {}, st = Object.keys(L).filter(k => L[k]?.stored), moved = Object.keys(L).length;   // v2.9.3 · 🪑 modo decorar
+          html += `<div class="app-card p-3 mb-2 flex items-center gap-3 bg-amber-50"><div class="text-3xl">🪑</div><div class="flex-1 min-w-0"><div class="font-bold text-sm">Decorar la casa</div><div class="text-[11px] text-slate-500">Coge un mueble, muévelo por la rejilla, gíralo 90° o guárdalo en el almacén.${st.length ? ` En el almacén: ${st.map(k => decoInfo(k).join(' ')).join(', ')}.` : ''}</div></div><div class="flex flex-col gap-1"><button data-deco class="btn-game px-3 py-1.5 text-xs bg-amber-200">🪑 Decorar</button>${moved ? '<button data-decoreset class="btn-game px-3 py-1 text-[11px] bg-white">↺ Original</button>' : ''}</div></div>`; }
         html += FURNITURE.map(f => { const own = hasFurniture(f.id); return `<div class="app-card p-3 mb-2 flex items-center gap-3"><div class="text-3xl">${f.icon}</div><div class="flex-1 min-w-0"><div class="font-bold text-sm">${esc(f.name)}</div><div class="text-[11px] text-slate-500">${esc(f.desc)}</div></div>${own ? '<span class="text-emerald-600 font-bold text-xs whitespace-nowrap">✓ En casa</span>' : canBuy ? `<button data-buyfurn="${f.id}" class="btn-game px-3 py-1.5 text-xs ${Wallet.canAfford(f.price) ? 'bg-emerald-300' : 'bg-slate-200 opacity-60'}">${fmt(f.price)} $T</button>` : `<span class="text-[11px] text-slate-400 whitespace-nowrap">${fmt(f.price)} $T</span>`}</div>`; }).join('');
         html += `<div class="text-[11px] text-slate-500">${canBuy ? 'Los fabrica Glover; te los trae a casa al momento.' : '🐿️ Glover te venderá muebles cuando completes su misión.'} Entra en casa para verlos colocados: cada mueble se usa ahí mismo (o desde este panel).</div>`;
       } else if (_houseTab === 'wardrobe') {
@@ -5265,6 +5273,8 @@ function openHousePanel(tab) {
       }
       body.innerHTML = html;
       body.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => { _houseTab = b.dataset.tab; render(); });
+      { const db = body.querySelector('[data-deco]'); if (db) db.onclick = () => { closeApp(); Decorate.start(); };   // v2.9.3
+        const rb = body.querySelector('[data-decoreset]'); if (rb) rb.onclick = async () => { if (await confirmDialog({ title: '↺ Colocación original', text: '¿Devolver todos los muebles a su sitio de siempre? También vuelve a su sitio lo que tengas en el almacén.', okLabel: 'DEVOLVER' })) { Decorate.reset(); render(); } }; }
       const amt = (id, max) => { const el = body.querySelector(id); const v = el && el.value ? +el.value : max; return clamp(Math.floor(v) || max, 1, max); };
       const q = (sel, fn) => { const b = body.querySelector(sel); if (b) b.onclick = () => { fn(); updateMailboxBadge(); render(); }; };
       q('[data-payrent]', () => payRentDebt(amt('#payRentAmt', rentDebt)));
@@ -8385,7 +8395,7 @@ function awakeningChainHTML() {
    Nota: la 🎪 Feria del Sábado (puestos de los vecinos, ofertas de tienda) NO es la
    📈 Feria del Tablón de la v0.8 (especulación por categorías): conviven sin tocarse.
    ========================================================= */
-const GAME_VERSION = '2.9.2', GAME_TAG = 'Eventos de temporada';
+const GAME_VERSION = '2.9.3', GAME_TAG = 'Decorar la casa';
 /* ---------- 🗓️ EVENTOS: calendario REAL → flags que leen los sistemas existentes (Sec. 10.10) ---------- */
 const Events = {
   _force: null,   // DBG.weekday(n): simula el día de la semana real (0 = domingo … 6 = sábado)
@@ -8947,31 +8957,32 @@ const INTERIOR_LAYOUTS = {
     const trophies = MUSEUM_SETS.filter(s => s.trophy && (Museum.st().trophies || []).includes(s.id)).map(s => s.trophy);
     const P = [
       { type: 'door', x: 0, z: hd, rot: Math.PI, act: 'exit', label: '🚪 Salir de casa', solid: false, range: 1.4 },
-      { type: 'rug', x: 0, z: 0.3, o: { r: Math.min(hw, hd) * 0.62, color: [0xffccbc, 0xb2dfdb, 0xffe082, 0xd1c4e9][lvl], color2: [0xfff3e0, 0xe0f2f1, 0xfff8e1, 0xede7f6][lvl] }, solid: false },
-      { type: 'bed', x: -hw + 1.05, z: -hd + 1.3, o: { comfy: hasFurniture('comfy_bed') }, act: 'sleep', label: hasFurniture('comfy_bed') ? '🛏️ Cama Mullida (dormir)' : '🛏️ Cama (dormir)' },
+      { type: 'rug', key: 'rug', x: 0, z: 0.3, o: { r: Math.min(hw, hd) * 0.62, color: [0xffccbc, 0xb2dfdb, 0xffe082, 0xd1c4e9][lvl], color2: [0xfff3e0, 0xe0f2f1, 0xfff8e1, 0xede7f6][lvl] }, solid: false },
+      { type: 'bed', key: 'bed', x: -hw + 1.05, z: -hd + 1.3, o: { comfy: hasFurniture('comfy_bed') }, act: 'sleep', label: hasFurniture('comfy_bed') ? '🛏️ Cama Mullida (dormir)' : '🛏️ Cama (dormir)' },
       { type: 'painting', x: -hw + 1.05, z: -hd + 0.06, y: 2.1, solid: false },
-      { type: 'kitchen', x: hw - 1.3, z: -hd + 0.5, o: { iron: hasFurniture('iron_stove') }, act: 'kitchen', label: hasFurniture('iron_stove') ? '🍳 Cocina de Hierro' : '🍳 Cocina' },
-      { type: 'wardrobe', x: -hw + 0.33, z: hd - 2.2, rot: Math.PI / 2, act: 'wardrobe', label: '👗 Armario (probador)' },
-      { type: 'desk_pc', x: hw - 0.42, z: 0.4, rot: -Math.PI / 2, act: 'pc', label: '💻 Escritorio: Laptop de IA y Red del Sueño' },
+      { type: 'kitchen', key: 'kitchen', x: hw - 1.3, z: -hd + 0.5, o: { iron: hasFurniture('iron_stove') }, act: 'kitchen', label: hasFurniture('iron_stove') ? '🍳 Cocina de Hierro' : '🍳 Cocina' },
+      { type: 'wardrobe', key: 'wardrobe', x: -hw + 0.33, z: hd - 2.2, rot: Math.PI / 2, act: 'wardrobe', label: '👗 Armario (probador)' },
+      { type: 'desk_pc', key: 'desk', x: hw - 0.42, z: 0.4, rot: -Math.PI / 2, act: 'pc', label: '💻 Escritorio: Laptop de IA y Red del Sueño' },
       { type: lvl >= 3 ? 'chandelier' : 'pendant', x: 0, z: 0, o: { h: H }, solid: false },
-      { type: 'plant', x: lvl ? 1.3 : hw - 0.45, z: hd - 0.42 },
+      { type: 'plant', key: 'plant1', x: lvl ? 1.3 : hw - 0.45, z: hd - 0.42 },
     ];
-    if (hasFurniture('trophy_shelf') || trophies.length) P.push({ type: 'trophies', x: -hw + 2.75, z: -hd + 0.3, o: { shelf: hasFurniture('trophy_shelf'), trophies }, act: 'trophies', label: hasFurniture('trophy_shelf') ? '🏆 Estantería de Trofeos' : '🏛️ Trofeos del museo' });
-    if (hasFurniture('muni_safe')) P.push({ type: 'muni_safe', x: -hw + 0.5, z: hd - 1.0, rot: Math.PI / 2, act: 'safe', label: '🔐 Caja Fuerte Municipal™' });
-    if (hasFurniture('lava_lamp')) P.push({ type: 'lava_lamp', x: hw - 0.4, z: -0.9, rot: -Math.PI / 2, act: 'lava', label: '🏮 Lámpara de Lava' });
-    if (hasFurniture('piggy_xl')) P.push({ type: 'piggy_xl', x: lvl ? -hw + 2.0 : 1.6, z: hd - 0.68, rot: Math.PI, act: 'piggy', label: '🐷 Hucha XL (escaparate)' });
-    if (lvl >= 1) P.push({ type: 'counter', x: hw - 2.1, z: hd - 1.9, o: { items: Showcase.list }, act: 'showcase', label: '🏷️ Mostrador (escaparate)' });
+    if (hasFurniture('trophy_shelf') || trophies.length) P.push({ type: 'trophies', key: 'trophies', x: -hw + 2.75, z: -hd + 0.3, o: { shelf: hasFurniture('trophy_shelf'), trophies }, act: 'trophies', label: hasFurniture('trophy_shelf') ? '🏆 Estantería de Trofeos' : '🏛️ Trofeos del museo' });
+    if (hasFurniture('muni_safe')) P.push({ type: 'muni_safe', key: 'safe', x: -hw + 0.5, z: hd - 1.0, rot: Math.PI / 2, act: 'safe', label: '🔐 Caja Fuerte Municipal™' });
+    if (hasFurniture('lava_lamp')) P.push({ type: 'lava_lamp', key: 'lava', x: hw - 0.4, z: -0.9, rot: -Math.PI / 2, act: 'lava', label: '🏮 Lámpara de Lava' });
+    if (hasFurniture('piggy_xl')) P.push({ type: 'piggy_xl', key: 'piggy', x: lvl ? -hw + 2.0 : 1.6, z: hd - 0.68, rot: Math.PI, act: 'piggy', label: '🐷 Hucha XL (escaparate)' });
+    if (lvl >= 1) P.push({ type: 'counter', key: 'counter', x: hw - 2.1, z: hd - 1.9, o: { items: Showcase.list }, act: 'showcase', label: '🏷️ Mostrador (escaparate)' });
     if (lvl >= 2) {
-      P.push({ type: 'sofa', x: -hw + 3.3, z: hd - 2.4, rot: Math.PI, o: { color: lvl >= 3 ? 0x9575cd : 0x7986cb } }, { type: 'table', x: -hw + 3.3, z: hd - 3.6 },
-        { type: 'floor_lamp', x: -hw + 4.8, z: hd - 2.4 }, { type: 'plant', x: hw - 2.9, z: -hd + 0.4, o: { pot: 0x5d4037 } });
+      P.push({ type: 'sofa', key: 'sofa', x: -hw + 3.3, z: hd - 2.4, rot: Math.PI, o: { color: lvl >= 3 ? 0x9575cd : 0x7986cb } }, { type: 'table', key: 'table', x: -hw + 3.3, z: hd - 3.6 },
+        { type: 'floor_lamp', key: 'lamp1', x: -hw + 4.8, z: hd - 2.4 }, { type: 'plant', key: 'plant2', x: hw - 2.9, z: -hd + 0.4, o: { pot: 0x5d4037 } });
     }
-    if (lvl >= 3) P.push({ type: 'fireplace', x: -hw + 0.3, z: -hd + 3.6, rot: Math.PI / 2 }, { type: 'plant', x: 2.6, z: hd - 0.42, o: { pot: 0x7e57c2 } }, { type: 'floor_lamp', x: hw - 0.45, z: hd - 2.9 });
+    if (lvl >= 3) P.push({ type: 'fireplace', key: 'fireplace', x: -hw + 0.3, z: -hd + 3.6, rot: Math.PI / 2 }, { type: 'plant', key: 'plant3', x: 2.6, z: hd - 0.42, o: { pot: 0x7e57c2 } }, { type: 'floor_lamp', key: 'lamp2', x: hw - 0.45, z: hd - 2.9 });
+    const stored = houseLayoutApply(P, hw, hd);   // v2.9.3: muebles movidos o guardados en el almacén (modo decorar)
     const back = [[0.4], [0.4], [-1.2, 1.4], [-2.4, 0, 2.4]][lvl];
     return {
       title: names[lvl] + ' · por dentro', size: [w, d], wallH: H, spawn: [0, hd - 1.5], exitZone: true,
       palette: { wall: [0xfff1d6, 0xe0f7fa, 0xfff8e1, 0xf3e5f5][lvl], trim: [0xffab91, 0x4db6ac, 0xffca28, 0xb388ff][lvl], floor: [['#c8a27a', '#b88f66'], ['#d7b98e', '#c9a676'], ['#e6c89c', '#d9b884'], ['#d1b3e0', '#c29fd6']][lvl], void: 0x150f26 },
       windows: { back, left: lvl === 2 ? [-hd + 3.4] : lvl === 3 ? [0.8] : [], right: lvl >= 1 ? [-hd + 2.4] : [] },
-      pieces: P, welcome: lvl === 3 ? '🏰 Bienvenido a la Mansión Onírica. El eco aplaude tus pasos.' : '🏠 Estás en casa. Más grande por dentro: es un sueño.',
+      pieces: P, stored, welcome: lvl === 3 ? '🏰 Bienvenido a la Mansión Onírica. El eco aplaude tus pasos.' : '🏠 Estás en casa. Más grande por dentro: es un sueño.',
     };
   },
   /** 🏪 Tienda de prueba (no accesible en el juego normal: DBG.enterShop). Base de los puestos/locales/boutiques del online.
@@ -9166,6 +9177,7 @@ const Interiors = {
   },
   _unmount(opts = {}) {
     const a = this.active; if (!a) return;
+    if (state.deco) Decorate.stop();   // v2.9.3: salir de casa termina el modo decorar
     const wasFit = Fitting.isOpen; if (wasFit) Fitting.close(false);
     scene.add(player); scene.add(marker); marker.material.opacity = 0;
     this._dispose(); this.active = null; this.target = null; this._C = null;
@@ -9210,6 +9222,7 @@ const Interiors = {
     const inter = [], boxes = [], lamps = [];
     for (const p of def.pieces) {
       const g = makeFurniture(p.type, p.o || {}), rot = p.rot || 0; g.position.set(p.x, p.y || 0, p.z); g.rotation.y = rot; root.add(g);
+      if (p.key) Object.assign(g.userData, { pkey: p.key, pdef: p });   // v2.9.3: se puede mover en el modo decorar
       const [fw, fd] = g.userData.foot, q = Math.abs(Math.sin(rot)) > 0.5, hx = (q ? fd : fw) / 2, hz = (q ? fw : fd) / 2;
       const solid = p.solid !== false && fw > 0 && fd > 0; if (solid) boxes.push({ x: p.x, z: p.z, hx, hz });
       (g.userData.lights || []).forEach(l => lamps.push(l));
@@ -9242,14 +9255,16 @@ const Interiors = {
     const old = this.scene; a.def = this.layouts[a.kind](a.opts); this._build(a.def);
     this.scene.add(player); this.scene.add(marker); this._dispose(old);
     this._moveBy(0, 0); this._sig = this._signature();
+    if (state.deco) Decorate.afterRebuild();   // v2.9.3: sigue decorando con la habitación nueva
   },
   _signature() {
     if (this.active?.kind !== 'house') return '';
-    return [GS.house.level | 0, (GS.furniture?.owned || []).join(','), (Museum.st().trophies || []).join(','), Showcase.list.map(s => s.id + ':' + s.qty).join(',')].join('|');
+    return [GS.house.level | 0, (GS.furniture?.owned || []).join(','), (Museum.st().trophies || []).join(','), Showcase.list.map(s => s.id + ':' + s.qty).join(','), JSON.stringify(this.houseState().layout || {})].join('|');   // v2.9.3: + colocación de los muebles
   },
   _hud(on) {
     const ex = document.getElementById('btnInteriorExit'), pn = document.getElementById('btnInteriorPanel'), pl = document.getElementById('btnPlanet');
     if (ex) ex.classList.toggle('hidden', !on); if (pn) pn.classList.toggle('hidden', !(on && this.active?.kind === 'house')); if (pl) pl.classList.toggle('hidden', !!on);
+    const dc = document.getElementById('btnInteriorDeco'); if (dc) dc.classList.toggle('hidden', !(on && this.active?.kind === 'house'));   // v2.9.3: 🪑 Decorar
   },
   /* ---------- movimiento plano con colisiones AABB ---------- */
   _moveBy(dx, dz) {
@@ -9283,7 +9298,7 @@ const Interiors = {
   tick(dt) {
     const pd = player.userData, parts = pd.parts, C = this._C || CFG.interior; let moving = false;
     cam.tPitch = clamp(cam.tPitch, C.camPitchMin, C.camPitchMax); cam.tDist = clamp(cam.tDist, C.camMin, C.camMax);
-    if (!this._busy && canControl()) {
+    if (!this._busy && canControl() && !state.deco) {   // v2.9.3: decorando no se camina
       const k = state.keys; let f = (k.KeyW || k.ArrowUp ? 1 : 0) - (k.KeyS || k.ArrowDown ? 1 : 0), r = (k.KeyD || k.ArrowRight ? 1 : 0) - (k.KeyA || k.ArrowLeft ? 1 : 0);
       if (!f && !r && (Math.abs(state.joy.x) > 0.12 || Math.abs(state.joy.y) > 0.12)) { f = state.joy.y; r = state.joy.x; }
       const sy = Math.sin(cam.yaw), cy = Math.cos(cam.yaw); let mx = 0, mz = 0, mag = 1;
@@ -9308,8 +9323,8 @@ const Interiors = {
     else { ['legL', 'legR', 'armL', 'armR'].forEach(p => parts[p].rotation.x *= 0.85); bob = Math.sin(performance.now() * 0.003) * 0.02; }
     this._placePlayer(bob); squash(dt, moving); playerBlob.position.y = CFG.gfx.blob.y - bob; playerBlob.visible = true;
     if (marker.material.opacity > 0) { marker.material.opacity -= dt * 0.8; marker.scale.addScalar(dt * 0.8); }
-    const near = canControl() && !this._busy ? this.nearby() : null; ui.hint.classList.toggle('hidden', !near); if (near) ui.hintText.textContent = near.obj.userData.interact.label;
-    if (IS_MOBILE) { document.getElementById('joystick').style.display = canControl() ? 'block' : 'none'; actionBtn.style.display = near ? 'flex' : 'none'; if (near) actionLabel.textContent = near.obj.userData.interact.label; }
+    const near = canControl() && !this._busy && !state.deco ? this.nearby() : null; ui.hint.classList.toggle('hidden', !near); if (near) ui.hintText.textContent = near.obj.userData.interact.label;
+    if (IS_MOBILE) { document.getElementById('joystick').style.display = canControl() && !state.deco ? 'block' : 'none'; actionBtn.style.display = near ? 'flex' : 'none'; if (near) actionLabel.textContent = near.obj.userData.interact.label; }
     aura.rotation.y += dt * 2.2; aura.children.forEach(c => { if (c.isMesh && c.userData.i !== undefined) c.position.y = Math.sin(performance.now() * 0.004 + c.userData.i) * 0.15; });
     if (!this.active) return;   // una interacción pudo sacarte
     // salir andando: pisar el felpudo de la puerta (tras haberte alejado de ella al entrar)
@@ -10484,7 +10499,8 @@ const SeasonDecor = (() => {
   function build(id) {
     const root = new THREE.Group(); root.visible = false; scene.add(root);
     if (id === 'spring') RING.forEach(([x, z], i) => { const g = new THREE.Group(); g.add(cyl(0.3, 0.22, 0.4, mat(0xbf6f4a), 0, 0.2, 0, 10)); g.add(sphere(0.32, mat(0x7cb342), 0, 0.5, 0, 10));
-      for (let k = 0; k < 6; k++) { const a = k / 6 * 6.283; g.add(sphere(0.09, mat([0xf48fb1, 0xfff176, 0xce93d8][(k + i) % 3]), Math.cos(a) * 0.26, 0.62 + (k % 2) * 0.08, Math.sin(a) * 0.26, 6)); } root.add(put(g, x, z)); });
+      for (let k = 0; k < 6; k++) { const a = k / 6 * 6.283; g.add(sphere(0.09, mat([0xf48fb1, 0xfff176, 0xce93d8][(k + i) % 3]), Math.cos(a) * 0.26, 0.62 + (k % 2) * 0.08, Math.sin(a) * 0.26, 6)); } g.scale.setScalar(1.35); root.add(put(g, x, z)); });
+    if (id === 'spring') { const a = seasonBuild('bloom_arch'); a.scale.setScalar(1.4); root.add(put(a, 0, 5.2, Math.PI)); }   // v2.9.3: arco de flores a la entrada de la plaza
     if (id === 'veil') RING.forEach(([x, z], i) => { const g = new THREE.Group(), p = sphere(0.36, mat(0xff8f00), 0, 0.3, 0, 12); p.scale.set(1.15, 0.85, 1.15); g.add(p); g.add(cyl(0.04, 0.05, 0.16, mat(0x558b2f), 0, 0.64, 0, 6));
       [-0.12, 0.12].forEach(ex => g.add(cone(0.06, 0.1, glow(0xffe082, 0xffb300, 1.6), ex, 0.36, 0.36, 3))); g.add(box(0.22, 0.05, 0.04, glow(0xffe082, 0xffb300, 1.6), 0, 0.2, 0.37));
       if (i % 2 === 0) { const l = sphere(0.14, glow(0xce93d8, 0x8e24aa, 1.8), 0.5, 1.3, 0, 8); g.add(l); g.add(cyl(0.02, 0.02, 1.2, mat(0x2b2b3d), 0.5, 0.6, 0, 4)); }
@@ -11864,6 +11880,7 @@ const Online = (() => {
   const muted = new Set((() => { try { return JSON.parse(localStorage.getItem('crossia.muted') || '[]'); } catch (e) { return []; } })());
   const blocked = new Set();
   const api = { get me() { return me; }, get session() { return session; }, get ready() { return !!sb; }, peers, chat, muted, blocked, status: 'off', err: '' };
+  api.sync = 'idle'; let syncP = null, syncAt = 0;   // v2.9.3 · ☁️ partida de la nube frente a la de este navegador: idle · checking · ok · conflict · unknown
   api.hidden = (id) => !!id && (muted.has(id) || blocked.has(id));
   api.setMuted = (id, on) => { if (on) muted.add(id); else muted.delete(id); try { localStorage.setItem('crossia.muted', JSON.stringify([...muted])); } catch (e) {} NetChat.render(); };
   api.loadBlocks = async () => { const l = await rpc('crossia_my_blocks'); blocked.clear(); (l || []).forEach(b => blocked.add(b.id)); return l || []; };
@@ -11899,20 +11916,36 @@ const Online = (() => {
   api.boot = async () => {
     const fromEmail = /access_token=|[?&]code=|cuenta=ok/.test(location.hash + location.search);   // vuelves del enlace de confirmación del email
     try { if (!fromEmail && !localStorage.getItem('crossia.auth')) return; } catch (e) { if (!fromEmail) return; }
-    try { await lib(); const { data } = await sb.auth.getSession(); session = data.session; if (session) await refreshMe();
+    try { await lib(); const { data } = await sb.auth.getSession(); session = data.session; if (session) await refreshMe(); if (me) api.syncCheck();   // v2.9.3: ¿la nube tiene esta partida?
       if (fromEmail) { try { history.replaceState(null, '', location.pathname); } catch (e) {}
         if (session) { api.pendingWelcome = true; showToast(me ? `✅ Cuenta confirmada · hola, ${me.name}` : '✅ Cuenta confirmada: elige tu nombre en el online', 'text-white'); } }
     } catch (e) { console.warn('[online]', e.message); } };
   api.signUp = async (email, password, name) => { await lib(); const { data, error } = await sb.auth.signUp({ email, password, options: { data: { app: 'crossia', username: name }, emailRedirectTo: location.origin + location.pathname + '?cuenta=ok' } });   // el enlace del email te devuelve al juego ya dentro if (error) throw new Error(tr(error.message));
     if (data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) throw new Error('Ya hay una cuenta con ese email (y no se reenvía el correo): pulsa «Entrar» con tu contraseña');   // Supabase no avisa de emails ya registrados
     session = data.session; return !!session; };
-  api.signIn = async (email, password) => { await lib(); const { data, error } = await sb.auth.signInWithPassword({ email, password }); if (error) throw new Error(tr(error.message)); session = data.session; await refreshMe(); return me; };
-  api.signOut = async () => { if (!sb) return; leave(); await sb.auth.signOut(); session = null; me = null; api.status = 'off'; GS.meta.profile = { type: PROFILE.GUEST, accountId: null, displayName: 'Invitado' }; };
-  api.register = async (name) => { me = await rpc('crossia_register', { p_name: name, p_profile: Number.isInteger(Net.origin()) ? Net.origin() : 0 }); await refreshMe(); SaveSystem.saveNow('account-link'); await api.push(true); return me; };
+  api.signIn = async (email, password) => { await lib(); const { data, error } = await sb.auth.signInWithPassword({ email, password }); if (error) throw new Error(tr(error.message)); session = data.session; await refreshMe(); if (me) api.syncCheck(); return me; };   // v2.9.3: al entrar se comparan las dos partidas
+  api.signOut = async () => { if (!sb) return; leave(); await sb.auth.signOut(); session = null; me = null; api.status = 'off'; api.sync = 'idle'; GS.meta.profile = { type: PROFILE.GUEST, accountId: null, displayName: 'Invitado' }; };
+  api.register = async (name) => { me = await rpc('crossia_register', { p_name: name, p_profile: Number.isInteger(Net.origin()) ? Net.origin() : 0 }); await refreshMe(); SaveSystem.saveNow('account-link'); if ((await api.syncCheck()) === 'ok') await api.push(true); return me; };
   /** ☁️ Subir la partida (manual o cada CFG.online.autosaveMin minutos mientras juegas) */
-  api.push = async (force = false) => { if (!me || (!force && Date.now() - lastPush < C.autosaveMin * 60000)) return null; lastPush = Date.now(); SaveSystem.saveNow('cloud');
-    const r = await rpc('crossia_save_put', { p_data: JSON.parse(SaveSystem.exportJSON()), p_version: SAVE_VERSION }); GS.meta.cloudAt = r.updated_at; return r; };
+  api.push = async (force = false, opts = {}) => {
+    if (!me || (!force && Date.now() - lastPush < C.autosaveMin * 60000)) return null; lastPush = Date.now();
+    if (!opts.choose) {   // v2.9.3 · nunca se pisa sin preguntar la partida que otro dispositivo dejó en la nube
+      const busy = 'Hay otra partida en tu cuenta de la nube: elige cuál usar en el aviso';
+      if (api.sync !== 'ok') { const v = await api.syncCheck(); if (v !== 'ok') { if (force) throw new Error(v === 'conflict' ? busy : 'No se pudo comprobar la partida de la nube'); return null; } }
+      const m = await rpc('crossia_save_meta').catch(() => null);   // solo la fecha: si otro dispositivo guardó entre medias, se vuelve a preguntar
+      if (m && m.updated_at && Date.parse(m.updated_at) !== Date.parse(GS.meta.cloudAt || '')) { api.sync = 'idle'; const v = await api.syncCheck(); if (v !== 'ok') { if (force) throw new Error(busy); return null; } }
+    }
+    SaveSystem.saveNow('cloud');
+    const r = await rpc('crossia_save_put', { p_data: JSON.parse(SaveSystem.exportJSON()), p_version: SAVE_VERSION }); GS.meta.cloudAt = r.updated_at; api.sync = 'ok'; SaveSystem.saveNow('cloud-at'); return r; };
   api.pull = async () => rpc('crossia_save_get');
+  /** v2.9.3 · ☁️ ¿La nube tiene esta misma partida? Si no, pregunta cuál usar (SyncGuard) y, mientras tanto, no se sube nada */
+  api.syncCheck = () => {
+    if (!me) { api.sync = 'idle'; return Promise.resolve('idle'); } if (syncP) return syncP;
+    api.sync = 'checking'; syncAt = Date.now();
+    syncP = (async () => { try { const r = await api.pull(); const v = SyncGuard.decide(r); api.sync = v; if (v === 'conflict') SyncGuard.show(r); else { SyncGuard.last = null; SyncGuard.close(); } return v; }
+      catch (e) { console.warn('[online] sync', e.message); api.sync = 'unknown'; return 'unknown'; } finally { syncP = null; } })();
+    return syncP;
+  };
   /* --- 🌐 Red real: presencia, posiciones y chat por zona --- */
   function leave() { if (chan) { try { sb.removeChannel(chan); } catch (e) {} } chan = null; chanZone = null; peers.forEach(p => p.g?.parent?.remove(p.g)); peers.clear(); if (typeof RealWorld !== 'undefined') RealWorld._tickAt = 0; }
   function avatarOf(p) {
@@ -11945,7 +11978,8 @@ const Online = (() => {
     if (error) { let m = error.message; try { const j = await error.context?.json?.(); if (j?.error) m = j.error; } catch (e) {} throw new Error(m); }
     leave(); try { await sb.auth.signOut(); } catch (e) {} session = null; me = null; api.status = 'off'; GS.meta.profile = { type: PROFILE.GUEST, accountId: null, displayName: 'Invitado' }; SaveSystem.saveNow('account-deleted'); return data; };
   api.update = (dt) => {
-    if (me && session && SaveSystem.started && !state.menuOpen && Date.now() - lastPush > C.autosaveMin * 60000) api.push().catch(e => console.warn('[online] push', e.message));
+    if (me && session && (api.sync === 'idle' || (api.sync === 'unknown' && Date.now() - syncAt > 60000))) api.syncCheck();   // v2.9.3: comprobar (o reintentar) antes de subir nada
+    if (me && session && api.sync === 'ok' && SaveSystem.started && !state.menuOpen && Date.now() - lastPush > C.autosaveMin * 60000) api.push().catch(e => console.warn('[online] push', e.message));
     const z = NetWorld.inside() ? NetWorld.zone() : null;
     if (!me || !sb) return;
     if (z && z !== chanZone) join(z); else if (!z && chanZone) leave();
@@ -12313,7 +12347,7 @@ const Account = {
         if (me) {
           const cloud = GS.meta.cloudAt ? new Date(GS.meta.cloudAt).toLocaleString('es-ES') : 'todavía no';
           html += `<div class="app-card p-3 mb-2 flex items-center gap-3"><div class="text-4xl">${NET_ORIGINS[me.profile]?.icon || '👤'}</div><div class="flex-1"><div class="font-bold text-[#2b2b3d]">${esc(me.name)}</div><div class="text-xs text-slate-500">${NET_ORIGINS[me.profile]?.name || ''} · cuenta online activa</div></div><button data-out class="btn-game px-2 py-1 text-xs bg-slate-200">Salir</button></div>
-            <div class="sec-h">Partida en la nube</div><div class="app-card p-3 mb-2 text-xs">Última copia: <b>${cloud}</b> · se guarda sola cada ${CFG.online.autosaveMin} min mientras juegas.
+            <div class="sec-h">Partida en la nube</div><div class="app-card p-3 mb-2 text-xs">Última copia: <b>${cloud}</b> · se guarda sola cada ${CFG.online.autosaveMin} min mientras juegas.${Online.sync === 'conflict' ? `<div class="mt-2 p-2 rounded-lg bg-amber-50 text-amber-800">⚠️ La partida de la nube no es la de este navegador: hasta que elijas, no se sube nada. <button data-sgopen class="btn-game px-2 py-0.5 text-[11px] bg-amber-200 ml-1">Elegir</button></div>` : Online.sync === 'ok' ? '<div class="mt-1 text-emerald-700">✓ Sincronizada con este navegador</div>' : ''}
               <div class="flex gap-2 mt-2"><button data-push class="btn-game px-3 py-1.5 text-xs bg-emerald-200 flex-1">☁️⬆ Subir ahora</button><button data-pull class="btn-game px-3 py-1.5 text-xs bg-sky-200 flex-1">☁️⬇ Traer la de la nube</button></div></div>
             ${me.rules_at ? '' : `<div class="app-card p-3 mb-2 text-xs bg-amber-50">Antes de seguir en la Red, acepta las <a href="#" data-normas2 class="underline">normas</a> (respeto, nada de estafas ni trampas). <button data-accept class="btn-game px-3 py-1 text-xs bg-emerald-200 mt-2 w-full">Acepto las normas</button></div>`}
             <div class="sec-h">Red del Sueño real</div><div class="app-card p-3 text-xs">Entra en la Red desde el PC de tu casa: verás a los jugadores conectados en tu misma zona y podrás chatear con ellos. Para comprar y vender con ellos, el Mercado real.<button data-mkt class="btn-game px-3 py-1.5 text-xs bg-amber-200 w-full mt-2">🏛️ Abrir el Mercado real</button></div>`;
@@ -12354,11 +12388,260 @@ const Account = {
         $b('[data-push]') && ($b('[data-push]').onclick = () => run(() => Online.push(true), (r) => `✓ Subida (${Math.round((r?.bytes || 0) / 1024)} KB)`));
         $b('[data-pull]') && ($b('[data-pull]').onclick = () => run(async () => { const r = await Online.pull(); if (!r?.data) throw new Error('No hay ninguna partida en la nube'); const when = new Date(r.updated_at).toLocaleString('es-ES');
           if (!(await confirmDialog({ title: '☁️ Traer la partida de la nube', text: `¿Cargar la partida guardada en la nube (${when})? La de este navegador se sustituirá.`, okLabel: 'CARGAR' }))) return 'Cancelado';
-          SaveSystem.importJSON(JSON.stringify(r.data)); location.reload(); return '…'; }, (m) => m));
+          SyncGuard.adopt(r); return '…'; }, (m) => m));   // v2.9.3: con la fecha de la nube (así no vuelve a preguntar)
+        $b('[data-sgopen]') && ($b('[data-sgopen]').onclick = () => { closeApp(); SyncGuard.reopen(); });
       };
       render(Online.ready || Online.session ? '' : '').catch(() => {});
       if (!Online.ready) { try { await Online.lib(); } catch (e) { body.innerHTML = `<div class="app-card p-3 text-sm">❌ No se pudo conectar con el servidor. Comprueba tu conexión.</div>`; } }
     });
+  },
+};
+
+/* ===== v2.9.3 · 🪑 DECORAR LA CASA Y ☁️ CONFLICTO ENTRE DISPOSITIVOS (Guía Maestra 2, Bloque I · Guía 1, Sec. 6.x y 9.3) =====
+   Decorar: dentro de casa coges un mueble, lo mueves por una rejilla, lo giras 90° y lo colocas o lo guardas en el almacén.
+   Reutiliza el panel del modo construcción del exterior (#buildHud). La colocación vive en GS.interiors.house.layout =
+   { clave: { x, z, rot } | { stored: true } } y la aplica el layout de la casa; los efectos de los muebles no dependen del sitio.
+   Conflicto: al entrar con tu cuenta se compara la partida de la nube con la de este navegador. Si no son la misma, se pregunta
+   cuál usar (avisando si hay un salto grande de capital) y, mientras tanto, no se sube nada. Antes de cada subida se mira la
+   fecha de la nube (crossia_save_meta): si otro dispositivo guardó entre medias, se vuelve a preguntar en vez de pisarla. */
+CFG.deco = { snap: 0.25, line: 0.5, doorW: 1.0, doorD: 1.9 };   // rejilla de 25 cm (líneas cada 50 cm) · paso libre delante de la puerta
+CFG.sync = { jumpAbs: 20000, jumpRel: 0.5 };                    // salto grande de capital: ≥ 20.000 $T y ≥ 50 % de la partida más rica
+/** Nombre de cada mueble que se puede decorar (función: la usa el layout de la casa, que está más arriba en el archivo) */
+function decoInfo(k) {
+  return ({ rug: ['🧶', 'Alfombra'], bed: ['🛏️', 'Cama'], kitchen: ['🍳', 'Cocina'], wardrobe: ['👗', 'Armario'], desk: ['💻', 'Escritorio'],
+    plant1: ['🪴', 'Planta'], plant2: ['🪴', 'Planta grande'], plant3: ['🪴', 'Planta morada'], trophies: ['🏆', 'Trofeos'], safe: ['🔐', 'Caja Fuerte'],
+    lava: ['🏮', 'Lámpara de Lava'], piggy: ['🐷', 'Hucha XL'], counter: ['🏷️', 'Mostrador'], sofa: ['🛋️', 'Sofá'], table: ['🪵', 'Mesa'],
+    lamp1: ['💡', 'Lámpara de pie'], lamp2: ['💡', 'Lámpara de pie'], fireplace: ['🔥', 'Chimenea'] })[k] || ['🪑', 'Mueble'];
+}
+/** Imprescindibles: se mueven y se giran, pero no se guardan (cama, cocina, armario, escritorio y mostrador) */
+function decoKeep(k) { return k === 'bed' || k === 'kitchen' || k === 'wardrobe' || k === 'desk' || k === 'counter'; }
+/** Aplica la colocación guardada a las piezas de la casa y devuelve las que están en el almacén */
+function houseLayoutApply(P, hw, hd) {
+  let L = {}; try { L = Interiors.houseState().layout || {}; } catch (e) {}
+  const stored = [];
+  for (let i = P.length - 1; i >= 0; i--) {
+    const p = P[i], o = p.key ? L[p.key] : null; if (!o) continue;
+    if (o.stored) { if (!decoKeep(p.key)) { stored.unshift(p); P.splice(i, 1); } continue; }
+    if (Number.isFinite(o.x) && Number.isFinite(o.z)) { p.x = clamp(o.x, -hw + 0.1, hw - 0.1); p.z = clamp(o.z, -hd + 0.1, hd - 0.1); if (Number.isFinite(o.rot)) p.rot = o.rot; p.moved = true; }
+  }
+  return stored;
+}
+const Decorate = (() => {
+  let grid = null, ghost = null, hoverKey = null; const marks = new Map(), Y = 0.045;
+  const S = () => state.deco;
+  const lay = () => { const h = Interiors.houseState(); return (h.layout ||= {}); };
+  const pieces = () => { const r = Interiors.root; return r && Array.isArray(r.children) ? r.children.filter(g => g && g.userData && g.userData.pkey) : []; };
+  const nameOf = (k) => decoInfo(k).join(' ');
+  const snap = (v) => Math.round(v / CFG.deco.snap) * CFG.deco.snap;
+  const normRot = (r) => (((Math.round((r || 0) / (Math.PI / 2)) % 4) + 4) % 4) * Math.PI / 2;
+  /** Media huella de una pieza girada (la alfombra se mide por su óvalo, pero no choca con nada) */
+  function half(g, rot = g.rotation.y) {
+    const p = g.userData.pdef || {}, rug = p.type === 'rug'; let [fw, fd] = g.userData.foot || [1, 1];
+    if (rug) { const r = p.o?.r ?? 2; fw = 2 * r; fd = 2 * r * (p.o?.oval ?? 0.75); }
+    const q = Math.abs(Math.sin(rot)) > 0.5; return { hx: (q ? fd : fw) / 2, hz: (q ? fw : fd) / 2, solid: !rug && p.solid !== false && fw > 0 && fd > 0 };
+  }
+  /** Por qué no cabe ahí (null = cabe): 'wall' · 'door' · 'busy:<clave>' */
+  function why(g, x, z, rot) {
+    const b = Interiors.bounds; if (!b) return 'wall'; const h = half(g, rot);
+    if (Math.abs(x) + h.hx > b.hw + 1e-3 || Math.abs(z) + h.hz > b.hd + 1e-3) return 'wall';
+    if (!h.solid) return null;
+    if (Math.abs(x) < h.hx + CFG.deco.doorW && z + h.hz > b.hd - CFG.deco.doorD) return 'door';
+    for (const o of pieces()) {
+      if (o === g) continue; const k = half(o); if (!k.solid) continue;
+      if (Math.abs(x - o.position.x) < h.hx + k.hx - 0.01 && Math.abs(z - o.position.z) < h.hz + k.hz - 0.01) return 'busy:' + o.userData.pkey;
+    }
+    return null;
+  }
+  const whyText = (w) => !w ? '✅ Aquí cabe' : w === 'wall' ? '⛔ Se sale de la habitación' : w === 'door' ? '⛔ Deja libre el paso de la puerta' : `⛔ Choca con ${nameOf(w.slice(5))}`;
+  /* --- rejilla y huellas en el suelo --- */
+  function drop(o) { if (!o) return; o.parent?.remove?.(o); o.geometry?.dispose?.(); o.material?.dispose?.(); }
+  function clearOverlays() { drop(grid); drop(ghost); marks.forEach(drop); grid = ghost = null; marks.clear(); }
+  function plate(color, opacity) { const m = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ color, transparent: true, opacity, depthWrite: false })); m.rotation.x = -Math.PI / 2; m.renderOrder = 3; m.userData.op = opacity; m.raycast = () => {}; return m; }
+  function fitPlate(m, g, x = g.position.x, z = g.position.z, rot = g.rotation.y, pad = 0.06) { const h = half(g, rot); m.scale.set(h.hx * 2 + pad, h.hz * 2 + pad, 1); m.position.set(x, Y + (g.userData.pdef?.type === 'rug' ? 0.002 : 0.004), z); }
+  function overlays() {
+    clearOverlays(); const root = Interiors.root, b = Interiors.bounds, st = S(); if (!root || !b || !st) return;
+    const pts = [], L = CFG.deco.line;
+    for (let x = -b.hw; x <= b.hw + 1e-6; x += L) pts.push(x, Y, -b.hd, x, Y, b.hd);
+    for (let z = -b.hd; z <= b.hd + 1e-6; z += L) pts.push(-b.hw, Y, z, b.hw, Y, z);
+    const gg = new THREE.BufferGeometry(); gg.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
+    grid = new THREE.LineSegments(gg, new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.4, depthWrite: false })); grid.renderOrder = 2; grid.raycast = () => {}; root.add(grid);
+    if (st.phase === 'pick') pieces().forEach(g => { const m = plate(0x4dd0e1, g.userData.pdef?.type === 'rug' ? 0.12 : 0.34); fitPlate(m, g, undefined, undefined, undefined, 0.36); root.add(m); marks.set(g.userData.pkey, m); });   // un halo alrededor de cada mueble que se puede coger
+    else { ghost = plate(0x22c55e, 0.45); root.add(ghost); }
+  }
+  /** El mueble que mueves tiene sus propios materiales (para teñirlo de rojo si no cabe sin tocar nada más) */
+  function own(g) { g.traverse(o => { if (o.isMesh && !o.userData._own) { o.material = Array.isArray(o.material) ? o.material.map(m => m.clone()) : o.material.clone(); o.userData._own = true; } }); }
+  function tint(g, bad) { g.traverse(o => { if (!o.isMesh || !o.material || !o.material.emissive) return; if (o.userData._em === undefined) o.userData._em = o.material.emissive.getHex(); o.material.emissive.setHex(bad ? 0x8b1a1a : o.userData._em); }); }
+  function hud() {
+    const st = S(); if (!st) return; const mv = st.phase === 'move', k = st.key;
+    $('buildMode').textContent = 'MODO DECORAR'; $('buildName').textContent = mv ? `🪑 ${nameOf(k)}` : '🪑 Decorar la casa';
+    const s = $('buildStatus'); s.textContent = mv ? whyText(st.why) : hoverKey ? `👆 ${nameOf(hoverKey)}: tócalo para cogerlo` : 'Toca un mueble para cogerlo';
+    s.className = `text-xs font-semibold ${mv ? (st.why ? 'text-red-600' : 'text-emerald-600') : 'text-slate-600'}`;
+    $('buildHelp').textContent = mv ? (IS_MOBILE ? 'Toca el suelo para moverlo (rejilla de 25 cm) · Girar 90° · Colocar o Guardar' : 'Mueve el ratón (rejilla de 25 cm) · R gira 90° · clic o Enter coloca · G guarda · Esc lo devuelve')
+      : (IS_MOBILE ? 'Toca un mueble para cogerlo · arrastra para girar la cámara' : 'Clic en un mueble para cogerlo · arrastra para girar la cámara · Esc termina');
+    const rb = $('buildRotate'), cf = $('buildConfirm'), sb = $('buildStore'), cn = $('buildCancel');
+    rb.textContent = IS_MOBILE ? '🔄 Girar' : '🔄 Girar 90°'; cf.textContent = '✅ Colocar'; sb.textContent = '📦 Guardar'; cn.textContent = mv ? '↩ Devolver' : '✔ Listo';
+    rb.classList.toggle('hidden', !mv); cf.classList.toggle('hidden', !mv); sb.classList.toggle('hidden', !mv); cf.disabled = !!(mv && st.why);
+    sb.disabled = !!(mv && decoKeep(k)); sb.title = mv && decoKeep(k) ? 'Imprescindible: se mueve y se gira, pero no se guarda' : 'Guardar en el almacén';
+    const ds = $('decoStore'), stored = Interiors.active?.def?.stored || [];
+    ds.classList.toggle('hidden', mv || !stored.length);
+    ds.innerHTML = !mv && stored.length ? `<span class="text-[11px] font-bold text-slate-500 mr-1">📦 Almacén:</span>` + stored.map(p => `<button data-unstore="${p.key}" class="btn-game px-2 py-1 text-[11px] bg-amber-100">${nameOf(p.key)}</button>`).join('') : '';
+    ds.querySelectorAll('[data-unstore]').forEach(b => b.onclick = () => unstore(b.dataset.unstore));
+  }
+  function validate() {
+    const st = S(); if (!st || st.phase !== 'move') return; st.why = why(st.g, st.x, st.z, st.rot);
+    if (ghost) { fitPlate(ghost, st.g, st.x, st.z, st.rot); ghost.material.color.setHex(st.why ? 0xef4444 : 0x22c55e); }
+    tint(st.g, !!st.why); hud();
+  }
+  function moveTo(x, z) {
+    const st = S(); if (!st || st.phase !== 'move') return; const b = Interiors.bounds, h = half(st.g, st.rot);
+    st.x = clamp(snap(x), -b.hw + h.hx, b.hw - h.hx); st.z = clamp(snap(z), -b.hd + h.hz, b.hd - h.hz);
+    st.g.position.x = st.x; st.g.position.z = st.z; validate();
+  }
+  /* --- coger · girar · colocar · guardar · devolver --- */
+  function pick(g, fromStore = false) {
+    const st = S(); if (!st || !g || !g.userData.pkey) return false; if (st.phase === 'move') back();
+    const y0 = g.position.y || 0;
+    Object.assign(st, { phase: 'move', g, key: g.userData.pkey, x: g.position.x, z: g.position.z, rot: normRot(g.rotation.y), x0: g.position.x, z0: g.position.z, rot0: g.rotation.y, y0, fromStore, why: null });
+    own(g); g.rotation.y = st.rot; g.position.y = y0 + 0.12; hoverKey = null; overlays(); validate(); playBeep(660, 0.05, 'triangle'); return true;
+  }
+  function rotate() { const st = S(); if (!st || st.phase !== 'move') return; st.rot = normRot(st.rot + Math.PI / 2); st.g.rotation.y = st.rot; playBeep(520, 0.04, 'triangle'); moveTo(st.x, st.z); }
+  function commit(msg) { const st = S(); st.phase = 'pick'; st.g = null; st.why = null; SaveSystem.saveNow('deco'); Interiors.rebuild(); playChime(); showToast(msg, 'text-white'); }
+  function place() {
+    const st = S(); if (!st || st.phase !== 'move') return false;
+    if (st.why) { showToast(whyText(st.why), 'text-red-200'); playBeep(200, 0.08, 'square'); return false; }
+    const k = st.key; lay()[k] = { x: +st.x.toFixed(3), z: +st.z.toFixed(3), rot: normRot(st.rot) }; commit(`✓ Colocado: ${nameOf(k)}`); return true;
+  }
+  function store() {
+    const st = S(); if (!st || st.phase !== 'move') return false; const k = st.key;
+    if (decoKeep(k)) { showToast(`${nameOf(k)} es imprescindible: puedes moverlo y girarlo, pero no guardarlo`, 'text-white'); return false; }
+    lay()[k] = { stored: true }; commit(`📦 Al almacén: ${nameOf(k)}`); return true;
+  }
+  function back() {
+    const st = S(); if (!st) return; if (st.phase !== 'move') { stop(); return; }
+    const g = st.g; if (st.fromStore) { g.traverse?.(o => { if (o.isMesh) { o.geometry?.dispose?.(); } }); g.parent?.remove?.(g); }
+    else { g.position.set(st.x0, st.y0, st.z0); g.rotation.y = st.rot0; tint(g, false); }
+    st.phase = 'pick'; st.g = null; st.why = null; overlays(); hud();
+  }
+  /** Sacar un mueble del almacén: aparece en el primer hueco libre (del centro hacia fuera) y lo colocas tú */
+  function freeSpot(g) {
+    const b = Interiors.bounds, s = CFG.deco.line, cand = [];
+    for (let x = -b.hw; x <= b.hw + 1e-6; x += s) for (let z = -b.hd; z <= b.hd + 1e-6; z += s) cand.push([x, z]);
+    cand.sort((a, c) => Math.hypot(a[0], a[1]) - Math.hypot(c[0], c[1]));
+    const h = half(g); for (const [x, z] of cand) { const xx = clamp(x, -b.hw + h.hx, b.hw - h.hx), zz = clamp(z, -b.hd + h.hz, b.hd - h.hz); if (!why(g, xx, zz, g.rotation.y)) return [xx, zz]; }
+    return [0, 0];
+  }
+  function unstore(key) {
+    const st = S(); if (!st || !Interiors.root) return false; const p = (Interiors.active?.def?.stored || []).find(q => q.key === key); if (!p) return false;
+    if (st.phase === 'move') back();
+    const g = makeFurniture(p.type, p.o || {}); Object.assign(g.userData, { pkey: key, pdef: p }); g.rotation.y = normRot(p.rot || 0); Interiors.root.add(g);
+    const [x, z] = freeSpot(g); g.position.set(x, p.y || 0, z); return pick(g, true);
+  }
+  /* --- puntero, teclado y botones --- */
+  function rayAt(cx, cy) { pointer.set((cx / innerWidth) * 2 - 1, -(cy / innerHeight) * 2 + 1); raycaster.setFromCamera(pointer, camera); return raycaster; }
+  const owner = (o) => { while (o && !o.userData?.pkey) o = o.parent; return o || null; };
+  function pieceAt(cx, cy) { const hit = rayAt(cx, cy).intersectObjects(pieces(), true)[0]; return hit ? owner(hit.object) : null; }
+  function floorAt(cx, cy) { const f = Interiors.floor, hit = f ? rayAt(cx, cy).intersectObject(f, false)[0] : null; return hit ? [hit.point.x, hit.point.z] : null; }
+  function hover(cx, cy) {
+    const st = S(); if (!st) return;
+    if (st.phase === 'move') { const p = floorAt(cx, cy); if (p) moveTo(p[0], p[1]); return; }
+    const g = pieceAt(cx, cy), k = g ? g.userData.pkey : null; if (k === hoverKey) return; hoverKey = k;
+    marks.forEach((m, key) => { m.material.opacity = key === k ? 0.62 : m.userData.op; m.material.color.setHex(key === k ? 0xffca28 : 0x4dd0e1); }); hud();
+  }
+  function tap(cx, cy) {
+    const st = S(); if (!st) return;
+    if (st.phase === 'pick') { const g = pieceAt(cx, cy); if (g) pick(g); return; }
+    const p = floorAt(cx, cy); if (p) moveTo(p[0], p[1]); if (!IS_MOBILE && !st.why) place();   // como fuera: en PC el clic coloca, en el móvil el toque mueve
+  }
+  function key(code) { if (code === 'Escape') back(); else if (code === 'KeyR') rotate(); else if (code === 'Enter' || code === 'Space') place(); else if (code === 'KeyG') store(); }
+  /* --- entrar y salir del modo --- */
+  function start() {
+    if (state.deco) return true;
+    if (!Interiors.active) {   // desde el panel Mi Casa estando fuera: entras y empiezas a decorar
+      if (houseSealed() || state.build || !Interiors.enter('house')) return false;
+      let n = 0; const wait = () => { if (Interiors.active?.kind === 'house' && !Interiors._busy) start(); else if (++n < 40) setTimeout(wait, 100); }; setTimeout(wait, 100); return true;
+    }
+    if (Interiors.active.kind !== 'house' || Interiors._busy || state.build || state.cinematic) { showToast('🪑 Solo puedes decorar dentro de tu casa', 'text-white'); return false; }
+    if (houseSealed()) { openSealedHousePanel(); return false; }
+    closeApp(); if (typeof Fitting !== 'undefined' && Fitting.isOpen) Fitting.close(false);
+    const C = Interiors._C || CFG.interior; state.deco = { phase: 'pick', cam: { pitch: cam.tPitch, dist: cam.tDist } }; Interiors.target = null; hoverKey = null;
+    cam.tPitch = C.camPitchMax; cam.tDist = C.camDist; document.body.classList.add('build', 'deco'); $('buildHud').classList.remove('hidden'); overlays(); hud();
+    showToast('🪑 Modo decorar: toca un mueble para cogerlo', 'text-white'); return true;
+  }
+  function stop() {
+    const st = S(); if (!st) return; if (st.phase === 'move') back(); clearOverlays(); state.deco = null; hoverKey = null;
+    if (st.cam) { cam.tPitch = st.cam.pitch; cam.tDist = st.cam.dist; }
+    document.body.classList.remove('deco'); if (!state.build) document.body.classList.remove('build'); $('buildHud').classList.add('hidden');
+    $('buildStore').classList.add('hidden'); $('decoStore').classList.add('hidden'); $('buildRotate').classList.remove('hidden'); $('buildConfirm').classList.remove('hidden');
+    $('buildRotate').textContent = '🔄 Rotar'; $('buildConfirm').textContent = '✅ Construir'; $('buildCancel').textContent = '✖ Cancelar'; $('buildMode').textContent = 'MODO CONSTRUCCIÓN'; SaveSystem.save('deco-end');
+  }
+  /** Tras reconstruir la habitación (colocar, guardar o un cambio de fuera) se vuelve a elegir mueble */
+  function afterRebuild() { const st = S(); if (!st) return; st.phase = 'pick'; st.g = null; st.why = null; overlays(); hud(); }
+  /** ↺ Todo a su sitio de siempre (también lo del almacén) */
+  function reset() {
+    const h = Interiors.houseState(), had = !!Object.keys(h.layout || {}).length; h.layout = {}; SaveSystem.saveNow('deco-reset');
+    if (Interiors.active?.kind === 'house') Interiors.rebuild(); if (had) showToast('↺ Los muebles vuelven a su sitio de siempre', 'text-white'); return had;
+  }
+  return { start, stop, pick, place, rotate, store, back, unstore, reset, hover, tap, key, afterRebuild, moveTo, why, half, pieces, normRot, get st() { return state.deco; } };
+})();
+{   // el panel del modo construcción sirve también para decorar (mismos botones, otra acción)
+  const R = $('buildRotate'), Cf = $('buildConfirm'), Cn = $('buildCancel'), r0 = R.onclick, c0 = Cf.onclick, n0 = Cn.onclick;
+  R.onclick = (e) => state.deco ? Decorate.rotate() : r0 && r0(e);
+  Cf.onclick = (e) => state.deco ? Decorate.place() : c0 && c0(e);
+  Cn.onclick = (e) => state.deco ? Decorate.back() : n0 && n0(e);
+  $('buildStore').onclick = () => Decorate.store();
+}
+ui_bind('btnInteriorDeco', () => { if (canControl()) Decorate.start(); });
+
+/* --- ☁️ ¿Qué partida usamos? (la de la nube o la de este navegador) --- */
+const SyncGuard = {
+  el: null, last: null,
+  /** Resumen de una partida para compararlas */
+  sum(d) {
+    d = d || {}; const m = d.meta || {}, ms = Object.values(d.missions || {}).filter(x => x && x.status === 2).length;
+    return { when: Number(m.lastSavedAt) || 0, money: Math.floor(Number(d.economy?.money) || 0), day: (d.daily?.dayCount | 0), missions: ms, house: (d.house?.level | 0), play: Math.floor((m.playTimeSec | 0) / 60), id: m.saveId || '', saves: m.saveCount | 0 };
+  },
+  /** 'ok' si la nube ya tiene esta partida (o no hay nada en la nube) · 'conflict' si son distintas */
+  decide(r) {
+    if (!r || !r.data || !r.data.meta) return 'ok';
+    const at = Date.parse(r.updated_at || ''), mine = Date.parse(GS.meta.cloudAt || '');
+    if (Number.isFinite(at) && at === mine) return 'ok';
+    const c = r.data.meta, l = GS.meta;
+    if (c.saveId && c.saveId === l.saveId && Number(c.lastSavedAt) === Number(l.lastSavedAt) && (c.saveCount | 0) === (l.saveCount | 0)) { GS.meta.cloudAt = r.updated_at; return 'ok'; }   // es la misma copia
+    return 'conflict';
+  },
+  /** Salto grande de capital entre las dos partidas */
+  jump(a, b) { const d = Math.abs(a - b); return d >= CFG.sync.jumpAbs && d >= CFG.sync.jumpRel * Math.max(a, b, 1); },
+  html(r) {
+    const c = this.sum(r.data), l = this.sum(GS), none = !SaveSystem.hasSave(), cNew = none || c.when >= l.when, same = !!c.id && c.id === l.id;
+    const when = (t) => t ? new Date(t).toLocaleString('es-ES', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—';
+    const card = (k, ttl, s, newer) => `<div class="app-card p-3 ${newer ? 'owned' : ''}"><div class="flex items-center justify-between gap-2"><b class="text-sm text-[#2b2b3d]">${ttl}</b>${newer ? '<span class="text-[10px] font-bold text-emerald-700 bg-emerald-100 rounded-full px-2 py-0.5">más reciente</span>' : ''}</div>
+      <div class="text-[11px] text-slate-600 mt-1 leading-relaxed">💾 guardada ${when(s.when)}<br>${COIN} <b>${fmt(s.money)} $T</b> · día ${s.day}<br>📜 misiones ${s.missions}/${NPCS.length} · 🏠 casa nivel ${s.house}<br>⏱️ ${fmt(s.play)} min jugados</div>
+      <button data-sg="${k}" class="btn-game w-full mt-2 px-3 py-2 text-sm ${k === 'cloud' ? 'bg-sky-200' : 'bg-emerald-200'}">${k === 'cloud' ? '☁️ Usar la de la nube' : '💻 Usar la de este navegador'}</button></div>`;
+    const big = !none && this.jump(c.money, l.money), diff = c.money - l.money;
+    return `<div class="font-bold text-lg text-[#2b2b3d]">☁️ ¿Qué partida usamos?</div>
+      <div class="text-xs text-slate-600 mt-1">${none ? 'Tu cuenta tiene una partida guardada en la nube y en este navegador todavía no hay ninguna.' : `La partida de tu cuenta en la nube no es la misma que la de este navegador${same ? ': es la misma partida, pero cada copia ha avanzado por su lado (¿has jugado en otro dispositivo?)' : ''}. Elige cuál usar: la otra se sustituye.`}</div>
+      ${big ? `<div class="mt-2 p-2 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-800">⚠️ <b>Salto grande de capital:</b> la de la nube tiene ${fmt(c.money)} $T y la de este navegador ${fmt(l.money)} $T (${diff > 0 ? '+' : '−'}${fmt(Math.abs(diff))} $T). Comprueba bien cuál es la buena antes de elegir.</div>` : ''}
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-3">${card('cloud', '☁️ En la nube', c, cNew)}${none ? `<div class="app-card p-3 text-[11px] text-slate-600"><b class="text-sm text-[#2b2b3d]">💻 Este navegador</b><div class="mt-1 leading-relaxed">Aquí no hay ninguna partida guardada. Usa la de la nube para seguir donde lo dejaste.</div></div>` : card('local', '💻 Este navegador', l, !cNew)}</div>
+      <div class="flex items-center justify-between gap-2 mt-3"><div class="text-[11px] text-slate-500">Hasta que elijas, no se sube nada a la nube.</div><button data-sg="later" class="btn-game px-3 py-1.5 text-xs bg-white">Decidir luego</button></div>`;
+  },
+  show(r) {
+    if (!r || !r.data) return; this.last = r; let el = this.el;
+    if (!el) { el = document.createElement('div'); el.id = 'syncModal'; el.style.cssText = 'position:fixed;inset:0;z-index:60;display:flex;align-items:center;justify-content:center;padding:14px;background:rgba(20,15,36,.55);font-family:Fredoka,sans-serif'; document.body.appendChild(el); this.el = el; }
+    el.style.display = 'flex'; el.innerHTML = `<div class="panel p-4 clickable" style="background:#fffdf5;width:min(560px,96vw);max-height:92vh;overflow:auto">${this.html(r)}</div>`;
+    el.querySelectorAll('[data-sg]').forEach(b => b.onclick = () => { const k = b.dataset.sg; if (k === 'cloud') this.adopt(r); else if (k === 'local') this.keepLocal(b); else this.close(); });
+  },
+  close() { if (this.el) this.el.style.display = 'none'; },
+  reopen() { if (this.last) this.show(this.last); else if (typeof Online !== 'undefined') Online.syncCheck(); },
+  /** ☁️ Usar la de la nube: sustituye la de este navegador (con la fecha de la nube, para no volver a preguntar) y recarga */
+  adopt(r) {
+    const d = JSON.parse(JSON.stringify(r.data)); (d.meta ||= {}).cloudAt = r.updated_at;
+    SaveSystem.importJSON(JSON.stringify(d)); this.close(); showToast('☁️ Cargando la partida de la nube…', 'text-white'); setTimeout(() => location.reload(), 300); return true;
+  },
+  /** 💻 Usar la de este navegador: se sube y sustituye a la de la nube */
+  async keepLocal(btn) {
+    if (btn) btn.disabled = true;
+    try { await Online.push(true, { choose: true }); this.close(); this.last = null; showToast('☁️ Hecho: la nube guarda ahora la partida de este navegador', 'text-white'); return true; }
+    catch (e) { if (btn) btn.disabled = false; showToast('☁️ ' + e.message, 'text-red-200'); return false; }
   },
 };
 
@@ -12862,13 +13145,15 @@ DBG.refs = DBG_REFS;
 if (/[?&]debug=1\b/.test(location.search)) window._dbg = DBG_REFS;   // v1.0: ya no es global por defecto
 /* v1.1 · Interior caminable de la casa (Sec. 6.9 Fase 2) */
 /** v1.5 · capturas: DBG.tp(x, z) lleva al jugador a (x, z) del pueblo · DBG.view(dist, pitch, yaw) fija la cámara · DBG.shot('B'|'C'|'D'|'G'|'H') prepara la escena del protocolo */
-DBG.g = { World, WGEO, WorldFX, TRAVEL_POSTS, Island, Voyage, TRIBE, ship, state, IconStudio, ItemArt, itemIcon, PhGlyph, startDialog, openInventory, openHousePanel, addLetter, endDialog, openShop, openGiftPicker, openEncargo, acceptCourier, refreshMissionUI, SeasonDecor, Snow, claimSeasonGift, seasonNow, openWeeklyPanel, openRoulette, Weather, Gather, Mining, npcObjs, interactables, colliders, SITES, NPCS, CFG, get house() { return house; }, scene, renderer, camera, cam, sky, water, atmo, clouds, PostFX, SkyEnv, PlanetAO, WATER_U, POST_U, Gather, Studio, ToolAnim, Profiles, Hub, Decor, Fitting, player, Interiors };   // v1.5: referencias gráficas para depurar
+DBG.g = { World, WGEO, WorldFX, TRAVEL_POSTS, Island, Voyage, TRIBE, ship, state, IconStudio, ItemArt, itemIcon, PhGlyph, startDialog, openInventory, openHousePanel, addLetter, endDialog, openShop, openGiftPicker, openEncargo, acceptCourier, refreshMissionUI, SeasonDecor, Snow, claimSeasonGift, seasonNow, openWeeklyPanel, openRoulette, Weather, Decorate, SyncGuard, Online, Gather, Mining, npcObjs, interactables, colliders, SITES, NPCS, CFG, get house() { return house; }, scene, renderer, camera, cam, sky, water, atmo, clouds, PostFX, SkyEnv, PlanetAO, WATER_U, POST_U, Gather, Studio, ToolAnim, Profiles, Hub, Decor, Fitting, player, Interiors };   // v1.5: referencias gráficas para depurar
 DBG.post = (v = !PostFX.active) => { PostFX.active = !!v; POST_U.uPost.value = v ? 1 : 0; return PostFX.active; };
 DBG.env = (v = !SkyEnv.enabled) => SkyEnv.setEnabled(v);
 DBG.ao = (v = true) => { if (!PlanetAO.on) return false; if (v) PlanetAO.bake(); else { const c = planet.geometry.attributes.color; PlanetAO.reset(); c.needsUpdate = true; } return v; };
 DBG.tp = (a = 0, b = 0) => { if (typeof a === 'string') { if (SITES[a] && !TRAVEL_POSTS.some(p => p.id === a) && !World.Z[a]) WorldFX.teleport(siteDir(SITES[a], 0, 2)); else WorldFX.tp(a); console.log('[DBG] tp →', a, '· zona', World.zoneAt(player.userData.dir)); return true; }
   const d = siteDir(S_V, a, b); player.userData.dir.copy(d); player.position.copy(d).multiplyScalar(surfaceR(d)); state.moveTarget = null; return true; };   // v2.7: DBG.tp('forest' | 'bakery' | x, z de la plaza)
 DBG.overlays = () => ({ total: Overlays.count, hidden: (() => { let n = 0; scene.traverse(o => { if (o.isSprite && o.layers.mask === (1 << 31) >>> 0) n++; }); return n; })() });   // v2.8
+DBG.deco = () => Decorate.start();   // v2.9.3: modo decorar (dentro de casa)
+DBG.syncShow = (cloud) => SyncGuard.show({ data: cloud || JSON.parse(JSON.stringify(GS)), updated_at: new Date().toISOString() });   // v2.9.3: ver el aviso de conflicto con una partida de prueba
 DBG.season = (id) => { _seasonForce = id === 'real' ? undefined : (id || null); seasonTick(); console.log('[DBG] temporada →', seasonNow()); return seasonNow(); };   // v2.9.2: 'veil', 'spring', 'solstice', 'anniversary', null (ninguna) o 'real'
 DBG.voyage = (go = false) => { const v = Voyage.st(); v.repaired = true; VOYAGE_PARTS.forEach(p => { v.parts[p] = true; }); Trust.entry('sam').points = Math.max(Trust.points('sam'), CFG.trustThresholds[2]); GS.missions.sam.status = 2; if (go) Voyage.sail('island'); return { ready: Voyage.ready(), ...v }; };   // v2.8
 DBG.zone = () => ({ zone: World.zoneAt(player.userData.dir), h: +(heightAt(player.userData.dir) - SEA).toFixed(2), slope: +World.slopeAt(player.userData.dir).toFixed(2), posts: GS.world.posts });
