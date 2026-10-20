@@ -328,6 +328,9 @@
   .sec-h::after { content: ''; flex: 1; height: 1px; background: var(--line); }
   /* Menú ☰ */
   .hub-grid { gap: 10px; }
+  #netModeBadge { position: fixed; left: 50%; bottom: 14px; transform: translateX(-50%); z-index: 24; display: none; align-items: center; gap: 6px; padding: 5px 14px; border-radius: 999px; font-family: var(--f-disp); font-weight: 600; font-size: 13px; box-shadow: var(--sh-2); pointer-events: none; }
+  #netModeBadge.real { background: #23244a; color: #ffe2a0; } #netModeBadge.demo { background: rgba(247,245,252,.92); color: #6a59e6; }
+  body.fitting #netModeBadge { display: none !important; }
   .hub-t { display: flex; gap: 12px; align-items: flex-start; background: #fff; border: 1px solid var(--line); border-radius: var(--r-lg); box-shadow: var(--sh-1); padding: 12px; font-family: var(--f-ui); transition: transform .12s, box-shadow .12s, border-color .12s; }
   .hub-t:hover { transform: translateY(-2px); background: #fff; box-shadow: var(--sh-2); border-color: rgba(124,108,240,.35); }
   .hub-t:active { transform: translateY(0); box-shadow: var(--sh-1); }
@@ -7481,7 +7484,7 @@ function awakeningChainHTML() {
    Nota: la 🎪 Feria del Sábado (puestos de los vecinos, ofertas de tienda) NO es la
    📈 Feria del Tablón de la v0.8 (especulación por categorías): conviven sin tocarse.
    ========================================================= */
-const GAME_VERSION = '2.3';
+const GAME_VERSION = '2.4';
 /* ---------- 🗓️ EVENTOS: calendario REAL → flags que leen los sistemas existentes (Sec. 10.10) ---------- */
 const Events = {
   _force: null,   // DBG.weekday(n): simula el día de la semana real (0 = domingo … 6 = sábado)
@@ -9545,12 +9548,22 @@ function netFloorPieces(zone) {   // bordillos y árboles del perímetro (decora
   return P;
 }
 const NetWorld = {
-  fromHouse: false, rt: null,
+  fromHouse: false, rt: null, mode: 'demo',
+  /** v2.4 · modo real = con cuenta y entrando por «Red real»: los objetos del mundo funcionan con el servidor */
+  real() { return this.mode === 'real' && !!Online.me; },
+  async enterReal(zone = 'plaza') {
+    if (!Online.me) { Account.open(); return false; }
+    if (!Number.isInteger(Net.origin())) { Profiles.ensure(() => this.enterReal(zone)); return false; }
+    showToast('🌍 Entrando en la Red real…', 'text-white');
+    await RealWorld.prefetch().catch(() => {});
+    return this.enter(zone, { mode: 'real' });
+  },
   inside() { return !!Interiors.active?.def?.net; },
   zone() { return Interiors.active?.def?.netZone || null; },
   /** Entrar = dormirse delante de la pantalla y aparecer en la Estación de la Red (Doc 2) */
-  enter(zone = 'plaza') {
-    if (!Number.isInteger(Net.origin())) { Profiles.ensure(() => this.enter(zone)); return false; }   // v1.6: el perfil se elige, nunca se sortea
+  enter(zone = 'plaza', { mode = 'demo' } = {}) {
+    if (!Number.isInteger(Net.origin())) { Profiles.ensure(() => this.enter(zone, { mode })); return false; }
+    this.mode = mode === 'real' && Online.me ? 'real' : 'demo';   // v1.6: el perfil se elige, nunca se sortea
     if (!Net.on()) Net.activate({ origin: Net.origin() });
     if (!Net.on()) return false;
     NetEco.W.pDay = NetEco.W.day;
@@ -9566,6 +9579,7 @@ const NetWorld = {
     if (zone === 'dorado' && !Net.doradoOk()) { showToast(`💎 El portero del Distrito Dorado: "Aura ${CFG.net.dorado.aura}+ o ${fmt(CFG.net.dorado.netWorth)} $T de patrimonio. Lo siento, normas del sueño."`, 'text-amber-200'); return false; }
     if (tram) { if (!Wallet.spend(CFG.net.tram, 'Red: billete de tranvía', { silent: true, snk: 'demo-net' })) return false; NetEco.snk('tranvia', CFG.net.tram); playBeep(784, 0.08, 'triangle'); }
     const from = this.zone(), arrive = tram ? NET_ZONES[zone].spawn : this._walkSpawn(zone, from);
+    if (this.real()) { RealWorld.prefetch().catch(() => {}).then(() => Interiors.switchTo('net', { zone, spawn: arrive, fade: '#1a1033' })); return true; }   // v2.4: datos frescos del servidor antes de dibujar el barrio
     return Interiors.switchTo('net', { zone, spawn: arrive, fade: '#1a1033' });
   },
   _walkSpawn(zone, from) {
@@ -9576,11 +9590,12 @@ const NetWorld = {
   wake() {
     if (!this.inside()) return false;
     const st = Net.st(); if (st.stash.length) Net.importStash();
-    st.inside = false; const ok = this.fromHouse ? Interiors.switchTo('house', { near: 'pc', fade: '#1a1033' }) : Interiors.exit();
+    st.inside = false; this.mode = 'demo'; const ok = this.fromHouse ? Interiors.switchTo('house', { near: 'pc', fade: '#1a1033' }) : Interiors.exit();
     showToast('🌙 Te despiertas de golpe frente a la pantalla. Aún huele a mercado.', 'text-purple-200'); SaveSystem.save('net-wake'); return ok;
   },
   plotOwner(zone, plot) { return NetEco.plotsOf(zone)[plot]; },
   openPlot(zone, plot) {
+    if (this.real()) return RealWorld.openPlot(zone, plot);   // v2.4
     const owner = this.plotOwner(zone, plot);
     if (owner === null) return NetUI.plot(zone, plot);
     return Interiors.switchTo('netshop', { zone, plot, mine: owner === 'P', bot: owner === 'P' ? null : owner });
@@ -9589,16 +9604,18 @@ const NetWorld = {
   /* ---------- layouts (datos puros: piezas + ganchos) ---------- */
   layout(zone, o = {}) {
     const Z = NET_ZONES[zone], [w, d] = Z.size, hw = w / 2, hd = d / 2, W = NetEco.W, P = [...netFloorPieces(zone)];
-    const A = { wake: () => this.wake(), tram: () => NetUI.tram(), tablon: () => NetUI.tablon(), subastas: () => NetUI.auctions(), aduana: () => NetUI.aduana(), contratos: () => NetUI.contracts(), pedidos: () => NetUI.requests(), origen: () => NetUI.originCard(),
+    const real = this.real(), soon = (what) => showToast(`${what}: en la Red real llega con las secciones nuevas. Aquí, de momento, el Tablón, la Aduana, los puestos y las tiendas.`, 'text-white');
+    const A = { wake: () => this.wake(), tram: () => NetUI.tram(), tablon: () => real ? RealMarket.open('market') : NetUI.tablon(), subastas: () => real ? soon('🔨 Subastas') : NetUI.auctions(), aduana: () => real ? RealMarket.open('aduana') : NetUI.aduana(), contratos: () => real ? soon('📜 Contratos') : NetUI.contracts(), pedidos: () => NetUI.requests(), origen: () => NetUI.originCard(),
+      rstall: (obj) => RealWorld.openStall(obj.userData.netPlot),
       walk: (obj) => this.go(obj.userData.netTo), plot: (obj) => this.openPlot(zone, obj.userData.netPlot), bot: (obj) => { if (obj.userData.peerId) { PeerCard.openId(obj.userData.peerId); return; } const i = obj.userData.botIdx; if (i !== undefined && i !== null) NetUI.barter(i); }, gate: () => this.go('dorado') };
     if (zone === 'plaza') {
-      const lines = []; if (W) { const mv = []; for (let m = 0; m < 32; m++) { const h = W.hist, a = h.length > 1 ? h[h.length - 2][m] : W.price[m]; mv.push([m, W.price[m] / Math.max(0.01, a) - 1]); } mv.sort((a, b) => Math.abs(b[1]) - Math.abs(a[1])); mv.slice(0, 6).forEach(([m, g]) => lines.push({ t: `${netItem(m).name}: ${fmt(Math.round(W.price[m]))} $T (${g >= 0 ? '+' : ''}${(g * 100).toFixed(1)} %)`, up: g >= 0 })); }
+      const lines = real ? RealWorld.boardLines() : []; if (W && !real) { const mv = []; for (let m = 0; m < 32; m++) { const h = W.hist, a = h.length > 1 ? h[h.length - 2][m] : W.price[m]; mv.push([m, W.price[m] / Math.max(0.01, a) - 1]); } mv.sort((a, b) => Math.abs(b[1]) - Math.abs(a[1])); mv.slice(0, 6).forEach(([m, g]) => lines.push({ t: `${netItem(m).name}: ${fmt(Math.round(W.price[m]))} $T (${g >= 0 ? '+' : ''}${(g * 100).toFixed(1)} %)`, up: g >= 0 })); }
       P.push(
         { type: 'fountain_big', x: 0, z: 0 },
-        { type: 'net_board', x: 0, z: -10.6, o: { lines }, act: 'tablon', label: '📋 Tablón de Ofertas (comprar y vender)', range: 1.6 },
+        { type: 'net_board', x: 0, z: -10.6, o: { lines }, act: 'tablon', label: real ? '📋 Tablón real: órdenes de compra y venta entre jugadores' : '📋 Tablón de Ofertas (comprar y vender)', range: 1.6 },
         { type: 'facade', x: -9.2, z: -9.0, o: { w: 6, text: 'CASA DE SUBASTAS', color: 0xfce4ec, roof: 0xad1457, icon: '🔨', dome: true }, act: 'subastas', label: '🔨 Casa de Subastas (joyas)', range: 1.4 },
         { type: 'facade', x: 9.2, z: -9.0, o: { w: 6, text: 'OFICINA DE CONTRATOS', color: 0xe8f5e9, roof: 0x2e7d32, icon: '📜' }, act: 'contratos', label: '📜 Oficina de Contratos', range: 1.4 },
-        { type: 'facade', x: -12.4, z: 3.6, rot: Math.PI / 2, o: { w: 5, h: 3.6, text: 'ADUANA', color: 0xe3f2fd, roof: 0x1565c0, icon: '🛃' }, act: 'aduana', label: '🛃 Aduana (traer lo comprado a tu sueño)', range: 1.4 },
+        { type: 'facade', x: -12.4, z: 3.6, rot: Math.PI / 2, o: { w: 5, h: 3.6, text: 'ADUANA', color: 0xe3f2fd, roof: 0x1565c0, icon: '🛃' }, act: 'aduana', label: real ? '🛃 Aduana real: ingresar y retirar $T y objetos' : '🛃 Aduana (traer lo comprado a tu sueño)', range: 1.4 },
         { type: 'kiosk', x: 6.2, z: 5.6, rot: -0.5, o: { text: 'PEDIDOS', color: 0xffcc80, icon: '📦' }, act: 'pedidos', label: '📦 Pedidos de Ultramar de tus vecinos' },
         { type: 'kiosk', x: -6.2, z: 5.6, rot: 0.5, o: { text: 'TU PERFIL', color: 0xd1c4e9, icon: NET_ORIGINS[Net.origin() ?? 0].icon }, act: 'origen', label: '👤 Tu perfil (ficha)' },
         { type: 'portal_bed', x: 0, z: 11.2, rot: Math.PI, act: 'wake', label: '🌙 Despertar (volver al PC de casa)', range: 1.2 },
@@ -9607,9 +9624,19 @@ const NetWorld = {
         { type: 'arch', x: -14.2, z: 0, rot: Math.PI / 2, o: { text: '← EL PASEO 🏪', color: 0x90caf9 }, act: 'walk', label: '🚶 Caminar a El Paseo', solid: false, range: 1.6, to: 'paseo' },
         { type: 'gate', x: 0, z: -12.6, o: { text: Net.doradoOk() ? '💎 DISTRITO DORADO ↑' : `💎 DORADO · aura ${CFG.net.dorado.aura}+ o 1M` }, act: 'gate', label: Net.doradoOk() ? '🚶 Entrar al Distrito Dorado' : `🔒 Distrito Dorado (aura ${CFG.net.dorado.aura}+ o ${fmt(CFG.net.dorado.netWorth)} $T)`, solid: false, range: 1.6 },
       );
+      if (real) RealWorld.STALL_SPOTS.forEach(([x, z, rot], i) => {   // v2.4 · puestos gratis de jugadores (5 objetos cada uno)
+        const st = RealWorld.stalls[i], mine = st && st.owner === Online.me?.id;
+        P.push({ type: 'stall', x, z, rot, plot: i, o: { text: st ? (mine ? '★ TU PUESTO' : st.who.toUpperCase()) : 'PUESTO LIBRE', free: !st, mine, items: st ? st.items.map(e => ({ id: e.item, price: e.price })).slice(0, IS_MOBILE ? 3 : 4) : [], tags: !IS_MOBILE, color: st ? NET_ORIGINS[st.profile]?.color : 0xb0bec5 },
+          act: 'rstall', label: st ? (mine ? '★ Tu puesto gratis' : `🧺 Puesto de ${st.who}${st.bot ? ' (Comerciante del Sueño)' : ''}`) : '🧺 Puesto libre: pon aquí hasta 5 objetos gratis', range: 1.3 });
+      });
     } else {
       const plots = NetEco.plotsOf(zone), T = Object.values(CFG.net.shops).find(s => s.zone === zone);
-      plots.forEach((owner, i) => {
+      if (real) plots.forEach((_, i) => {   // v2.4 · en la Red real, cada parcela es una tienda de jugador (o está libre)
+        const [x, z, rot] = netPlotPos(zone, i), sh = (RealWorld.shops[zone] || [])[i], mine = sh && sh.owner === Online.me?.id, RT = RealShops.TIERS[Object.keys(RealShops.TIERS).find(k => RealShops.TIERS[k].zone === zone)] || RealShops.TIERS.puesto;
+        const o2 = { text: sh ? (mine ? `★ ${sh.name}` : sh.name).toUpperCase().slice(0, 22) : `SE ALQUILA · ${fmt(RT.cost)} $T`, free: !sh, mine, items: sh ? (sh.preview || []).slice(0, IS_MOBILE ? 3 : 5) : [], tags: !IS_MOBILE, color: sh ? NET_ORIGINS[sh.profile]?.color : 0xb0bec5, gold: zone === 'dorado', plot: i };
+        P.push({ type: zone === 'mercadillo' ? 'stall' : 'storefront', x, z, rot, o: o2, act: 'plot', plot: i, label: sh ? (mine ? `⭐ Entrar en tu tienda` : `🏪 ${sh.name} · de ${sh.who}`) : `🏷️ Parcela libre: abre aquí tu ${RT.name} (${fmt(RT.cost)} $T de tu Aduana)`, range: 1.3 });
+      });
+      else plots.forEach((owner, i) => {
         const [x, z, rot] = netPlotPos(zone, i), mine = owner === 'P', free = owner === null, sh = Net.st().shop;
         const items = mine ? sh.stock.slice(0, 5).map(e => ({ id: e.id, price: e.price })) : free ? [] : NetEco.botShelf(owner).slice(0, 5).map(e => ({ id: e.id, price: e.price }));
         const text = free ? `SE ALQUILA · ${fmt(T.L)} $T` : mine ? `★ TU ${T.name.toUpperCase()}` : NetEco.S[owner].name.toUpperCase();
@@ -9624,15 +9651,25 @@ const NetWorld = {
     P.forEach(p => { if (p.to || p.plot !== undefined) { p.o = { ...(p.o || {}), netTo: p.to, plot: p.plot ?? p.o?.plot }; } });
     const spawn = o.spawn || Z.spawn;
     return {
-      title: `${Z.icon} ${Z.name} · Red del Sueño (demo)`, size: [w, d], wallH: 3, spawn, exitZone: false, outdoor: true, net: true, netZone: zone,
+      title: `${Z.icon} ${Z.name} · ${real ? 'Red real' : 'Red del Sueño (demo)'}`, size: [w, d], wallH: 3, spawn, exitZone: false, outdoor: true, net: true, netZone: zone, real,
       groundTex: () => zone === 'dorado' ? netGroundTexture('#4a3b6b', '#6a5594', '#ffd54f') : zone === 'plaza' ? netGroundTexture('#c9b8e8', '#b39ddb', '#e1bee7') : netGroundTexture('#d7ccc8', '#bcaaa4', '#ffe0b2'),
       palette: { wall: 0xffffff, trim: 0xffffff, floor: ['#c9b8e8', '#b39ddb'], void: zone === 'dorado' ? 0x1a0f33 : 0x2a1f4d },
       windows: {}, cam: CFG.gfx.netCam, skirtColor: zone === 'dorado' ? 0x4a3b6b : zone === 'plaza' ? 0xc9b8e8 : 0xd7ccc8,   // v1.4: cámara 3/4 encajada · falda del color del suelo
       pieces: P, actions: A, onBuild: (root, def) => this._buildBots(root, def), onFrame: (dt, t) => this._frame(dt, t), onHudExit: () => this.wake(),
-      welcome: `${Z.icon} ${Z.name} · 🤖 Modo demo: los demás comerciantes son bots · solo $TOKEN del juego`,
+      welcome: real ? `${Z.icon} ${Z.name} · 🌍 Red real: jugadores de verdad (y Comerciantes del Sueño si hay poca gente)` : `${Z.icon} ${Z.name} · 🤖 Modo demo: los demás comerciantes son bots · solo $TOKEN del juego`,
     };
   },
   shopLayout(o = {}) {
+    if (o.real) {   // v2.4 · tienda de un jugador real: su escaparate y su avatar como tendero
+      const S = o.real, RT = RealShops.TIERS[S.tier] || RealShops.TIERS.puesto, mine = S.owner === Online.me?.id, col = NET_ORIGINS[S.profile]?.color || 0xffb74d;
+      const def = INTERIOR_LAYOUTS.shop({ items: S.items.filter(i => i.qty > 0).map(i => ({ id: i.item, price: i.price })), title: S.name, keeperLine: mine ? 'Tu tienda vende aunque no estés.' : `¡Hola! Soy ${S.who}. Mira el escaparate.` });
+      const keeper = def.pieces.find(p => p.type === 'keeper'); if (keeper) keeper.o = { fur: col, apron: 0xffca28 };
+      if (S.tier === 'boutique') def.palette = { wall: 0x2a1b47, trim: 0xffca28, floor: ['#4a3b6b', '#3b2d58'], void: 0x120a24 };
+      else if (S.tier === 'local') def.palette = { wall: 0xe3f2fd, trim: 0x546e7a, floor: ['#d7ccc8', '#bcaaa4'], void: 0x150f26 };
+      Object.assign(def, { net: true, netZone: o.zone, real: true, title: `${RT.icon} ${S.name} · Red real`, welcome: `${RT.icon} ${S.name} · ${mine ? 'tu tienda' : `de ${S.who}`}`,
+        actions: { shelf: () => RealShops.visit(S.owner), keeper: () => RealShops.visit(S.owner), exit: () => this.leaveShop(o) }, onDoor: () => this.leaveShop(o), onHudExit: () => this.leaveShop(o) });
+      return def;
+    }
     const W = NetEco.W, T = Object.values(CFG.net.shops).find(s => s.zone === o.zone) || CFG.net.shops.puesto, sh = Net.st().shop;
     const items = o.mine ? sh.stock.map(e => ({ id: e.id, price: e.price })) : NetEco.botShelf(o.bot).map(e => ({ id: e.id, price: e.price }));
     const s = o.mine ? null : NetEco.S[o.bot], title = o.mine ? `Tu ${T.name}` : `${s.name} · ${T.name}`;
@@ -9648,7 +9685,7 @@ const NetWorld = {
   _buildBots(root, def) {
     const W = NetEco.W, zone = def.netZone; if (!W) return;
     const r = netRngOf(W.seed + ':avatars:' + W.day + ':' + zone), on = NetEco.S.filter(s => NetEco.logged(s.i));
-    const keepers = [], plots = zone !== 'plaza' ? NetEco.plotsOf(zone) : [];
+    const keepers = [], plots = zone !== 'plaza' && !def.real ? NetEco.plotsOf(zone) : [];
     plots.forEach((owner, i) => { if (owner !== null && owner !== 'P') keepers.push({ s: NetEco.S[owner], plot: i }); });
     const pool = netShuffle(on.filter(s => !keepers.some(k => k.s.i === s.i)), r), n = Math.min(CFG.net.avatars[zone] || 12, keepers.length + pool.length);
     const list = [...keepers.slice(0, n), ...pool.slice(0, Math.max(0, n - keepers.length)).map(s => ({ s, plot: null }))];
@@ -9710,8 +9747,9 @@ const NetWorld = {
     });
     Object.values(R.M).forEach(im => im.instanceMatrix.needsUpdate = true);
     const px = R.proxy; if (px) {
+      if (NetWorld.real()) best = null;   // v2.4: en la Red real los bots de la demo solo pasean
       const pr = typeof Online !== 'undefined' && Online.nearestPeer ? Online.nearestPeer(I.px, I.pz) : null;   // v2.3: las personas reales también se pueden tocar (ficha de jugador)
-      if (pr && pr.d < Math.min(bd, 2.6)) {
+      if (pr && pr.d < Math.min(best ? bd : 99, 2.6)) {
         px.visible = true; px.position.set(pr.p.x, 0, pr.p.z); px.userData.lx = pr.p.x; px.userData.lz = pr.p.z; px.userData.botIdx = null; px.userData.peerId = pr.id; px.userData.interact.label = `👤 ${pr.p.name} · ver ficha`;
         if (R.tagFor !== 'peer:' + pr.id && px.userData.tag) { R.tagFor = 'peer:' + pr.id; const old = px.userData.tag.material.map; px.userData.tag.material.map = textTexture(' ', { w: 384, h: 96 }); px.userData.tag.material.needsUpdate = true; if (old) old.dispose(); }
         best = null;
@@ -9753,9 +9791,9 @@ const NetUI = {
         html += st.log.length ? `<div class="app-card p-3 text-[11px] text-slate-600"><div class="font-bold text-sm mb-1">📰 Novedades</div>${st.log.slice(0, 8).map(l => `<div>· ${esc(l.t)}</div>`).join('')}</div>` : '';
       }
       body.innerHTML = html;
-      this.on(body, '[data-demo]', () => { closeApp(); if (!Number.isInteger(st.origin)) { Profiles.ensure(() => NetWorld.enter()); return; } if (!Net.on()) { st.intro = true; Net.activate({ origin: st.origin }); this.originCard(() => NetWorld.enter()); return; } NetWorld.enter(); });   // v1.6: el perfil se elige, no se sortea
+      this.on(body, '[data-demo]', () => { closeApp(); if (!Number.isInteger(st.origin)) { Profiles.ensure(() => NetWorld.enter('plaza', { mode: 'demo' })); return; } if (!Net.on()) { st.intro = true; Net.activate({ origin: st.origin }); this.originCard(() => NetWorld.enter('plaza', { mode: 'demo' })); return; } NetWorld.enter('plaza', { mode: 'demo' }); });   // v1.6: el perfil se elige, no se sortea
       this.on(body, '[data-rmkt]', () => { closeApp(); setTimeout(() => RealMarket.open(), 30); });
-      this.on(body, '[data-real]', () => { closeApp(); if (!Online.me) { Account.open(); return; } if (!Number.isInteger(st.origin)) { Profiles.ensure(() => NetWorld.enter()); return; } NetWorld.enter(); });   // v1.7: con cuenta, en la Red ves a jugadores reales (y los bots siguen ahí)
+      this.on(body, '[data-real]', () => { closeApp(); NetWorld.enterReal(); });   // v2.4: Red real = el mundo funciona con el servidor   // v1.7: con cuenta, en la Red ves a jugadores reales (y los bots siguen ahí)
       this.on(body, '[data-origin]', () => this.originCard());
       this.on(body, '[data-reqs]', () => this.requests());
       this.on(body, '[data-box]', () => { const n = Net.collectBox(); showToast(n ? `💰 +${fmt(n)} $T de la caja de tu tienda` : 'La caja está vacía', 'text-white'); re(); });
@@ -10199,6 +10237,13 @@ const Online = (() => {
   api.setMuted = (id, on) => { if (on) muted.add(id); else muted.delete(id); try { localStorage.setItem('crossia.muted', JSON.stringify([...muted])); } catch (e) {} NetChat.render(); };
   api.loadBlocks = async () => { const l = await rpc('crossia_my_blocks'); blocked.clear(); (l || []).forEach(b => blocked.add(b.id)); return l || []; };
   api.setBlocked = async (id, on) => { await rpc(on ? 'crossia_block' : 'crossia_unblock', { p_target: id }); if (on) blocked.add(id); else blocked.delete(id); const p = peers.get(id); if (p && p.g) p.g.visible = !on; NetChat.render(); };
+  /** v2.4 · jugadores bot visibles como uno más (paseo local); salen cuando el servidor dice que sobran */
+  api.setBots = (list, zone) => {
+    const want = new Set(list.map(b => b.id));
+    peers.forEach((p, id) => { if (p.bot && !want.has(id)) { p.g?.parent?.remove(p.g); peers.delete(id); } });
+    const Z = NET_ZONES[zone]; if (!Z) return; const [w, d] = Z.size, r = () => (Math.random() * 2 - 1);
+    list.forEach(b => { if (peers.has(b.id)) return; const x = r() * (w / 2 - 2), z = r() * (d / 2 - 2); peers.set(b.id, { id: b.id, name: b.name, profile: b.profile, title: null, bot: true, x, z, tx: x, tz: z, yaw: 0, seen: Date.now(), wait: Math.random() * 4 }); });
+  };
   api.nearestPeer = (x, z) => { let best = null; peers.forEach((p, id) => { if (blocked.has(id) || !p.g) return; const d = Math.hypot(p.x - x, p.z - z); if (!best || d < best.d) best = { id, p, d }; }); return best; };
   async function lib() {
     if (sb) return sb; if (loading) return loading;
@@ -10238,18 +10283,18 @@ const Online = (() => {
     const r = await rpc('crossia_save_put', { p_data: JSON.parse(SaveSystem.exportJSON()), p_version: SAVE_VERSION }); GS.meta.cloudAt = r.updated_at; return r; };
   api.pull = async () => rpc('crossia_save_get');
   /* --- 🌐 Red real: presencia, posiciones y chat por zona --- */
-  function leave() { if (chan) { try { sb.removeChannel(chan); } catch (e) {} } chan = null; chanZone = null; peers.forEach(p => p.g?.parent?.remove(p.g)); peers.clear(); }
+  function leave() { if (chan) { try { sb.removeChannel(chan); } catch (e) {} } chan = null; chanZone = null; peers.forEach(p => p.g?.parent?.remove(p.g)); peers.clear(); if (typeof RealWorld !== 'undefined') RealWorld._tickAt = 0; }
   function avatarOf(p) {
     const o = NET_ORIGINS[p.profile] || NET_ORIGINS[0], g = new THREE.Group(), col = mat(o.color);
     g.add(cyl(0.32, 0.38, 0.9, col, 0, 0.55, 0, 12)); g.add(sphere(0.36, mat(0xf1c9a5), 0, 1.3, 0, 14)); g.add(sphere(0.37, mat(0x4e342e), 0, 1.42, -0.04, 12));
-    const tag = new THREE.Sprite(new THREE.SpriteMaterial({ map: textTexture(`${p.title ? medal(p.title) + ' ' : ''}${o.icon} ${p.name}`, { w: 512, h: 96, bg: '#fffdf5', font: 'bold 44px Fredoka, Arial' }), depthWrite: false })); tag.scale.set(1.9, 0.36, 1); tag.position.y = 2.05; g.add(tag);
+    const tag = new THREE.Sprite(new THREE.SpriteMaterial({ map: textTexture(`${p.bot ? '🌙 ' : p.title ? medal(p.title) + ' ' : ''}${o.icon} ${p.name}`, { w: 512, h: 96, bg: '#fffdf5', font: 'bold 44px Fredoka, Arial' }), depthWrite: false })); tag.scale.set(1.9, 0.36, 1); tag.position.y = 2.05; g.add(tag);
     addBlob(g, 0.9); g.traverse(m => { m.raycast = () => {}; }); charify(g); addOutline(g); return g;
   }
   async function join(zone) {
     if (!me || !sb) return; if (chanZone === zone) return; leave(); chanZone = zone;
     chan = sb.channel('crossia-' + zone, { config: { presence: { key: me.id }, broadcast: { self: false } } });
     chan.on('presence', { event: 'sync' }, () => { const st = chan.presenceState(); const ids = new Set(Object.keys(st));
-      peers.forEach((p, id) => { if (!ids.has(id)) { p.g?.parent?.remove(p.g); peers.delete(id); } });
+      peers.forEach((p, id) => { if (!p.bot && !ids.has(id)) { p.g?.parent?.remove(p.g); peers.delete(id); } });
       ids.forEach(id => { if (id === me.id) return; const m = st[id][0]; if (!peers.has(id)) peers.set(id, { id, name: m.name, profile: m.profile, title: m.title || null, x: m.x || 0, z: m.z || 0, tx: m.x || 0, tz: m.z || 0, yaw: 0, seen: Date.now() }); }); });
     chan.on('broadcast', { event: 'pos' }, ({ payload: m }) => { const p = peers.get(m.id); if (p) { p.tx = m.x; p.tz = m.z; p.yaw = m.yaw; p.seen = Date.now(); } });
     chan.on('broadcast', { event: 'chat' }, ({ payload: m }) => { pushChat(m.name, m.profile, m.text, false, m.title, m.id || null); });
@@ -10274,12 +10319,15 @@ const Online = (() => {
     if (!me || !sb) return;
     if (z && z !== chanZone) join(z); else if (!z && chanZone) leave();
     RealShops.update();   // v1.9: puestos de jugadores reales en su barrio
+    if (z && NetWorld.real()) RealWorld.tick(z);   // v2.4: Comerciantes del Sueño si hay poca gente
+    peers.forEach(p => { if (!p.bot) return; p.wait -= dt; if (p.wait <= 0 && Math.hypot(p.tx - p.x, p.tz - p.z) < 0.2) { const Z = NET_ZONES[z]; if (Z) { const [w, d] = Z.size; p.tx = (Math.random() * 2 - 1) * (w / 2 - 2); p.tz = (Math.random() * 2 - 1) * (d / 2 - 2); p.yaw = Math.atan2(p.tx - p.x, p.tz - p.z); } p.wait = 2 + Math.random() * 5; }
+      const dx = p.tx - p.x, dz = p.tz - p.z, L = Math.hypot(dx, dz); if (L > 0.05) { const st = Math.min(L, dt * 1.2); p.x += dx / L * st; p.z += dz / L * st; } });   // los bots caminan solos (p.tx/tz)
     if (!chan || !z) return;
     posAcc += dt; if (posAcc > C.posEvery) { posAcc = 0; const k = `${Interiors.px.toFixed(2)},${Interiors.pz.toFixed(2)}`; if (k !== lastPos) { lastPos = k; chan.send({ type: 'broadcast', event: 'pos', payload: { id: me.id, x: Interiors.px, z: Interiors.pz, yaw: Interiors.yaw } }); } }
     const root = Interiors.root; if (!root) return;
     peers.forEach((p, id) => { if (!p.g) { p.g = avatarOf(p); p.g.position.set(p.x, 0, p.z); root.add(p.g); } p.g.visible = !blocked.has(id);
       if (p.g.parent !== root) root.add(p.g);
-      p.x += (p.tx - p.x) * Math.min(1, dt * 8); p.z += (p.tz - p.z) * Math.min(1, dt * 8); p.g.position.set(p.x, Math.abs(Math.sin((p.x + p.z) * 3)) * 0.04, p.z); p.g.rotation.y += ((p.yaw || 0) - p.g.rotation.y) * Math.min(1, dt * 8); });
+      if (!p.bot) { p.x += (p.tx - p.x) * Math.min(1, dt * 8); p.z += (p.tz - p.z) * Math.min(1, dt * 8); } p.g.position.set(p.x, Math.abs(Math.sin((p.x + p.z) * 3)) * 0.04, p.z); p.g.rotation.y += ((p.yaw || 0) - p.g.rotation.y) * Math.min(1, dt * 8); });
   };
   api.lib = lib;
   return api;
@@ -10295,7 +10343,10 @@ const NetChat = {
   },
   ping() { if (!this.open) { this.unread++; this.render(); } },
   render() {
-    const d = this.ensure(), inside = NetWorld.inside(); d.style.display = inside && SaveSystem.started ? 'block' : 'none'; if (!inside) return;
+    const d = this.ensure(), inside = NetWorld.inside(); d.style.display = inside && SaveSystem.started ? 'block' : 'none';
+    let bdg = document.getElementById('netModeBadge'); if (!bdg && document.body.appendChild) { bdg = document.createElement('div'); bdg.id = 'netModeBadge'; document.body.appendChild(bdg); }
+    if (bdg) { bdg.style.display = inside ? 'flex' : 'none'; bdg.className = NetWorld.real() ? 'real' : 'demo'; bdg.innerHTML = NetWorld.real() ? '🌍 Red real' : '🌙 Demo con bots'; }
+    if (!inside) return;
     const on = !!Online.me, n = Online.peers.size;
     if (!this.open) { d.innerHTML = `<button data-o class="btn-game px-3 py-2 bg-[#fff6c2] text-[#2b2b3d] text-sm">💬 Chat ${on ? `· ${n + 1} aquí` : '(sin conexión)'}${this.unread ? ` <span class="ml-1 px-1.5 rounded-full bg-red-500 text-white text-[10px]">${this.unread}</span>` : ''}</button>`; d.querySelector('[data-o]').onclick = () => { this.open = true; this.unread = 0; this.render(); }; return; }
     const log = Online.chat.filter(m => m.me || !Online.hidden(m.id)).slice(-30).map(m => `<div style="align-self:${m.me ? 'flex-end' : 'flex-start'};background:${m.me ? '#d1fae5' : '#fff'};border:1px solid #e2e8f0;border-radius:12px;padding:3px 8px;max-width:88%"><b style="font-size:11px;${m.me || !m.id ? '' : 'cursor:pointer;text-decoration:underline dotted'}" ${m.me || !m.id ? '' : `data-peer="${m.id}"`}>${NET_ORIGINS[m.profile]?.icon || ''} ${esc(m.name)}</b>${m.title ? ` <span style="font-size:10px;color:#b45309">${esc(m.title)}</span>` : ''}<div style="font-size:12px">${esc(m.text)}</div></div>`).join('');
@@ -10326,13 +10377,14 @@ const RealMarket = {
   rpc: async (fn, args) => { const s = await Online.lib(); const { data, error } = await s.rpc(fn, args); if (error) throw new Error(error.message); return data; },
   async load() { this.data = await this.rpc('crossia_market', {}); return this.data; },
   name: (id) => ITEMS[id] ? `${ITEMS[id].icon} ${ITEMS[id].name}` : id,
+  ref(id) { const x = this.data?.items?.find(i => i.id === id); return x?.last || x?.ask || x?.bid || 0; },
   open(tab = null) {
     if (!Online.me) { Account.open(); return; } if (tab) this.tab = tab;
     openApp('🏛️ Mercado real', '', (body) => {
       const render = async (msg = '') => {
         body.innerHTML = `<div class="app-card p-3 text-sm text-slate-500">Cargando el mercado…</div>`;
         let D; try { D = await this.load(); } catch (e) { body.innerHTML = `<div class="app-card p-3 text-sm">❌ ${esc(e.message)}</div>`; return; }
-        const me = Online.me, mine = NET_ORIGINS[me.profile], tabs = [['market', '📈 Mercado'], ['aduana', '🛃 Aduana'], ['orders', `📋 Órdenes (${D.mine.length})`], ['shops', '🏪 Tiendas'], ['myshop', '🏬 Mi tienda']];
+        const me = Online.me, mine = NET_ORIGINS[me.profile], tabs = [['market', '📈 Mercado'], ['aduana', '🛃 Aduana'], ['orders', `📋 Órdenes (${D.mine.length})`], ['stall', '🧺 Mi puesto'], ['shops', '🏪 Tiendas'], ['myshop', '🏬 Mi tienda']];
         let html = (msg ? `<div class="app-card p-2 mb-2 text-xs ${/^❌/.test(msg) ? 'bg-red-50' : 'bg-emerald-50'}">${msg}</div>` : '') +
           `<div class="app-card p-2.5 mb-2 flex items-center gap-3 text-xs"><span class="text-2xl">${mine.icon}</span><div class="flex-1"><b class="text-sm">${esc(me.name)}</b> · ${D.players} jugador(es) en la Red<br>Aduana: <b>${fmt(D.coins)} $T</b> · ${Object.values(D.stock).reduce((a, b) => a + b, 0)} objeto(s) · en tu partida: ${fmt(GS.economy.money)} $T</div></div>
           <div class="flex gap-1 mb-2">${tabs.map(([k, l]) => `<button data-tab="${k}" class="btn-game px-3 py-1.5 text-xs ${this.tab === k ? 'bg-[#fff6c2]' : 'bg-white'}">${l}</button>`).join('')}</div>`;
@@ -10348,6 +10400,11 @@ const RealMarket = {
             <div class="sec-h">Tus objetos de ${mine.icon} ${mine.name} (se ingresan con tope diario)</div>` +
             own.map((id, j) => { const cap = j < 4 ? [10, 8, 5, 3][j] : 1, used = D.depToday[id] || 0, have = Inventory.count(id); return `<div class="app-card p-2 mb-1.5 flex items-center gap-2 text-xs"><div class="flex-1"><b>${this.name(id)}</b><div class="text-slate-500">En tu mochila ${have} · ingresados ${j < 4 ? 'hoy' : 'esta semana'} ${used}/${cap}</div></div><button data-di="${id}" class="btn-game px-2 py-1 text-[11px] bg-emerald-200" ${have && used < cap ? '' : 'disabled style="opacity:.45"'}>Ingresar 1</button></div>`; }).join('') +
             `<div class="sec-h">En la Aduana (retirables a tu partida)</div>` + (Object.entries(D.stock).map(([id, q]) => `<div class="app-card p-2 mb-1.5 flex items-center gap-2 text-xs"><div class="flex-1"><b>${this.name(id)}</b> ×${q}</div><button data-wi="${id}" class="btn-game px-2 py-1 text-[11px] bg-sky-200">Retirar 1</button><button data-wa="${id}" data-q="${q}" class="btn-game px-2 py-1 text-[11px] bg-sky-100">Todo</button></div>`).join('') || '<div class="text-xs text-slate-400 mb-2">Vacía.</div>');
+        } else if (this.tab === 'stall') {   // v2.4 · puesto gratis: 5 objetos a la vez en la Plaza de la Red real
+          const S = await this.rpc('crossia_my_stall', {}), stockIds = Object.keys(D.stock);
+          html += `<div class="app-card p-3 mb-2 text-xs">Tu <b>puesto gratis</b> está en la Plaza de la Red real: hasta <b>5 objetos</b> a la vez, sin licencia. Para más, una tienda (25, 40 o 60 huecos). Comisión 2 % al vender.</div>` +
+            (S.map(i => `<div class="app-card p-2 mb-1.5 flex items-center gap-2 text-xs"><div class="flex-1"><b>${this.name(i.item)}</b> · ${i.qty} a la venta · ${fmt(i.price)} $T</div><button data-stk="${i.item}" data-q="${i.qty}" class="btn-game px-2 py-1 text-[11px] bg-sky-100">Retirar</button></div>`).join('') || '<div class="text-xs text-slate-400 mb-2">Vacío.</div>') +
+            `<div class="sec-h">Poner a la venta (${S.length}/5)</div>` + (stockIds.length ? `<div class="app-card p-2 text-xs flex gap-1 items-center flex-wrap"><select data-spi class="game text-xs px-1 py-1">${stockIds.map(id => `<option value="${id}">${this.name(id)} (${D.stock[id]})</option>`).join('')}</select><label>Cant. <input data-spq type="number" min="1" value="1" class="game w-14 text-xs px-1 py-1"></label><label>Precio <input data-spr type="number" min="1" value="60" class="game w-20 text-xs px-1 py-1"></label><button data-sput class="btn-game px-2 py-1 text-[11px] bg-emerald-200">Poner</button></div>` : '<div class="text-xs text-slate-400">Tu Aduana está vacía: ingresa objetos primero.</div>');
         } else if (this.tab === 'shops') {
           html += `<div class="text-[11px] text-slate-500 mb-1">Tiendas de jugadores reales: venden aunque su dueño no esté. También las ves como puestos en su barrio de la Red.</div>` + await RealShops.listHTML();
         } else if (this.tab === 'myshop') {
@@ -10361,6 +10418,8 @@ const RealMarket = {
         body.querySelectorAll('input').forEach(i => i.onkeydown = (e) => e.stopPropagation());
         q$('[data-visit]').forEach(b => b.onclick = () => { closeApp(); setTimeout(() => RealShops.visit(b.dataset.visit), 30); });
         if (this.tab === 'myshop') RealShops.bindMine(body, run);
+        q$('[data-stk]').forEach(b => b.onclick = () => run(async () => { await this.rpc('crossia_stall_take', { p_item: b.dataset.stk, p_qty: +b.dataset.q }); return '✓ Retirado a tu Aduana'; }));
+        const sput = body.querySelector('[data-sput]'); if (sput) sput.onclick = () => run(async () => { const v = (s) => body.querySelector(s)?.value; await this.rpc('crossia_stall_put', { p_item: v('[data-spi]'), p_qty: Math.floor(+v('[data-spq]') || 0), p_price: Math.floor(+v('[data-spr]') || 0) }); RealWorld.prefetch().catch(() => {}); return '✓ A la venta en tu puesto de la Plaza'; });
         q$('[data-tab]').forEach(b => b.onclick = () => { this.tab = b.dataset.tab; render(); });
         q$('[data-f]').forEach(b => b.onclick = () => { this.filter = +b.dataset.f; render(); });
         q$('[data-buy]').forEach(b => b.onclick = () => this.orderForm(body, 'buy', b.dataset.buy, D, render));
@@ -10403,7 +10462,7 @@ const RealMarket = {
 /* ===== v1.9 · 🏪 TIENDAS DE JUGADORES (F3): se compran con $T de la Aduana (puesto 5.000 · local 50.000 · boutique 500.000), viven en su barrio
    (Mercadillo, Paseo, Distrito Dorado) y venden aunque el dueño no esté. El dueño pone precios y una condición de entrada (saldo mínimo). ===== */
 const RealShops = {
-  TIERS: { puesto: { icon: '⛺', name: 'Puesto', zone: 'mercadillo', cost: 5000, slots: 6, fee: 2 }, local: { icon: '🏪', name: 'Local', zone: 'paseo', cost: 50000, slots: 16, fee: 1 }, boutique: { icon: '💎', name: 'Boutique', zone: 'dorado', cost: 500000, slots: 30, fee: 0 } },
+  TIERS: { puesto: { icon: '⛺', name: 'Puesto', zone: 'mercadillo', cost: 5000, slots: 25, fee: 2 }, local: { icon: '🏪', name: 'Local', zone: 'paseo', cost: 50000, slots: 40, fee: 1 }, boutique: { icon: '💎', name: 'Boutique', zone: 'dorado', cost: 500000, slots: 60, fee: 0 } },   // v2.4: 25 / 40 / 60 huecos
   SPOTS: { mercadillo: [[-8, 0], [-2, 0], [4, 0], [10, 0]], paseo: [[-10, 0], [-4, 0], [2, 0], [8, 0]], dorado: [[-3.2, 0], [3.2, 0]] },
   rpc: (fn, args = {}) => RealMarket.rpc(fn, args),
   /** Directorio (todas o una zona) */
@@ -10466,6 +10525,7 @@ const RealShops = {
     return g;
   },
   async update() {
+    return;   // v2.4: las tiendas reales ya no se ponen en mitad de la calle; ocupan las parcelas de su barrio en la Red real (RealWorld)
     const z = NetWorld.inside() ? NetWorld.zone() : null, root = Interiors.root;
     if (!Online.me || !z || !this.SPOTS[z] || !root) { this._root = null; return; }
     if (root === this._root && Date.now() - this._at < 30000) return;
@@ -10521,18 +10581,70 @@ const RealSeason = {
   },
 };
 
+/* ===== v2.4 · 🌍 LA RED REAL EN 3D (Guía Maestra 2, C1–C4): los objetos del mundo funcionan con el servidor.
+   Puestos gratis (5 objetos) en la Plaza, tiendas de jugadores en las parcelas de su barrio, Tablón y Aduana reales,
+   y jugadores bot («Comerciantes del Sueño») cuando hay poca gente, que salen cuando entra alguien real. ===== */
+const RealWorld = {
+  STALL_SPOTS: [[-9, -5.4, 0], [-5.3, -5.4, 0], [5.3, -5.4, 0], [9, -5.4, 0], [-9, 8.4, Math.PI], [9, 8.4, Math.PI]],
+  shops: {}, stalls: [], at: 0,
+  rpc: (fn, args = {}) => RealMarket.rpc(fn, args),
+  async prefetch() {
+    if (!Online.me) return;
+    const [L, S] = await Promise.all([this.rpc('crossia_shops', { p_zone: null }).catch(() => []), this.rpc('crossia_stalls', { p_limit: 12 }).catch(() => []), RealMarket.load().catch(() => null)]);
+    this.shops = {}; (L || []).forEach(s => { (this.shops[s.zone] ||= []).push(s); });
+    const mine = (S || []).find(x => x.owner === Online.me.id), rest = (S || []).filter(x => x.owner !== Online.me.id);
+    this.stalls = (mine ? [mine, ...rest] : rest).slice(0, this.STALL_SPOTS.length); this.at = Date.now();
+  },
+  boardLines() {
+    const D = RealMarket.data; if (!D?.items) return [{ t: 'Mercado real: abre el Tablón para ver precios', up: true }];
+    return D.items.filter(x => x.vol || x.ask || x.bid).sort((a, b) => (b.vol || 0) - (a.vol || 0)).slice(0, 6).map(x => ({ t: `${ITEMS[x.id]?.name || x.id}: ${fmt(x.last || x.ask || x.bid)} $T${x.vol ? ` · ${x.vol} hoy` : ''}`, up: true }));
+  },
+  async openPlot(zone, plot) {
+    const sh = (this.shops[zone] || [])[plot];
+    if (!sh) { RealMarket.open('myshop'); return; }
+    let S; try { S = await this.rpc('crossia_shop_view', { p_owner: sh.owner }); } catch (e) { showToast('❌ ' + e.message, 'text-red-200'); return; }
+    if (!S) { showToast('Esta tienda ha cerrado', 'text-white'); return; }
+    Interiors.switchTo('netshop', { zone, plot, real: S });
+  },
+  openStallOf(owner) { const i = this.stalls.findIndex(s => s.owner === owner); if (i >= 0) { this.openStall(i); return true; } return false; },
+  openStall(i) {
+    const st = this.stalls[i];
+    if (!st || st.owner === Online.me?.id) { RealMarket.open('stall'); return; }
+    openApp('🧺 Puesto', '', (body) => {
+      const render = async (msg = '') => {
+        let S = st; try { const L = await this.rpc('crossia_stalls', { p_limit: 30 }); S = L.find(x => x.owner === st.owner) || { ...st, items: [] }; } catch (e) {}
+        setAppTitle(`🧺 Puesto de ${S.who}`);
+        body.innerHTML = (msg ? `<div class="app-card p-2 mb-2 text-xs ${/^❌/.test(msg) ? 'bg-red-50' : 'bg-emerald-50'}">${msg}</div>` : '') +
+          `<div class="hub-head mb-2">${profChip(NET_ORIGINS[S.profile] || NET_ORIGINS[0], 'lg')}<div class="flex-1 min-w-0"><div class="nm">${esc(S.who)}</div><div class="sub">${S.bot ? 'Comerciante del Sueño · ' : ''}puesto gratis · pagas desde tu Aduana (comisión 2 % al vendedor)</div></div></div>` +
+          ((S.items || []).filter(x => x.qty > 0).map(x => `<div class="app-card p-2 mb-1.5 flex items-center gap-2 text-xs"><div class="flex-1"><b>${RealMarket.name(x.item)}</b> · quedan ${x.qty}<div class="text-slate-500">${fmt(x.price)} $T/u · precio de referencia ${fmt(RealMarket.ref(x.item))} $T</div></div><input data-q="${x.item}" type="number" min="1" max="${x.qty}" value="1" class="game w-12 text-xs px-1 py-1"><button data-b="${x.item}" data-p="${x.price}" class="btn-game px-2 py-1 text-[11px] bg-emerald-200">Comprar</button></div>`).join('') || '<div class="app-card p-3 text-xs text-slate-500">Lo ha vendido todo.</div>');
+        body.querySelectorAll('input').forEach(x => x.onkeydown = (e) => e.stopPropagation());
+        body.querySelectorAll('[data-b]').forEach(b => b.onclick = async () => { const id = b.dataset.b, q = Math.floor(+body.querySelector(`[data-q="${id}"]`).value || 0);
+          try { const r = await this.rpc('crossia_stall_buy', { p_owner: S.owner, p_item: id, p_qty: q, p_price: +b.dataset.p }); playChime(); Online.push(true).catch(() => {}); render(`✓ Compraste ${q}× ${RealMarket.name(id)} por ${fmt(r.cost)} $T · está en tu Aduana`); } catch (e) { render('❌ ' + e.message); } });
+      };
+      render();
+    });
+  },
+  /* --- jugadores bot (Comerciantes del Sueño): el servidor dice cuántos y quiénes; aquí solo pasean --- */
+  _tickAt: 0, _bots: [],
+  async tick(zone) {
+    if (!NetWorld.real() || Date.now() - this._tickAt < 60000) return; this._tickAt = Date.now();
+    const realHere = [...Online.peers.values()].filter(p => !p.bot).length + 1;
+    try { const r = await this.rpc('crossia_bots_tick', { p_zone: zone, p_real: realHere }); this._bots = r?.bots || []; Online.setBots(this._bots, zone); } catch (e) { console.warn('[bots]', e.message); }
+  },
+};
+
 /* ===== v2.3 · 👤 FICHA DE JUGADOR (Guía Maestra 2, H1 y C3): desde el chat o tocando su avatar en la Red.
    Silenciar (solo en tu pantalla), Bloquear (en el servidor: no ves su chat ni su avatar y no puede comprar en tu tienda) y Reportar con motivo. ===== */
 const PeerCard = {
   REASONS: [['insulto', 'Insultos o acoso'], ['estafa', 'Estafa en un trato'], ['nombre', 'Nombre ofensivo'], ['trampas', 'Trampas o bots'], ['otro', 'Otro motivo']],
-  find(id) { const p = Online.peers.get(id); if (p) return { id, name: p.name, profile: p.profile, title: p.title }; const c = [...Online.chat].reverse().find(m => m.id === id); return c ? { id, name: c.name, profile: c.profile, title: c.title } : { id, name: 'Jugador', profile: 0 }; },
+  find(id) { const p = Online.peers.get(id); if (p) return { id, name: p.name, profile: p.profile, title: p.title, bot: !!p.bot }; const c = [...Online.chat].reverse().find(m => m.id === id); return c ? { id, name: c.name, profile: c.profile, title: c.title } : { id, name: 'Jugador', profile: 0 }; },
   openId(id) { if (!id || !Online.me || id === Online.me.id) return; this.open(this.find(id)); },
   open(p) {
     openApp('👤 Jugador', '', (body) => {
       const render = (msg = '') => {
         const o = NET_ORIGINS[p.profile] || NET_ORIGINS[0], mut = Online.muted.has(p.id), blk = Online.blocked.has(p.id);
         body.innerHTML = (msg ? `<div class="app-card p-2 mb-2 text-xs ${/^❌/.test(msg) ? 'bg-red-50' : 'bg-emerald-50'}">${msg}</div>` : '') +
-          `<div class="hub-head mb-2">${profChip(o, 'lg')}<div class="flex-1 min-w-0"><div class="nm">${esc(p.name)}${p.title ? ` <span class="text-xs" style="color:#b7791f">${esc(p.title)}</span>` : ''}</div><div class="sub">${o.name}${blk ? ' · bloqueado' : mut ? ' · silenciado' : ''}</div></div></div>
+          `<div class="hub-head mb-2">${profChip(o, 'lg')}<div class="flex-1 min-w-0"><div class="nm">${esc(p.name)}${p.title ? ` <span class="text-xs" style="color:#b7791f">${esc(p.title)}</span>` : ''}</div><div class="sub">${o.name}${p.bot ? ' · Comerciante del Sueño (jugador bot: entra cuando hay poca gente y no puntúa en el ranking)' : ''}${blk ? ' · bloqueado' : mut ? ' · silenciado' : ''}</div></div></div>
           <div class="hub-grid">
             <button class="hub-t" data-shop>${uiChip('🏪')}<div class="tx"><div class="ti">Ir a su tienda</div><div class="de">Si tiene puesto o tienda en la Red</div></div></button>
             <button class="hub-t" data-mute>${uiChip(mut ? '💬' : '🔕')}<div class="tx"><div class="ti">${mut ? 'Quitar silencio' : 'Silenciar'}</div><div class="de">${mut ? 'Vuelves a ver sus mensajes' : 'Dejas de ver sus mensajes; solo en tu pantalla'}</div></div></button>
@@ -10543,7 +10655,7 @@ const PeerCard = {
         const run = async (fn, ok) => { try { await fn(); render(ok); } catch (e) { render('❌ ' + e.message); } };
         body.querySelector('[data-mute]').onclick = () => { Online.setMuted(p.id, !mut); render(!mut ? '✓ Silenciado: ya no ves sus mensajes' : '✓ Silencio quitado'); };
         body.querySelector('[data-block]').onclick = () => run(() => Online.setBlocked(p.id, !blk), !blk ? '✓ Bloqueado' : '✓ Desbloqueado');
-        body.querySelector('[data-shop]').onclick = async () => { try { closeApp(); await RealShops.visit(p.id); } catch (e) { showToast('🏪 ' + (e.message || 'No tiene tienda'), 'text-white'); } };
+        body.querySelector('[data-shop]').onclick = async () => { closeApp(); if (RealWorld.openStallOf(p.id)) return; try { await RealShops.visit(p.id); } catch (e) { showToast('🏪 ' + (e.message || 'No tiene tienda'), 'text-white'); } };
         body.querySelectorAll('[data-rep]').forEach(b => b.onclick = () => run(() => Online.report(p.id, b.dataset.rep), '✓ Reporte enviado. Gracias por cuidar la Red.'));
       };
       render();
@@ -10761,7 +10873,7 @@ $('btnNewGame').onclick = async () => {
   const ok = await confirmDialog({ title: '¿Seguro que quieres comenzar una nueva partida?', text: 'Se perderá el progreso guardado en este navegador:\n◎ ' + GS.economy.money.toLocaleString('es-ES') + ' $TOKEN · ' + missionsDone() + '/' + NPCS.length + ' misiones · casa nivel ' + GS.house.level, okLabel: 'NUEVA PARTIDA' });
   if (!ok) return; SaveSystem.reset(); location.reload();
 };
-{ const v = document.createElement('div'); v.className = 'text-[10px] text-slate-400 text-center mt-3'; v.textContent = `CrossIA · Micro World: AI Village · v${GAME_VERSION} «Red segura» · guardado v${SAVE_VERSION}`; document.querySelector('#settingsModal .menu-card')?.append(v); }   // v1.0: etiqueta de versión
+{ const v = document.createElement('div'); v.className = 'text-[10px] text-slate-400 text-center mt-3'; v.textContent = `CrossIA · Micro World: AI Village · v${GAME_VERSION} «Red en 3D» · guardado v${SAVE_VERSION}`; document.querySelector('#settingsModal .menu-card')?.append(v); }   // v1.0: etiqueta de versión
 // =====================================================================
 // DEBUG (B0.2b) - Herramientas de prueba. Uso: consola -> DBG.help()
 // Panel en pantalla: añadir ?debug=1 a la URL
