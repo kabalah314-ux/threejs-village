@@ -337,7 +337,7 @@ const CFG = {
   rescueFeeMin: 50,
   rescueHunger: 35,               // saciedad con la que despiertas en la carpa de Sombra tras desmayarte
   /* ===== v0.3 · FACTURAS DIARIAS (Sec. 4.5–4.7) — definidos ya; se COBRAN desde v0.3 ===== */
-  rentByLevel: [100, 250, 800],   // alquiler/día según nivel de casa
+  rentByLevel: [100, 250, 800, 5000],   // alquiler/día según nivel de casa · v0.9: Mansión Onírica 5.000 $T/día (Sec. 10.7)
   rentGraceDays: 5,               // días de gracia iniciales
   rentSealThreshold: 3,           // días de deuda acumulada → sello de runas
   unsealFeePct: 10,               // tarifa de desellado: 10% de la deuda (la 1ª vez gratis)
@@ -447,6 +447,21 @@ const CFG = {
   boutiquePrices: { common: 50, uncommon: 150, rare: 400, epic: 900, legendary: 2000 },   // Sec. 8.4: 50–2.000 $T por rareza
   importPrices: { uncommon: 300, rare: 600, epic: 1000, legendary: 1500 },                // Sec. 8.4: telas del muelle 300–1.500 $T (se venden desde v0.8)
   fittingRotateSpeed: 0.012,      // probador: radianes por píxel arrastrado
+  /* ===== v0.9 · EL DESPERTAR (Sec. 1.6, 2.10, 5.10, 7.5, 10.7) ===== */
+  ticketTrustLevel: 4,            // Sec. 5.10: confianza ❤️ Aliada con Sombra para comprar el billete
+  planeFuelNeeded: 5,             // Sec. 5.10 / Anexo A.2: el avión de Sam necesita 5× Gasolina Gasil
+  permitProcessDays: 1,           // Sec. 7.5: el Formulario 99-Z tarda un día onírico de tramitación…
+  permitExpressFee: 1000,         // …o la "tasa exprés" de 1.000 $T
+  farewellDeepLevel: 3,           // Sec. 2.1: despedida profunda con confianza ≥ 3 (cordial ≤ 2)
+  decisionSilenceMs: 3000,        // Sec. 2.10: 3 s de silencio antes de poder elegir (el silencio es diseño)
+  farewellTypeMs: 34,             // ms por carácter en las despedidas (más lento que las tiendas: se leen despacio)
+  takeoffSecs: 4.5,               // duración del despegue del Final A antes del fundido
+  ngplusMultiplier: 1.5,          // Sec. 10.7: ×1.5 a todas las ganancias en Nuevo Sueño+ (apuestas, lotería y devoluciones no cuentan: no son ganancias)
+  dreamerTradeBonus: 0.10,        // Sec. 3.6: aura Soñador Eterno → +10% comercio (compra y venta)…
+  dreamerTrustBonus: 0.10,        // …y +10% confianza ganada
+  club100M: 100000000,            // Sec. 10.7: Club de los 100M (título del post-juego)
+  houseMaxLevel: 3,               // 0 Casa · 1 Tienda · 2 Villa · 3 Mansión Onírica (solo post-juego, Final B)
+  mansionCost: 10000000,          // diseño propio (la Guía solo fija el alquiler): precio de la Mansión Onírica · calibrable en v1.0
 };
 /** Detección de dispositivo táctil → controles y calidad adaptados */
 const IS_MOBILE = matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window;
@@ -510,8 +525,8 @@ function defaultGameState() {
     /* ===== v0.8 · datos de los 7 sistemas del Acto 2 (Sec. 7.4) ===== */
     act2: { orders: { day: 0, done: false, served: 0 }, bridge: { phase: 0, lastPhaseDay: 0, donated: 0, doneDay: 0 }, oracle: { since: 0, hits: 0, total: 0, log: [] },
       climate: { seeds: {}, lastSeedDay: 0 }, imports: { day: 0, count: 0, total: 0 }, feria: { lots: [], log: [], lastResult: null }, rumors: { log: [] } },
-    awakening: { step: 0, planeFueled: false, permit: false, permitDay: 0 },   // Cadena del Despertar (Sec. 7.5)
-    story: { prologueDone: false, revealed: false, farewellDone: false, ending: null, act1Done: false, creatorPending: false },   // v0.7: creatorPending = el creador inicial tras el prólogo sigue sin cerrarse
+    awakening: { step: 0, planeFueled: false, permit: false, permitDay: 0, inspected: false, permitRequested: false, expressPaid: false, readingDone: false, refunded: false, roccoPearl: false, permitLetter: false },   // Cadena del Despertar (Sec. 7.5) · step 1 alas · 2 Formulario 99-Z · 3 última lectura · permitDay = día en que el 99-Z queda tramitado
+    story: { prologueDone: false, revealed: false, farewellDone: false, ending: null, act1Done: false, creatorPending: false, endingAt: 0 },   // v0.9: ending 'A' (despertar) | 'B' (quedarse)   // v0.7: creatorPending = el creador inicial tras el prólogo sigue sin cerrarse
     weekly: { seals: [false, false, false, false, false, false, false], weekStart: null },  // Sello Semanal (Sec. 10.3)
     museum: { donated: [] },                         // Museo del Sueño (Sec. 10.5)
     // Avatar (Sec. 8.8): config "clásica" = el look actual del prototipo (piel #ffd5b3, camiseta cian, vaqueros, pelo marrón, mochila naranja). Lo usa v0.7.
@@ -520,7 +535,8 @@ function defaultGameState() {
     garden: { lastHarvestDay: 0, byId: {} },         // cosecha diaria del Jardín (Sec. 5.11) · byId: { recId: día de la última cosecha }
     fountain: { lastWishDay: 0, byId: {} },          // deseo diario de la Fuente (Sec. 5.11) · byId: { recId: día del último deseo }
     mill: {},                                        // v0.4 · Molino: { recId: { qty, readyAt } } (timestamps reales)
-     ngplus: { count: 0, multiplier: 1 },             // Nuevo Sueño+ (Sec. 10.7)
+     ngplus: { count: 0, multiplier: 1, freshStart: false, dejaVu: {}, runs: [] },   // Nuevo Sueño+ (Sec. 10.7) · dejaVu: { npcId: true } ya saludado en este sueño · runs: finales anteriores
+     postgame: { mansion: false, mansionAt: 0, club100M: false },   // v0.9 · post-juego del Final B (Sec. 10.7)
      municipal: { job: null },                        // v0.3 · empleo municipal activo (Sec. 4.8)
   };
 }
@@ -599,8 +615,8 @@ const Wallet = {
   canAfford(n) { return GS.economy.money >= Math.max(0, Math.floor(n)); },
   _log(amount, label) { const h = GS.economy.history; h.unshift({ t: Date.now(), amount, label }); if (h.length > 40) h.length = 40; },
   /** Ingreso. Devuelve la cantidad añadida. */
-  add(n, label = 'Ingreso', { silent = false } = {}) {
-    n = Math.max(0, Math.floor(n)); if (!n) return 0;
+  add(n, label = 'Ingreso', { silent = false, noMult = false } = {}) {
+    n = Math.max(0, Math.floor(n * (noMult ? 1 : (GS.ngplus?.multiplier || 1)))); if (!n) return 0;   // v0.9 · NG+: ×1.5 a las ganancias (noMult: devoluciones, apuestas, lotería)
     GS.economy.money += n; GS.economy.lifetimeEarned += n; GS.daily.today.earned += n; this._log(n, label);
     if (!silent) moneyToast(`+${n.toLocaleString('es-ES')} $TOKEN`, 'gain');
     SaveSystem.save('money+'); return n;
@@ -653,7 +669,7 @@ const ITEMS = {
   croissant:      defItem({ id: 'croissant',      name: 'Croissant',          icon: '🥐', cat: 'consumable', rarity: 'common',   sell: 2,  buy: 4,   usable: true, desc: 'Recién horneado por el Oso. Al comerlo corres un 30% más rápido durante 20 s.' }),
   cupcake:        defItem({ id: 'cupcake',        name: 'Cupcake',            icon: '🧁', cat: 'consumable', rarity: 'common',   sell: 2,  buy: 5,   usable: true, desc: 'Dulce y esponjoso. Velocidad +30% durante 30 s.' }),
   strawberry_cake:defItem({ id: 'strawberry_cake',name: 'Tarta de Fresa',     icon: '🍰', cat: 'consumable', rarity: 'uncommon', sell: 5,  buy: 12,  usable: true, desc: 'La especialidad de la casa. Velocidad +50% durante 45 s.' }),
-  gasil_fuel:     defItem({ id: 'gasil_fuel',     name: 'Gasolina Gasil',     icon: '⛽', cat: 'consumable', rarity: 'uncommon', sell: 20, buy: 40,  usable: true, desc: 'Combustible del planeta. Se utilizará con los vehículos (próximamente).' }),
+  gasil_fuel:     defItem({ id: 'gasil_fuel',     name: 'Gasolina Gasil',     icon: '⛽', cat: 'consumable', rarity: 'uncommon', sell: 20, buy: 40,  usable: true, desc: 'Combustible del planeta. El avión de juguete de Sam necesita 5 bidones para despegar ("no vuela a sueños, grumete"). Sam la compra ×1,5. Vehículos: aún no existen en el sueño.' }),
   gift_box:       defItem({ id: 'gift_box',       name: 'Caja Regalo',        icon: '🎁', cat: 'special',    rarity: 'rare',     sell: 0,  usable: true, desc: 'Un agradecimiento de los vecinos por tu ayuda. Ábrela para descubrir qué contiene.' }),
   merchant_crate: defItem({ id: 'merchant_crate', name: 'Carga del Mercante', icon: '📦', cat: 'special',    rarity: 'rare',     sell: 25, usable: true, desc: 'Mercancía traída por el barco de Salty Sam. Ábrela para obtener materiales u objetos valiosos.' }),
   poor_bread:     defItem({ id: 'poor_bread',     name: 'Pan del Pobre',      icon: '🥖', cat: 'special',    rarity: 'common',   sell: 0,  usable: true, desc: 'Un regalo del Oso para quien pasa penurias. Saciedad +30. No se vende: es dignidad, no mercancía.' }),
@@ -697,7 +713,7 @@ const ITEM_EFFECTS = {
   croissant:       () => { Needs.eat(10); applyBuff(1.3, 20, '🥐 ¡Energía! Velocidad +30% · saciedad +10'); },
   cupcake:         () => { Needs.eat(12); applyBuff(1.3, 30, '🧁 ¡Azúcar! Velocidad +30% · saciedad +12'); },
   strawberry_cake: () => { Needs.eat(25); applyBuff(1.5, 45, '🍰 ¡Deliciosa! Velocidad +50% · saciedad +25'); spawnConfetti(player.position.clone().addScaledVector(player.userData.dir, 2), 20); },
-  gasil_fuel:      () => { showToast('⛽ La Gasolina Gasil se usará con los vehículos (próximamente)', 'text-white'); return false; },
+  gasil_fuel:      () => { showToast(`⛽ Entrégasela a Sam: su avión necesita ${CFG.planeFuelNeeded} bidones (vehículos: aún no existen)`, 'text-white'); return false; },   // v0.9 · Sec. 5.4
   gift_box:        () => openLootBox('gift_box', '🎁 Caja Regalo'),
   merchant_crate:  () => openLootBox('merchant_crate', '📦 Carga del Mercante'),
   poor_bread:      () => { Needs.eat(30); showToast('🥖 Pan humilde pero honesto: saciedad +30', 'text-white'); },
@@ -1200,7 +1216,12 @@ function buildHouse(level) {
     const aw = box(4.8, 0.12, 1.2, mat(0x0097a7), 0, 2.15, 2.3); aw.rotation.x = 0.35; g.add(aw);
     g.add(box(1.2, 0.8, 0.8, mat(0xffe082), 2.9, 0.4, 1.2)); g.add(box(0.8, 0.6, 0.6, mat(0xffab91), 2.7, 1.1, 1.0));
   } else {
-    g.add(makeBuilding({ w: 5.4, h: 5, d: 4.2, wall: 0xfff8e1, roof: 0xffc107, roofType: 'flat', sign: 'VILLA $TOKEN', signColor: '#b8860b', windowGlow: 0.8 }));
+    g.add(makeBuilding({ w: 5.4, h: 5, d: 4.2, wall: level >= 3 ? 0xf3e5f5 : 0xfff8e1, roof: level >= 3 ? 0xb388ff : 0xffc107, roofType: 'flat', sign: level >= 3 ? 'MANSIÓN ONÍRICA' : 'VILLA $TOKEN', signColor: level >= 3 ? '#6a1b9a' : '#b8860b', windowGlow: 0.8 }));
+    if (level >= 3) {   // v0.9 · Mansión Onírica (Sec. 10.7): dos torres, cúpula de cristal y estandarte arcoíris
+      [-3.9, 3.9].forEach(x => { g.add(cyl(0.9, 1.0, 6.4, mat(0xf3e5f5), x, 3.2, -0.4, 10)); g.add(cone(1.15, 2.0, mat(0x7e57c2, { flatShading: true }), x, 7.4, -0.4, 10)); g.add(sphere(0.18, glow(0xffd54f, 0xffab00, 1.4), x, 8.5, -0.4, 8)); [1.8, 3.6, 5.2].forEach(y => g.add(box(0.4, 0.55, 0.06, glow(0xfff3b0, 0xffd54f, 0.7), x, y, 0.55))); });
+      g.add(mesh(new THREE.SphereGeometry(1.5, 16, 10, 0, Math.PI * 2, 0, Math.PI / 2), glow(0xe1f5fe, 0x80d8ff, 0.5, { transparent: true, opacity: 0.75 }), 0, 6.1, -0.2));
+      g.add(cyl(0.05, 0.05, 2.2, mat(0x5d4037), 0, 8.2, -0.2, 6)); [0xff5252, 0xffd740, 0x69f0ae, 0x40c4ff, 0xb388ff].forEach((c, i) => g.add(box(0.9, 0.12, 0.03, mat(c), 0.5, 9.1 - i * 0.12, -0.2)));
+    }
     g.add(box(5.6, 0.15, 1.4, mat(0xffffff), 0, 2.6, 2.7)); [-2.5, 0, 2.5].forEach(x => g.add(box(0.12, 1, 0.12, mat(0xffffff), x, 3.1, 3.3)));
     g.add(box(5.6, 0.08, 0.08, mat(0xffffff), 0, 3.6, 3.3)); g.add(box(3, 0.5, 2, glow(0xb2ebf2, 0x4dd0e1, 0.6), 0, 0.15, 4.3));
     [-1.4, 1.4].forEach(x => g.add(box(0.7, 0.8, 0.5, mat(0xd4af37), x, 5.4, 0)));
@@ -1214,7 +1235,7 @@ function buildHouse(level) {
   registerInteractable(g, { type: 'house', label: 'Tu casa' });
   { const mb = new THREE.Object3D(); mb.position.set(1.9, 1.1, 1.9); g.add(mb); if (mailboxObj) { const k = interactables.indexOf(mailboxObj); if (k >= 0) interactables.splice(k, 1); } registerInteractable(mb, { type: 'mailbox', label: 'Abrir el buzón 📮' }); mailboxObj = mb; }   // v0.5: buzón independiente (Sec. 6.10)
   { // v0.7 · Armario 🪞 (Sec. 8.2 y 8.9): box + espejo, en los 3 niveles de casa. Abre el probador (cambiarse es gratis)
-    const wd = new THREE.Group(); wd.position.set(-[2.45, 2.95, 3.35][level], 0, 0.9);
+    const wd = new THREE.Group(); wd.position.set(-[2.45, 2.95, 3.35, 3.35][level], 0, level >= 3 ? 1.6 : 0.9);
     wd.add(box(0.9, 1.7, 0.45, mat(0x8d6e63), 0, 0.85, 0)); wd.add(box(1.0, 0.1, 0.52, mat(0x6d4c41), 0, 1.74, 0));
     wd.add(box(0.6, 1.1, 0.03, new THREE.MeshStandardMaterial({ color: 0xdff3ff, metalness: 0.9, roughness: 0.08, emissive: 0x9fd8ff, emissiveIntensity: 0.18 }), 0, 0.95, 0.24));
     wd.add(sphere(0.04, mat(0xffd54f), 0.37, 0.9, 0.24, 6)); g.add(wd);
@@ -1222,7 +1243,7 @@ function buildHouse(level) {
     registerInteractable(wd, { type: 'wardrobe', label: 'Armario 🪞 (probador)' }); wardrobeObj = wd;
   }
   placeAtSite(g, S_V, -6.5, -3.5, 0.5, -0.1); scene.add(g); house = g;
-  houseCollider.pos.copy(g.position); houseCollider.r = [2.8, 3.3, 4.2][level];
+  houseCollider.pos.copy(g.position); houseCollider.r = [2.8, 3.3, 4.2, 5.0][level];
   if (GS.house.level !== level) { GS.house.level = level; SaveSystem.save('house'); }
 }
 buildHouse(0);
@@ -1534,7 +1555,7 @@ const AURA_STYLES = {
   ice:     { c: 0x80deea, e: 0x00e5ff, name: 'Hielo' },
   void:    { c: 0x7c4dff, e: 0x651fff, name: 'Vacío' },
   gold:    { c: 0xffd54f, e: 0xffab00, name: 'Dorada' },
-  dreamer: { c: 0xff9ec4, e: 0xb388ff, name: 'Soñador Eterno' },   // v0.9 · solo Final B (su perk se conecta entonces)
+  dreamer: { c: 0xff9ec4, e: 0xb388ff, name: 'Soñador Eterno', rainbow: true },   // v0.9 · solo Final B (intransferible) · arcoíris · +10% confianza y comercio
 };
 /** Render del aura: tier (0–4) + estilo. No toca GS: la fuente de verdad es Trust + auraV3. */
 function setAura(tier, styleId) {
@@ -1543,7 +1564,8 @@ function setAura(tier, styleId) {
   if (!t.particles) return;
   for (let i = 0; i < t.particles; i++) {
     const a = i / t.particles * Math.PI * 2;
-    const s = sphere(t.size, glow(st.c, st.e, 1.6), Math.cos(a) * t.radius, 0, Math.sin(a) * t.radius, 6);
+    const rc = st.rainbow ? new THREE.Color().setHSL(i / t.particles, 0.85, 0.65).getHex() : null;   // v0.9: Soñador Eterno = arcoíris (Sec. 3.6)
+    const s = sphere(t.size, rc !== null ? glow(rc, rc, 1.6) : glow(st.c, st.e, 1.6), Math.cos(a) * t.radius, 0, Math.sin(a) * t.radius, 6);
     s.castShadow = false; s.userData.i = i; aura.add(s);
   }
   if (t.light > 0) { const l = new THREE.PointLight(st.e, t.light, 5, 2); l.position.y = 0.5; aura.add(l); }
@@ -1571,8 +1593,9 @@ function equipAuraStyle(styleId) {
 const AuraFX = {
   style() { return GS.cosmetics.auraV3?.style || 'none'; },
   active() { return (typeof Trust !== 'undefined') && Trust.auraTier() >= 1; },
-  sellMult() { const s = this.style(); return this.active() && (s === 'fire' || s === 'gold') ? 1.05 : 1; },
-  buyMult() { return this.active() && this.style() === 'gold' ? 0.95 : 1; },
+  sellMult() { const s = this.style(); return this.active() && (s === 'fire' || s === 'gold') ? 1.05 : this.active() && s === 'dreamer' ? 1 + CFG.dreamerTradeBonus : 1; },
+  buyMult() { const s = this.style(); return this.active() && s === 'gold' ? 0.95 : this.active() && s === 'dreamer' ? 1 - CFG.dreamerTradeBonus : 1; },
+  trustMult() { return this.active() && this.style() === 'dreamer' ? 1 + CFG.dreamerTrustBonus : 1; },   // v0.9 · Soñador Eterno (Sec. 3.6)
   cooldownMult() { return this.active() && this.style() === 'ice' ? 0.9 : 1; },
   rareLootBoost() { return this.active() && this.style() === 'void' ? 1.15 : 1; },
 };
@@ -1778,7 +1801,7 @@ function startVendorDialog() {
   state.dialogPose = { pos: cA.distanceTo(storeBuilding.position) > cB.distanceTo(storeBuilding.position) ? cA : cB, target: mid, up: up.clone() }; tweenCamera(state.dialogPose, 0.9);
   ui.hint.classList.add('hidden'); ui.dialog.classList.remove('hidden'); ui.dialogButtons.innerHTML = ''; ui.dialogAvatar.textContent = '🦝'; ui.dialogName.textContent = `ROCCO · TENDERO · ${trustLvIcon('rocco')} ${trustLvName('rocco')}`;   // v0.2: con Rocco la confianza es volumen de comercio (Sec. 5.8)
   const lines = ['¡Bienvenido a mi tienda! Compro de todo lo que encuentres por el planeta y vendo materiales, dulces y Gasolina Gasil. ¿Comerciamos?', '¡Hola de nuevo! Las conchas y las perlas se pagan bien hoy. ¿Qué me traes?', 'Psst… si construyes farolas y bancos la aldea sube de nivel. Yo te vendo la piedra y la madera.'];
-  typeText(ui.dialogText, lines[Math.floor(Math.random() * lines.length)], 16, () => ui.dialogButtons.append(dialogButton('🛒 Comerciar', 'bg-amber-200 text-[#2b2b3d]', () => openShop('store')), dialogButton('🎒 Mochila', 'bg-yellow-200 text-[#2b2b3d]', () => openInventory()), dialogButton('Hasta luego', 'bg-slate-200 text-[#2b2b3d]', endDialog)));
+  typeText(ui.dialogText, dejaVuGreeting('rocco') || lines[Math.floor(Math.random() * lines.length)], 16, () => ui.dialogButtons.append(dialogButton('🛒 Comerciar', 'bg-amber-200 text-[#2b2b3d]', () => openShop('store')), dialogButton('🎒 Mochila', 'bg-yellow-200 text-[#2b2b3d]', () => openInventory()), dialogButton('Hasta luego', 'bg-slate-200 text-[#2b2b3d]', endDialog)));
 }
 
 // --- Instanciar NPCs ---
@@ -1984,7 +2007,7 @@ function removeBuilding(id, refund = 0.5) {
   delete placedBuildings[id]; GS.world.buildings.splice(i, 1);
   { const ii = interactables.indexOf(p.group); if (ii >= 0) interactables.splice(ii, 1); } if (GS.mill) delete GS.mill[id];
   removeEmbargoVisual(id); { const sb = GS.housing.sealedBuildings || [], k = sb.indexOf(id); if (k >= 0) sb.splice(k, 1); }
-  if (def && refund > 0) { const back = Math.floor(def.cost * refund); if (back > 0) Wallet.add(back, `Demolición: ${def.name}`); }
+  if (def && refund > 0) { const back = Math.floor(def.cost * refund); if (back > 0) Wallet.add(back, `Demolición: ${def.name}`, { noMult: true }); }
   showToast(`🧹 ${def ? def.icon + ' ' + def.name : 'Edificio'} retirado`, 'text-white');
   SaveSystem.saveNow('demolish:' + rec.type); return true;
 }
@@ -2312,6 +2335,7 @@ function serviceBtns(npcId) {
   if (npcId === 'glover' && typeof openFurnitureShop === 'function') btns.push(dialogButton('🛋️ Muebles', 'bg-emerald-200 text-[#2b2b3d]', () => openFurnitureShop()));   // S3.5 (Sec. 6.8)
   if (npcId === 'hedgehogs' && GS.missions?.hedgehogs?.status === 2) btns.push(dialogButton('🕶️ Boutique Viral', 'bg-fuchsia-200 text-[#2b2b3d]', () => Boutique.open()));   // v0.7 (Sec. 8.4 y 8.9): tras su misión
   if (npcId === 'sombra') btns.push(dialogButton('🎫 Billete del Despertar', 'bg-yellow-200 text-[#2b2b3d]', () => openDreamTicketPanel()));   // S2.5 (Sec. 5.10)
+  btns.push(...awakeningBtns(npcId));     // v0.9: Cadena del Despertar + post-juego (Sec. 7.5, 10.7)
   btns.push(...act2ServiceBtns(npcId));   // v0.8: sistemas de los Trabajos Mayores (pedidos, censo, feria, obra, oráculo, clima, muelle, agencia)
   return btns;
 }
@@ -2359,6 +2383,12 @@ const SOMBRA_REVEAL = [
   'Hay un vuelo de vuelta a tu mundo. Cuesta 40.000.000 $TOKEN. Nadie lo ha pagado jamás.',
   'Pero tú tienes esa máquina... y tiempo. Todo el tiempo del sueño.'
 ];
+const SOMBRA_REVEAL_NG = [   // v0.9 · Nuevo Sueño+ (Sec. 10.7)
+  'Ah. Has vuelto. Interesante. Nadie vuelve dos veces al mismo sueño… casi nadie.',
+  'Sí, soñador: esto sigue siendo un sueño. Uno nuevo. Las cartas, en cambio, te recuerdan.',
+  'El vuelo de vuelta cuesta 40.000.000 $TOKEN. Tú ya lo pagaste una vez.',
+  'Mmm… esta vez el sueño te pone las cosas un poco más fáciles. No se lo digas a nadie.'
+];
 const SOMBRA_ACT1 = ['Ya eres de aquí.', 'Ahora la pregunta es si quieres dejar de serlo.', '40 millones, soñador.'];
 const _storyQueue = [];   // v0.7: las escenas que coinciden (insignia + cierre del Acto 1…) se encolan en vez de perderse
 function showStoryScene(icon, name, lines, onDone, theme = '#7e57c2') {
@@ -2386,7 +2416,8 @@ function showStoryScene(icon, name, lines, onDone, theme = '#7e57c2') {
 function maybeRevealDream(after) {
   if ($('storyScene')) return true;
   const s = storyState(); if (s.revealed) return false;
-  showStoryScene('🐈‍⬛', 'Madame Sombra', SOMBRA_REVEAL, () => {
+  const ng = (GS.ngplus?.count | 0) > 0; if (ng) { GS.ngplus.dejaVu ||= {}; GS.ngplus.dejaVu.sombra = true; }   // v0.9 · NG+: Sombra te reconoce (Sec. 10.7)
+  showStoryScene('🐈‍⬛', 'Madame Sombra', ng ? SOMBRA_REVEAL_NG : SOMBRA_REVEAL, () => {
     s.revealed = true; refreshGoalHUD(true); SaveSystem.saveNow('story:reveal');
     showToast('✈️ Nuevo objetivo: el vuelo de vuelta a tu mundo', 'text-purple-200');
     after && setTimeout(after, 400);
@@ -2416,14 +2447,14 @@ function showPrologue(onDone) {
       <div style="position:absolute;right:-46px;bottom:4px;font-size:30px">☕</div>
       <span class="st-z" style="left:40%;top:-10px">Z</span><span class="st-z" style="left:52%;top:-20px;animation-delay:1s">z</span><span class="st-z" style="left:46%;top:-5px;animation-delay:2s">Z</span>
     </div>
-    <p style="margin:22px 0 6px;font-size:16px;opacity:.85">Café frío. Código que no compila. Demasiadas horas despierto.</p>
+    <p style="margin:22px 0 6px;font-size:16px;opacity:.85">${(GS.ngplus?.count | 0) > 0 ? 'Esa noche, te vuelves a quedar dormido frente al portátil… 🌙' : 'Café frío. Código que no compila. Demasiadas horas despierto.'}</p>
     <button id="btnSleep" style="margin-top:14px;padding:14px 34px;border-radius:999px;background:#7e57c2;color:#fff;font:700 18px Fredoka,sans-serif;border:0;box-shadow:0 6px 24px #7e57c288;cursor:pointer">😴 DORMIRSE</button>
   </div>`;
   document.body.appendChild(o);
   $('btnSleep').onclick = () => {
     $('btnSleep').disabled = true;
     storyFade('#ffffff', 1400, () => {
-      o.remove(); storyState().prologueDone = true; storyState().creatorPending = true;   // v0.7: tras el prólogo llega el creador (Sec. 8.2)
+      o.remove(); storyState().prologueDone = true; storyState().creatorPending = !((GS.ngplus?.count | 0) > 0);   // v0.7: tras el prólogo llega el creador (Sec. 8.2) · v0.9: en NG+ el avatar ya te siguió (Sec. 10.7)
       onDone && onDone();
       SaveSystem.saveNow('story:prologue');
       // el saludo del Oso ahora suena al cerrar el creador de personaje (ver maybeOpenCreator)
@@ -2445,7 +2476,7 @@ function startDialog(npcId) {
   ui.hint.classList.add('hidden'); ui.dialog.classList.remove('hidden'); ui.dialogButtons.innerHTML = '';
   ui.dialogAvatar.textContent = n.emoji;
   ui.dialogName.textContent = `${n.name.toUpperCase()} · ${trustLvIcon(npcId)} ${trustLvName(npcId)}`;   // v0.2: relación visible
-  const greet = greetingFor(npcId);
+  const greet = dejaVuGreeting(npcId) || awakeningGreeting(npcId) || greetingFor(npcId);   // v0.9: déjà vu en NG+ (Sec. 10.7) · líneas de la cadena (Sec. 7.5)
   const giftBtn = dialogButton('🎁 Regalar', 'bg-pink-200 text-[#2b2b3d]', () => openGiftPicker(npcId));
   const openBtn = dialogButton('💻 Abrir Laptop de IA', 'bg-cyan-300 text-[#2b2b3d]', () => { if (m.status === 0) setMissionStatus(npcId, 1); openLaptop(npcId); });
   const shopBtns = () => SHOPS[npcId] ? [dialogButton(`🛒 ${SHOPS[npcId].name}`, 'bg-amber-200 text-[#2b2b3d]', () => openShop(npcId))] : [];
@@ -2575,6 +2606,7 @@ function refreshMissionUI() {
     const next = NPCS.find(n => state.missions[n.id].status === 1) || NPCS.find(n => state.missions[n.id].status === 0);
     ui.missionText.textContent = done === NPCS.length ? '🏆 ¡Todas las misiones completadas!' : next ? `${next.emoji} ${state.missions[next.id].status === 1 ? next.mission.title + ' (usa la laptop)' : 'Habla con ' + next.name}` : '';
   }
+  act3MissionHUD(lbl);   // v0.9: «ACTO 3 · EL DESPERTAR» mientras dura la cadena, y metas del post-juego tras el Final B
   const tab = state.missionTab || (act2 ? 'big' : 'main');
   let html = `<div class="flex flex-wrap gap-1 mb-1">` + MISSION_TABS.map(([id, label]) => `<button data-mtab="${id}" class="btn-game px-2 py-0.5 text-[10px] ${tab === id ? 'active' : 'bg-white'}">${label}${id === 'main' ? ` ${done}/${NPCS.length}` : id === 'big' ? ` ${bigJobsDoneCount()}/${CFG.act2BigJobs}` : ''}</button>`).join('') + `</div>`;
   if (tab === 'big') {
@@ -2954,7 +2986,7 @@ function mountMemeTool(b) {
 function addTokens(n, label = 'Recompensa') { return Wallet.add(n, label); }
 function showToast(msg, cls = '') { const t = document.createElement('div'); t.className = `toast absolute left-1/2 whitespace-nowrap font-bold text-sm bg-[#2b2b3d]/90 px-3 py-1.5 rounded-lg ${cls}`; t.textContent = msg; ui.toastArea.append(t); setTimeout(() => t.remove(), 2500); }
 let audioCtx = null;
-function playBeep(freq, dur, type = 'square') { try { audioCtx ||= new (window.AudioContext || window.webkitAudioContext)(); const o = audioCtx.createOscillator(), g = audioCtx.createGain(); o.type = type; o.frequency.value = freq; g.gain.value = 0.06; o.connect(g).connect(audioCtx.destination); o.start(); g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + dur + 0.1); o.stop(audioCtx.currentTime + dur + 0.12); } catch (e) {} }
+function playBeep(freq, dur, type = 'square') { if (state.cinematic) return; /* v0.9: en la despedida y la decisión no suena nada (Sec. 2.10) */ try { audioCtx ||= new (window.AudioContext || window.webkitAudioContext)(); const o = audioCtx.createOscillator(), g = audioCtx.createGain(); o.type = type; o.frequency.value = freq; g.gain.value = 0.06; o.connect(g).connect(audioCtx.destination); o.start(); g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + dur + 0.1); o.stop(audioCtx.currentTime + dur + 0.12); } catch (e) {} }
 function playChime() { [523, 659, 784, 1046].forEach((f, i) => setTimeout(() => playBeep(f, 0.18, 'triangle'), i * 110)); }
 
 /* =========================================================
@@ -3055,7 +3087,7 @@ function addLetter(from, text) {
    lotería), intereses de deuda y aviso de embargo. Todo queda en el resumen. */
 DailySystem.onSettle(() => {
   const charges = [];
-  const lvl = clamp(GS.house.level | 0, 0, 2);
+  const lvl = clamp(GS.house.level | 0, 0, CFG.houseMaxLevel);   // v0.9: la Mansión (nivel 3) paga 5.000 $T/día
   const rent = CFG.rentByLevel[lvl] || 0;
   /* 1) ALQUILER (con período de gracia de 5 días; Sec. 6.3) */
   if (GS.housing.graceDaysLeft > 0) {
@@ -3260,11 +3292,11 @@ function openSealedHousePanel() {
 const HOUSE_TABS = [['mail', '📮 Buzón'], ['rent', '🏠 Alquiler'], ['sleep', '🛏️ Dormir'], ['kitchen', '🍳 Cocina'], ['showcase', '🏷️ Escaparate'], ['furniture', '🪑 Muebles'], ['wardrobe', '🪞 Armario']];   // v0.7: + Armario (Sec. 8.2)
 let _houseTab = 'rent';
 function openHousePanel(tab) {
-  const levelNames = ['🏠 Casa', '🏪 Tienda', '🏡 Villa $TOKEN'];
+  const levelNames = ['🏠 Casa', '🏪 Tienda', '🏡 Villa $TOKEN', '🏰 Mansión Onírica'];
   _houseTab = tab || ((GS.housing.mailboxUnread || 0) > 0 ? 'mail' : _houseTab);
-  openApp(`${levelNames[clamp(GS.house.level | 0, 0, 2)]} · Mi Casa`, '', (body) => {
+  openApp(`${levelNames[clamp(GS.house.level | 0, 0, CFG.houseMaxLevel)]} · Mi Casa`, '', (body) => {
     const render = () => {
-      const lvl = clamp(GS.house.level | 0, 0, 2), rent = CFG.rentByLevel[lvl];
+      const lvl = clamp(GS.house.level | 0, 0, CFG.houseMaxLevel), rent = CFG.rentByLevel[lvl];
       const rentDebt = GS.housing.rentDebt || 0, daysOwed = rent > 0 ? Math.ceil(rentDebt / rent) : 0;
       const debt = GS.debt || 0, embargo = debt >= CFG.debtEmbargoAt;
       const letters = GS.housing.mailbox || [], unread = GS.housing.mailboxUnread || 0;
@@ -3462,7 +3494,7 @@ function openRoulette() {
           if (win) {
             const prize = amount * CFG.roulettePayout;
             st2.won += prize; st2.lossStreak = 0;
-            Wallet.add(prize, `🎰 Ruleta: ¡${ROULETTE_RUNES[result].name}!`);
+            Wallet.add(prize, `🎰 Ruleta: ¡${ROULETTE_RUNES[result].name}!`, { noMult: true });
             showToast(`🎉 ¡${ROULETTE_RUNES[result].icon} ${ROULETTE_RUNES[result].name}! +${fmt(prize)} $TOKEN`, 'text-yellow-200');
             playChime(); spawnConfetti(player.position.clone().addScaledVector(player.userData.dir, 2), 25);
           } else {
@@ -3587,7 +3619,7 @@ function openDiceGame() {
         if (win) {
           const prize = Math.floor(amount * 2 * (1 - CFG.diceHouseEdge));
           st2.won += prize; st2.lossStreak = 0;
-          Wallet.add(prize, '🎲 Dados: victoria contra Sam');
+          Wallet.add(prize, '🎲 Dados: victoria contra Sam', { noMult: true });
           if (elMsg) elMsg.textContent = `🦤 "Arrr… el mar te sonríe, grumete. Toma tu botín (−2% para la casa)."`;
           showToast(`🎉 ¡${sumYou} contra ${sumSam}! +${fmt(prize)} $TOKEN`, 'text-yellow-200');
           playChime(); spawnConfetti(player.position.clone().addScaledVector(player.userData.dir, 2), 20);
@@ -3651,7 +3683,7 @@ function runLotteryDraw() {
   const numTxt = String(num).padStart(3, '0');
   if (winTicket && prize > 0) {
     L.pool = Math.max(0, L.pool - prize);
-    Wallet.add(prize, '🎫 ¡LOTERÍA DEL SUEÑO!');
+    Wallet.add(prize, '🎫 ¡LOTERÍA DEL SUEÑO!', { noMult: true });
     addLetter('🏛️ Lotería Municipal', `¡EJEM! ¡ENHORABUENA, CIUDADANO! El número ganador del sorteo semanal ha sido el ${numTxt}… ¡y USTED lo tenía! Premio: ${fmt(prize)} $TOKEN. El municipio comparte su alegría (y recuerda que el pozo se alimenta de las tasas de todos).`);
     showToast(`🎫🎉 ¡LOTERÍA! El ${numTxt} era tuyo: +${fmt(prize)} $TOKEN`, 'text-yellow-200');
     playChime(); spawnConfetti(player.position.clone().addScaledVector(player.userData.dir, 3), 60);
@@ -4481,12 +4513,13 @@ TRUST_NPCS.forEach(id => { if (NPC_SOCIAL[id]?.giftPrefs && NPC_SOCIAL[id].giftP
 /* Sec. 5.10: el Billete del Despertar se compra a Sombra (40M + confianza 4 con ella) */
 function buyDreamTicket() {
   if (Inventory.has('dream_ticket', 1)) { showToast('🎫 Ya tienes el billete', 'text-white'); return false; }
-  if (Trust.level('sombra') < 4) { showToast('🔮 Sombra: "Aún no confío en ti lo suficiente, soñador."', 'text-white'); return false; }
+  if (GS.story?.ending) { showToast(GS.story.ending === 'B' ? '🔮 Sombra: "Mmm… el billete ya volvió a mi baraja, soñador. Te quedaste."' : '🎫 Ya usaste el billete', 'text-white'); return false; }   // v0.9
+  if (Trust.level('sombra') < CFG.ticketTrustLevel) { showToast('🔮 Sombra: "No le vendería la salida del sueño a un desconocido."', 'text-white'); return false; }
   if (!Wallet.canAfford(CFG.ticketPrice)) { showToast(`❌ Necesitas ${fmt(CFG.ticketPrice)} $TOKEN`, 'text-red-200'); return false; }
   if (!Inventory.canAdd('dream_ticket', 1)) { showToast('🎒 Haz hueco en la mochila para el billete', 'text-red-200'); return false; }
   if (!Wallet.spend(CFG.ticketPrice, 'Billete del Despertar')) return false;
   Inventory.add('dream_ticket', 1, { silent: true });
-  GS.awakening.step = Math.max(GS.awakening.step | 0, 1);   // arranca la Cadena del Despertar (Sec. 7.5)
+  startAwakening();   // v0.9: arranca la Cadena del Despertar (Sec. 7.5) · aviso de Sombra (Anexo A.2)
   addLetter('🔮 M. Sombra', 'El billete es mío; el combustible es cosa del pelícano. Habla con Sam: su avión necesita 5 Gasolinas Gasil. Mmm… y luego ven a verme.');
   showToast('🎫 ¡BILLETE DEL DESPERTAR! Ya tienes la salida…', 'text-white'); playChime();
   spawnConfetti(player.position.clone().addScaledVector(player.userData.dir, 2), 40);
@@ -4495,10 +4528,11 @@ function buyDreamTicket() {
 function openDreamTicketPanel() {
   openApp('🎫 Billete del Despertar', '', (body) => {
     const render = () => {
-      const has = Inventory.has('dream_ticket', 1), lv = Trust.level('sombra'), okT = lv >= 4, okM = Wallet.canAfford(CFG.ticketPrice);
+      const has = Inventory.has('dream_ticket', 1) || awakeningHasTicket(), lv = Trust.level('sombra'), okT = lv >= CFG.ticketTrustLevel, okM = Wallet.canAfford(CFG.ticketPrice);
+      if (GS.story?.ending === 'B') { body.innerHTML = balanceBar() + `<div class="app-card p-4"><div class="text-sm text-slate-600">"Mmm… lo sabía." — Sombra</div><div class="font-bold text-fuchsia-700 mt-2">💤 Te quedaste en el sueño. El billete descansa en su baraja.</div></div>`; return; }
       body.innerHTML = balanceBar() + `<div class="app-card p-4">
         <div class="text-sm text-slate-600 mb-2">"Hay un vuelo de vuelta a tu mundo. Cuesta ${fmt(CFG.ticketPrice)} $TOKEN. Nadie lo ha pagado jamás." — Sombra</div>
-        ${has ? '<div class="font-bold text-emerald-700">✓ Ya tienes el billete. La pregunta es cuándo lo usas.</div>' : `
+        ${has ? '<div class="font-bold text-emerald-700">✓ Ya tienes el billete. La pregunta es cuándo lo usas.</div>' + awakeningChainHTML() : `
         <div class="text-sm">${okM ? '✅' : '❌'} ${fmt(CFG.ticketPrice)} $TOKEN (tienes ${fmt(Wallet.balance)})</div>
         <div class="text-sm">${okT ? '✅' : '❌'} Confianza con Sombra: ${TRUST_LEVELS[lv].heart} ${TRUST_LEVELS[lv].name} (requiere nivel 4)</div>
         <button data-buyticket class="btn-game px-4 py-2 text-sm mt-3 ${okM && okT ? 'bg-yellow-300' : 'bg-slate-200 opacity-60'}">🎫 Comprar el billete</button>`}</div>`;
@@ -4645,22 +4679,23 @@ function updateHungerHUD() {
 /* ===== v0.1 · HUD OBJETIVO 40M (Guía Sec. 0.2 P4: "un número imposible siempre visible") ===== */
 let _goalLast = -1;
 function updateGoalHUD() {
-  const goal = CFG.ticketPrice;
+  const post = GS.story?.ending === 'B', goal = post ? CFG.club100M : CFG.ticketPrice;   // v0.9 · Final B: el número imposible pasa a ser el Club de los 100M (Sec. 10.7)
   const shown = Math.max(0, Math.floor(typeof state.tokensShown === 'number' ? state.tokensShown : GS.economy.money));
-  if (shown === _goalLast) return;
-  _goalLast = shown;
+  const key = shown + (post ? 0.5 : 0) + ((GS.ngplus?.count | 0) > 0 ? 0.25 : 0);
+  if (key === _goalLast) return;
+  _goalLast = key;
   const pct = Math.min(100, (shown / goal) * 100);
   const t = document.getElementById('goalText'), p = document.getElementById('goalPct'), b = document.getElementById('goalBar');
-  if (t) t.textContent = `✈️ ${fmtDots(shown)} / ${fmtDots(goal)}`;
-  if (p) p.textContent = ` · ${pct.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`;
+  if (t) t.textContent = `${post ? '🌟' : '✈️'} ${fmtDots(shown)} / ${fmtDots(goal)}`;
+  if (p) p.textContent = ` · ${pct.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%${(GS.ngplus?.count | 0) > 0 ? ` · 🌙 NG+ ×${String(GS.ngplus.multiplier).replace('.', ',')}` : ''}`;
   if (b) b.style.width = (shown > 0 ? Math.max(pct, 0.6) : 0) + '%';
 }
 function animate() {
   requestAnimationFrame(animate);
   const dt = Math.min(clock.getDelta(), 0.05), t = clock.elapsedTime;
-  updatePlayer(dt); Needs.update(dt); updateNPCs(dt, t); updateCamera(dt); updateSun(); updateNeon(dt, t); updateUnlocks(dt, t); updateShip(dt); updateConfetti(dt); updateWater(t);
+  updatePlayer(dt); if (!state.cinematic) Needs.update(dt); updateNPCs(dt, t); Awakening.update(dt, t); /* v0.9: el sueño se detiene durante la escena del puerto */ updateCamera(dt); updateSun(); updateNeon(dt, t); updateUnlocks(dt, t); updateShip(dt); updateConfetti(dt); updateWater(t);
   clouds.children.forEach(p => p.rotateY(p.userData.speed * dt)); updateTokens(); updateGoalHUD(); updateClockHUD(); Weather.update(dt); Fishing.update(dt); Mining.update(dt); StarFall.update(dt);
-  if (SaveSystem.started && !state.menuOpen) {
+  if (SaveSystem.started && !state.menuOpen && !state.cinematic) {
     GS.meta.playTimeSec += dt;
     GS.daily.clockMs += dt * 1000 * DAY_SCALE;                 // v0.1: el reloj onírico solo avanza jugando
     if (GS.daily.clockMs >= DAY_MS) { GS.daily.clockMs -= DAY_MS; GS.daily.dayCount++; if (typeof settleDay === 'function') settleDay(); SaveSystem.save('new-day'); }
@@ -4985,9 +5020,10 @@ function refreshNpcBubbles() {
   NPCS.forEach(n => {
     if (GS.missions?.[n.id]?.status !== 2) return;
     const o = npcObjs[n.id]; if (!o) return; const st = GS.bigJobs?.[n.id]?.status | 0;
-    const sym = st === 1 || (st === 0 && bigJobReady(n.id)) ? '★' : '✓';
+    const aw = awakeningBubbleFor(n.id);   // v0.9: ✈️ el vecino del paso actual de la Cadena del Despertar
+    const sym = aw || (st === 1 || (st === 0 && bigJobReady(n.id)) ? '★' : '✓');
     if (o.userData.bubbleSym === sym) return; o.userData.bubbleSym = sym;
-    o.userData.bubble.material.map = bubbleTexture(sym, sym === '★' ? '#ffb74d' : '#7dffa8'); o.userData.bubble.material.needsUpdate = true;
+    o.userData.bubble.material.map = bubbleTexture(sym, aw ? '#b39ddb' : sym === '★' ? '#ffb74d' : '#7dffa8'); o.userData.bubble.material.needsUpdate = true;
   });
 }
 
@@ -5210,7 +5246,7 @@ const Feria = {
     let back = 0, staked = 0; const lines = [];
     due.forEach(l => { const m = this.move(l.day + 1, l.cat), r = l.side === 'up' ? m : -m, pay = Math.max(0, Math.floor(l.stake * (1 + r) * (1 - CFG.feriaCommission))); back += pay; staked += l.stake; lines.push(`${catLabel(l.cat)} ${l.side === 'up' ? '📈' : '📉'} ${fmt(l.stake)} → ${fmt(pay)} (${v08pct(m)})`); });
     f.lots = lots.filter(l => l.day >= D);
-    if (back) Wallet.add(back, 'Feria: liquidación de lotes', { silent: true });
+    if (back) Wallet.add(back, 'Feria: liquidación de lotes', { silent: true, noMult: true });
     f.lastResult = { day: D, staked, back }; (f.log ||= []).unshift({ day: D, staked, back }); if (f.log.length > 10) f.log.length = 10;
     (GS.daily.lastCharges ||= []).push({ label: '📈 Feria: lotes liquidados', note: `${fmt(staked)} → ${fmt(back)} $T` });
     addLetter('🏛️ Tablón · Feria', `Liquidación de lotes (simulación):\n${lines.join('\n')}\nTotal: ${fmt(staked)} → ${fmt(back)} $T (comisión ${Math.round(CFG.feriaCommission * 100)}%).`);
@@ -5412,6 +5448,491 @@ DailySystem.onSettle(() => {
 });
 
 /* =========================================================
+   19c. v0.9 · EL DESPERTAR (Guía Maestra Sec. 1.6, 2.10, 5.10, 7.5, 10.7)
+   ---------------------------------------------------------
+   Cadena (Sec. 7.5): 🎫 billete → ⭐1 alas de Sam (inspección + 5× Gasil) → ⭐2 Formulario 99-Z
+   del Mayor (1 día onírico o tasa exprés) → ⭐3 última lectura de Sombra → 🛫 escena del puerto
+   (Sec. 2.10: desfile de despedidas + decisión con silencio de diseño) → Final A (despertar →
+   escritorio → créditos → Nuevo Sueño+) | Final B (devolución, aura Soñador Eterno, post-juego).
+   Regla: la cadena nunca se bloquea (sin azar, sin caducidades, la gasolina siempre se repone).
+   Fuente de verdad: GS.awakening · GS.story.{farewellDone, ending} · GS.ngplus · GS.postgame.
+   ========================================================= */
+const FAREWELLS = {   // Sec. 2.2–2.9 · cordial (confianza ≤ 2) / profunda (≥ 3). Ningún chiste aquí (Sec. 1.7).
+  bear: { c: '¡Que tengas buen viaje! Te he envuelto unos croissants para el camino. Donde sea que vayas… que no te falte algo dulce.',
+    p: 'El primer día pensé que eras un cliente. Luego un amigo. Ahora eres la razón por la que este pueblo huele a futuro. Llévate el pan. Y si alguna vez, en tu mundo, muerdes un croissant y te saben a hogar… ya sabes de dónde viene ese sabor.' },
+  mayor: { c: '¡Ejem! Por la presente, este ayuntamiento le expide el certificado de partida. Formulario 99-Z. El único que no duele firmar.',
+    p: 'Llevo años firmando papeles que nadie lee, para un pueblo que creí de papel. Y llegaste tú, y resulta que el pueblo era real. Vete, soñador. Y que conste en acta: aquí siempre serás ciudadano. Artículo primero. Redactado hoy. Por mí.' },
+  glover: { c: 'Buen viaje. Y si en tu mundo construyen tan rápido como aquí… mide dos veces.',
+    p: 'Setenta y dos horas dibujando a mano me enseñaron una cosa: el oficio no está en las manos, está en querer que quede bien. Tú lo entendiste. Esa villa que tienes la construimos milímetro a milímetro. Vete. Pero que nadie te diga que lo que dejas aquí no era de verdad. Yo lo medí. Era real.' },
+  sombra: { c: 'El billete se usó. El sueño se cumplió. No mires atrás demasiado: los sueños se ofenden. Mmm… buen viaje, soñador.',
+    p: 'He vendido este billete cientos de veces, en cientos de sueños. Tú eres el primero que lo pagó entero. ¿Sabes lo que eso significa? Que querías irte… y aún así te tomaste el tiempo de querernos. Anda. Despierta. Y que tu mundo despierto aprenda del que soñaste. Yo seguiré aquí. Alguien tiene que vender los billetes.' },
+  dax: { c: '¡¡BUEN VIAJE!! ¡Predije que te irías! (baja la voz) …no quería tener razón. ¡PERO CIENCIA!',
+    p: '¡Tengo un modelo que predice todo! ¿Sabes qué es lo único que no pude predecir? (pausa, casi tranquilo) …que me dolería tanto que te fueras. Las frutas doradas seguirán creciendo, ¿vale? Cada vez que coseches una en tu mundo —bueno, algo parecido— acuérdate: aquí hay un científico que te debe su mejor experimento. El experimento fuiste tú.' },
+  sam: { c: 'Arrr… todo a bordo, grumete. Cinco bidones de Gasil, billete en regla. El cielo está despejado. El mar… el mar te echará de menos. Y yo también, grumete. Y yo también.',
+    p: 'Veinte años navegué buscando el horizonte. Pensé que estaba roto yo. Y llegas tú y resulta que el horizonte no se alcanza navegando… se alcanza despertando. (Se quita el gorro.) Sube, grumete. Este avión de juguete es el barco más honesto que he capitaneado: va exactamente donde dice. Y si en tu mundo ves un mar… mándale un saludo de Sam. Dile que por fin entendió.' },
+  hedgehogs: { c: '¡BROOO! ¡Documentamos tu despedida! (Llora grabando.) ¡Va a ser nuestro mejor contenido! (Pip, deja de llorar, no se ve nada.)',
+    p: 'Bro… (se quita las gafas de sol, por primera vez) hicimos memes de todo. De la panadería, del alcalde, del token… ¿Sabes cuál nunca publicamos? El que hicimos de ti llegando. Porque ese no era contenido, bro. Ese era… familia llegando. (Pip asiente, sin el móvil, por primera vez.) Vuela alto, bro. El cielo es el único algoritmo que no se cambia.' },
+  rocco: { c: '¿Te vas? Psst… mala suerte para mi facturación. Buen viaje, cliente.',
+    p: 'Psst… ven un segundo. (Te da una caja pequeña.) Una Perla. No, no se vende. Es regalo. ¿Que desde cuándo regalo yo cosas? Desde que un soñador me demostró que el mejor negocio no es comprar barato y vender caro. Es que vuelvan. Tú no vas a volver… así que llévatela. Para que cuentes, en tu mundo, que conociste a un mapache honrado. Branding, ¿eh? Branding.' },
+};
+const SOMBRA_CLOSE = 'El velo se abre solo para quien ya no necesita empujarlo.';   // Sec. 2.10: Sombra siempre cierra el desfile
+const DEJA_VU = {   // Sec. 10.7 · Nuevo Sueño+: los vecinos te reconocen vagamente (Oso y Sombra, textos de la Guía; el resto, en su voz)
+  bear: '¿Nos conocemos? Me suenas… de un sueño.',
+  sombra: 'Ah. Has vuelto. Interesante. Nadie vuelve dos veces al mismo sueño… casi nadie.',
+  mayor: '¡Ejem! ¿Usted otra vez? Este ayuntamiento juraría tener su expediente… y no lo tiene. Qué raro. Rellene el 114-C.',
+  glover: '¿Sí? Esa forma de mirar los planos… ya la he medido antes. No sé dónde.',
+  dax: '¡¡HOLA!! ¡Mi modelo dice que ya nos conocíamos! ¡Al 98,7%! ¡No guardé los datos! ¡CIENCIA!',
+  sam: 'Arrr… ¿grumete? Juraría que ya te vi zarpar alguna vez. Cosas del mar.',
+  hedgehogs: '¿Bro? Tu cara nos suena. (¿De un meme?) ¡De un meme, bro!',
+  rocco: 'Psst… ¿nos hemos visto? Tu cara me suena a buen cliente.',
+};
+function dejaVuGreeting(id) {
+  const ng = GS.ngplus; if (!ng || (ng.count | 0) < 1 || !DEJA_VU[id]) return '';
+  ng.dejaVu ||= {}; if (ng.dejaVu[id]) return '';
+  ng.dejaVu[id] = true; SaveSystem.save('dejavu:' + id); return DEJA_VU[id];
+}
+function awakeningHasTicket() { const a = GS.awakening; return !!a && (a.step | 0) >= 1 && !a.refunded && GS.story?.ending !== 'B'; }   // el billete «no se puede perder»: manda la cadena, no el slot
+function startAwakening() {   // Sec. 7.9: startAwakening() al comprar dream_ticket
+  const a = Awakening.st(); a.step = Math.max(a.step | 0, 1);
+  if (ui.appModal.style.display === 'flex') closeApp();
+  showStoryScene('🐈‍⬛', 'Madame Sombra', ['Mmm… ya tienes la salida, soñador. La pregunta es cuándo la usas.', 'El billete es mío; el combustible es cosa del pelícano.'], null);
+  refreshMissionUI(); Awakening.apply();
+}
+/* ---- ✈️ El avión de juguete de Sam (R4): biplano con flotadores varado junto al muelle · luces de noche al repostar (Sec. 7.5) ---- */
+const toyPlane = (() => {
+  const g = new THREE.Group(), b = new THREE.Group(); b.position.y = 0.95; g.add(b);
+  const red = mat(0xff5252), yel = mat(0xffd740), blu = mat(0x40c4ff), wht = mat(0xffffff), dark = mat(0x37474f);
+  const fus = cyl(0.42, 0.32, 3.2, red, 0, 0, 0, 12); fus.rotation.x = Math.PI / 2; b.add(fus);
+  b.add(sphere(0.42, yel, 0, 0, 1.6, 12));
+  const prop = new THREE.Group(); prop.position.set(0, 0, 2.05); prop.add(box(0.12, 1.5, 0.06, dark)); prop.add(box(1.5, 0.12, 0.06, dark)); b.add(prop);
+  b.add(box(4.6, 0.12, 0.95, blu, 0, -0.05, 0.3)); b.add(box(4.2, 0.1, 0.8, blu, 0, 0.85, 0.35));
+  [-1.5, 1.5].forEach(x => { b.add(box(0.06, 0.9, 0.06, wht, x, 0.4, 0.6)); b.add(box(0.06, 0.9, 0.06, wht, x, 0.4, 0.05)); });
+  b.add(box(1.8, 0.08, 0.55, blu, 0, 0.1, -1.5)); b.add(box(0.08, 0.8, 0.6, yel, 0, 0.5, -1.55));
+  b.add(sphere(0.3, new THREE.MeshStandardMaterial({ color: 0x9fe3ff, transparent: true, opacity: 0.55, roughness: 0.1 }), 0, 0.42, 0.1, 10));
+  [-0.9, 0.9].forEach(x => { const f = cyl(0.16, 0.16, 2.4, wht, x, -0.75, 0.2, 8); f.rotation.x = Math.PI / 2; b.add(f); b.add(box(0.05, 0.55, 0.05, wht, x, -0.45, 0.6)); b.add(box(0.05, 0.55, 0.05, wht, x, -0.45, -0.3)); });
+  const bulbs = [], lights = [];
+  [[-2.3, -0.05, 0.3, 0xff1744], [2.3, -0.05, 0.3, 0x00e676], [0, 0.5, -1.85, 0xffffff], [0, 0, 1.95, 0xfff59d]].forEach(([x, y, z, c]) => {
+    const m = glow(c, c, 0.15); bulbs.push(m); b.add(sphere(0.1, m, x, y, z, 8));
+    const l = new THREE.PointLight(c, 0, 5, 2); l.position.set(x, y, z); l.userData.base = 1.4; b.add(l); lights.push(l);
+  });
+  g.userData = { ...g.userData, body: b, prop, bulbs, lights, lit: false };
+  const s = SITES.port, d = siteDir(s, -3.3, 3.9); placeOnPlanet(g, d, 0, 0, s.S, Math.max(heightAt(d) + 0.05, SEA + 0.05));
+  g.userData.home = { dir: g.userData.dir.clone(), quat: g.quaternion.clone(), r: g.position.length() };
+  g.visible = false; scene.add(g);
+  registerInteractable(g, { type: 'npc', label: 'Avión de juguete (habla con Sam)' }, 'sam');
+  return g;
+})();
+function setPlaneLit(on) {
+  const u = toyPlane.userData; if (u.lit === !!on) return; u.lit = !!on;
+  u.bulbs.forEach(m => m.emissiveIntensity = on ? 1.8 : 0.15);
+  u.lights.forEach(l => { const k = nightLights.indexOf(l); if (on && k < 0) nightLights.push(l); if (!on) { if (k >= 0) nightLights.splice(k, 1); l.intensity = 0; } });
+}
+const monitorSun = (() => {   // Final A: "el avión despega hacia un sol que es la pantalla de un monitor" (Sec. 1.6)
+  const g = new THREE.Group(); g.add(mesh(new THREE.PlaneGeometry(14, 9), new THREE.MeshBasicMaterial({ color: 0xe3f2fd }), 0, 0, 0, false));
+  g.add(mesh(new THREE.PlaneGeometry(15.2, 10.2), new THREE.MeshBasicMaterial({ color: 0x263238 }), 0, 0, -0.05, false));
+  g.add(mesh(new THREE.PlaneGeometry(6, 0.8), new THREE.MeshBasicMaterial({ map: textTexture('✔ Compiled', { w: 512, h: 80, bg: '#e3f2fd', color: '#2e7d32', font: 'bold 54px monospace' }) }), 0, 0, 0.02, false));
+  g.visible = false; scene.add(g); return g;
+})();
+const _awV = new THREE.Vector3(), _awV2 = new THREE.Vector3();
+const Awakening = {
+  _acc: 0, fly: null, sc: null,
+  st() { GS.awakening ||= { step: 0, planeFueled: false, permit: false, permitDay: 0 }; const a = GS.awakening; for (const k of ['inspected', 'permitRequested', 'expressPaid', 'readingDone', 'refunded', 'roccoPearl']) if (a[k] === undefined) a[k] = false; return a; },
+  step() { return this.st().step | 0; },
+  active() { return this.step() >= 1 && !GS.story?.ending; },
+  fuel() { return Inventory.count('gasil_fuel'); },
+  doneSteps() { const a = this.st(); return (a.planeFueled ? 1 : 0) + (a.permit ? 1 : 0) + (a.readingDone ? 1 : 0); },
+  /* ⭐ 1 · "El vuelo necesita alas" (Sam) */
+  inspect() { const a = this.st(); if (!this.active() || a.step !== 1 || a.inspected) return false; a.inspected = true; SaveSystem.save('awake:inspect'); refreshMissionUI(); return true; },
+  deliverFuel() {
+    const a = this.st(); if (!this.active() || a.step !== 1 || !a.inspected || a.planeFueled) return false;
+    if (!Inventory.remove('gasil_fuel', CFG.planeFuelNeeded)) return false;   // vendida o gastada → se repone (tienda de Sam, Rocco, cajas del mercante)
+    a.planeFueled = true; a.step = 2; setPlaneLit(true); SaveSystem.saveNow('awake:fuel'); refreshMissionUI(); return true;
+  },
+  /* ⭐ 2 · "El Formulario 99-Z" (Reginald): un día onírico de tramitación… o la tasa exprés */
+  requestPermit() { const a = this.st(); if (!this.active() || a.step !== 2 || a.permit || a.permitRequested) return false; a.permitRequested = true; a.permitDay = GS.daily.dayCount + CFG.permitProcessDays; SaveSystem.saveNow('awake:99z'); refreshMissionUI(); return true; },
+  permitReady() { const a = this.st(); return a.step === 2 && !a.permit && a.permitRequested && GS.daily.dayCount >= (a.permitDay | 0); },
+  payExpress() { const a = this.st(); if (!this.active() || a.step !== 2 || a.permit) return false; if (!Wallet.spend(CFG.permitExpressFee, 'Formulario 99-Z: tasa exprés')) return false; a.expressPaid = true; a.permitRequested = true; return this.grantPermit(); },
+  collectPermit() { return this.permitReady() ? this.grantPermit() : false; },
+  grantPermit() { const a = this.st(); if (a.permit) return false; a.permit = true; a.step = 3; a.permitDay ||= GS.daily.dayCount; SaveSystem.saveNow('awake:permit'); refreshMissionUI(); return true; },
+  /* ⭐ 3 · "La última lectura" (Sombra) */
+  reading() { const a = this.st(); if (!this.active() || a.step !== 3 || !a.permit || a.readingDone) return false; a.readingDone = true; SaveSystem.saveNow('awake:reading'); refreshMissionUI(); return true; },
+  canBoard() { const a = this.st(); return this.active() && a.readingDone && a.planeFueled && a.permit && awakeningHasTicket() && !GS.story.farewellDone; },
+  nextText() {
+    const a = this.st(), N = CFG.planeFuelNeeded;
+    if (GS.story?.farewellDone) return '🛫 Sam espera junto al avión: decide';
+    if (a.step === 1) return a.inspected ? `⛽ Entrega ${N}× Gasolina Gasil a Sam (${Math.min(this.fuel(), N)}/${N})` : '✈️ Revisa el avión de juguete con Sam (puerto)';
+    if (a.step === 2) return this.permitReady() ? '📝 Recoge el Permiso de Salida (Mayor)' : a.permitRequested ? `📝 Formulario 99-Z en tramitación · listo el día ${a.permitDay} (o tasa exprés)` : '📝 Pide el Formulario 99-Z al Mayor Reginald';
+    if (a.step >= 3 && !a.readingDone) return '🃏 Visita a Madame Sombra: la última lectura';
+    return '🛫 Presenta el billete a Sam en el puerto';
+  },
+  /* 🛫 Escena del puerto (Sec. 2.10): orden de confianza ascendente, Sombra siempre cierra */
+  farewellOrder() {
+    const ids = ['bear', 'mayor', 'glover', 'dax', 'sam', 'hedgehogs', 'rocco'];
+    const rows = ids.map((id, i) => ({ id, i, pts: Trust.points(id) })).sort((x, y) => x.pts - y.pts || x.i - y.i).map(r => r.id);
+    rows.push('sombra');
+    return rows.map(id => {
+      const deep = Trust.level(id) >= CFG.farewellDeepLevel, n = npcById[id];
+      const lines = [deep ? FAREWELLS[id].p : FAREWELLS[id].c]; if (id === 'sombra') lines.push(SOMBRA_CLOSE);
+      return { id, deep, emoji: n ? n.emoji : '🦝', name: n ? n.name : 'Rocco', lines };
+    });
+  },
+  roccoGift() { const a = this.st(); if (a.roccoPearl || Trust.level('rocco') < CFG.farewellDeepLevel) return false; a.roccoPearl = true; if (Inventory.canAdd('pearl', 1)) Inventory.add('pearl', 1, { silent: true }); SaveSystem.save('awake:rocco'); return true; },
+  finishFarewell() { const s = storyState(); if (s.farewellDone) return false; s.farewellDone = true; SaveSystem.saveNow('awake:farewell'); return true; },
+  /* 🛫 Final A: despertar */
+  chooseA() {
+    const s = storyState(); if (s.ending || !(this.st().readingDone || s.farewellDone)) return false;
+    s.farewellDone = true; s.ending = 'A'; s.endingAt = Date.now();
+    const suit = AVATAR_PARTS.find(p => p.origin === 'special' && p.id === 'awake_suit'); if (suit) grantSpecialPiece(suit.key);   // Sec. 8.4: Traje del Mundo Despierto
+    Titles.grant('El Despertar'); SaveSystem.saveNow('ending:A'); return true;
+  },
+  /* 💤 Final B: quedarse */
+  chooseB() {
+    const s = storyState(), a = this.st(); if (s.ending || !(a.readingDone || s.farewellDone)) return false;
+    s.farewellDone = true; s.ending = 'B'; s.endingAt = Date.now();
+    if (!a.refunded) {   // Sec. 1.6: devuelves el billete y Sombra te devuelve los 40M ("lo sabía") · atómico y una sola vez
+      a.refunded = true; const n = Inventory.count('dream_ticket'); if (n) Inventory.remove('dream_ticket', n);
+      Wallet.add(CFG.ticketPrice, 'Devolución del Billete del Despertar', { noMult: true, silent: true });
+    }
+    this.applyDreamer(true); Titles.grant('Soñador Eterno');
+    addLetter('🔮 M. Sombra', 'Mmm… el billete vuelve a mi baraja y tú te quedas en el sueño. Tu aura ya lo sabe: Soñador Eterno. Ahora el sueño es tuyo, soñador. Cuídalo.');
+    addLetter('🦫 Glover', 'Así que te quedas. Bien. Entonces que sea en algo a tu altura: te he dibujado una Mansión Onírica. Dos torres, cúpula, tolerancia cero. Pásate por el taller cuando quieras.');
+    _goalLast = -1; SaveSystem.saveNow('ending:B'); refreshMissionUI(); return true;
+  },
+  applyDreamer(equip) {
+    const v3 = GS.cosmetics.auraV3 ||= { style: 'none', unlockedStyles: [] }; v3.unlockedStyles ||= [];
+    if (!v3.unlockedStyles.includes('dreamer')) v3.unlockedStyles.push('dreamer');
+    if (equip) equipAuraStyle('dreamer'); else refreshAuraFromTrust();
+  },
+  /* 🌙 Nuevo Sueño+ (Sec. 10.7): conservas armario + insignias + títulos + Pijama; reseteas capital, misiones, confianza, construcciones */
+  buildNGPlus(old) {
+    const clone = (o) => JSON.parse(JSON.stringify(o ?? null));
+    const fresh = defaultGameState();
+    fresh.meta = { ...clone(old.meta), lastReason: 'ngplus' };
+    fresh.avatar = { ...fresh.avatar, ...clone(old.avatar) }; fresh.avatar.wardrobe = Array.isArray(fresh.avatar.wardrobe) ? fresh.avatar.wardrobe : [];
+    fresh.achievements = clone(old.achievements) || {}; fresh.achievements.titles ||= [];
+    ['El Despertar', 'Déjà vu'].forEach(t => { if (!fresh.achievements.titles.includes(t)) fresh.achievements.titles.push(t); });   // Sec. 10.4: logros de Historia → títulos
+    if (old.weekly) fresh.weekly = { ...fresh.weekly, ...clone(old.weekly) };   // la Carta de la Semana es del calendario real, no del sueño
+    const ng = old.ngplus || {}, count = (ng.count | 0) + 1;
+    fresh.ngplus = { count, multiplier: CFG.ngplusMultiplier, freshStart: true, dejaVu: {}, runs: [...(Array.isArray(ng.runs) ? ng.runs : []), { n: count, ending: old.story?.ending || 'A', day: old.daily?.dayCount | 0, earned: Math.floor(old.economy?.lifetimeEarned || 0), at: Date.now() }].slice(-20) };
+    const suit = AVATAR_PARTS.find(p => p.origin === 'special' && p.id === 'awake_suit'), pj = AVATAR_PARTS.find(p => p.origin === 'special' && p.id === 'pajama');
+    [suit, pj].forEach(p => { if (p && !fresh.avatar.wardrobe.includes(p.key)) fresh.avatar.wardrobe.push(p.key); });
+    if (pj) fresh.avatar[pj.slot] = pj.idx;   // te vuelves a dormir… en pijama
+    fresh.story.creatorPending = false;
+    return fresh;
+  },
+  startNGPlus() {
+    if (storyState().ending !== 'A') { console.warn('[NG+] solo tras el Final A'); return false; }
+    const fresh = migrate(deepMerge(defaultGameState(), this.buildNGPlus(GS)));
+    clearTimeout(SaveSystem._timer); const ok = SaveSystem.adapter.write(SAVE_KEY, fresh);
+    if (!ok) { showToast('❌ No se pudo guardar el Nuevo Sueño+', 'text-red-200'); return false; }
+    SaveSystem.locked = true; location.reload(); return true;
+  },
+  /* 🌟 Post-juego del Final B (Sec. 10.7): Mansión Onírica + Club de los 100M */
+  pg() { GS.postgame ||= { mansion: false, mansionAt: 0, club100M: false }; return GS.postgame; },
+  buyMansion() {
+    const p = this.pg(); if (GS.story?.ending !== 'B' || p.mansion) return false;
+    if ((GS.house.level | 0) < 2) { showToast('🦫 Glover: "Primero la Villa. Los cimientos no se saltan."', 'text-white'); return false; }
+    if (typeof embargoActive === 'function' && embargoActive() || houseSealed()) { showToast('🔒 Con embargo o casa sellada no se construye', 'text-red-200'); return false; }
+    if (!Wallet.spend(CFG.mansionCost, 'Mansión Onírica')) return false;
+    p.mansion = true; p.mansionAt = Date.now(); buildHouse(3); playChime(); spawnConfetti(house.position.clone().addScaledVector(house.userData.dir || player.userData.dir, 6), 70);
+    showToast(`🏰 ¡Mansión Onírica! Alquiler ${fmt(CFG.rentByLevel[3])} $T/día · orgullo infinito`, 'text-white'); SaveSystem.saveNow('postgame:mansion'); refreshMissionUI(); return true;
+  },
+  checkClub() {
+    const p = this.pg(); if (GS.story?.ending !== 'B' || p.club100M || GS.economy.money < CFG.club100M) return false;
+    p.club100M = true; Titles.grant('Club de los 100M');
+    addLetter('🐶 Mayor Reginald', '¡Ejem! Este ayuntamiento le comunica su ingreso en el Club de los 100M. Formulario 100-M. Sí, existe. Lo acabo de redactar. Por usted.');
+    showToast('💯 ¡Club de los 100M! Nuevo título', 'text-amber-200'); playChime(); spawnConfetti(player.position.clone().addScaledVector(player.userData.dir, 2), 60);
+    SaveSystem.saveNow('postgame:club'); refreshMissionUI(); return true;
+  },
+  /** Re-aplica todo lo persistente al mundo (idempotente: se llama al cargar y tras cada paso) */
+  apply() {
+    const a = this.st(), s = storyState(); this.pg();
+    toyPlane.visible = !!(s.revealed || a.step >= 1) && !this.fly; setPlaneLit(!!a.planeFueled);
+    if (awakeningHasTicket() && !Inventory.has('dream_ticket', 1) && Inventory.canAdd('dream_ticket', 1)) { Inventory._addRaw('dream_ticket', 1); refreshInvBadge(); }   // "no se puede perder" (Sec. 5.10)
+    if (s.ending === 'B') { if (a.refunded && Inventory.has('dream_ticket', 1)) Inventory.remove('dream_ticket', Inventory.count('dream_ticket')); this.applyDreamer(false); this.checkClub(); }
+    if ((GS.house.level | 0) >= 3 && !this.pg().mansion && s.ending !== 'B') buildHouse(2);   // la Mansión solo existe en el post-juego
+    refreshGoalHUD();
+  },
+  update(dt, t) {
+    const u = toyPlane.userData;
+    if (toyPlane.visible) { u.prop.rotation.z += dt * (this.fly ? 40 : u.lit ? 2 : 0.3); if (!this.fly) u.body.position.y = 0.95 + Math.sin(t * 1.6) * 0.05; }
+    if (this.fly) this.updateFly(dt);
+    if ((this._acc += dt) > 1) { this._acc = 0; if (SaveSystem.started) { const vis = !!(GS.story?.revealed || this.step() >= 1); if (!this.fly && toyPlane.visible !== vis) toyPlane.visible = vis; this.checkClub(); } }
+  },
+  /* ---------- UI ---------- */
+  css() {
+    if (document.getElementById('awakeCSS')) return;
+    const st = document.createElement('style'); st.id = 'awakeCSS';
+    st.textContent = `body.cinematic #ui, body.cinematic #joystick, body.cinematic #actionBtn, body.cinematic #ticker, body.cinematic .money-toast, body.cinematic #saveIndicator, body.cinematic #dbgPanel, body.cinematic .pop-in { display: none !important }
+    @keyframes awIn { from { opacity: 0; transform: translateY(14px) } to { opacity: 1; transform: none } }
+    .aw-card { animation: awIn .7s ease-out }
+    .aw-btn { padding: 14px 28px; border-radius: 999px; border: 2px solid rgba(255,255,255,.35); font: 700 18px Fredoka, sans-serif; cursor: pointer; color: #fff; min-width: 200px; transition: opacity 1.2s ease, transform .2s }
+    .aw-btn:disabled { cursor: default } .aw-btn:not(:disabled):hover { transform: scale(1.04) }
+    @keyframes awCredits { from { transform: translateY(100%) } to { transform: translateY(-100%) } }`;
+    document.head.appendChild(st);
+  },
+  enterCinematic() { this.css(); state.cinematic = true; state.modalOpen = true; clearInterval(typeTimer); ui.dialog.classList.add('hidden'); ui.hint.classList.add('hidden'); document.body.classList.add('cinematic'); state.moveTarget = null; state.pendingInteract = null; },
+  exitCinematic() { state.cinematic = false; state.modalOpen = false; document.body.classList.remove('cinematic'); state.mode = 'player'; tweenCamera(camPose(), 0.9); },
+  at(x, z) { return siteDir(SITES.port, x, z); },
+  gather() {   // los 7 vecinos + Rocco se reúnen en el puerto; tú en el muelle, frente al avión
+    const P = SITES.port, spots = [[0.3, 1.6], [1.0, 1.0], [0.3, 0.5], [-0.6, 0.6], [1.7, 0.1], [0.9, -0.4], [-1.5, 0.3]];
+    player.userData.dir.copy(this.at(-0.9, 2.0)); player.userData.fwd.copy(tangent(toyPlane.position.clone().sub(player.userData.dir.clone().multiplyScalar(R)), player.userData.dir));
+    player.position.copy(player.userData.dir).multiplyScalar(surfaceR(player.userData.dir));
+    const order = ['bear', 'mayor', 'glover', 'dax', 'hedgehogs', 'rocco', 'sombra'];
+    order.forEach((id, i) => { const o = id === 'rocco' ? vendor : npcObjs[id]; const d = this.at(...spots[i]); placeOnPlanet(o, d, 0, 0, P.S); this.face(o); });
+    placeOnPlanet(npcObjs.sam, this.at(-1.8, 1.4), 0, 0, P.S); this.face(npcObjs.sam);
+    toyPlane.visible = true; this.sc = { gathered: true };
+  },
+  face(o) { const up = o.userData.up, f = tangent(player.position.clone().sub(o.position), up); if (f.lengthSq() > 0) quatFromFrame(frameAt(up, f), o.quaternion); },
+  restoreNpcs() { NPCS.forEach(n => placeAtSite(npcObjs[n.id], SITES[n.site], n.pos[0], n.pos[1], n.yaw)); placeAtSite(vendor, S_V, -3.6, 4.4, Math.PI * 0.55); this.sc = null; },
+  wide(dur = 1.2) { const up = SITES.port.dir.clone(); const pose = { pos: this.at(1.6, 7.2).multiplyScalar(SEA + 3.4), target: this.at(-0.6, 1.4).multiplyScalar(SEA + 1.9), up }; state.mode = 'dialog'; state.dialogPose = pose; tweenCamera(pose, dur); },
+  focus(o, dur = 1.0) {
+    const up = o.userData.up || SITES.port.dir, target = o.position.clone().addScaledVector(up, o === npcObjs.hedgehogs ? 1.0 : 1.4);
+    let tw = tangent(player.position.clone().sub(o.position), up); if (tw.lengthSq() < 1e-6) tw = SITES.port.S.clone();
+    const side = new THREE.Vector3().crossVectors(tw, up).normalize();
+    const pose = { pos: target.clone().addScaledVector(tw, 3.0).addScaledVector(side, 1.1).addScaledVector(up, 0.5), target, up: up.clone() };
+    state.mode = 'dialog'; state.dialogPose = pose; tweenCamera(pose, dur);
+  },
+  /** Tarjeta de diálogo sobria (despedidas): sin sonido, tecleo lento, toca para completar */
+  card(icon, name, lines, onDone, { deep = false } = {}) {
+    this.css(); document.getElementById('awCard')?.remove();
+    const o = document.createElement('div'); o.id = 'awCard';
+    o.style.cssText = 'position:fixed;left:0;right:0;bottom:0;z-index:9500;display:flex;justify-content:center;padding:16px;font-family:Fredoka,sans-serif;pointer-events:auto';
+    o.innerHTML = `<div class="aw-card" style="width:min(94vw,600px);background:rgba(16,12,30,.92);border:1px solid ${deep ? '#b39ddb' : '#5c6b8a'};border-radius:18px;padding:16px 18px 12px;color:#ede7f6;box-shadow:0 10px 40px rgba(0,0,0,.5)">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px"><span style="font-size:30px">${icon}</span><b style="font-size:17px">${name}</b></div>
+      <p id="awLine" style="min-height:70px;font-size:16px;line-height:1.5;margin:0"></p>
+      <div style="text-align:right;margin-top:8px"><button id="awNext" style="padding:10px 22px;border-radius:999px;background:transparent;color:#ede7f6;border:1px solid rgba(237,231,246,.5);font:600 15px Fredoka,sans-serif;cursor:pointer">▸</button></div></div>`;
+    document.body.appendChild(o);
+    let i = 0, typing = null; const el = o.querySelector('#awLine'), btn = o.querySelector('#awNext');
+    const show = () => { const txt = lines[i]; let k = 0; clearInterval(typing); el.textContent = ''; typing = setInterval(() => { el.textContent = txt.slice(0, ++k); if (k >= txt.length) clearInterval(typing); }, CFG.farewellTypeMs); };
+    btn.onclick = () => {
+      if (el.textContent.length < lines[i].length) { clearInterval(typing); el.textContent = lines[i]; return; }
+      if (++i < lines.length) show(); else { clearInterval(typing); o.remove(); onDone && onDone(); }
+    };
+    show();
+  },
+  uiInspect() {
+    endDialog(); this.focusPlane();
+    showStoryScene('🦤', 'Salty Sam', ['Motor de juguete: OK. Alas de juguete: OK. Piloto: tú, grumete.', 'Esto va a funcionar o va a ser la mejor historia del puerto.', `Eso sí: el avión de juguete no vuela a sueños, grumete. Necesita ${CFG.planeFuelNeeded} bidones de Gasil.`], () => { this.inspect(); endDialog(); }, '#1e88e5');
+  },
+  focusPlane() { const up = toyPlane.userData.up, tgt = toyPlane.position.clone().addScaledVector(up, 1.2); const pose = { pos: tgt.clone().addScaledVector(SITES.port.S, 5.5).addScaledVector(SITES.port.E, 3.5).addScaledVector(up, 2.2), target: tgt, up: up.clone() }; state.mode = 'dialog'; state.dialogPose = pose; tweenCamera(pose, 1.2); },
+  uiDeliverFuel() {
+    if (!this.deliverFuel()) { showToast(`⛽ Faltan bidones (${this.fuel()}/${CFG.planeFuelNeeded}): tienda de Sam, Rocco o la caja del mercante`, 'text-white'); return; }
+    endDialog(); this.focusPlane(); playChime();
+    showStoryScene('🦤', 'Salty Sam', ['¡Listo para despegar, grumete! Y mira: luces. De noche se verán desde el horizonte… bueno, desde donde debería estar.', 'Ahora el papeleo. El Mayor tiene un formulario para todo. Para esto, también.'], () => endDialog(), '#1e88e5');
+  },
+  openPermitPanel() {
+    openApp('📝 Formulario 99-Z · Permiso de Salida', '', (body) => {
+      const render = () => {
+        const a = this.st(), ready = this.permitReady();
+        body.innerHTML = balanceBar() + `<div class="app-card p-4 space-y-2">
+          <div class="text-sm text-slate-600">"¡Ejem! Para abandonar el sueño, este ayuntamiento exige el Formulario 99-Z: el Permiso de Salida. Tramitación ordinaria: un día onírico. O, si tiene prisa, la tasa exprés." — Mayor Reginald</div>
+          ${a.permit ? '<div class="font-bold text-emerald-700">✅ Permiso de Salida concedido.</div>' : ready ? '<div class="font-bold text-emerald-700">📜 Su 99-Z está tramitado. Solo falta la firma.</div><button data-collect class="btn-game px-4 py-2 text-sm bg-emerald-300">📜 Recoger el permiso</button>'
+            : `${a.permitRequested ? `<div class="text-sm font-semibold">⏳ En tramitación: listo el <b>día ${a.permitDay}</b> (hoy es el ${GS.daily.dayCount}). Duerme o espera a medianoche.</div>` : `<button data-request class="btn-game px-4 py-2 text-sm bg-sky-200">📝 Tramitar (gratis · ${CFG.permitProcessDays} día onírico)</button>`}
+            <button data-express class="btn-game px-4 py-2 text-sm ${Wallet.canAfford(CFG.permitExpressFee) ? 'bg-yellow-300' : 'bg-slate-200 opacity-60'}">⚡ Tasa exprés · ${fmt(CFG.permitExpressFee)} $T</button>`}
+          <div class="text-[11px] text-slate-500">La cadena del Despertar no caduca ni falla: la vía gratuita siempre está disponible.</div></div>`;
+        body.querySelector('[data-request]')?.addEventListener('click', () => { if (this.requestPermit()) showToast(`📝 99-Z registrado: listo el día ${this.st().permitDay}`, 'text-white'); render(); });
+        body.querySelector('[data-express]')?.addEventListener('click', () => { if (this.payExpress()) this.uiPermitGranted(); else render(); });
+        body.querySelector('[data-collect]')?.addEventListener('click', () => { if (this.collectPermit()) this.uiPermitGranted(); else render(); });
+      };
+      render();
+    });
+  },
+  uiPermitGranted() { closeApp(); ui.dialog.classList.add('hidden'); showStoryScene('🐶', 'Mayor Reginald', ['¡Ejem! El 99-Z. El formulario que ningún funcionario quiere firmar.', '(Lo firma sin mirar.) Listo. Tramitado.', 'Y… ejem… ha sido un honor tramitarle, ciudadano.'], () => { endDialog(); showToast('📜 Permiso de Salida · ahora, la última lectura de Sombra', 'text-white'); }, '#1e3a8a'); },
+  uiReading() {
+    if (!this.reading()) return; ui.dialog.classList.add('hidden');
+    showStoryScene('🐈‍⬛', 'Madame Sombra', ['Mmm… el billete y el permiso. Siéntate, soñador. Una última vez.', 'Las cartas muestran dos caminos, soñador. En uno despiertas. En el otro… te quedas con nosotros.', 'No, no preguntes cuál es correcto. Llevo siglos aquí y aún no lo sé.'], () => { endDialog(); showToast('🛫 Se abre la escena del puerto: presenta el billete a Sam', 'text-purple-200'); }, '#7e57c2');
+  },
+  uiPort() {   // Sec. 2.10: convocatoria → desfile de despedidas → decisión
+    if (!this.canBoard()) return false;
+    this.enterCinematic();
+    storyFade('#0b0820', 900, () => { this.gather(); this.wide(0.1); setTimeout(() => this.parade(this.farewellOrder(), 0), 1400); });
+    return true;
+  },
+  parade(list, i) {
+    if (i >= list.length) return this.afterParade();
+    const f = list[i], o = f.id === 'rocco' ? vendor : npcObjs[f.id];
+    this.focus(o); if (f.id === 'rocco' && f.deep) this.roccoGift();
+    setTimeout(() => this.card(f.emoji, f.name, f.lines, () => this.parade(list, i + 1), { deep: f.deep }), 1050);
+  },
+  afterParade() {
+    this.finishFarewell();
+    placeOnPlanet(npcObjs.sam, this.at(-1.7, 2.1), 0, 0, SITES.port.S); this.face(npcObjs.sam);   // Sam sube al avión (Sec. 1.6)
+    this.wide(1.6); setTimeout(() => this.showDecision(), 1900);
+  },
+  /** La decisión: HUD limpio, dos botones, sin música, 3 s de silencio antes de poder elegir (Sec. 2.10) */
+  showDecision() {
+    this.css(); document.getElementById('awDecision')?.remove();
+    const o = document.createElement('div'); o.id = 'awDecision';
+    o.style.cssText = 'position:fixed;inset:0;z-index:9600;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:16px;padding:0 16px 12vh;background:radial-gradient(ellipse at 50% 40%,rgba(0,0,0,0) 30%,rgba(5,3,14,.78) 100%);font-family:Fredoka,sans-serif';
+    o.innerHTML = `<div style="display:flex;flex-wrap:wrap;gap:14px;justify-content:center">
+      <button id="awA" class="aw-btn" disabled style="opacity:0;background:rgba(30,136,229,.55)">🛫 Despertar</button>
+      <button id="awB" class="aw-btn" disabled style="opacity:0;background:rgba(126,87,194,.55)">💤 Quedarse</button></div>`;
+    document.body.appendChild(o);
+    const a = o.querySelector('#awA'), b = o.querySelector('#awB');
+    setTimeout(() => { [a, b].forEach(x => { x.disabled = false; x.style.opacity = '1'; }); }, CFG.decisionSilenceMs);
+    a.onclick = () => { if (a.disabled) return; o.remove(); this.uiFinalA(); };
+    b.onclick = () => { if (b.disabled) return; o.remove(); this.uiFinalB(); };
+  },
+  resumeDecision() { this.enterCinematic(); this.gather(); placeOnPlanet(npcObjs.sam, this.at(-1.7, 2.1), 0, 0, SITES.port.S); this.face(npcObjs.sam); this.wide(1.2); setTimeout(() => this.showDecision(), 1500); },
+  onSessionStart() { const s = storyState(); if (s.farewellDone && !s.ending) setTimeout(() => this.resumeDecision(), 900); },
+  consumeFreshStart() { const ng = GS.ngplus; if (!ng?.freshStart) return false; ng.freshStart = false; SaveSystem.save('ngplus:start'); return true; },
+  /* --- Final A: el avión despega hacia el monitor → escritorio → código que compila → concha → créditos → NG+ --- */
+  uiFinalA() {
+    if (!this.chooseA()) return;
+    player.visible = false; npcObjs.sam && placeOnPlanet(npcObjs.sam, this.at(-1.5, 1.6), 0, 0, SITES.port.S);
+    const S = SITES.port.S, up = toyPlane.userData.home.dir;
+    monitorSun.position.copy(up.clone().multiplyScalar(R + 42).addScaledVector(S, 46)); monitorSun.lookAt(toyPlane.position); monitorSun.visible = true;
+    this.fly = { t: 0, cam: this.at(-0.6, 1.2).multiplyScalar(SEA + 2.2) }; toyPlane.visible = true;
+  },
+  updateFly(dt) {
+    const f = this.fly; f.t += dt; const h = toyPlane.userData.home, S = SITES.port.S, k = f.t;
+    const dir = _awV.copy(h.dir).addScaledVector(S, 0.012 * k * k + 0.02 * k).normalize();
+    toyPlane.position.copy(dir).multiplyScalar(h.r + Math.max(0, k - 1.2) ** 2 * 1.1);
+    quatFromFrame(frameAt(dir, tangent(S.clone(), dir)), toyPlane.quaternion); toyPlane.rotateX(-Math.min(0.5, Math.max(0, k - 1.2) * 0.25));
+    state.mode = 'dialog'; state.dialogPose = { pos: f.cam, target: _awV2.copy(toyPlane.position), up: h.dir.clone() };
+    if (f.t >= CFG.takeoffSecs && !f.faded) { f.faded = true; storyFade('#ffffff', 1400, () => { this.fly = null; toyPlane.visible = false; monitorSun.visible = false; this.showDesk(); }); }
+  },
+  showDesk() {
+    this.css(); document.getElementById('awDesk')?.remove();
+    const o = document.createElement('div'); o.id = 'awDesk';
+    o.style.cssText = 'position:fixed;inset:0;z-index:10000;background:radial-gradient(circle at 50% 70%,#3b3552,#141220);display:flex;align-items:center;justify-content:center;padding:16px;font-family:Fredoka,sans-serif;color:#e8eaf6;overflow:hidden';
+    o.innerHTML = `<div class="aw-card" style="width:min(92vw,520px);text-align:center">
+      <div style="font-size:14px;opacity:.75;margin-bottom:10px">🕖 7:12 AM</div>
+      <div style="position:relative;margin:0 auto;width:min(80vw,360px)">
+        <div style="background:#1e1e2e;border:6px solid #3a3a52;border-radius:12px 12px 4px 4px;padding:12px;text-align:left;font:13px/1.5 monospace;color:#a5d6a7;height:150px;overflow:hidden">
+          <div>&gt; npm run build</div><div style="color:#ef9a9a">✖ Error: Unexpected token ';'</div>
+          <div>&gt; npm run build</div><div style="color:#a5d6a7">✔ Compiled successfully.</div>
+          <div>&gt; <span class="st-cursor">▌</span></div></div>
+        <div style="height:12px;background:#4a4a66;border-radius:0 0 14px 14px;margin:0 -18px"></div>
+        <div style="position:absolute;left:44%;bottom:-6px;font-size:24px" title="Una concha del planeta">🐚</div>
+        <div style="position:absolute;right:-46px;bottom:4px;font-size:30px;filter:grayscale(.4)">☕</div>
+      </div>
+      <p style="margin:22px 0 4px;font-size:16px;opacity:.9">Abres los ojos. El café, frío. Y en el portátil… el código compila.</p>
+      <p style="margin:0 0 6px;font-size:15px;opacity:.75">Sobre el teclado, una concha del planeta.</p>
+      <button id="awCredits" style="margin-top:14px;padding:12px 30px;border-radius:999px;background:#7e57c2;color:#fff;font:700 17px Fredoka,sans-serif;border:0;cursor:pointer">Créditos ▸</button></div>`;
+    document.body.appendChild(o); storyCSS();
+    o.querySelector('#awCredits').onclick = () => this.showCredits(o);
+  },
+  showCredits(o) {
+    const cast = [...NPCS.map(n => `${n.emoji} ${n.name}`), '🦝 Rocco'];
+    o.innerHTML = `<div style="position:absolute;inset:0;overflow:hidden"><div style="position:absolute;left:0;right:0;top:0;text-align:center;animation:awCredits 26s linear forwards;padding-top:100vh;line-height:1.9">
+      <div style="font:700 13px 'Press Start 2P',monospace;color:#fde68a;margin-bottom:18px">MICRO WORLD · AI VILLAGE</div>
+      <div style="font-size:15px;opacity:.75;margin-bottom:26px">Acto 3 · El Despertar</div>
+      ${cast.map(c => `<div style="font-size:18px">${c}</div>`).join('')}
+      <div style="margin-top:26px;font-size:15px;opacity:.8">y tú, soñador</div>
+      <div style="font-size:13px;opacity:.6">${GS.daily.dayCount} días oníricos · ${fmt(Math.floor(GS.economy.lifetimeEarned || 0))} $TOKEN ganados</div>
+      <div style="margin-top:30px;font-size:15px;opacity:.75">Hecho con primitivas, Web Audio y café frío.</div>
+      <div style="margin-top:40px;font-size:20px">Gracias por soñar.</div></div></div>
+      <button id="awSkip" style="position:absolute;right:14px;bottom:14px;padding:8px 16px;border-radius:999px;background:rgba(255,255,255,.12);color:#fff;border:1px solid rgba(255,255,255,.3);font:600 13px Fredoka,sans-serif;cursor:pointer">Saltar ▸</button>`;
+    const next = () => { clearTimeout(tm); this.showNGCard(o); };
+    const tm = setTimeout(next, 26500); o.querySelector('#awSkip').onclick = next;
+  },
+  showNGCard(o) {
+    const m = String(CFG.ngplusMultiplier).replace('.', ',');
+    o.innerHTML = `<div class="aw-card" style="width:min(92vw,500px);text-align:center">
+      <div style="font-size:42px;margin-bottom:6px">🌙</div>
+      <p style="font-size:18px;margin:0 0 14px">Esa noche, te vuelves a quedar dormido frente al portátil…</p>
+      <div style="font-size:13px;opacity:.75;line-height:1.5;margin-bottom:16px">Nuevo Sueño+: conservas tu armario, las insignias, los títulos y el <b>Pijama del Soñador</b>.<br>Capital, misiones, confianza y construcciones empiezan de cero: es un sueño nuevo.<br>Todas las ganancias ×${m}: el sueño te reconoce.</div>
+      <button id="awNG" style="padding:14px 34px;border-radius:999px;background:#7e57c2;color:#fff;font:700 18px Fredoka,sans-serif;border:0;box-shadow:0 6px 24px #7e57c288;cursor:pointer">😴 Nuevo Sueño+</button></div>`;
+    o.querySelector('#awNG').onclick = () => { o.querySelector('#awNG').disabled = true; storyFade('#ffffff', 1200, () => this.startNGPlus()); };
+  },
+  resumeFinalA() { const m = document.getElementById('menu'); if (m) { m.classList.add('hide'); setTimeout(() => m.remove(), 700); } this.showDesk(); },
+  /* --- Final B: devolución, aura Soñador Eterno, post-juego --- */
+  uiFinalB() {
+    if (!this.chooseB()) return;
+    this.focus(npcObjs.sombra, 1.2);
+    this.card('🙂', 'Tú', ['¿Sabes qué? Este sueño es mejor que mi vida real.'], () =>
+      this.card('🐈‍⬛', 'Madame Sombra', ['(Sombra recoge el billete y te devuelve tus $TOKEN, con una sonrisa.)', 'Mmm… lo sabía.'], () =>
+        storyFade('#0b0820', 900, () => {
+          this.restoreNpcs(); this.exitCinematic(); refreshGoalHUD(true); refreshMissionUI();
+          showToast('🌟 Aura legendaria «Soñador Eterno»: +10% confianza y comercio', 'text-purple-200');
+          setTimeout(() => showToast('🏰 Post-juego: Mansión Onírica · 💯 Club de los 100M (habla con Sombra o Glover)', 'text-amber-200'), 2200);
+        }), { deep: true }));
+  },
+  openPostgame() {
+    openApp('🌟 Metas del Soñador Eterno', '', (body) => {
+      const render = () => {
+        const p = this.pg(), money = GS.economy.money, pct = Math.min(100, money / CFG.club100M * 100), eq = (GS.cosmetics.auraV3?.style) === 'dreamer';
+        const row = (ok, icon, title, sub, extra = '') => `<div class="app-card p-3 flex items-center gap-3 ${ok ? 'owned' : ''}"><span class="text-2xl">${icon}</span><div class="flex-1 min-w-0"><div class="font-bold text-[#2b2b3d]">${title} ${ok ? '✅' : ''}</div><div class="text-xs text-slate-500">${sub}</div>${extra}</div></div>`;
+        body.innerHTML = balanceBar() + `<div class="text-sm text-slate-600 mb-3">Te quedaste. El sueño ya no tiene billete: tiene metas de lujo (Sec. 10.7).</div><div class="grid gap-2">` +
+          row(eq, '🌈', 'Aura «Soñador Eterno»', '+10% confianza y comercio · solo Final B (intransferible)', eq ? '' : '<button data-eqdream class="btn-game px-3 py-1 text-xs bg-fuchsia-200 mt-1">Equipar</button>') +
+          row(p.mansion, '🏰', 'Mansión Onírica', p.mansion ? `Casa nivel 3 · alquiler ${fmt(CFG.rentByLevel[3])} $T/día · orgullo infinito` : `Requiere la Villa · ${fmt(CFG.mansionCost)} $T (precio de diseño propio, calibrable) · alquiler ${fmt(CFG.rentByLevel[3])} $T/día`, p.mansion ? '' : `<button data-mansion class="btn-game px-3 py-1 text-xs mt-1 ${Wallet.canAfford(CFG.mansionCost) && (GS.house.level | 0) >= 2 ? 'bg-yellow-300' : 'bg-slate-200 opacity-60'}">🦫 Encargar a Glover</button>`) +
+          row(p.club100M, '💯', 'Club de los 100M', `Título · ${fmtDots(money)} / ${fmtDots(CFG.club100M)} $TOKEN`, `<div class="h-2 mt-1 rounded-full bg-slate-200 overflow-hidden"><div class="h-full bg-amber-400" style="width:${pct.toFixed(2)}%"></div></div>`) +
+          row(insigniasOwned() >= 7, '🏆', 'Las 7 insignias', `${insigniasOwned()}/7 prendas de confianza Aliada`) +
+          row(Trust.auraTier() >= 4, '✨', 'Aura legendaria', `Tier actual: ${AURA_TIERS[Trust.auraTier()].name} (media de confianza ≥ 3,5)`) + `</div>`;
+        body.querySelector('[data-eqdream]')?.addEventListener('click', () => { equipAuraStyle('dreamer'); render(); });
+        body.querySelector('[data-mansion]')?.addEventListener('click', () => { this.buyMansion(); render(); });
+      };
+      render();
+    });
+  },
+};
+/* Aura Soñador Eterno: +10% a toda confianza ganada (Sec. 3.6). Envuelve Trust.add una sola vez. */
+if (!Trust.__dreamerWrapped) {
+  const _td = Trust.add.bind(Trust);
+  Trust.add = function (id, pts, ...rest) { return _td(id, (typeof pts === 'number' && pts > 0) ? pts * AuraFX.trustMult() : pts, ...rest); };
+  Trust.__dreamerWrapped = true;
+}
+/* El 99-Z tramitado llega por carta (no caduca: se recoge cuando quieras) */
+DailySystem.onSettle(() => { const a = GS.awakening; if (a && a.step === 2 && a.permitRequested && !a.permit && !a.permitLetter && GS.daily.dayCount >= (a.permitDay | 0)) { a.permitLetter = true; addLetter('🐶 Mayor Reginald', '¡Ejem! Su Formulario 99-Z ha sido tramitado. Pase por el ayuntamiento a recoger su Permiso de Salida. Sin prisa: este ayuntamiento no caduca.'); } });
+/** Botones de la cadena por NPC (los añade serviceBtns) */
+function awakeningBtns(npcId) {
+  const out = [], a = Awakening.st(), s = GS.story || {};
+  if (s.ending === 'B' && (npcId === 'sombra' || npcId === 'glover')) out.push(dialogButton('🌟 Metas del Soñador Eterno', 'bg-fuchsia-200 text-[#2b2b3d]', () => Awakening.openPostgame()));
+  if (!Awakening.active()) return out;
+  if (npcId === 'sam') {
+    if (s.farewellDone) out.push(dialogButton('🛫 Volver al avión', 'bg-yellow-300 text-[#2b2b3d]', () => Awakening.resumeDecision()));
+    else if (Awakening.canBoard()) out.push(dialogButton('🛫 Presentar el billete', 'bg-yellow-300 text-[#2b2b3d]', () => Awakening.uiPort()));
+    else if (a.step === 1 && !a.inspected) out.push(dialogButton('✈️ Revisar el avión', 'bg-sky-300 text-[#2b2b3d]', () => Awakening.uiInspect()));
+    else if (a.step === 1) out.push(dialogButton(`⛽ Entregar ${CFG.planeFuelNeeded}× Gasolina (${Math.min(Awakening.fuel(), CFG.planeFuelNeeded)}/${CFG.planeFuelNeeded})`, Awakening.fuel() >= CFG.planeFuelNeeded ? 'bg-yellow-300 text-[#2b2b3d]' : 'bg-slate-200 text-[#2b2b3d]', () => Awakening.uiDeliverFuel()));
+  }
+  if (npcId === 'mayor' && a.step === 2) out.push(dialogButton('📝 Formulario 99-Z', 'bg-yellow-200 text-[#2b2b3d]', () => Awakening.openPermitPanel()));
+  if (npcId === 'sombra' && a.step >= 3 && !a.readingDone) out.push(dialogButton('🃏 La última lectura', 'bg-purple-300 text-[#2b2b3d]', () => Awakening.uiReading()));
+  return out;
+}
+/** Línea de saludo de la cadena (sustituye al saludo por nivel mientras hay algo que decir) */
+function awakeningGreeting(npcId) {
+  if (!Awakening.active()) return '';
+  const a = Awakening.st(), N = CFG.planeFuelNeeded;
+  if (npcId === 'sam') {
+    if (GS.story.farewellDone) return 'Arrr… el avión sigue aquí, grumete. Y yo también.';
+    if (Awakening.canBoard()) return 'Arrr… billete en regla, cinco bidones dentro. Los vecinos están viniendo al puerto, grumete.';
+    if (a.step === 1 && !a.inspected) return 'Arrr… ¿eso que llevas es el billete de Sombra, grumete? Entonces vamos a ver el avión.';
+    if (a.step === 1) return Awakening.fuel() >= N ? '¡Cinco bidones! Arrr, huele a despegue.' : 'Arrr… faltan bidones, grumete. Tengo Gasil en mi tienda, Rocco también vende, y el mercante a veces trae alguno en la caja del muelle.';
+    return 'El avión está listo, grumete. Te falta el papeleo del Mayor y la palabra de Sombra.';
+  }
+  if (npcId === 'mayor' && a.step === 2) return Awakening.permitReady() ? '¡Ejem! Su expediente está listo para la firma.' : a.permitRequested ? '¡Ejem! Su 99-Z sigue en tramitación. Los sellos no se ponen solos.' : '¡Ejem! Así que el ciudadano desea abandonar el sueño. Este ayuntamiento tiene un formulario para eso. Claro que lo tiene.';
+  if (npcId === 'sombra') return a.step < 3 ? 'Mmm… el billete ya es tuyo. Ahora ve a por las alas y los papeles, soñador.' : !a.readingDone ? 'Mmm… el billete y el permiso. Siéntate, soñador. Una última vez.' : 'El puerto te espera, soñador.';
+  return '';
+}
+/** Burbuja sobre el vecino que toca en la cadena (sin guía externa) */
+function awakeningBubbleFor(id) {
+  const a = GS.awakening, s = GS.story || {}; if (!a || (a.step | 0) < 1 || s.ending) return '';
+  const who = s.farewellDone || a.readingDone || a.step === 1 ? 'sam' : a.step === 2 ? 'mayor' : 'sombra';
+  return id === who ? '✈️' : '';
+}
+/** HUD de misiones: Acto 3 mientras dura la cadena · post-juego tras el Final B */
+function act3MissionHUD(lbl) {
+  const a = GS.awakening, s = GS.story || {};
+  if (s.ending === 'B') {
+    const p = GS.postgame || {}; if (lbl) lbl.textContent = 'POST-JUEGO · SOÑADOR ETERNO'; ui.missionCount.textContent = `${(p.mansion ? 1 : 0) + (p.club100M ? 1 : 0)}/2`;
+    ui.missionText.textContent = !p.mansion ? '🏰 Mansión Onírica: encárgasela a Glover' : !p.club100M ? `💯 Club de los 100M: ${fmtDots(GS.economy.money)} / ${fmtDots(CFG.club100M)}` : '🌟 Eres leyenda del sueño';
+  } else if ((a?.step | 0) >= 1 && !s.ending) {
+    if (lbl) lbl.textContent = 'ACTO 3 · EL DESPERTAR'; ui.missionCount.textContent = `${Awakening.doneSteps()}/3`; ui.missionText.textContent = Awakening.nextText();
+  }
+}
+/** Lista de la cadena dentro del panel del billete */
+function awakeningChainHTML() {
+  const a = Awakening.st(), N = CFG.planeFuelNeeded, li = (ok, t) => `<div class="text-sm ${ok ? 'text-emerald-700 font-semibold' : 'text-slate-600'}">${ok ? '✅' : '▫️'} ${t}</div>`;
+  return `<div class="mt-3 space-y-1"><div class="pixel text-[9px] text-slate-500">LA CADENA DEL DESPERTAR</div>
+    ${li(a.planeFueled, `⭐ 1 · "El vuelo necesita alas": revisa el avión con Sam y entrégale ${N}× Gasolina Gasil (${a.planeFueled ? N : Math.min(Awakening.fuel(), N)}/${N})`)}
+    ${li(a.permit, `⭐ 2 · "El Formulario 99-Z": Permiso de Salida del Mayor (${CFG.permitProcessDays} día onírico o ${fmt(CFG.permitExpressFee)} $T)`)}
+    ${li(a.readingDone, '⭐ 3 · "La última lectura": visita a Sombra con el billete y el permiso')}
+    ${li(!!GS.story?.farewellDone, '🛫 Presenta el billete a Sam en el puerto')}
+    <div class="text-[11px] text-slate-500">Nada caduca ni se pierde: si vendiste la gasolina, Sam, Rocco y las cajas del mercante tienen más.</div></div>`;
+}
+/* =========================================================
    20. MENÚ DE ENTRADA → PLAY
    ========================================================= */
 const $ = (id) => document.getElementById(id);
@@ -5424,7 +5945,7 @@ function applyGameStateToWorld() {
   applyAvatar(GS.avatar);   // v0.7: el look guardado (las partidas antiguas traen el clásico vía deepMerge)
   refreshGoalHUD();
   NPCS.forEach(n => { GS.missions[n.id] ||= { status: 0, generated: false, completedAt: null }; });
-  buildHouse(clamp(GS.house.level | 0, 0, 2));
+  buildHouse(clamp(GS.house.level | 0, 0, CFG.houseMaxLevel));   // v0.9: nivel 3 = Mansión Onírica (post-juego)
   ['fountain', 'lamps', 'windmill', 'statue'].forEach(id => { if (hasItem(id)) buildStructure(id); });   // mejoras antiguas de la tienda de Glover (compatibilidad)
   UPGRADES.forEach(u => { if (hasItem(u.id) && u.id.startsWith('bag')) u.apply(); });                     // capacidad de mochila
   restoreBuildings();                                                                                       // construcciones del jugador (GS.world.buildings)
@@ -5437,6 +5958,7 @@ function applyGameStateToWorld() {
   if (GS.unlocks.neon) state.neonT = 1;
   NPCS.forEach(n => { if (GS.bigJobs?.[n.id]?.status === 2) BIG_UNLOCKS[n.id](); });   // v0.8: Trabajos Mayores → sistemas + huellas 3D (idempotente)
   refreshNpcBubbles();
+  Awakening.apply();   // v0.9: avión (luces), billete imperdible, efectos del Final B y post-juego (idempotente)
   if (Array.isArray(GS.player.dir) && GS.player.dir.length === 3) { player.userData.dir.fromArray(GS.player.dir).normalize(); if (Array.isArray(GS.player.fwd)) player.userData.fwd.fromArray(GS.player.fwd); }
   state.tokensShown = GS.economy.money; ui.tokenValue.textContent = state.tokensShown.toLocaleString('es-ES');
   refreshMissionUI();
@@ -5476,15 +5998,18 @@ const startGameFromMenu = () => {
   cam.rate = 1.7; cam.tDist = 9; cam.tPitch = 0.42; // zoom cinematográfico desde el espacio hasta el personaje
   setTimeout(() => {
     state.menuOpen = false; cam.rate = 10;
+    const ngFresh = Awakening.consumeFreshStart();   // v0.9: primera sesión de un Nuevo Sueño+
     const welcome = () => {
-      showToast(hadSave ? '💾 Partida restaurada · ¡bienvenido de nuevo!' : '🐻 Busca al Oso Panadero: tiene un “!” sobre la cabeza', 'text-white');
+      showToast(hadSave && !ngFresh ? '💾 Partida restaurada · ¡bienvenido de nuevo!' : '🐻 Busca al Oso Panadero: tiene un “!” sobre la cabeza', 'text-white');
+      if (ngFresh) setTimeout(() => showToast(`🌙 Nuevo Sueño+ · el sueño te reconoce: ganancias ×${String(GS.ngplus.multiplier).replace('.', ',')}`, 'text-purple-200'), 1600);
+      Awakening.onSessionStart();   // v0.9: decisión del puerto pendiente (si recargaste en mitad de la escena)
       if (retroInsignias.length) setTimeout(() => showToast(`🏆 Tus Aliados te guardaban ${retroInsignias.length} prenda(s) insignia: mira el Armario 🪞`, 'text-amber-200'), 1800);
     };
     // v0.7 · Sec. 8.2: partida nueva → creador de personaje tras el prólogo (y antes de despertar del todo)
     maybeOpenCreator((wasCreator) => { if (wasCreator && !hadSave) showToast('🐻 "¡Eh, eh! ¿Estás bien? ¡Por fin llegó el humano de la laptop!"', 'text-white'); setTimeout(welcome, wasCreator && !hadSave ? 2200 : 0); });   // sin creador pendiente → welcome al momento
   }, 2600);
 };
-btnPlay.onclick = () => (storyState().prologueDone ? startGameFromMenu() : showPrologue(startGameFromMenu));
+btnPlay.onclick = () => (storyState().ending === 'A' ? Awakening.resumeFinalA() : storyState().prologueDone ? startGameFromMenu() : showPrologue(startGameFromMenu));   // v0.9: un Final A sin cerrar vuelve a los créditos → NG+
 
 // ---- Guardado periódico de seguridad y al salir / ocultar la pestaña ----
 setInterval(() => SaveSystem.saveNow('periodic'), 30000);
@@ -5635,6 +6160,16 @@ const DBG = (() => {
       'DBG.dock() · DBG.importNow() -> fuerza un atraque del mercante / da una importación de Ultramar',
       "DBG.viral() · DBG.rumor('mayor') · DBG.premium('sam') -> tendencia de hoy / rumor real / prepara un encargo premium",
       'DBG.economy(capital)      -> estimación de ingresos diarios por sistema (cordura de balance)',
+      '--- v0.9 · El Despertar ---',
+      'DBG.ticketReady()         -> 40M + Sombra Aliada (requisitos del billete)',
+      'DBG.buyTicket()           -> compra el billete (arranca la cadena) · DBG.fuel(5) -> 5× Gasolina Gasil',
+      'DBG.awakenNext(exprés)    -> avanza un paso real de la cadena (inspección, gasolina, 99-Z, lectura) · DBG.chain() -> todos',
+      'DBG.awakening() · DBG.farewells() -> estado de la cadena / orden y tono de las despedidas',
+      'DBG.port()                -> escena del puerto completa (desfile + decisión con silencio)',
+      'DBG.decision()            -> muestra la decisión A/B directamente (como tras recargar)',
+      "DBG.choose('A'|'B', ui)   -> elige final (ui=false: solo lógica) · DBG.endingA() · DBG.endingB()",
+      'DBG.ngplus()              -> (Final A si falta) y empieza Nuevo Sueño+ (recarga la página)',
+      'DBG.mansion() · DBG.club() · DBG.postgame() -> post-juego del Final B (Mansión, Club de los 100M, panel)',
       'IDs NPC: ' + NPC_IDS.join(', ')
     ].join('\n'));
   }
@@ -5673,7 +6208,7 @@ DBG.toolDur = (id, n) => { const s = GS.inventory.slots.find(x => x.id === id); 
 DBG.goMine = (i = 0) => { const n = Mining.nodes[i]; if (!n) { console.warn('[DBG] hay ' + Mining.nodes.length + ' nodos'); return; } setMoveTarget(n.userData.dir.clone()); state.pendingInteract = n; console.log('[DBG] Caminando al nodo ' + i); };
 DBG.mineReset = () => { GS.world.mineNodes = {}; Mining.restore(); DBG.save('debug_mine'); console.log('[DBG] Nodos de minería repuestos'); };
 DBG.rest = () => { GS.daily.restedUntil = dreamNow() + CFG.restedDurationDays * DAY_MS; DBG.save('debug_rest'); console.log('[DBG] Descansado activado'); };
-DBG.house = (lv) => { GS.house.level = clamp(lv | 0, 0, 2); buildHouse(GS.house.level); DBG.save('debug_house'); console.log('[DBG] Casa nivel ' + GS.house.level); };
+DBG.house = (lv) => { GS.house.level = clamp(lv | 0, 0, CFG.houseMaxLevel); buildHouse(GS.house.level); DBG.save('debug_house'); console.log('[DBG] Casa nivel ' + GS.house.level); };
 DBG.showcaseSettle = () => { Showcase.settle(); DBG.save('debug_showcase'); console.log('[DBG] Hucha: ' + (GS.housing.showcaseRevenue | 0)); };
 DBG.furniture = (id) => { if (!FURNITURE.some(f => f.id === id)) { console.warn('[DBG] muebles: ' + FURNITURE.map(f => f.id).join(', ')); return; } if (!hasFurniture(id)) GS.furniture.owned.push(id); DBG.save('debug_furniture'); console.log('[DBG] Mueble: ' + id); };
 DBG.coffee = () => { Coffee.until = Date.now() + CFG.coffeeMs; console.log('[DBG] Café activo 5 min'); };
@@ -5746,6 +6281,40 @@ DBG.economy = (capital = GS.economy.money) => {
   ];
   console.table(rows); return rows;
 };
+// ---- v0.9 · El Despertar (cadena, escena del puerto, finales A/B, NG+, post-juego) ----
+DBG.ticketReady = (extra = 0) => { const s = storyState(); s.revealed = true; refreshGoalHUD(); GS.economy.money = Math.max(GS.economy.money, CFG.ticketPrice + (extra | 0)); state.tokensShown = GS.economy.money; DBG.trust('sombra', Math.max(Trust.points('sombra'), CFG.trustThresholds[CFG.ticketTrustLevel - 1])); console.log(`[DBG] Listo para el billete: ${fmt(GS.economy.money)} $T · Sombra nivel ${Trust.level('sombra')}`); };
+DBG.buyTicket = () => { if (!awakeningHasTicket()) DBG.ticketReady(); const ok = awakeningHasTicket() || buyDreamTicket(); console.log('[DBG] Billete: ' + (ok ? 'sí' : 'no') + ' · paso ' + Awakening.step()); return ok; };
+DBG.fuel = (n = CFG.planeFuelNeeded) => DBG.give('gasil_fuel', n);
+DBG.awakenNext = (express = false) => {
+  const A = Awakening, a = A.st();
+  if (GS.story?.ending) { console.log('[DBG] Ya hay final: ' + GS.story.ending); return false; }
+  if (!A.active()) DBG.buyTicket();
+  else if (a.step === 1 && !a.inspected) A.inspect();
+  else if (a.step === 1) { if (A.fuel() < CFG.planeFuelNeeded) DBG.fuel(CFG.planeFuelNeeded - A.fuel()); A.deliverFuel(); }
+  else if (a.step === 2) { if (express) { GS.economy.money += Wallet.canAfford(CFG.permitExpressFee) ? 0 : CFG.permitExpressFee; A.payExpress(); } else { A.requestPermit(); if (!A.permitReady()) DBG.day(Math.max(1, a.permitDay - GS.daily.dayCount)); A.collectPermit(); } }
+  else if (a.step >= 3 && !a.readingDone) A.reading();
+  else { console.log('[DBG] Cadena completa → DBG.port() (escena) o DBG.choose("A"/"B")'); return false; }
+  refreshMissionUI(); console.log(`[DBG] Despertar: paso ${A.step()} · ${A.doneSteps()}/3 · siguiente: ${A.nextText()}`); return true;
+};
+DBG.chain = (express = false) => { for (let i = 0; i < 12 && DBG.awakenNext(express); i++); return Awakening.st(); };
+DBG.awakening = () => { const a = Awakening.st(), s = storyState(); console.table([{ ...a, billete: awakeningHasTicket(), enMochila: Inventory.count('dream_ticket'), gasolina: Awakening.fuel(), farewellDone: s.farewellDone, ending: s.ending, ngplus: GS.ngplus.count, mult: GS.ngplus.multiplier, mansion: GS.postgame.mansion, club100M: GS.postgame.club100M }]); console.log('[DBG] Siguiente: ' + Awakening.nextText()); return a; };
+DBG.farewells = () => console.table(Awakening.farewellOrder().map((f, i) => ({ orden: i + 1, npc: f.id, puntos: Trust.points(f.id), nivel: Trust.level(f.id), tono: f.deep ? 'profunda' : 'cordial', texto: f.lines[0].slice(0, 60) + '…' })));
+DBG.port = () => { DBG.chain(); const ok = Awakening.uiPort(); if (!ok) console.warn('[DBG] No se puede embarcar (¿ya hubo despedida? usa DBG.decision())'); return ok; };
+DBG.decision = () => { if (!storyState().farewellDone) { DBG.chain(); Awakening.finishFarewell(); } Awakening.resumeDecision(); };
+DBG.choose = (which = 'A', ui = true) => {
+  if (!storyState().farewellDone) { DBG.chain(); Awakening.finishFarewell(); }
+  document.getElementById('awDecision')?.remove(); document.getElementById('awCard')?.remove();
+  if (!ui) { const ok = which === 'B' ? Awakening.chooseB() : Awakening.chooseA(); console.log('[DBG] Final ' + which + ': ' + ok); return ok; }
+  if (!Awakening.sc) { Awakening.enterCinematic(); Awakening.gather(); Awakening.wide(0.4); }
+  return which === 'B' ? Awakening.uiFinalB() : Awakening.uiFinalA();
+};
+DBG.endingA = (ui = true) => DBG.choose('A', ui);
+DBG.endingB = (ui = true) => DBG.choose('B', ui);
+DBG.ngplus = () => { if (storyState().ending !== 'A') DBG.choose('A', false); return Awakening.startNGPlus(); };
+DBG.mansion = () => { if (storyState().ending !== 'B') DBG.choose('B', false); if ((GS.house.level | 0) < 2) DBG.house(2); GS.economy.money = Math.max(GS.economy.money, CFG.mansionCost); return Awakening.buyMansion(); };
+DBG.club = () => { if (storyState().ending !== 'B') DBG.choose('B', false); GS.economy.money = Math.max(GS.economy.money, CFG.club100M); state.tokensShown = GS.economy.money; return Awakening.checkClub(); };
+DBG.postgame = () => Awakening.openPostgame();
+Object.assign(window._dbg, { Awakening, toyPlane, monitorSun, FAREWELLS, DEJA_VU, buyDreamTicket, startAwakening, awakeningHasTicket, awakeningBtns, awakeningGreeting, awakeningChainHTML, act3MissionHUD, dejaVuGreeting, AuraFX, Titles, buildHouse, storyState, setPlaneLit });
 </script>
 </body>
 </html>
