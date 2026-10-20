@@ -9545,7 +9545,7 @@ const NetUI = {
       const st = Net.st(), on = Net.on(), o = on ? NET_ORIGINS[st.origin] : null;
       let html = balanceBar() + `<div class="app-card p-3 mb-2"><div class="font-bold text-[#2b2b3d]">🌐 La Red del Sueño</div><div class="text-xs text-slate-600 mt-1">Una bolsa de comercio onírica: lo que a ti te sobra, a otro le falta. Te duermes delante de la pantalla y apareces en la Estación de la Red.</div>
         <button data-demo class="btn-game px-3 py-2 text-sm mt-2 bg-violet-300 w-full">🌙 Modo demo (bots) · ${on ? 'entrar' : 'empezar'}</button>
-        <button data-real class="btn-game px-3 py-2 text-sm mt-2 bg-emerald-200 w-full">🌍 Red real ${Online.me ? `· entrar como ${esc(Online.me.name)}` : '· iniciar sesión'}</button>
+        <button data-real class="btn-game px-3 py-2 text-sm mt-2 bg-emerald-200 w-full">🌍 Red real ${Online.me ? `· entrar como ${esc(Online.me.name)}` : '· iniciar sesión'}</button>${Online.me ? '<button data-rmkt class="btn-game px-3 py-2 text-sm mt-2 bg-amber-200 w-full">🏛️ Mercado real (jugadores)</button>' : ''}
         <div class="text-[10px] text-slate-500 mt-1">La demo es del modo offline: 50–100 comerciantes bot, solo $TOKEN del juego. Nada de token real (ni compras ni premios).</div></div>`;
       if (on) {
         const reqs = Net.genRequests(), sh = st.shop, T = Net.shopDef(), open = Net.myOrders();
@@ -9557,6 +9557,7 @@ const NetUI = {
       }
       body.innerHTML = html;
       this.on(body, '[data-demo]', () => { closeApp(); if (!Number.isInteger(st.origin)) { Profiles.ensure(() => NetWorld.enter()); return; } if (!Net.on()) { st.intro = true; Net.activate({ origin: st.origin }); this.originCard(() => NetWorld.enter()); return; } NetWorld.enter(); });   // v1.6: el perfil se elige, no se sortea
+      this.on(body, '[data-rmkt]', () => { closeApp(); setTimeout(() => RealMarket.open(), 30); });
       this.on(body, '[data-real]', () => { closeApp(); if (!Online.me) { Account.open(); return; } if (!Number.isInteger(st.origin)) { Profiles.ensure(() => NetWorld.enter()); return; } NetWorld.enter(); });   // v1.7: con cuenta, en la Red ves a jugadores reales (y los bots siguen ahí)
       this.on(body, '[data-origin]', () => this.originCard());
       this.on(body, '[data-reqs]', () => this.requests());
@@ -9928,6 +9929,7 @@ const Hub = {
         { ic: '🏠', ti: 'Mi casa', de: 'Muebles, cartas, escaparate y mejoras', fn: () => GS.housing.sealed ? openSealedHousePanel() : openHousePanel() },
         { ic: '📬', ti: 'Cartas', de: (GS.housing.mailboxUnread | 0) ? `${GS.housing.mailboxUnread} sin leer` : 'Tu buzón', bd: (GS.housing.mailboxUnread | 0) ? String(GS.housing.mailboxUnread) : '', fn: () => GS.housing.sealed ? openSealedHousePanel() : openHousePanel('mail') },
         { ic: '🌐', ti: 'Red del Sueño', de: 'Comercio con otros perfiles (demo con bots)', fn: () => NetUI.pc() },
+        { ic: '🏛️', ti: 'Mercado real', de: Online.me ? 'Compra y vende con jugadores reales' : 'Necesita cuenta online', fn: () => RealMarket.open() },
         { ic: '🧭', ti: 'Guía de recursos', de: 'Qué se consigue, dónde y con qué', fn: () => this.guide() },
       ]],
       ['SISTEMA', [
@@ -10069,15 +10071,90 @@ const NetChat = {
       ${on ? `<div data-log style="display:flex;flex-direction:column;gap:4px;max-height:180px;overflow:auto;margin-bottom:6px">${log || '<div class="text-xs text-slate-400">Nadie ha escrito todavía. ¡Saluda!</div>'}</div>
       <div class="flex flex-wrap gap-1 mb-1">${NetUI.QUICK.map((q, k) => `<button data-q="${k}" class="btn-game px-1.5 py-0.5 text-[10px] bg-sky-100">${q}</button>`).join('')}</div>
       <div class="flex gap-1"><input data-in maxlength="140" placeholder="Escribe…" class="game flex-1 text-xs px-2 py-1"><button data-s class="btn-game px-2 py-1 text-xs bg-emerald-200">Enviar</button></div>`
+      + `<button data-rm class="btn-game px-2 py-1 text-[11px] bg-amber-200 w-full mt-1.5">🏛️ Mercado real</button>`
       : `<div class="text-xs text-slate-600 mb-2">Estás en la demo con bots. Entra con tu cuenta para ver a otros jugadores y hablar con ellos.</div><button data-acc class="btn-game px-3 py-1.5 text-xs bg-violet-200 w-full">🌍 Entrar al online</button>`}</div>`;
     d.querySelector('[data-x]').onclick = () => { this.open = false; this.render(); };
     const acc = d.querySelector('[data-acc]'); if (acc) acc.onclick = () => Account.open();
+    const rm = d.querySelector('[data-rm]'); if (rm) rm.onclick = () => RealMarket.open();
     const inp = d.querySelector('[data-in]'); if (!inp) return; const lg = d.querySelector('[data-log]'); if (lg) lg.scrollTop = 1e6;
     const send = async (t) => { try { await Online.say(t); } catch (e) { showToast('💬 ' + e.message, 'text-red-200'); } };
     d.querySelector('[data-s]').onclick = () => { const v = inp.value.trim(); if (v) { inp.value = ''; send(v); } };
     inp.onkeydown = (e) => { e.stopPropagation(); if (e.key === 'Enter') { const v = inp.value.trim(); if (v) { inp.value = ''; send(v); } } };
     inp.onkeyup = (e) => e.stopPropagation();
     d.querySelectorAll('[data-q]').forEach(b => b.onclick = () => send(NetUI.QUICK[+b.dataset.q]));
+  },
+};
+
+/* ===== v1.8 · 🏛️ MERCADO REAL (F2): Aduana en el servidor + Tablón con órdenes de compra/venta entre jugadores reales =====
+   Lo que comercias vive en el servidor: ingresas $T (tope 50.000/día) y objetos de TU perfil (tope por nivel y día; la joya, 1/semana),
+   compras y vendes con órdenes (cruce por precio y antigüedad, comisión 2 % al vendedor) y retiras a tu partida cuando quieras. */
+const RealMarket = {
+  tab: 'market', filter: -1, data: null, busy: false,
+  rpc: async (fn, args) => { const s = await Online.lib(); const { data, error } = await s.rpc(fn, args); if (error) throw new Error(error.message); return data; },
+  async load() { this.data = await this.rpc('crossia_market', {}); return this.data; },
+  name: (id) => ITEMS[id] ? `${ITEMS[id].icon} ${ITEMS[id].name}` : id,
+  open(tab = null) {
+    if (!Online.me) { Account.open(); return; } if (tab) this.tab = tab;
+    openApp('🏛️ Mercado real', '', (body) => {
+      const render = async (msg = '') => {
+        body.innerHTML = `<div class="app-card p-3 text-sm text-slate-500">Cargando el mercado…</div>`;
+        let D; try { D = await this.load(); } catch (e) { body.innerHTML = `<div class="app-card p-3 text-sm">❌ ${esc(e.message)}</div>`; return; }
+        const me = Online.me, mine = NET_ORIGINS[me.profile], tabs = [['market', '📈 Mercado'], ['aduana', '🛃 Mi Aduana'], ['orders', `📋 Mis órdenes (${D.mine.length})`]];
+        let html = (msg ? `<div class="app-card p-2 mb-2 text-xs ${/^❌/.test(msg) ? 'bg-red-50' : 'bg-emerald-50'}">${msg}</div>` : '') +
+          `<div class="app-card p-2.5 mb-2 flex items-center gap-3 text-xs"><span class="text-2xl">${mine.icon}</span><div class="flex-1"><b class="text-sm">${esc(me.name)}</b> · ${D.players} jugador(es) en la Red<br>Aduana: <b>${fmt(D.coins)} $T</b> · ${Object.values(D.stock).reduce((a, b) => a + b, 0)} objeto(s) · en tu partida: ${fmt(GS.economy.money)} $T</div></div>
+          <div class="flex gap-1 mb-2">${tabs.map(([k, l]) => `<button data-tab="${k}" class="btn-game px-3 py-1.5 text-xs ${this.tab === k ? 'bg-[#fff6c2]' : 'bg-white'}">${l}</button>`).join('')}</div>`;
+        if (this.tab === 'market') {
+          html += `<div class="flex flex-wrap gap-1 mb-2"><button data-f="-1" class="btn-game px-2 py-0.5 text-[11px] ${this.filter < 0 ? 'bg-[#fff6c2]' : 'bg-white'}">Todos</button>${NET_ORIGINS.map((o, i) => `<button data-f="${i}" class="btn-game px-2 py-0.5 text-[11px] ${this.filter === i ? 'bg-[#fff6c2]' : 'bg-white'}">${o.icon}</button>`).join('')}</div>
+            <div class="text-[11px] text-slate-500 mb-1">Comprar = pagas al mejor vendedor. Vender = cobras del mejor comprador (−2 %). Si nadie cruza, tu orden queda en el Tablón.</div>`;
+          html += D.items.filter(x => this.filter < 0 || x.p === this.filter).map(x => `<div class="app-card p-2 mb-1.5 flex items-center gap-2 text-xs"><div class="flex-1 min-w-0"><b>${this.name(x.id)}</b> <span class="text-slate-400">NV${x.t}${x.p === me.profile ? ' · tuyo' : ''}</span><div class="text-slate-500">Venden ${x.ask ? `<b class="text-emerald-700">${fmt(x.ask)}</b> (${x.askQ})` : '—'} · Compran ${x.bid ? `<b class="text-sky-700">${fmt(x.bid)}</b> (${x.bidQ})` : '—'} · Último ${x.last ? fmt(x.last) : '—'} · 24 h: ${x.vol}</div></div>
+            <button data-buy="${x.id}" class="btn-game px-2 py-1 text-[11px] bg-emerald-200">Comprar</button><button data-sell="${x.id}" class="btn-game px-2 py-1 text-[11px] bg-sky-200" ${D.stock[x.id] ? '' : 'disabled style="opacity:.45"'}>Vender</button></div>`).join('');
+        } else if (this.tab === 'aduana') {
+          const left = Math.max(0, 50000 - D.coinsToday), own = [...mine.mats.map(m => m[0]), mine.jewel[0]];
+          html += `<div class="sec-h">$TOKEN</div><div class="app-card p-3 mb-2 text-xs">Hoy puedes ingresar <b>${fmt(left)} $T</b> más.<div class="flex gap-1 mt-2"><input data-coins type="number" min="1" placeholder="Cantidad" class="game flex-1 text-xs px-2 py-1"><button data-dc class="btn-game px-2 py-1 text-[11px] bg-emerald-200">Ingresar ⬆</button><button data-wc class="btn-game px-2 py-1 text-[11px] bg-sky-200">Retirar ⬇</button></div></div>
+            <div class="sec-h">Tus objetos de ${mine.icon} ${mine.name} (se ingresan con tope diario)</div>` +
+            own.map((id, j) => { const cap = j < 4 ? [10, 8, 5, 3][j] : 1, used = D.depToday[id] || 0, have = Inventory.count(id); return `<div class="app-card p-2 mb-1.5 flex items-center gap-2 text-xs"><div class="flex-1"><b>${this.name(id)}</b><div class="text-slate-500">En tu mochila ${have} · ingresados ${j < 4 ? 'hoy' : 'esta semana'} ${used}/${cap}</div></div><button data-di="${id}" class="btn-game px-2 py-1 text-[11px] bg-emerald-200" ${have && used < cap ? '' : 'disabled style="opacity:.45"'}>Ingresar 1</button></div>`; }).join('') +
+            `<div class="sec-h">En la Aduana (retirables a tu partida)</div>` + (Object.entries(D.stock).map(([id, q]) => `<div class="app-card p-2 mb-1.5 flex items-center gap-2 text-xs"><div class="flex-1"><b>${this.name(id)}</b> ×${q}</div><button data-wi="${id}" class="btn-game px-2 py-1 text-[11px] bg-sky-200">Retirar 1</button><button data-wa="${id}" data-q="${q}" class="btn-game px-2 py-1 text-[11px] bg-sky-100">Todo</button></div>`).join('') || '<div class="text-xs text-slate-400 mb-2">Vacía.</div>');
+        } else {
+          html += `<div class="sec-h">Abiertas</div>` + (D.mine.map(o => `<div class="app-card p-2 mb-1.5 flex items-center gap-2 text-xs"><div class="flex-1">${o.side === 'buy' ? '🟢 Compra' : '🔵 Venta'} <b>${this.name(o.item)}</b> · ${o.rem}/${o.qty} a ${fmt(o.price)} $T</div><button data-cancel="${o.id}" class="btn-game px-2 py-1 text-[11px] bg-rose-200">Cancelar</button></div>`).join('') || '<div class="text-xs text-slate-400">Ninguna.</div>') +
+            `<div class="sec-h">Tus últimas operaciones</div>` + (D.trades.map(t => `<div class="text-xs py-1 border-b border-slate-100">${t.side === 'buy' ? '🟢 Compraste' : '🔵 Vendiste'} ${t.qty}× ${this.name(t.item)} a ${fmt(t.price)} $T · ${new Date(t.at).toLocaleString('es-ES')}</div>`).join('') || '<div class="text-xs text-slate-400">Todavía ninguna.</div>');
+        }
+        body.innerHTML = html;
+        const q$ = (s) => body.querySelectorAll(s), run = async (fn) => { if (this.busy) return; this.busy = true; let m; try { m = await fn(); Online.push(true).catch(() => {}); } catch (e) { m = '❌ ' + e.message; } this.busy = false; render(m); };
+        body.querySelectorAll('input').forEach(i => i.onkeydown = (e) => e.stopPropagation());
+        q$('[data-tab]').forEach(b => b.onclick = () => { this.tab = b.dataset.tab; render(); });
+        q$('[data-f]').forEach(b => b.onclick = () => { this.filter = +b.dataset.f; render(); });
+        q$('[data-buy]').forEach(b => b.onclick = () => this.orderForm(body, 'buy', b.dataset.buy, D, render));
+        q$('[data-sell]').forEach(b => b.onclick = () => this.orderForm(body, 'sell', b.dataset.sell, D, render));
+        q$('[data-cancel]').forEach(b => b.onclick = () => run(async () => { await this.rpc('crossia_order_cancel', { p_id: +b.dataset.cancel }); return '✓ Orden cancelada: lo apartado vuelve a tu Aduana'; }));
+        const coinsIn = () => Math.floor(+(body.querySelector('[data-coins]')?.value || 0));
+        body.querySelector('[data-dc]') && (body.querySelector('[data-dc]').onclick = () => run(async () => { const n = coinsIn(); if (n < 1) throw new Error('Pon una cantidad'); if (!Wallet.canAfford(n)) throw new Error('No tienes tantos $T en tu partida');
+          await this.rpc('crossia_deposit_coins', { p_n: n }); Wallet.spend(n, 'Aduana de la Red real (ingreso)', { silent: true }); SaveSystem.saveNow('real-deposit'); return `✓ Ingresados ${fmt(n)} $T`; }));
+        body.querySelector('[data-wc]') && (body.querySelector('[data-wc]').onclick = () => run(async () => { const n = coinsIn(); if (n < 1) throw new Error('Pon una cantidad');
+          await this.rpc('crossia_withdraw_coins', { p_n: n }); Wallet.add(n, 'Aduana de la Red real (retirada)', { noMult: true, silent: true }); SaveSystem.saveNow('real-withdraw'); return `✓ Retirados ${fmt(n)} $T a tu partida`; }));
+        q$('[data-di]').forEach(b => b.onclick = () => run(async () => { const id = b.dataset.di; if (!Inventory.has(id, 1)) throw new Error('No lo tienes en la mochila');
+          await this.rpc('crossia_deposit_item', { p_item: id, p_qty: 1 }); Inventory.remove(id, 1); Net.lotsSync(id); SaveSystem.saveNow('real-deposit-item'); return `✓ ${this.name(id)} ingresado`; }));
+        const takeOut = (id, q) => run(async () => { if (!Inventory.canAddMany([[id, q]], null)) throw new Error('No cabe en tu mochila');
+          await this.rpc('crossia_withdraw_item', { p_item: id, p_qty: q }); Inventory.add(id, q, { silent: true }); Net.lotsAdd(id, q, Net.today()); SaveSystem.saveNow('real-withdraw-item'); return `✓ ${q}× ${this.name(id)} a tu mochila`; });
+        q$('[data-wi]').forEach(b => b.onclick = () => takeOut(b.dataset.wi, 1));
+        q$('[data-wa]').forEach(b => b.onclick = () => takeOut(b.dataset.wa, +b.dataset.q));
+      };
+      render();
+    });
+  },
+  orderForm(body, side, id, D, render) {
+    const x = D.items.find(i => i.id === id), have = D.stock[id] || 0, def = side === 'buy' ? (x.ask || x.last || 50) : (x.bid || x.last || 50);
+    const box = document.createElement('div'); box.className = 'app-card p-3 mb-2 text-xs bg-amber-50';
+    box.innerHTML = `<b class="text-sm">${side === 'buy' ? '🟢 Comprar' : '🔵 Vender'} ${this.name(id)}</b><div class="text-slate-500 mt-0.5">${side === 'buy' ? `Pagas desde la Aduana (tienes ${fmt(D.coins)} $T). Si pones más que el mejor vendedor, pagas lo suyo y te devuelve la diferencia.` : `Vendes desde la Aduana (tienes ${have}). Cobras el precio del comprador menos un 2 %.`}</div>
+      <div class="flex gap-1 mt-2 items-center"><label>Cantidad <input data-oq type="number" min="1" value="1" class="game w-16 text-xs px-1 py-1"></label><label>Precio/u <input data-op type="number" min="1" value="${def}" class="game w-24 text-xs px-1 py-1"></label>
+      <button data-ok class="btn-game px-3 py-1 text-[11px] ${side === 'buy' ? 'bg-emerald-300' : 'bg-sky-300'}">Publicar</button><button data-no class="btn-game px-2 py-1 text-[11px] bg-slate-200">✕</button></div>`;
+    body.prepend(box); box.querySelectorAll('input').forEach(i => i.onkeydown = (e) => e.stopPropagation());
+    box.querySelector('[data-no]').onclick = () => box.remove();
+    box.querySelector('[data-ok]').onclick = async () => {
+      const q = Math.floor(+box.querySelector('[data-oq]').value || 0), p = Math.floor(+box.querySelector('[data-op]').value || 0);
+      try { const r = await this.rpc('crossia_order_place', { p_side: side, p_item: id, p_qty: q, p_price: p }); Online.push(true).catch(() => {});
+        render(r.filled ? `✓ ${side === 'buy' ? 'Compraste' : 'Vendiste'} ${r.filled}× ${this.name(id)}${r.remaining ? ` · ${r.remaining} quedan en el Tablón` : ''}` : `✓ Orden publicada en el Tablón: ${q}× a ${fmt(p)} $T`);
+      } catch (e) { render('❌ ' + e.message); }
+    };
   },
 };
 
@@ -10093,7 +10170,7 @@ const Account = {
           html += `<div class="app-card p-3 mb-2 flex items-center gap-3"><div class="text-4xl">${NET_ORIGINS[me.profile]?.icon || '👤'}</div><div class="flex-1"><div class="font-bold text-[#2b2b3d]">${esc(me.name)}</div><div class="text-xs text-slate-500">${NET_ORIGINS[me.profile]?.name || ''} · cuenta online activa</div></div><button data-out class="btn-game px-2 py-1 text-xs bg-slate-200">Salir</button></div>
             <div class="sec-h">Partida en la nube</div><div class="app-card p-3 mb-2 text-xs">Última copia: <b>${cloud}</b> · se guarda sola cada ${CFG.online.autosaveMin} min mientras juegas.
               <div class="flex gap-2 mt-2"><button data-push class="btn-game px-3 py-1.5 text-xs bg-emerald-200 flex-1">☁️⬆ Subir ahora</button><button data-pull class="btn-game px-3 py-1.5 text-xs bg-sky-200 flex-1">☁️⬇ Traer la de la nube</button></div></div>
-            <div class="sec-h">Red del Sueño real</div><div class="app-card p-3 text-xs">Entra en la Red desde el PC de tu casa: verás a los jugadores conectados en tu misma zona y podrás chatear con ellos. El comercio entre jugadores llega en la siguiente fase.</div>`;
+            <div class="sec-h">Red del Sueño real</div><div class="app-card p-3 text-xs">Entra en la Red desde el PC de tu casa: verás a los jugadores conectados en tu misma zona y podrás chatear con ellos. Para comprar y vender con ellos, el Mercado real.<button data-mkt class="btn-game px-3 py-1.5 text-xs bg-amber-200 w-full mt-2">🏛️ Abrir el Mercado real</button></div>`;
         } else if (Online.session) {
           html += `<div class="app-card p-3 mb-2 text-sm">Último paso: elige tu nombre en el online.${o ? ` Tu perfil será ${o.icon} ${o.name}.` : ''}</div><input data-name maxlength="18" placeholder="Nombre (3–18)" class="game w-full text-sm px-3 py-2 mb-2"><button data-reg class="btn-play w-full" style="font-size:12px;padding:12px">CREAR MI JUGADOR</button>`;
         } else {
@@ -10109,6 +10186,7 @@ const Account = {
         $b('[data-in]') && ($b('[data-in]').onclick = () => run(() => Online.signIn(val('[data-email]'), val('[data-pass]')), (m) => m ? `✓ Hola de nuevo, ${esc(m.name)}` : '✓ Sesión iniciada'));
         $b('[data-up]') && ($b('[data-up]').onclick = () => run(async () => { const n = val('[data-name]'); if (n.length < 3) throw new Error('Pon un nombre de 3–18 caracteres'); const s = await Online.signUp(val('[data-email]'), val('[data-pass]'), n); if (s) await Online.register(n); return s; }, (s) => s ? '✓ ¡Cuenta creada y partida subida a la nube!' : '📧 Te hemos enviado un email: confírmalo y luego pulsa «Entrar» aquí.'));
         $b('[data-reg]') && ($b('[data-reg]').onclick = () => run(() => Online.register(val('[data-name]')), '✓ Jugador creado y partida subida a la nube'));
+        $b('[data-mkt]') && ($b('[data-mkt]').onclick = () => { closeApp(); setTimeout(() => RealMarket.open(), 30); });
         $b('[data-out]') && ($b('[data-out]').onclick = () => run(() => Online.signOut(), 'Has salido de tu cuenta (sigues jugando en local)'));
         $b('[data-push]') && ($b('[data-push]').onclick = () => run(() => Online.push(true), (r) => `✓ Subida (${Math.round((r?.bytes || 0) / 1024)} KB)`));
         $b('[data-pull]') && ($b('[data-pull]').onclick = () => run(async () => { const r = await Online.pull(); if (!r?.data) throw new Error('No hay ninguna partida en la nube'); const when = new Date(r.updated_at).toLocaleString('es-ES');
