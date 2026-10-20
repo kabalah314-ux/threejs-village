@@ -9743,6 +9743,7 @@ DBG.refs = DBG_REFS;
 if (/[?&]debug=1\b/.test(location.search)) window._dbg = DBG_REFS;   // v1.0: ya no es global por defecto
 /* v1.1 · Interior caminable de la casa (Sec. 6.9 Fase 2) */
 /** v1.5 · capturas: DBG.tp(x, z) lleva al jugador a (x, z) del pueblo · DBG.view(dist, pitch, yaw) fija la cámara · DBG.shot('B'|'C'|'D'|'G'|'H') prepara la escena del protocolo */
+DBG.post = (v = !PostFX.active) => { PostFX.active = !!v; POST_U.uPost.value = v ? 1 : 0; return PostFX.active; };
 DBG.env = (v = !SkyEnv.enabled) => SkyEnv.setEnabled(v);
 DBG.ao = (v = true) => { if (!PlanetAO.on) return false; if (v) PlanetAO.bake(); else { const c = planet.geometry.attributes.color; PlanetAO.reset(); c.needsUpdate = true; } return v; };
 DBG.tp = (x = 0, z = 0) => { const d = siteDir(S_V, x, z); player.userData.dir.copy(d); player.position.copy(d).multiplyScalar(surfaceR(d)); state.moveTarget = null; return true; };
