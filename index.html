@@ -419,6 +419,29 @@ const CFG = {
   cookMaxBatch: 10,
   /* ===== v0.6 · ACTO 2 (Sec. 7.3) ===== */
   act2BigJobs: 7,                 // Trabajos Mayores del Acto 2 (el HUD cuenta GS.bigJobs[id].status === 2)
+  /* ===== v0.8 · EL COMERCIANTE (Sec. 7.4, 7.6, 3.4, 4.9) — calibrable en el pase de balance de v1.0 ===== */
+  bigJobRewards: { bear: 2500, mayor: 3000, glover: 4000, sombra: 5000, dax: 3500, sam: 3000, hedgehogs: 2500 },   // Sec. 7.4 (23.500 $T en total) · +missionTrustReward
+  bigJobTrustLevel: 3,            // Sec. 7.4: misión principal hecha + confianza ❤️ Socio
+  bakeryOrderMult: 1.5,           // 🐻 Pedidos del Horno: pago ×1,5 sobre el valor de tienda (ITEMS.sell)
+  bakeryOrderTrust: 2,            // diseño propio: confianza con el Oso por pedido servido (la Guía no da cifra)
+  bakeryOrders: [[['golden_jam', 4], ['golden_cake', 2]], [['golden_jam', 3], ['dream_bread', 4]], [['golden_cake', 3]], [['golden_jam', 2], ['grilled_fish', 4]], [['dream_bread', 6], ['golden_cake', 1]], [['golden_jam', 5]]],   // 1 pedido/día (determinista)
+  censusTaxDiscount: 0.10,        // 🐶 Ciudadano Ejemplar: −10% en la tasa de residencia para siempre
+  bridgePhases: [{ wood_log: 10 }, { stone: 10 }, { wood_log: 8, stone: 8 }, { stone: 6, raw_gem: 1 }, { wood_log: 6, stone: 6, raw_gem: 1 }],   // 🦫 5 fases = 5 días oníricos (1 fase/día) · troncos, piedras, gemas
+  bridgeBuildDiscount: 0.15,      // 🦫 −15% en costes de construcción para siempre (al terminar el puente)
+  oracleAccuracy: 0.70,           // 🐈‍⬛ el Oráculo acierta ~70% (se muestra en la UI: Pilar P5)
+  feriaUpPct: 0.45, feriaDownPct: 0.40, feriaFlatPct: 0.04,   // 📈 Feria del Tablón (diseño propio): cada día 1 categoría sube, 1 baja, el resto ±4%
+  feriaCommission: 0.02, feriaStakeCapPct: 0.7, feriaMinStake: 100,   // comisión · tope de lotes por día (% del capital) · lote mínimo
+  mayorRumorChance: 0.3,          // 🐶 prob. diaria de rumor de mercado del Mayor (❤️ 3, Sec. 2.3) · diseño propio
+  climateChances: { clear: 35, rain: 25, fog: 12, sun: 15, storm: 8, stars: 5 },   // 🦎 % por franja con el Climatizador ('stars' solo de tarde-noche)
+  climateRainGardenMult: 2, climateRainFruitMult: 2, climateRainTropicalMult: 2,      // 🌧️ cosechas y jardín ×2, pesca +tropical
+  climateSunHungerMult: 1.5, climateSunBearMult: 1.25,                               // 🔆 saciedad baja +50% más rápido · "el Oso vende más" → paga +25% por lo que le vendes
+  climateStormRareMult: 2.5, climateStormFogDensity: 0.03,                            // ⛈️ la mejor pesca (raros ×2,5; Pez Dorado ×3 también de día)
+  climateStarsMin: 5, climateStarsMax: 8,                                             // 🌠 lluvia de estrellas: 5–8 Fragmentos en una noche
+  climateSeedCost: 500,           // diseño propio: sembrar nubes (fijar 1 franja de mañana), 1 vez al día
+  importLoot: [['dream_spice', 50], ['sky_compass', 30], ['timeless_clock', 15], ['edge_map', 5]],   // 🦤 1 objeto exclusivo por atraque (peso relativo)
+  importsPerDayCap: 8,            // diseño propio: tope diario (el barco del prototipo atraca cada ~62 s)
+  viralSellMult: 2,               // 🦔 Tendencia del Día: precio de venta a NPCs ×2 (el escaparate ya usa trendSaleMult)
+  premiumMult: 3, premiumTrust: 8,   // 💼 encargo premium (❤️ 3): ×3 cantidad, ×3 $TOKEN, +8 confianza, +1 rumor (Sec. 7.6)
   /* ===== v0.7 · AVATAR Y MODA ONÍRICA (Sec. 8) — la ropa NUNCA da ventaja mecánica ===== */
   boutiqueDailyCount: 4,          // Sec. 8.4: 4 piezas al día del pool de la Boutique Viral
   boutiquePrices: { common: 50, uncommon: 150, rare: 400, epic: 900, legendary: 2000 },   // Sec. 8.4: 50–2.000 $T por rareza
@@ -483,7 +506,10 @@ function defaultGameState() {
     trust: {},                                       // { [npcId]: { points, tradeToday, tradeDay, giftsToday, giftDay } }
     encargos: {},                                    // { [npcId]: { id, day, done, premium } }
     /* ===== v3 · CONTENIDO FUTURO (defaults listos para no volver a migrar) ===== */
-    bigJobs: {},                                     // Trabajos Mayores (Sec. 7.4)
+    bigJobs: {},                                     // Trabajos Mayores (Sec. 7.4): { [npcId]: { status 0|1|2, generated, completedAt } }
+    /* ===== v0.8 · datos de los 7 sistemas del Acto 2 (Sec. 7.4) ===== */
+    act2: { orders: { day: 0, done: false, served: 0 }, bridge: { phase: 0, lastPhaseDay: 0, donated: 0, doneDay: 0 }, oracle: { since: 0, hits: 0, total: 0, log: [] },
+      climate: { seeds: {}, lastSeedDay: 0 }, imports: { day: 0, count: 0, total: 0 }, feria: { lots: [], log: [], lastResult: null }, rumors: { log: [] } },
     awakening: { step: 0, planeFueled: false, permit: false, permitDay: 0 },   // Cadena del Despertar (Sec. 7.5)
     story: { prologueDone: false, revealed: false, farewellDone: false, ending: null, act1Done: false, creatorPending: false },   // v0.7: creatorPending = el creador inicial tras el prólogo sigue sin cerrarse
     weekly: { seals: [false, false, false, false, false, false, false], weekStart: null },  // Sello Semanal (Sec. 10.3)
@@ -649,6 +675,11 @@ const ITEMS = {
   coffee:         defItem({ id: 'coffee',         name: 'Café del Mundo Real',   icon: '☕', cat: 'consumable', rarity: 'common',    sell: 10, buy: 25, usable: true, desc: 'Sombra lo encontró "flotando junto a un escritorio". Durante 5 min la laptop genera ×2 más rápido y el hambre se pausa.' }),
   flower_bouquet: defItem({ id: 'flower_bouquet', name: 'Ramo de Flores',        icon: '💐', cat: 'special',    rarity: 'common',    sell: 10, desc: 'Sale del Jardín (1 al día). Regalo universal: a todos los vecinos les gusta.' }),
   dream_ticket:   defItem({ id: 'dream_ticket',   name: 'Billete del Despertar', icon: '🎫', cat: 'special',    rarity: 'legendary', sell: 0, stack: 1, desc: 'Tu salida del sueño. No se vende, no se regala, no se pierde. El avión de Sam necesita 5 Gasolinas Gasil. Ya tienes la salida… la pregunta es cuándo la usas.' }),
+  /* ===== v0.8 · IMPORTACIONES DE ULTRAMAR (Rutas del Horizonte, Sec. 7.4) · objetos de colección de alto valor ===== */
+  dream_spice:    defItem({ id: 'dream_spice',    name: 'Especias Oníricas',  icon: '🌶️', cat: 'valuable', rarity: 'uncommon',  sell: 120, desc: 'Importación de Ultramar. Huelen a un mercado que no sale en ningún mapa.' }),
+  sky_compass:    defItem({ id: 'sky_compass',    name: 'Brújula del Cielo',  icon: '🧭', cat: 'valuable', rarity: 'rare',      sell: 300, desc: 'Importación de Ultramar. Apunta hacia arriba. Sam dice que la suya también.' }),
+  timeless_clock: defItem({ id: 'timeless_clock', name: 'Reloj sin Horas',    icon: '⏱️', cat: 'valuable', rarity: 'epic',      sell: 500, desc: 'Objeto de colección de Ultramar. Siempre marca la misma hora de una mañana que no recuerdas.' }),
+  edge_map:       defItem({ id: 'edge_map',       name: 'Mapa del Borde',     icon: '🗺️', cat: 'valuable', rarity: 'legendary', sell: 900, desc: 'Objeto de colección de Ultramar. Dibuja el lugar donde el mar se acaba. Los coleccionistas pagan lo que haga falta.' }),
   golden_gift_box: defItem({ id: 'golden_gift_box', name: 'Caja Regalo Dorada', icon: '🎁', cat: 'special', rarity: 'epic', sell: 0, usable: true, desc: 'Premio del Sello Semanal. Botín mejorado: perlas, gemas, estrellas, mermelada…' }),
 };
 /** Tablas de botín (peso relativo) para objetos que se abren */
@@ -778,7 +809,7 @@ function shopState(id) {
   if (Date.now() > (s.restockAt || 0)) { s.stock = {}; def.sells.forEach(x => s.stock[x.id] = x.stock); s.restockAt = Date.now() + def.restockMin * 60000; }
   return s;
 }
-const shopSellPrice = (shopId, itemId) => Math.max(1, Math.round((ITEMS[itemId].sell || 0) * (SHOPS[shopId].buyMult[itemId] || 1) * (typeof Needs !== 'undefined' ? Needs.priceMult() : 1) * (typeof AuraFX !== 'undefined' ? AuraFX.sellMult() : 1) * (typeof Trust !== 'undefined' && SHOP_OWNER[shopId] ? Trust.sellMult(SHOP_OWNER[shopId]) : 1) * (typeof Rested !== 'undefined' ? Rested.sellMult() : 1)));   // v0.2 × confianza · S3.1 × Descansado
+const shopSellPrice = (shopId, itemId) => Math.max(1, Math.round((ITEMS[itemId].sell || 0) * (SHOPS[shopId].buyMult[itemId] || 1) * (typeof Needs !== 'undefined' ? Needs.priceMult() : 1) * (typeof AuraFX !== 'undefined' ? AuraFX.sellMult() : 1) * (typeof Trust !== 'undefined' && SHOP_OWNER[shopId] ? Trust.sellMult(SHOP_OWNER[shopId]) : 1) * (typeof Rested !== 'undefined' ? Rested.sellMult() : 1) * viralSellMult(itemId) * (shopId === 'bear' ? climateBearMult() : 1)));   // v0.2 × confianza · S3.1 × Descansado · v0.8 × Tendencia del Día (Agencia Viral) × Ola de sol (Oso)
 /** Precio de COMPRA mostrado y cobrado (aura Dorada: −5%). Fuente única para UI y cobro. */
 const shopBuyPrice = (shopId, itemId) => { const e = SHOPS[shopId].sells.find(x => x.id === itemId); return Math.max(1, Math.round(((e?.price ?? ITEMS[itemId].buy) || 1) * (typeof AuraFX !== 'undefined' ? AuraFX.buyMult() : 1) * (typeof Trust !== 'undefined' && SHOP_OWNER[shopId] ? Trust.buyMult(SHOP_OWNER[shopId]) : 1) * (typeof Rested !== 'undefined' ? Rested.buyMult() : 1))); };   // v0.2 × confianza · S3.1 × Descansado
 const shopBuysItem = (shopId, itemId) => ITEMS[itemId]?.sellable && (SHOPS[shopId].buys === 'all' || SHOPS[shopId].buys.includes(itemId));
@@ -1865,6 +1896,7 @@ function drawBoard() {
   ctx.fillStyle = '#ffde59'; ctx.font = 'bold 16px Fredoka, Arial'; ctx.fillText('🏆 TOP HOLDERS', 290, 74);
   const rows = [...market.holders, ['🧑‍💻 Tú (jugador)', GS.economy.money]].sort((a, b) => b[1] - a[1]).slice(0, 7);
   rows.forEach(([n, v], i) => { const me = n.startsWith('🧑'); ctx.fillStyle = me ? '#ffde59' : '#e0f7fa'; ctx.font = `${me ? 'bold ' : ''}14px Fredoka, Arial`; ctx.fillText(`${i + 1}. ${n}`, 290, 98 + i * 20); ctx.textAlign = 'right'; ctx.fillText(v.toLocaleString('es-ES'), 494, 98 + i * 20); ctx.textAlign = 'left'; });
+  if (GS.bigJobs?.mayor?.status === 2) { ctx.fillStyle = '#7ef0c0'; ctx.font = 'bold 13px Fredoka, Arial'; ctx.fillText(`🏅 CENSO DIGITAL · Ciudadano Ejemplar: tú (−${Math.round(CFG.censusTaxDiscount * 100)}% tasa)`, 18, 262); ctx.fillText(`📋 Empadronados: 9 · Días del sueño: ${GS.daily.dayCount} · Recursos: ${(GS.stats.itemsCollected || 0).toLocaleString('es-ES')}`, 18, 284); }   // v0.8 · Censo (Sec. 7.4)
   ctx.fillStyle = '#ffde59'; ctx.font = 'bold 12px Fredoka, Arial'; ctx.fillText(`🎫 Pozo lotería: ${Math.floor(GS.lottery.pool).toLocaleString('es-ES')} $T · Último nº: ${GS.lottery.lastDraw ? String(GS.lottery.lastDraw.num).padStart(3, '0') : '—'} · Smart Contracts: 42`, 18, 320);
   boardTex.needsUpdate = true;
 }
@@ -1966,7 +1998,7 @@ function buildPlacementValid(def, dir) {
   return true;
 }
 const buildMissing = (def) => Object.entries(def.mats).filter(([id, q]) => !Inventory.has(id, q)).map(([id, q]) => `${ITEMS[id].icon} ${ITEMS[id].name} ×${q} (tienes ${Inventory.count(id)})`);
-const buildAffordable = (def) => Wallet.canAfford(def.cost) && buildMissing(def).length === 0 && (!def.unlock || def.unlock());
+const buildAffordable = (def) => Wallet.canAfford(buildCost(def)) && buildMissing(def).length === 0 && (!def.unlock || def.unlock());
 let buildRing = null;
 function enterBuildMode(type) {
   const def = buildableById[type]; if (!def || state.build) return;
@@ -1979,7 +2011,7 @@ function enterBuildMode(type) {
   // posición inicial: delante del jugador
   const start = player.userData.dir.clone().multiplyScalar(R).addScaledVector(player.userData.fwd, 2.5).normalize();
   state.build = { type, def, preview, yaw: 0, dir: start, valid: false };
-  document.body.classList.add('build'); $('buildHud').classList.remove('hidden'); $('buildName').textContent = `${def.icon} ${def.name} · ${def.cost} $T${Object.keys(def.mats).length ? ' + ' + Object.entries(def.mats).map(([id, q]) => `${ITEMS[id].icon}×${q}`).join(' ') : ''}`;
+  document.body.classList.add('build'); $('buildHud').classList.remove('hidden'); $('buildName').textContent = `${def.icon} ${def.name} · ${buildCost(def)} $T${Object.keys(def.mats).length ? ' + ' + Object.entries(def.mats).map(([id, q]) => `${ITEMS[id].icon}×${q}`).join(' ') : ''}`;
   $('buildHelp').textContent = IS_MOBILE ? 'Toca el suelo para mover la vista previa · Rotar · Construir' : 'Mueve el ratón para colocar · Clic o Enter para construir · R rota · Esc cancela';
   updateBuildPreview(true);
 }
@@ -2002,7 +2034,7 @@ function confirmBuild() {
   const b = state.build; if (!b || !b.valid) return; const def = b.def;
   if (!buildAffordable(def)) { showToast('❌ Ya no cumples los requisitos', 'text-red-200'); return; }
   if (embargoActive()) { showToast('🔮 Embargo activo: no puedes construir', 'text-red-200'); exitBuildMode(); return; }
-  if (!Wallet.spend(def.cost, `Construcción: ${def.name}`)) return;
+  if (!Wallet.spend(buildCost(def), `Construcción: ${def.name}`)) return;   // v0.8: −15% con el Puente del Horizonte
   Object.entries(def.mats).forEach(([id, q]) => Inventory.remove(id, q));
   const rec = { id: uid(), type: def.id, dir: b.dir.toArray(), yaw: b.yaw, t: Date.now() };
   GS.world.buildings.push(rec); placeBuilding(rec); GS.stats.built = (GS.stats.built || 0) + 1;
@@ -2030,7 +2062,7 @@ const Production = {
   harvestGarden(recId) {
     const g = GS.garden, day = GS.daily.dayCount; g.byId ||= {};
     if (g.byId[recId] === day) { showToast('🌷 Este jardín ya dio su cosecha hoy. Vuelve mañana', 'text-white'); return; }
-    const bonus = Weather.gardenBonus(), wheat = CFG.gardenWheatPerDay + bonus, list = [['dream_wheat', wheat], ['flower_bouquet', CFG.gardenBouquetPerDay]];
+    const wheat = Weather.gardenWheat(CFG.gardenWheatPerDay), bonus = wheat - CFG.gardenWheatPerDay, list = [['dream_wheat', wheat], ['flower_bouquet', CFG.gardenBouquetPerDay]];
     if (!Inventory.canAddMany(list)) { showToast('🎒 Inventario lleno: libera espacio para cosechar', 'text-red-200'); return; }
     list.forEach(([id, q]) => Inventory.add(id, q, { silent: true })); g.byId[recId] = day; g.lastHarvestDay = day;
     showToast(`🌷 Cosecha: 🌾 ${wheat} Trigo Onírico${bonus ? ' (¡la lluvia ayuda!)' : ''} · 💐 ${CFG.gardenBouquetPerDay} Ramo`, 'text-white'); playChime(); SaveSystem.saveNow('garden');
@@ -2114,7 +2146,7 @@ function updateShip(dt) {
   ship.position.copy(dir).multiplyScalar(SEA + 0.05 + Math.sin(performance.now() * 0.0025) * 0.06);
   setDocked(moving === 0);
 }
-function setDocked(v) { if (v === state.shipDocked) return; state.shipDocked = v; const tk = document.getElementById('ticker'); if (v) { genTicker(); tk.style.display = 'block'; state.crateTaken = false; crate.visible = true; showToast('🚢 ¡El barco mercante ha llegado al puerto! Hay carga en el muelle 📦', 'text-white'); } else { tk.style.display = 'none'; crate.visible = false; } }
+function setDocked(v) { if (v === state.shipDocked) return; state.shipDocked = v; const tk = document.getElementById('ticker'); if (v) { state.dockCount = (state.dockCount | 0) + 1; genTicker(); tk.style.display = 'block'; state.crateTaken = false; crate.visible = true; showToast('🚢 ¡El barco mercante ha llegado al puerto! Hay carga en el muelle 📦', 'text-white'); } else { tk.style.display = 'none'; crate.visible = false; } }
 
 /* =========================================================
    12. CÁMARA ORBITAL CONTINUA (jugador → planeta completo)
@@ -2237,14 +2269,14 @@ function interactWith(obj) {
   else if (it.type === 'production') Production.use(obj);
   else if (it.type === 'wardrobe') Fitting.open('wardrobe');   // v0.7 · probador gratis (Sec. 8.2)
   else if (it.type === 'mailbox') { if (GS.housing.sealed) openSealedHousePanel(); else openHousePanel('mail'); }   // v0.5   // v0.4 · Jardín / Molino / Fuente
-  else if (it.type === 'crate') { if (state.crateTaken) return; if (Inventory.add('merchant_crate', 1)) { state.crateTaken = true; crate.visible = false; playChime(); } }
+  else if (it.type === 'crate') { if (state.crateTaken) return; if (Inventory.add('merchant_crate', 1)) { state.crateTaken = true; crate.visible = false; playChime(); importsOnCrate(); } }   // v0.8: + 1 importación de Ultramar por atraque
   else if (it.type === 'vendor') startVendorDialog();
   else if (it.type === 'store') { if (!canControl()) return; openApp('🦝 Tienda de Rocco', '', (b) => mountItemShop(b, 'store')); }
 }
 /** RECOGER FRUTA → INVENTARIO (se vende después en las tiendas por 50 $TOKEN) */
 function harvest(f) {
   if (!f.userData.ready) return;
-  if (!Inventory.add('golden_fruit', 1)) return; // inventario lleno: la fruta sigue en el árbol
+  if (!Inventory.add('golden_fruit', Weather.fruitMult())) return; // inventario lleno: la fruta sigue en el árbol · v0.8: lluvia + Climatizador ×2
   f.userData.ready = false; f.visible = false; f.userData.respawnAt = Date.now() + CFG.fruitCooldown * (typeof AuraFX !== 'undefined' ? AuraFX.cooldownMult() : 1);
   GS.farm.fruits[fruits.indexOf(f)] = f.userData.respawnAt; GS.stats.fruitsHarvested++;
   playBeep(1046, 0.1, 'triangle'); const wp = new THREE.Vector3(); f.getWorldPosition(wp); spawnConfetti(wp, 18); SaveSystem.save('harvest');
@@ -2280,6 +2312,7 @@ function serviceBtns(npcId) {
   if (npcId === 'glover' && typeof openFurnitureShop === 'function') btns.push(dialogButton('🛋️ Muebles', 'bg-emerald-200 text-[#2b2b3d]', () => openFurnitureShop()));   // S3.5 (Sec. 6.8)
   if (npcId === 'hedgehogs' && GS.missions?.hedgehogs?.status === 2) btns.push(dialogButton('🕶️ Boutique Viral', 'bg-fuchsia-200 text-[#2b2b3d]', () => Boutique.open()));   // v0.7 (Sec. 8.4 y 8.9): tras su misión
   if (npcId === 'sombra') btns.push(dialogButton('🎫 Billete del Despertar', 'bg-yellow-200 text-[#2b2b3d]', () => openDreamTicketPanel()));   // S2.5 (Sec. 5.10)
+  btns.push(...act2ServiceBtns(npcId));   // v0.8: sistemas de los Trabajos Mayores (pedidos, censo, feria, obra, oráculo, clima, muelle, agencia)
   return btns;
 }
 
@@ -2425,7 +2458,8 @@ function startDialog(npcId) {
     typeText(ui.dialogText, `${greet} ${n.intro}`, 16, () => ui.dialogButtons.append(openBtn, ...encBtns(npcId), ...serviceBtns(npcId), giftBtn, ...shopBtns(), dialogButton('Más tarde', 'bg-slate-200 text-[#2b2b3d]', () => { setMissionStatus(npcId, 1); endDialog(); })));
   }
   else if (m.status === 1) typeText(ui.dialogText, `${greet} ${n.waiting}`, 16, () => ui.dialogButtons.append(openBtn, ...encBtns(npcId), ...serviceBtns(npcId), giftBtn, ...shopBtns(), closeBtn));
-  else typeText(ui.dialogText, `${greet} ${n.done}`, 16, () => ui.dialogButtons.append(dialogButton(`✨ Abrir ${APP_TITLES[n.app]}`, 'bg-emerald-300 text-[#2b2b3d]', () => openUnlockedApp(n.app)), ...encBtns(npcId), ...serviceBtns(npcId), giftBtn, ...shopBtns(), dialogButton('¡Hasta luego!', 'bg-slate-200 text-[#2b2b3d]', endDialog)));
+  else { const bj = bigJobDialog(npcId);   // v0.8 · Acto 2: oferta / espera / sistema del Trabajo Mayor (Sec. 7.4)
+    typeText(ui.dialogText, `${greet} ${bj ? bj.text : n.done}`, 16, () => ui.dialogButtons.append(...(bj ? bj.btns : []), dialogButton(`✨ Abrir ${APP_TITLES[n.app]}`, 'bg-emerald-300 text-[#2b2b3d]', () => openUnlockedApp(n.app)), ...encBtns(npcId), ...serviceBtns(npcId), giftBtn, ...shopBtns(), dialogButton('¡Hasta luego!', 'bg-slate-200 text-[#2b2b3d]', endDialog))); }
 }
 function endDialog() { clearInterval(typeTimer); ui.dialog.classList.add('hidden'); tweenCamera(camPose(), 0.7, () => { state.mode = 'player'; }); }
 /** 🎁 Selector de regalos: inventario con los puntos que daría cada objeto (preferencias + decaimiento del día) */
@@ -2453,9 +2487,79 @@ function openGiftPicker(npcId) {
 }
 function setMissionStatus(id, status) { GS.missions[id].status = status; if (status === 2) GS.missions[id].completedAt = Date.now(); refreshMissionUI(); SaveSystem.save('mission:' + id); }
 /* ===== v0.6 · HUD de misiones por actos (Sec. 7.3 y 7.9) =====
-   Acto 1: MISIONES n/7. Al completarlas: «ACTO 2 · TRABAJOS MAYORES n/7» (lee GS.bigJobs[id].status, que rellenará v0.8).
+   Acto 1: MISIONES n/7. Al completarlas: «ACTO 2 · TRABAJOS MAYORES n/7» (lee GS.bigJobs[id].status · v0.8: BIG_JOBS reales).
    Pestañas: Principales · Trabajos Mayores · Encargos de hoy. La pestaña elegida es solo UI (state). */
-const BIG_JOB_TEASERS = { bear: 'OsoExpress', mayor: 'Censo Digital', glover: 'El Puente del Horizonte', sombra: 'El Oráculo de los Mercados', dax: 'El Climatizador Onírico', sam: 'Rutas del Horizonte', hedgehogs: 'Agencia Viral' };   // títulos de Sec. 7.4 (v0.8 aportará BIG_JOBS completos)
+/* ===== v0.8 · LOS 7 TRABAJOS MAYORES (Guía Sec. 7.4 y 7.9) =====
+   Mismo esquema que NPCS[].mission (title, app, comps, prompt, code, preview) + textos de diálogo + sistema que desbloquea.
+   Requisitos comunes (Sec. 7.4): misión principal del NPC completada + confianza ❤️ Socio (CFG.bigJobTrustLevel).
+   Recompensas en CFG.bigJobRewards (23.500 $T en total) · +30 confianza · sistema permanente (ver bloque v0.8 · sistemas). */
+const BIG_JOBS = {
+  bear: { short: 'OsoExpress', title: 'OsoExpress — La Franquicia del Horno', app: 'franquicia.html', comps: 'Pedidos recurrentes, Rutas de reparto, Club de clientes', system: '📦 Pedidos del Horno',
+    intro: '¡Socio! La panadería ya no da abasto: me llegan pedidos de todo el planeta y yo con un horno y dos patas. ¿Me montas una franquicia con tu laptop? Pedidos recurrentes, repartos, club de clientes… ¡OsoExpress! 🥐',
+    waiting: '¿Cómo va OsoExpress? Tengo tres pedidos apuntados en una servilleta y ya no sé cuál es cuál. 🥐',
+    celebrate: '¡La web trae más pedidos que horno tengo! ¡Necesito un proveedor oficial y eres tú! Cada día te dejaré un pedido grande de tu cocina, y lo pago mejor que nadie. ¡Huele a futuro! 🎉',
+    done: '¡OsoExpress va como un tiro! Mira el pedido de hoy: tu cocina y mi horno, socios. 🥐',
+    teaser: 'Oye… tengo una idea GRANDE para la panadería. Pero eso es cosa de socios, ¿eh?',
+    prompt: 'Crea "OsoExpress", la franquicia digital de la Panadería del Oso: pedidos recurrentes de clientes, rutas de reparto en bici optimizadas, club de fidelidad y un proveedor oficial que cocina los productos premium. Pagos en $TOKEN con margen de socio. 🐻🚲',
+    code: ['// franquicia.html · OsoExpress Enterprise', 'import { Pedidos, Rutas, Club } from "villager-commerce";', 'const proveedor = await Socios.oficial({ npc: "oso", desde: "tu-cocina" });', 'Pedidos.diario(async (dia) => {', '  const pedido = await IA.predecirDemanda({ productos: ["Mermelada", "Pastel Dorado", "Pan"], dia });', '  pedido.precio = pedido.valorTienda * 1.5; // tarifa de socio', '  return proveedor.encargar(pedido);', '});', 'Rutas.optimizar({ vehiculo: "triciclo", paradas: Club.miembros() });', 'Club.recompensas({ sello: "🥐", cada: 10 });', 'PlanetWallet.liquidar({ a: proveedor, token: "$TOKEN" });', 'Horno.encender({ modo: "franquicia", humo: "a vainilla" });'],
+    preview: previewShell('bg-rose-400', '🛺 OsoExpress', 'Franquicia del Horno · pedidos recurrentes · reparto en triciclo', card('📦', 'Pedido del día', '×1,5 $TOKEN') + card('🗺️', 'Rutas', '12 paradas') + card('💳', 'Club', '1.204 socios')) },
+  mayor: { short: 'Censo Digital', title: 'Censo Digital — El Formulario Definitivo', app: 'censo.html', comps: 'Registro ciudadano, Estadísticas municipales, Pozo en vivo', system: '🏅 Ciudadano Ejemplar (−10% tasa) + 📊 estadísticas',
+    intro: '¡Ejem! Este ayuntamiento ha decidido… modernizarse. Un Censo Digital: registro de ciudadanos, estadísticas municipales y el pozo de la lotería a la vista de todos. Sin un solo papel. (Le tiembla el bigote al decirlo.) ¿Se encarga usted, socio?',
+    waiting: '¡Ejem! ¿El censo? Los formularios 114-C se están reproduciendo en el archivo. Literalmente.',
+    celebrate: '¡Ejem! Por fin un censo sin un solo papel. Este ayuntamiento le concede el título de Ciudadano Ejemplar. Con su correspondiente descuento fisc— administrativo.',
+    done: '¡Ejem! El censo funciona de maravilla. Consulte sus estadísticas cuando guste, Ciudadano Ejemplar.',
+    teaser: '(Ejem… este ayuntamiento tiene en mente un proyecto de INFRAESTRUCTURA CRÍTICA. Solo para socios de plena confianza.)',
+    prompt: 'Crea el "Censo Digital" del Ayuntamiento: registro de ciudadanos sin papel, estadísticas municipales en vivo (recursos recogidos, días vividos, ranking local), el pozo de la lotería publicado en el Tablón y el título de Ciudadano Ejemplar con su bonificación fiscal. 🐶📊',
+    code: ['// censo.html · Formulario Definitivo (sustituye a 4.000 formularios)', 'contract CensoOnirico {', '  mapping(address => Ciudadano) public registro;', '  function empadronar(string nombre) external { registro[msg.sender] = Ciudadano(nombre, block.timestamp); }', '  function tituloEjemplar(address c) external onlyAlcalde { ejemplar[c] = true; tasa[c] = 90; // % de la tasa base', '  }', '}', 'const stats = await Municipio.estadisticas(["recursos", "diasVividos", "ranking"]);', 'Tablon.publicar({ pozoLoteria: await Loteria.pozo(), stats, holo: true });', 'Archivo.formularios.forEach(f => f.reciclar()); // adiós, 114-C', 'Sello.estampar("APROBADO", { ruido: "¡Ejem!" });'],
+    preview: previewShell('bg-blue-600', '📊 Censo Digital', 'Registro ciudadano · estadísticas en vivo · cero papeles', card('🏅', 'Ciudadano Ejemplar', '−10% tasa') + card('🎫', 'Pozo lotería', 'público') + card('📈', 'Ranking local', 'en vivo')) },
+  glover: { short: 'El Puente del Horizonte', title: 'El Puente del Horizonte — La Gran Obra', app: 'granobra.html', comps: 'Planos colaborativos, Gestión de materiales, Fases de obra', system: '🌉 Gran Obra comunitaria → −15% construcción',
+    intro: 'Mira. Llevo toda la vida queriendo construir algo que mire al horizonte. No me preguntes por qué. (Lo sabe. No lo dice.) Necesito una app de gran obra: planos colaborativos, materiales, fases. Y tu cacharro. Sí, lo he dicho.',
+    waiting: '¿Los planos de la Gran Obra? Tolerancia cero, ¿eh? El horizonte no admite chapuzas.',
+    celebrate: 'Aceptable. Casi milimétrico. Ahora viene lo difícil: la obra. Cinco fases, una por día. Tú traes troncos, piedras y alguna gema; yo pongo el oficio. Tu nombre irá en la placa, al lado del mío.',
+    done: 'La Gran Obra avanza. Trae los materiales de la siguiente fase: una al día, sin prisas pero sin pausa.',
+    doneLine: () => (Bridge.done() ? 'Ahí está. Un puente que mira al horizonte. Lo medimos dos veces y salió bien. No pregunto más.' : 'La Gran Obra avanza. Trae los materiales de la siguiente fase: una al día, sin prisas pero sin pausa.'),
+    teaser: 'Tengo unos planos guardados… de algo grande. Pero esos solo se los enseño a un socio de obras.',
+    prompt: 'Crea "La Gran Obra": gestor colaborativo para construir el Puente del Horizonte, un puente-mirador en la costa. Planos con tolerancia cero, inventario de materiales donados (troncos, piedras, gemas), 5 fases de obra de un día cada una y una placa con el nombre de los autores. 🦫🌉',
+    code: ['// granobra.html · Puente del Horizonte', 'import { Blueprint, Fases } from "villager-3d";', 'const plano = await AI.blueprint("puente-mirador que apunta al horizonte", { tolerancia: 0 });', 'const obra = new Fases(plano, { fases: 5, unaPorDia: true });', 'obra.materiales({ troncos: true, piedras: true, gemas: "pocas pero buenas" });', 'obra.on("fase", (n) => Andamios.retirar(n));', 'obra.on("fin", () => {', '  Mundo.alzar("PuenteDelHorizonte", { costa: "puerto", luz: "faro" });', '  Placa.grabar(["Glover", jugador.nombre]);', '  Construccion.descuento(0.15); // los materiales saben quién eres', '});', 'Glover.medir({ veces: 2 }); // si sale bien, no pregunto'],
+    preview: previewShell('bg-amber-600', '🌉 La Gran Obra', 'Planos colaborativos · 5 fases · tolerancia cero', card('📐', 'Planos', '±0 mm') + card('🧱', 'Materiales', 'donaciones') + card('🌅', 'Mirador', 'al horizonte')) },
+  sombra: { short: 'El Oráculo de los Mercados', title: 'El Oráculo de los Mercados — La Bola Rentable', app: 'oraculo.html', comps: 'Predicción de tendencias, Sentimiento onírico, Runas de precisión', system: '🔮 Predicción diaria de la feria (~70%)',
+    intro: 'Mmm… socio. Mi bola de cristal ve el futuro de los mercados, pero lo cuenta en acertijos. Tradúcela a tu máquina: predicción de tendencias, sentimiento onírico, runas de precisión. El azar también tiene derechos, soñador… pero no todos.',
+    waiting: 'La bola se impacienta. Y cuando se impacienta, se empaña.',
+    celebrate: 'Curioso. La bola muestra tu futuro y solo veo… un escritorio. Debe estar estropeada. Mmm. Desde hoy, una predicción gratis cada noche en tu buzón. Acierta casi siempre. Casi.',
+    done: 'La bola habla cada noche en tu buzón. Recuerda: el azar también tiene derechos, soñador.',
+    teaser: 'La bola quiere decirte algo… pero solo habla con mis socios. Mmm.',
+    prompt: 'Construye "El Oráculo de los Mercados": un modelo que lee la bola de cristal y predice qué categoría de la feria del Tablón subirá o bajará mañana, con análisis de sentimiento onírico y runas de precisión. Debe declarar honestamente su porcentaje de acierto. 🐈‍⬛🔮',
+    code: ['// oraculo.html · La Bola Rentable', 'const bola = await Cristal.conectar({ propietaria: "Madame Sombra", humor: "críptico" });', 'const sentimiento = await IA.sentimiento(Sueno.susurros({ ultimos: "7 días" }));', 'async function predecir(manana) {', '  const runas = Runas.tirar(13);', '  const vision = await bola.leer({ runas, sentimiento, dia: manana });', '  return { categoria: vision.categoria, sube: vision.sube, precision: 0.70 }; // honestidad: P5', '}', 'Buzon.cadaNoche(async () => Carta.enviar(await predecir(Dia.manana())));', 'if (bola.ve("escritorio")) console.warn("…debe estar estropeada. Mmm.");', 'Azar.derechos.respetar();'],
+    preview: previewShell('bg-purple-800', '🔮 El Oráculo', 'Predicción de tendencias · sentimiento onírico · ~70% de acierto', card('📈', 'Mañana', 'sube…') + card('🌙', 'Sentimiento', 'inquieto') + card('🎯', 'Precisión', '~70%')) },
+  dax: { short: 'El Climatizador Onírico', title: 'El Climatizador Onírico — ¡¡METEOROLOGÍA APLICADA!!', app: 'climatizador.html', comps: 'Control de estaciones, Sensores, Alertas', system: '🌦️ Clima con efectos (sol, tormenta…) + aviso + siembra',
+    intro: '¡¡SOCIO DE CIENCIA!! ¡Mi modelo ya PREDICE el clima! ¡Ahora quiero CONTROLARLO! ¡Un Climatizador Onírico! ¡Sensores! ¡Alertas! ¡Estaciones del sueño! ¿Me ayudas? ¿Me ayudas? ¿ME AYUDAS?',
+    waiting: '¡¿El Climatizador?! ¡Las nubes me miran raro! ¡Creo que saben algo!',
+    celebrate: '¡¡AHORA SÍ!! ¡El clima obedece a la CIENCIA! (Susurro) bueno, al 98,7% de la ciencia.',
+    done: '¡El Climatizador avisa con un día de antelación! ¡Y si siembras nubes, el cielo te hace caso! ¡CIENCIA!',
+    teaser: '¡Tengo un proyecto TOP SECRET! ¡Solo para socios de ciencia! ¡Ups, ya lo he dicho!',
+    prompt: 'Crea "El Climatizador Onírico": control de las estaciones del sueño con sensores y alertas. El clima gana efectos reales (lluvia, ola de sol, tormenta, lluvia de estrellas), avisa con un día de antelación y permite sembrar nubes una vez al día. 🦎🌦️',
+    code: ['// climatizador.html · METEOROLOGÍA APLICADA', 'import { Sensores, Estaciones } from "dax-science";', 'const red = await Sensores.desplegar({ anemometros: 3, antenas: 1, pantallas: "grandes" });', 'Estaciones.registrar({', '  lluvia:   { cosechas: 2, jardin: 2, pesca: "+tropical" },', '  olaDeSol: { hambre: 1.5, oso: "vende más" },', '  tormenta: { pesca: "la mejor", pezDorado: "×3 también de día" },', '  estrellas:{ fragmentos: [5, 8] },', '});', 'Alertas.cadaNoche((manana) => Buzon.carta(Estaciones.pronostico(manana))); // 1 día de antelación', 'Nubes.sembrar({ unaVezAlDia: true }); // ¡¡CIENCIA!!', 'console.log("Precisión: 98,7% (lo calculé yo… creo)");'],
+    preview: previewShell('bg-cyan-600', '🌦️ Climatizador', 'Estaciones del sueño · sensores · alertas', card('⛈️', 'Tormenta', 'pesca top') + card('🔆', 'Ola de sol', 'hambre ×1,5') + card('🌧️', 'Lluvia', 'cosecha ×2')) },
+  sam: { short: 'Rutas del Horizonte', title: 'Rutas del Horizonte — El Mercante de Ultramar', app: 'rutas.html', comps: 'Nuevas rutas, Catálogo de importación, Seguro de mercancías', system: '🚢 Importaciones de Ultramar + telas imposibles',
+    intro: 'Arrr, socio. He echado las cuentas: el barco va y viene, pero siempre por las mismas aguas. Quiero rutas nuevas, grumete. Catálogo de importación, seguro de mercancías… cosas que no salen en ningún mapa.',
+    waiting: '¿Las rutas? Mi brújula sigue apuntando arriba. Igual es la ruta buena.',
+    celebrate: 'Arrr… las nuevas rutas traen cosas que no existen en ningún mapa, grumete. Porque el mapa… bueno. Tú ya sabes del mapa.',
+    done: 'Cada vez que atraca el mercante trae algo de Ultramar, grumete. Mira la caja del muelle. Y las telas… arrr, las telas.',
+    teaser: 'Arrr… hay aguas que solo navego con socios, grumete. Algún día te las enseño.',
+    prompt: 'Programa "Rutas del Horizonte": nuevas rutas para el barco mercante de Sam hacia más allá del sueño, un catálogo de importación (especias oníricas, telas imposibles, objetos de colección) y un seguro de mercancías. Cada atraque deja 1 objeto exclusivo en la caja del muelle. 🦤🚢',
+    code: ['// rutas.html · El Mercante de Ultramar', 'const mapa = await Cartografia.cargar({ hasta: "el borde" }); // ¿qué borde? no preguntes', 'const rutas = await AI.route({ desde: "Puerto Sam", hasta: mapa.fueraDelSueno, evitar: ["tormentas", "lógica"] });', 'Catalogo.importacion([', '  "Especias Oníricas", "Brújula del Cielo", "Reloj sin Horas", "Mapa del Borde",', '  ...Telas.imposibles(12),', ']);', 'Barco.on("atraque", (b) => Muelle.caja.meter(Catalogo.aleatorio(1)));', 'Seguro.cubrir({ mercancia: "todo", excepto: "botas viejas" });', 'Brujula.calibrar(); // sigue apuntando arriba. vale.'],
+    preview: previewShell('bg-sky-700', '🚢 Rutas del Horizonte', 'Importaciones de Ultramar · 1 objeto exclusivo por atraque', card('🌶️', 'Especias', 'oníricas') + card('🧵', 'Telas', 'imposibles') + card('🗺️', 'Colección', 'alto valor')) },
+  hedgehogs: { short: 'Agencia Viral', title: 'Agencia Viral — El Algoritmo Domesticado', app: 'agencia.html', comps: 'Calendario de tendencias, Analytics, Campañas', system: '🔥 Tendencia del Día (venta ×2)',
+    intro: '¡JEFE DE CONTENIDO! Bro, queremos una agencia. (Una AGENCIA, bro.) Calendario de tendencias, analytics, campañas… ¡Vamos a domesticar al algoritmo!',
+    waiting: '¿La agencia, bro? El algoritmo ya nos está mirando. (Es una ruleta, Pip.) ¡SHH!',
+    celebrate: '¡BRO! ¡Hemos hackeado el algoritmo! (Era solo una ruleta.) ¡NO DIGAS ESO, PIP!',
+    done: 'Cada mañana, un objeto en tendencia, bro. 🔥 Mira la valla. Se vende al doble. (Mamá ya lo sabe.)',
+    teaser: 'Bro… tenemos un proyecto de agencia. Pero solo para socios creativos, bro. (Mamá dice que pronto.)',
+    prompt: 'Crea la "Agencia Viral" de Barnaby Jr. & Pip: calendario de tendencias, analytics y campañas. Cada mañana un objeto del sueño entra en tendencia (🔥 en mochila y tiendas): su precio de venta a los vecinos y su probabilidad en el escaparate se duplican durante ese día. 🦔🔥',
+    code: ['// agencia.html · El Algoritmo Domesticado', 'import { Tendencias, Analytics, Campanas } from "viral-bro";', 'const calendario = Tendencias.calendario({ semilla: partida.id }); // determinista, bro', 'Dia.cadaManana((dia) => {', '  const objeto = calendario.ruleta(dia); // (es una ruleta) (¡SHH!)', '  Tiendas.precioVenta(objeto, x => x * 2);', '  Escaparate.probabilidad(objeto, p => p * 2);', '  Iconos.marcar(objeto, "🔥");', '});', 'Analytics.track("mamá"); // 1 fan fiel', 'Campanas.lanzar({ hashtag: "#TOKEN", tono: "BRO" });'],
+    preview: previewShell('bg-fuchsia-600', '🔥 Agencia Viral', 'Tendencia del día · analytics · campañas', card('🔥', 'Tendencia', '×2 venta') + card('📊', 'Analytics', '1M visitas') + card('📣', 'Campañas', 'virales')) },
+};
+const bigJobSteps = (who, comps, app) => [[8, `🏢 Reunión de requisitos con ${who}…`], [20, '📐 Arquitectura de nivel empresarial…'], [34, `⚙️ Generando módulos: ${comps}…`], [50, '🗄️ Base de datos onírica + caché…'], [64, '🪙 Integrando $TOKEN (PlanetWallet SDK Pro)…'], [78, '📊 Conectando con la economía del sueño…'], [90, '🧪 Pruebas de carga con todo el pueblo…'], [100, `🚀 En producción: https://planet.local/${app} ✅`]];
 const bigJobsDoneCount = () => NPCS.filter(n => GS.bigJobs?.[n.id]?.status === 2).length;
 const MISSION_TABS = [['main', '📜 Principales'], ['big', '🏗️ Trabajos Mayores'], ['enc', '📋 Encargos de hoy']];
 function refreshMissionUI() {
@@ -2464,7 +2568,8 @@ function refreshMissionUI() {
   if (act2) {
     const bj = bigJobsDoneCount(), cur = NPCS.find(n => GS.bigJobs?.[n.id]?.status === 1);
     if (lbl) lbl.textContent = 'ACTO 2 · TRABAJOS MAYORES'; ui.missionCount.textContent = `${bj}/${CFG.act2BigJobs}`;
-    ui.missionText.textContent = bj >= CFG.act2BigJobs ? '🏆 ¡Todos los Trabajos Mayores completados!' : cur ? `🏗️ ${cur.emoji} ${BIG_JOB_TEASERS[cur.id]} (usa la laptop)` : '🏗️ Pronto: los vecinos te encargarán Trabajos Mayores';
+    const rdy = NPCS.find(n => (GS.bigJobs?.[n.id]?.status | 0) === 0 && bigJobReady(n.id));
+    ui.missionText.textContent = bj >= CFG.act2BigJobs ? '🏆 ¡Todos los Trabajos Mayores completados!' : cur ? `🏗️ ${cur.emoji} ${BIG_JOBS[cur.id].short} (usa la laptop)` : rdy ? `🏗️ ${rdy.emoji} ${BIG_JOBS[rdy.id].short}: habla con ${rdy.name}` : `🏗️ Sube a ${TRUST_LEVELS[CFG.bigJobTrustLevel].heart} ${TRUST_LEVELS[CFG.bigJobTrustLevel].name} con un vecino para su Trabajo Mayor`;
   } else {
     if (lbl) lbl.textContent = 'MISIONES'; ui.missionCount.textContent = `${done}/${NPCS.length}`;
     const next = NPCS.find(n => state.missions[n.id].status === 1) || NPCS.find(n => state.missions[n.id].status === 0);
@@ -2473,17 +2578,22 @@ function refreshMissionUI() {
   const tab = state.missionTab || (act2 ? 'big' : 'main');
   let html = `<div class="flex flex-wrap gap-1 mb-1">` + MISSION_TABS.map(([id, label]) => `<button data-mtab="${id}" class="btn-game px-2 py-0.5 text-[10px] ${tab === id ? 'active' : 'bg-white'}">${label}${id === 'main' ? ` ${done}/${NPCS.length}` : id === 'big' ? ` ${bigJobsDoneCount()}/${CFG.act2BigJobs}` : ''}</button>`).join('') + `</div>`;
   if (tab === 'big') {
-    html += NPCS.map(n => { const st = GS.bigJobs?.[n.id]?.status | 0, mOk = state.missions[n.id].status === 2, tOk = Trust.level(n.id) >= 3; const ready = mOk && tOk;
-      return `<div class="flex items-center gap-2 text-xs font-semibold p-1.5 rounded-lg ${st === 2 ? 'bg-emerald-100' : st === 1 ? 'bg-amber-100' : 'bg-slate-100'}"><span class="text-base">${n.emoji}</span><div class="flex-1 min-w-0"><div class="truncate">${BIG_JOB_TEASERS[n.id]}</div><div class="text-[10px] text-slate-500">${mOk ? '✅' : '▫️'} misión · ${tOk ? '✅' : '▫️'} ${TRUST_LEVELS[3].heart} ${TRUST_LEVELS[3].name}</div></div><span>${st === 2 ? '✅' : st === 1 ? '⏳' : ready ? '🔜' : '🔒'}</span></div>`; }).join('');
-    html += `<div class="text-[10px] text-slate-500 mt-1 leading-snug">${act2 ? 'Los vecinos están preparando encargos de nivel empresarial. Pronto podrás generarlos en la laptop.' : 'Se abren en el Acto 2: completa las 7 misiones principales.'} Requisitos: su misión principal + confianza ${TRUST_LEVELS[3].name} ${TRUST_LEVELS[3].heart}.</div>`;
+    const TL = TRUST_LEVELS[CFG.bigJobTrustLevel];
+    html += NPCS.map(n => { const def = BIG_JOBS[n.id], st = GS.bigJobs?.[n.id]?.status | 0, mOk = state.missions[n.id].status === 2, tOk = Trust.level(n.id) >= CFG.bigJobTrustLevel; const ready = mOk && tOk;
+      const sub = st === 2 ? `${def.system}${n.id === 'glover' && !Bridge.done() ? ` · obra ${Bridge.phase()}/${Bridge.phases()}` : ' · ✓ activo'}` : `${mOk ? '✅' : '▫️'} misión · ${tOk ? '✅' : '▫️'} ${TL.heart} ${TL.name} · +${fmt(CFG.bigJobRewards[n.id] || 0)} $T`;
+      return `<div class="flex items-center gap-2 text-xs font-semibold p-1.5 rounded-lg ${st === 2 ? 'bg-emerald-100' : st === 1 ? 'bg-amber-100' : 'bg-slate-100'}"><span class="text-base">${n.emoji}</span><div class="flex-1 min-w-0"><div class="truncate">${def.short}</div><div class="text-[10px] text-slate-500 truncate">${sub}</div></div><span>${st === 2 ? '✅' : st === 1 ? '⏳' : ready ? '❗' : '🔒'}</span><button data-go="${n.id}" class="btn-game px-2 py-0.5 bg-sky-200 text-[10px]">Ir</button></div>`; }).join('');
+    html += `<div class="text-[10px] text-slate-500 mt-1 leading-snug">Requisitos (Sec. 7.4): su misión principal + confianza ${TL.heart} ${TL.name}. Se generan en la laptop 💻 y cada uno deja un sistema económico permanente.</div>`;
   } else if (tab === 'enc') {
     const rows = NPCS.map(n => { const cur = currentEncargo(n.id); const it = cur && cur.q && ITEMS[cur.q.item]; if (!it) return '';
-      return `<div class="flex items-center gap-2 text-xs font-semibold p-1.5 rounded-lg ${cur.done ? 'bg-emerald-100' : 'bg-slate-100'}"><span class="text-base">${n.emoji}</span><div class="flex-1 min-w-0"><div class="truncate">${it.icon} ${cur.q.qty}× ${esc(it.name)} <span class="text-slate-400">(${Inventory.count(cur.q.item)}/${cur.q.qty})</span></div><div class="text-[10px] text-slate-500">${n.name} · +${cur.q.tokens} $TOKEN · +${cur.q.trust} confianza</div></div><span>${cur.done ? '✅' : '📋'}</span>${cur.done ? '' : `<button data-go="${n.id}" class="btn-game px-2 py-0.5 bg-sky-200 text-[10px]">Ir</button>`}</div>`; }).join('');
-    html += rows || `<div class="text-[11px] text-slate-500 p-1.5">Aún nadie te hace encargos. Los vecinos te los piden desde ${TRUST_LEVELS[2].heart} ${TRUST_LEVELS[2].name} (y el Oso tiene uno de bienvenida).</div>`;
+      return `<div class="flex items-center gap-2 text-xs font-semibold p-1.5 rounded-lg ${cur.done ? 'bg-emerald-100' : 'bg-slate-100'}"><span class="text-base">${n.emoji}</span><div class="flex-1 min-w-0"><div class="truncate">${it.icon} ${cur.q.qty}× ${esc(it.name)} <span class="text-slate-400">(${Inventory.count(cur.q.item)}/${cur.q.qty})</span></div><div class="text-[10px] text-slate-500">${n.name} · +${cur.q.tokens} $TOKEN · +${cur.q.trust} confianza${!cur.tutorial && !cur.done && Trust.level(n.id) >= 3 ? ' · 💼 premium ×3' : cur.enc?.premium ? ' · 💼 premium' : ''}</div></div><span>${cur.done ? '✅' : '📋'}</span>${cur.done ? '' : `<button data-go="${n.id}" class="btn-game px-2 py-0.5 bg-sky-200 text-[10px]">Ir</button>`}</div>`; }).join('');
+    const oso = bigJobDone('bear') ? BakeryOrders.today() : null;   // v0.8 · Pedido del Horno
+    if (oso) html += `<div class="flex items-center gap-2 text-xs font-semibold p-1.5 rounded-lg ${oso.done ? 'bg-emerald-100' : 'bg-orange-100'}"><span class="text-base">📦</span><div class="flex-1 min-w-0"><div class="truncate">OsoExpress: ${oso.items.map(([id, q]) => `${q}× ${ITEMS[id].icon}`).join(' + ')}</div><div class="text-[10px] text-slate-500">Pedido del Horno · +${fmt(oso.pay)} $TOKEN</div></div><span>${oso.done ? '✅' : '📦'}</span>${oso.done ? '' : `<button data-go="bear" class="btn-game px-2 py-0.5 bg-sky-200 text-[10px]">Ir</button>`}</div>`;
+    html += rows || (oso ? '' : `<div class="text-[11px] text-slate-500 p-1.5">Aún nadie te hace encargos. Los vecinos te los piden desde ${TRUST_LEVELS[2].heart} ${TRUST_LEVELS[2].name} (y el Oso tiene uno de bienvenida).</div>`);
     html += `<div class="text-[10px] text-slate-500 mt-1">Caducan a medianoche onírica: mañana, otros.</div>`;
   } else html += NPCS.map(n => { const s = state.missions[n.id].status; const gate = s === 0 && !missionGateOk(n.id); const gateTxt = gate ? ` · 🔒 ${TRUST_LEVELS[NPC_SOCIAL[n.id]?.trustRequired ?? 0].name}` : ''; return `<div class="flex items-center gap-2 text-xs font-semibold p-1.5 rounded-lg ${s === 2 ? 'bg-emerald-100' : s === 1 ? 'bg-amber-100' : 'bg-slate-100'}"><span class="text-base">${n.emoji}</span><div class="flex-1 min-w-0"><div class="truncate">${n.mission.title}</div><div class="text-[10px] text-slate-500">${n.name} ${trustLvIcon(n.id)}${gateTxt} · +${n.reward} $TOKEN</div></div><span>${s === 2 ? '✅' : s === 1 ? '⏳' : gate ? '🔒' : '❗'}</span><button data-go="${n.id}" class="btn-game px-2 py-0.5 bg-sky-200 text-[10px]">Ir</button></div>`; }).join('');
   ui.missionList.innerHTML = html;
   ui.missionList.querySelectorAll('[data-mtab]').forEach(b => b.onclick = (e) => { e.stopPropagation(); state.missionTab = b.dataset.mtab; refreshMissionUI(); });
+  refreshNpcBubbles();   // v0.8: ★ sobre los vecinos con Trabajo Mayor disponible
   ui.missionList.querySelectorAll('[data-go]').forEach(b => b.onclick = () => { const obj = npcObjs[b.dataset.go]; const up = obj.userData.up; const away = tangent(player.position.clone().sub(obj.position), up); setMoveTarget(obj.position.clone().addScaledVector(away, 2).normalize()); state.pendingInteract = obj; showToast(`🧭 Viajando hacia ${npcById[b.dataset.go].name}…`, 'text-white'); });
 }
 ui.btnMissions.onclick = () => { ui.missionList.classList.toggle('hidden'); if (!ui.missionList.classList.contains('hidden')) refreshMissionUI(); };
@@ -2519,17 +2629,20 @@ function currentEncargo(npcId) {
 /** Botón 📋 de los diálogos (vacío si el NPC aún no ofrece encargos). La llama encBtns() desde startDialog. */
 function encargoBtns(npcId) {
   const cur = currentEncargo(npcId); if (!cur) return [];
-  return [dialogButton(cur.done ? '📋 Encargo ✓' : cur.tutorial ? '📋 Encargo: 3 🐚' : '📋 Encargo del día', 'bg-emerald-200 text-[#2b2b3d]', () => openEncargo(npcId))];
+  return [dialogButton(cur.done ? '📋 Encargo ✓' : cur.tutorial ? '📋 Encargo: 3 🐚' : Trust.level(npcId) >= 3 ? '📋 Encargo del día (💼 premium)' : '📋 Encargo del día', 'bg-emerald-200 text-[#2b2b3d]', () => openEncargo(npcId))];
 }
 /** Entrega: quita los objetos, paga $TOKEN y confianza, marca hecho. Devuelve true si se entregó. */
-function deliverEncargo(npcId) {
+function deliverEncargo(npcId, premium = false) {
   const cur = currentEncargo(npcId); if (!cur || cur.done) return false; const q = cur.q;
-  if (!Inventory.has(q.item, q.qty)) { showToast(`❌ Te faltan ${q.qty - Inventory.count(q.item)} × ${ITEMS[q.item].name}`, 'text-red-200'); return false; }
-  Inventory.remove(q.item, q.qty);
+  premium = !!premium && !cur.tutorial && Trust.level(npcId) >= 3;   // v0.8 · encargo premium (Sec. 7.6): ×3 cantidad, ×3 $TOKEN, +8 confianza, +1 rumor
+  const qty = q.qty * (premium ? CFG.premiumMult : 1), tokens = q.tokens * (premium ? CFG.premiumMult : 1), trust = premium ? CFG.premiumTrust : q.trust;
+  if (!Inventory.has(q.item, qty)) { showToast(`❌ Te faltan ${qty - Inventory.count(q.item)} × ${ITEMS[q.item].name}`, 'text-red-200'); return false; }
+  Inventory.remove(q.item, qty);
   if (cur.tutorial) GS.encargos[npcId] = { id: 'tutorial', day: GS.daily.dayCount, done: true };
-  else GS.encargos[npcId].done = true;
-  Wallet.add(q.tokens, `Encargo: ${npcById[npcId].name}`);
-  Trust.add(npcId, q.trust, 'encargo');
+  else { GS.encargos[npcId].done = true; GS.encargos[npcId].premium = premium; }
+  Wallet.add(tokens, `Encargo${premium ? ' premium' : ''}: ${npcById[npcId].name}`);
+  Trust.add(npcId, trust, premium ? 'encargo:premium' : 'encargo');
+  if (premium) giveRumor(npcId);
   playChime(); const obj = npcObjs[npcId]; if (obj) spawnConfetti(obj.position.clone().addScaledVector(obj.userData.up, 2), 15);
   const thanks = NPC_SOCIAL[npcId]?.encargoThanks; if (thanks) showToast(`${npcById[npcId].emoji} "${thanks}"`, 'text-white');
   SaveSystem.saveNow('encargo:' + npcId); return true;
@@ -2541,14 +2654,16 @@ function openEncargo(npcId) {
   openApp(`📋 Encargo de ${n.name}`, '', (body) => {
     const render = () => {
       if (cur.done) { body.innerHTML = `<div class="app-card p-5 text-center"><div class="text-4xl mb-2">✅</div><div class="font-bold text-[#2b2b3d]">¡Encargo completado!</div><div class="text-sm text-slate-600 mt-1">${n.name} está encantado contigo. Vuelve mañana 🌙</div></div>`; return; }
-      const it = ITEMS[cur.q.item], have = Inventory.count(cur.q.item), ok = have >= cur.q.qty;
+      const it = ITEMS[cur.q.item], have = Inventory.count(cur.q.item), ok = have >= cur.q.qty, prem = !cur.tutorial && Trust.level(npcId) >= 3, pq = cur.q.qty * CFG.premiumMult, pok = have >= pq;
       body.innerHTML = `<div class="app-card p-4"><div class="flex items-start gap-3"><div class="text-4xl leading-none">${it.icon}</div><div class="flex-1 min-w-0">
         <div class="font-bold text-[#2b2b3d]">${n.emoji} ${n.name} pide:</div>
         <p class="text-sm text-slate-600 mt-1">“${cur.q.text}”</p>
         <div class="text-sm font-bold mt-2 ${ok ? 'text-emerald-600' : 'text-red-600'}">${it.icon} ${it.name}: tienes ${have}/${cur.q.qty}</div>
         <div class="text-xs text-slate-500 mt-1">Recompensa: <b class="text-amber-600">🪙 ${cur.q.tokens} $TOKEN</b> + <b>🤝 ${cur.q.trust} de confianza</b>${cur.tutorial ? ' · <b>¡nivel completo!</b>' : ''}</div></div></div>
-        <div class="flex justify-end gap-2 mt-3"><button data-deliver class="btn-game px-4 py-2 text-sm bg-emerald-300" ${ok ? '' : 'disabled'}>📦 Entregar encargo</button></div></div>`;
+        ${prem ? `<div class="mt-3 p-2 rounded-lg bg-amber-50 text-xs"><b class="text-amber-700">💼 Versión premium (${TRUST_LEVELS[3].heart} Socio):</b> ${pq}× ${it.icon} (tienes ${have}) → <b>🪙 ${cur.q.tokens * CFG.premiumMult} $TOKEN</b> + <b>🤝 ${CFG.premiumTrust}</b> + <b>📰 1 rumor real de mercado para mañana</b></div>` : ''}
+        <div class="flex justify-end gap-2 mt-3 flex-wrap"><button data-deliver class="btn-game px-4 py-2 text-sm bg-emerald-300" ${ok ? '' : 'disabled'}>📦 Entregar encargo</button>${prem ? `<button data-premium class="btn-game px-4 py-2 text-sm bg-amber-300" ${pok ? '' : 'disabled'}>💼 Entregar premium ×${CFG.premiumMult}</button>` : ''}</div></div>`;
       const d = body.querySelector('[data-deliver]'); if (d) d.onclick = () => { if (deliverEncargo(npcId)) { cur.done = true; render(); } };
+      const pb = body.querySelector('[data-premium]'); if (pb) pb.onclick = () => { if (deliverEncargo(npcId, true)) { cur.done = true; render(); } };
     };
     render();
   });
@@ -2558,41 +2673,45 @@ function openEncargo(npcId) {
    ========================================================= */
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 let generating = false;
+/** v0.8 · Proyectos de la laptop: 'bear' = misión principal del Acto 1 · 'bj:bear' = Trabajo Mayor del Acto 2 (Sec. 7.9: mismo modal, mismo teatro) */
+function laptopProj(key) { key = String(key); const big = key.startsWith('bj:'), id = big ? key.slice(3) : key, n = npcById[id]; return { key, id, n, big, def: big ? BIG_JOBS[id] : n.mission, st: big ? bigJobState(id) : state.missions[id] }; }
+function laptopProjects() { return [...NPCS.filter(n => state.missions[n.id].status >= 1).map(n => n.id), ...NPCS.filter(n => (GS.bigJobs?.[n.id]?.status | 0) >= 1).map(n => 'bj:' + n.id)]; }
 function openLaptop(preferId) {
   if (state.modalOpen) return;
-  const accepted = NPCS.filter(n => state.missions[n.id].status >= 1);
-  if (!accepted.length) { showToast('Acepta una misión primero', 'text-white'); return; }
+  const keys = laptopProjects();
+  if (!keys.length) { showToast('Acepta una misión primero', 'text-white'); return; }
   state.modalOpen = true; ui.dialog.classList.add('hidden'); clearInterval(typeTimer); ui.laptopModal.style.display = 'flex';
-  ui.missionSelect.innerHTML = accepted.map(n => `<option value="${n.id}">${n.emoji} ${n.mission.title}${state.missions[n.id].status === 2 ? ' ✅' : ''}</option>`).join('');
-  loadMission(preferId && state.missions[preferId].status >= 1 ? preferId : (accepted.find(n => state.missions[n.id].status === 1) || accepted[0]).id);
+  ui.missionSelect.innerHTML = keys.map(k => { const p = laptopProj(k); return `<option value="${k}">${p.n.emoji} ${p.big ? '🏗️ ' : ''}${p.def.title}${p.st.status === 2 ? ' ✅' : ''}</option>`; }).join('');
+  loadMission(preferId && keys.includes(String(preferId)) ? String(preferId) : (keys.find(k => laptopProj(k).st.status === 1) || keys[0]));
 }
 ui.missionSelect.onchange = () => loadMission(ui.missionSelect.value);
 function loadMission(id) {
   if (generating) return;
-  state.activeMission = id; ui.missionSelect.value = id; const n = npcById[id], m = state.missions[id];
-  ui.codeFile.textContent = n.mission.app; ui.previewPane.innerHTML = n.mission.preview; ui.stepsLog.innerHTML = ''; ui.progressBar.style.width = '0%';
+  const p = laptopProj(id), n = p.n, d = p.def, m = p.st;
+  state.activeMission = p.key; ui.missionSelect.value = p.key;
+  ui.codeFile.textContent = d.app; ui.previewPane.innerHTML = d.preview; ui.stepsLog.innerHTML = ''; ui.progressBar.style.width = '0%';
   ui.btnDeliver.textContent = `${n.emoji} Entregar a ${n.name}`; ui.btnDeliver.classList.toggle('hidden', !(m.generated && m.status === 1));
-  if (m.generated) { ui.promptText.textContent = n.mission.prompt; ui.promptText.classList.remove('cursor'); ui.codePane.innerHTML = n.mission.code.map(hl).join('\n'); ui.progressBar.style.width = '100%'; showTab('preview'); ui.btnGenerate.disabled = true; ui.laptopStatus.textContent = m.status === 2 ? 'Estado: ✅ entregado' : 'Estado: ✅ web app lista · entrégala'; return; }
-  showTab('code'); ui.codePane.innerHTML = '<span class="cm">// Esperando prompt…</span>'; ui.btnGenerate.disabled = true; ui.promptText.classList.add('cursor'); ui.laptopStatus.textContent = 'Estado: escribiendo prompt…';
-  typeText(ui.promptText, n.mission.prompt, 12, () => { ui.btnGenerate.disabled = false; ui.laptopStatus.textContent = 'Estado: prompt listo · pulsa Generar'; });
+  if (m.generated) { ui.promptText.textContent = d.prompt; ui.promptText.classList.remove('cursor'); ui.codePane.innerHTML = d.code.map(hl).join('\n'); ui.progressBar.style.width = '100%'; showTab('preview'); ui.btnGenerate.disabled = true; ui.laptopStatus.textContent = m.status === 2 ? 'Estado: ✅ entregado' : p.big ? 'Estado: ✅ app empresarial lista · entrégala' : 'Estado: ✅ web app lista · entrégala'; return; }
+  showTab('code'); ui.codePane.innerHTML = `<span class="cm">// ${p.big ? 'Trabajo Mayor · nivel empresarial · ' : ''}Esperando prompt…</span>`; ui.btnGenerate.disabled = true; ui.promptText.classList.add('cursor'); ui.laptopStatus.textContent = 'Estado: escribiendo prompt…';
+  typeText(ui.promptText, d.prompt, 12, () => { ui.btnGenerate.disabled = false; ui.laptopStatus.textContent = 'Estado: prompt listo · pulsa Generar'; });
 }
 function closeLaptop() { if (ui.laptopModal.style.display === 'none') return; state.modalOpen = false; clearInterval(typeTimer); ui.laptopModal.style.display = 'none'; if (state.mode === 'dialog') endDialog(); }
 function showTab(t) { const code = t === 'code'; ui.codePane.classList.toggle('hidden', !code); ui.previewPane.classList.toggle('hidden', code); ui.tabCode.className = `px-4 py-2 border-b-2 ${code ? 'text-cyan-300 border-cyan-300' : 'text-slate-400 border-transparent'}`; ui.tabPreview.className = `px-4 py-2 border-b-2 ${!code ? 'text-cyan-300 border-cyan-300' : 'text-slate-400 border-transparent'}`; }
 ui.tabCode.onclick = () => showTab('code'); ui.tabPreview.onclick = () => showTab('preview');
 ui_bind('btnCloseLaptop', closeLaptop); ui_bind('btnCancelLaptop', closeLaptop);
 ui.btnGenerate.onclick = async () => {
-  const id = state.activeMission, n = npcById[id]; generating = true; ui.missionSelect.disabled = true;
+  const p = laptopProj(state.activeMission), n = p.n, d = p.def; generating = true; ui.missionSelect.disabled = true;
   ui.btnGenerate.disabled = true; ui.promptText.classList.remove('cursor'); ui.laptopStatus.textContent = 'Estado: generando con IA…'; ui.codePane.innerHTML = ''; playBeep(660, 0.05);
-  const codeTask = (async () => { for (const line of n.mission.code) { ui.codePane.innerHTML += hl(line) + '\n'; ui.codePane.scrollTop = ui.codePane.scrollHeight; await sleep(150 * Needs.laptopMult()); } })();
-  for (const [pct, msg] of missionSteps(n.name, n.mission.comps, n.mission.app)) {
+  const codeTask = (async () => { for (const line of d.code) { ui.codePane.innerHTML += hl(line) + '\n'; ui.codePane.scrollTop = ui.codePane.scrollHeight; await sleep(150 * Needs.laptopMult()); } })();
+  for (const [pct, msg] of (p.big ? bigJobSteps : missionSteps)(n.name, d.comps, d.app)) {
     const row = document.createElement('div'); row.className = 'flex items-center gap-2 fade-in'; row.innerHTML = `<span class="w-2 h-2 rounded-full bg-cyan-300 animate-pulse"></span><span>${msg}</span>`;
     ui.stepsLog.append(row); ui.stepsLog.scrollTop = ui.stepsLog.scrollHeight; ui.progressBar.style.width = pct + '%'; await sleep((650 + Math.random() * 300) * Needs.laptopMult()); row.firstChild.className = 'w-2 h-2 rounded-full bg-emerald-400';
   }
-  await codeTask; state.missions[id].generated = true; generating = false; ui.missionSelect.disabled = false;
-  showTab('preview'); ui.laptopStatus.textContent = `Estado: ✅ Web App lista · entrégala a ${n.name}`; ui.btnDeliver.classList.remove('hidden'); ui.btnDeliver.classList.add('pop-in');
+  await codeTask; p.st.generated = true; generating = false; ui.missionSelect.disabled = false; SaveSystem.save('laptop-generated');
+  showTab('preview'); ui.laptopStatus.textContent = `Estado: ✅ ${p.big ? 'App empresarial' : 'Web App'} lista · entrégala a ${n.name}`; ui.btnDeliver.classList.remove('hidden'); ui.btnDeliver.classList.add('pop-in');
   playBeep(880, 0.08); setTimeout(() => playBeep(1174, 0.1), 120);
 };
-ui.btnDeliver.onclick = () => { const id = state.activeMission; state.modalOpen = false; ui.laptopModal.style.display = 'none'; completeMission(id); };
+ui.btnDeliver.onclick = () => { const p = laptopProj(state.activeMission); state.modalOpen = false; ui.laptopModal.style.display = 'none'; if (p.big) completeBigJob(p.id); else completeMission(p.id); };
 
 /** Efectos de desbloqueo. Deben ser IDEMPOTENTES: se ejecutan al completar la misión y al restaurar la partida. */
 const UNLOCKS = {
@@ -2674,13 +2793,13 @@ function mountItemShop(body, shopId) {
       `<div class="flex gap-2 mb-3 items-center flex-wrap"><button data-tab="buy" class="btn-game px-4 py-1.5 text-sm ${tab === 'buy' ? 'active' : 'bg-white'}">🛒 Comprar</button><button data-tab="sell" class="btn-game px-4 py-1.5 text-sm ${tab === 'sell' ? 'active' : 'bg-white'}">💰 Vender</button>${trustTag}</div>`;
     if (tab === 'buy') {
       html += `<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">` + def.sells.map(e => { const it = ITEMS[e.id], price = shopBuyPrice(shopId, e.id), stock = s.stock[e.id] ?? 0, can = stock > 0 && Wallet.canAfford(price) && Inventory.canAdd(e.id, 1);
-        return `<div class="app-card p-3"><div class="flex items-start gap-3"><div class="text-4xl leading-none">${it.icon}</div><div class="flex-1 min-w-0"><div class="font-bold text-[#2b2b3d] flex items-center gap-2 flex-wrap">${it.name} ${rarityBadge(it.rarity)}</div><div class="text-xs text-slate-500 mt-0.5">${it.desc}</div><div class="text-[11px] text-slate-500 mt-1">${CATEGORIES[it.cat].icon} ${CATEGORIES[it.cat].name} · Stock: <b>${stock}</b> · Tienes: ${Inventory.count(e.id)}</div></div></div>
+        return `<div class="app-card p-3"><div class="flex items-start gap-3"><div class="text-4xl leading-none">${it.icon}</div><div class="flex-1 min-w-0"><div class="font-bold text-[#2b2b3d] flex items-center gap-2 flex-wrap">${it.name}${viralFlame(e.id)} ${rarityBadge(it.rarity)}</div><div class="text-xs text-slate-500 mt-0.5">${it.desc}</div><div class="text-[11px] text-slate-500 mt-1">${CATEGORIES[it.cat].icon} ${CATEGORIES[it.cat].name} · Stock: <b>${stock}</b> · Tienes: ${Inventory.count(e.id)}</div></div></div>
           <div class="flex items-center justify-between mt-2 gap-2"><span class="pixel text-[10px] text-amber-600">${price} $T</span><div class="flex gap-1"><button data-buy="${e.id}" data-q="1" class="btn-game px-3 py-1 text-xs bg-yellow-300" ${can ? '' : 'disabled'}>Comprar 1</button><button data-buy="${e.id}" data-q="5" class="btn-game px-2 py-1 text-xs bg-yellow-200" ${stock >= 5 && Wallet.canAfford(price * 5) && Inventory.canAdd(e.id, 5) ? '' : 'disabled'}>×5</button></div></div></div>`; }).join('') + `</div><p class="text-[11px] text-slate-500 mt-3">El stock se repone en ${restockIn} min.</p>`;
     } else {
       const sellable = Inventory.slots.map(sl => sl.id).filter((id, i, a) => a.indexOf(id) === i && shopBuysItem(shopId, id));
       html += sellable.length ? `<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">` + sellable.map(id => { const it = ITEMS[id], q = it.maxDur ? 1 : Inventory.count(id), p = it.maxDur ? toolSellPreview(shopId, id) : shopSellPrice(shopId, id), bonus = (def.buyMult[id] || 1) > 1;   // S2.2b: herramientas de 1 en 1 y precio × durabilidad
-        return `<div class="app-card p-3"><div class="flex items-start gap-3"><div class="text-4xl leading-none">${it.icon}</div><div class="flex-1 min-w-0"><div class="font-bold text-[#2b2b3d] flex items-center gap-2 flex-wrap">${it.name} <span class="text-slate-500">×${q}</span> ${rarityBadge(it.rarity)}</div><div class="text-xs text-slate-500 mt-0.5">${it.desc}</div></div></div>
-          <div class="flex items-center justify-between mt-2 gap-2"><span class="pixel text-[10px] text-emerald-600">${p} $T/u ${bonus ? '⭐' : ''}</span><div class="flex gap-1"><button data-sell="${id}" data-q="1" class="btn-game px-3 py-1 text-xs bg-emerald-300">Vender 1</button><button data-sell="${id}" data-q="${q}" class="btn-game px-2 py-1 text-xs bg-emerald-200">Todo (+${fmt(p * q)})</button></div></div></div>`; }).join('') + '</div>'
+        return `<div class="app-card p-3"><div class="flex items-start gap-3"><div class="text-4xl leading-none">${it.icon}</div><div class="flex-1 min-w-0"><div class="font-bold text-[#2b2b3d] flex items-center gap-2 flex-wrap">${it.name}${viralFlame(id)} <span class="text-slate-500">×${q}</span> ${rarityBadge(it.rarity)}</div><div class="text-xs text-slate-500 mt-0.5">${it.desc}</div></div></div>
+          <div class="flex items-center justify-between mt-2 gap-2"><span class="pixel text-[10px] text-emerald-600">${p} $T/u ${bonus ? '⭐' : ''}${viralFlame(id) ? '🔥×' + CFG.viralSellMult : ''}</span><div class="flex gap-1"><button data-sell="${id}" data-q="1" class="btn-game px-3 py-1 text-xs bg-emerald-300">Vender 1</button><button data-sell="${id}" data-q="${q}" class="btn-game px-2 py-1 text-xs bg-emerald-200">Todo (+${fmt(p * q)})</button></div></div></div>`; }).join('') + '</div>'
         : `<div class="app-card p-4 text-sm text-slate-600">No llevas nada que ${def.name} compre.<br><span class="text-xs">Compra aquí: ${def.buys === 'all' ? 'cualquier objeto vendible' : def.buys.map(i => ITEMS[i].icon + ' ' + ITEMS[i].name).join(', ')}${Object.keys(def.buyMult).length ? ' · ⭐ paga extra por ' + Object.keys(def.buyMult).filter(k => def.buyMult[k] > 1).map(k => ITEMS[k].name).join(', ') : ''}</span></div>`;
     }
     body.innerHTML = html;
@@ -2697,9 +2816,9 @@ function openInventory(backFn = null, page = 'items') { if (ui.appModal.style.di
 function buildCatalogHTML() {
   const built = GS.world.buildings || [];
   return `<div class="app-card p-3 mb-3 text-xs text-slate-600">Construye en la <b>zona de la aldea</b> (alrededor de tu casa). Cada construcción cuesta $TOKEN y, a veces, materiales de la mochila. Construcciones actuales: <b>${built.length}</b>${built.length ? ' · ' + BUILDABLES.filter(b => built.some(x => x.type === b.id)).map(b => `${b.icon}×${built.filter(x => x.type === b.id).length}`).join(' ') : ''}</div>
-    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">` + BUILDABLES.map(b => { const locked = b.unlock && !b.unlock(); const missing = buildMissing(b); const ok = !locked && Wallet.canAfford(b.cost) && !missing.length;
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">` + BUILDABLES.map(b => { const locked = b.unlock && !b.unlock(); const missing = buildMissing(b); const ok = !locked && Wallet.canAfford(buildCost(b)) && !missing.length;
       return `<div class="app-card p-3 ${locked ? 'opacity-70' : ''}"><div class="flex items-start gap-3"><div class="text-4xl leading-none">${b.icon}</div><div class="flex-1 min-w-0"><div class="font-bold text-[#2b2b3d]">${b.name}</div><div class="text-xs text-slate-500">${b.desc}</div>
-        <div class="text-[11px] mt-1 ${Wallet.canAfford(b.cost) ? 'text-slate-600' : 'text-red-600'}">Coste: <b>${b.cost} $TOKEN</b>${Object.keys(b.mats).length ? ' + ' + Object.entries(b.mats).map(([id, q]) => `${ITEMS[id].icon} ${ITEMS[id].name} ×${q}`).join(', ') : ''}</div>
+        <div class="text-[11px] mt-1 ${Wallet.canAfford(buildCost(b)) ? 'text-slate-600' : 'text-red-600'}">Coste: <b>${buildCost(b)} $TOKEN</b>${buildCost(b) < b.cost ? ` <s class="text-slate-400">${b.cost}</s> 🌉` : ''}${Object.keys(b.mats).length ? ' + ' + Object.entries(b.mats).map(([id, q]) => `${ITEMS[id].icon} ${ITEMS[id].name} ×${q}`).join(', ') : ''}</div>
         ${missing.length && !locked ? `<div class="text-[11px] text-red-600">Te falta: ${missing.join(' · ')}</div>` : ''}${locked ? `<div class="text-[11px] text-amber-700">🔒 Requiere ${b.unlockText}</div>` : ''}</div></div>
         <div class="flex justify-end mt-2"><button data-build="${b.id}" class="btn-game px-4 py-1.5 text-sm bg-emerald-300" ${ok ? '' : 'disabled'}>🏗️ Construir</button></div></div>`; }).join('') + '</div>';
 }
@@ -2773,7 +2892,7 @@ function mountInventory(body, backFn, initialPage = 'items') {
     } else {
       const slots = Inventory.slots.map((s, i) => ({ ...s, i })).filter(s => cat === 'all' || ITEMS[s.id].cat === cat);
       const empty = cat === 'all' ? Inventory.freeSlots() : 0;
-      html += `<div class="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-2">` + slots.map(s => { const it = ITEMS[s.id]; return `<button data-slot="${s.i}" class="app-card p-1.5 aspect-square flex flex-col items-center justify-center relative ${sel === s.i ? 'ring-4 ring-yellow-300' : ''}" style="border-color:${RARITY[it.rarity].color}"><div class="text-2xl md:text-3xl leading-none" style="${it.maxDur && Tools.dur(s) <= 0 ? 'filter:grayscale(1);opacity:.5' : ''}">${it.icon}</div><div class="text-[10px] font-bold text-[#2b2b3d] truncate w-full text-center mt-1">${it.name}</div>${it.maxDur ? toolBarHTML(s) : `<span class="absolute top-0.5 right-1 pixel text-[9px] text-[#2b2b3d]">×${s.qty}</span>`}</button>`; }).join('') +
+      html += `<div class="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-2">` + slots.map(s => { const it = ITEMS[s.id]; return `<button data-slot="${s.i}" class="app-card p-1.5 aspect-square flex flex-col items-center justify-center relative ${sel === s.i ? 'ring-4 ring-yellow-300' : ''}" style="border-color:${RARITY[it.rarity].color}"><div class="text-2xl md:text-3xl leading-none" style="${it.maxDur && Tools.dur(s) <= 0 ? 'filter:grayscale(1);opacity:.5' : ''}">${it.icon}</div><div class="text-[10px] font-bold text-[#2b2b3d] truncate w-full text-center mt-1">${it.name}${viralFlame(s.id)}</div>${it.maxDur ? toolBarHTML(s) : `<span class="absolute top-0.5 right-1 pixel text-[9px] text-[#2b2b3d]">×${s.qty}</span>`}</button>`; }).join('') +
         Array.from({ length: empty }, () => `<div class="rounded-xl border-2 border-dashed border-slate-300 aspect-square"></div>`).join('') + '</div>';
       if (!slots.length && !empty) html += `<div class="text-sm text-slate-500 mt-2">No tienes objetos de esta categoría.</div>`;
       if (!Inventory.slots.length) html += `<div class="app-card p-3 mt-3 text-xs text-slate-600">💡 Explora el planeta: recoge 🐚 conchas en las playas, 🪵 troncos en los bosques, 🪨 piedras en las montañas y 🔮 cristales junto a la carpa de Madame Sombra. Las 🍋 Frutas Doradas crecen junto al laboratorio de Dax.</div>`;
@@ -2798,7 +2917,8 @@ function mountInventory(body, backFn, initialPage = 'items') {
 function openUnlockedApp(app) {
   if (state.modalOpen) closeApp();
   if (app === 'bakery') openApp('🐻 ' + APP_TITLES.bakery, `<div class="flex justify-end mb-3"><button data-shop class="btn-game px-4 py-1.5 text-sm bg-amber-200">🛒 Comprar pasteles / vender frutas</button></div><div class="rounded-xl overflow-hidden border-[3px] border-[#2b2b3d]">${npcById.bear.mission.preview}</div>`, (b) => b.querySelector('[data-shop]').onclick = () => openShop('bear'));
-  else if (app === 'board') openApp('🏛️ ' + APP_TITLES.board, '', (b) => { b.append(boardCanvas); const p = document.createElement('p'); p.className = 'text-xs text-slate-500 mt-3'; p.textContent = 'Leaderboard de holders y precio de $TOKEN actualizados cada segundo (simulación on-chain). Tu balance aparece en el ranking en tiempo real.'; b.append(p); });
+  else if (app === 'board') openApp('🏛️ ' + APP_TITLES.board, '', (b) => { b.append(boardCanvas); const p = document.createElement('p'); p.className = 'text-xs text-slate-500 mt-3'; p.textContent = 'Leaderboard de holders y precio de $TOKEN actualizados cada segundo (simulación on-chain). Tu balance aparece en el ranking en tiempo real.'; b.append(p);
+    if (Feria.on()) { const bar = document.createElement('div'); bar.className = 'flex flex-wrap gap-2 justify-end mt-3'; bar.innerHTML = `<button data-feria class="btn-game px-4 py-1.5 text-sm bg-emerald-300">📈 Feria del Tablón (lotes)</button>${censusOn() ? '<button data-censo class="btn-game px-4 py-1.5 text-sm bg-blue-200">📊 Censo Digital</button>' : ''}`; bar.querySelector('[data-feria]').onclick = () => Feria.open(); const c = bar.querySelector('[data-censo]'); if (c) c.onclick = () => Census.open(); b.append(bar); } });   // v0.8: el Tablón se vuelve especulación jugable (Sec. 1.5)
   else if (app === 'shop') openApp('🦫 ' + APP_TITLES.shop, '', (b) => { const w = document.createElement('div'); mountShop(w, UPGRADES, 'build'); const bar = document.createElement('div'); bar.className = 'app-card p-3 mb-3 text-xs text-slate-600 flex items-center justify-between gap-2 flex-wrap'; bar.innerHTML = '<span>🏗️ Fuentes, farolas, molinos, bancos y jardines ahora se <b>construyen donde tú quieras</b> desde la Mochila.</span><button class="btn-game px-3 py-1.5 text-sm bg-emerald-300">🏗️ Abrir Construcción</button>'; bar.querySelector('button').onclick = () => openInventory(null, 'build'); b.append(bar, w); });
   else if (app === 'secret') openApp('🐈‍⬛ ' + APP_TITLES.secret, '', (b) => { const w = document.createElement('div'); mountShop(w, SKINS, 'skin'); const bar = document.createElement('div'); bar.className = 'flex justify-end mb-3'; bar.innerHTML = '<button class="btn-game px-4 py-1.5 text-sm bg-amber-200">🔮 Bazar Místico (objetos)</button>'; bar.firstChild.onclick = () => openShop('sombra'); b.append(bar, w); });
   else if (app === 'farm') openApp('🦎 ' + APP_TITLES.farm, '', (b) => { const render = () => { const ready = fruits.filter(f => f.userData.ready).length; const next = fruits.filter(f => !f.userData.ready).map(f => f.userData.respawnAt).sort()[0]; b.innerHTML = `<div class="text-sm text-slate-600 space-y-2"><div class="app-card p-4"><div class="font-bold text-lg text-[#2b2b3d]">🍋 Frutas maduras: ${ready} / ${fruits.length}</div><div>Cada fruta va a tu <b>🎒 mochila</b> (llevas ${Inventory.count('golden_fruit')}) y se vende por <b>${ITEMS.golden_fruit.sell} $TOKEN</b> en la Tienda de Rocco, la Panadería o el Bazar (⭐ paga extra). Acércate a los árboles dorados y pulsa E.</div><div class="text-xs text-slate-500 mt-1">Recompensa diaria — rebrotan cada ${CFG.fruitCooldown / 60000} min. ${next ? `Próxima cosecha en ${Math.max(0, Math.ceil((next - Date.now()) / 1000))}s` : ''}</div></div><div class="app-card p-4"><div class="font-bold text-[#2b2b3d]">🌦️ Pronóstico IA</div><div>Mañana: ☀️ 24 °C · Lluvia 12% · Viento 8 km/h · Cosecha óptima 09:00</div></div></div>`; }; liveApp(b, render); });
@@ -2856,7 +2976,7 @@ const Needs = {
   update(dt) {
     if (!SaveSystem.started || state.menuOpen) return;
     const secs = state.moving ? CFG.hungerSecsPerPointActive : CFG.hungerSecsPerPointIdle;
-    GS.needs.hunger = clamp(GS.needs.hunger - dt / secs, 0, 100);
+    GS.needs.hunger = clamp(GS.needs.hunger - dt / secs * Weather.hungerMult(), 0, 100);   // v0.8: 🔆 Ola de sol (Climatizador) ×1,5
     if (Math.floor(GS.needs.hunger) !== this._lastShown) { this._lastShown = Math.floor(GS.needs.hunger); updateHungerHUD(); }
     const h = this.hungry();
     if (h && !this._wasHungry) showToast('🍖 Tienes hambre: velocidad y precios reducidos. Come algo', 'text-red-200');
@@ -2957,9 +3077,9 @@ DailySystem.onSettle(() => {
     }
   }
   /* 2) TASA DE RESIDENCIA ONÍRICA (1% del capital, mín. 10 $T) → el 100% alimenta el pozo de la lotería */
-  const tax = Math.max(CFG.taxMin, Math.floor(GS.economy.money * (typeof hasFurniture === 'function' && hasFurniture('muni_safe') ? 1 - CFG.muniSafeExemptPct : 1) * CFG.taxRatePct / 100));   // S3.5: Caja Fuerte (Sec. 6.8)
+  const tax = Math.max(CFG.taxMin, Math.floor((GS.economy.money + feriaOpenStake()) * (typeof hasFurniture === 'function' && hasFurniture('muni_safe') ? 1 - CFG.muniSafeExemptPct : 1) * CFG.taxRatePct / 100 * censusTaxMult()));   // S3.5: Caja Fuerte (Sec. 6.8) · v0.8: Ciudadano Ejemplar −10% (Censo)
   if (Wallet.spend(tax, 'Tasa de Residencia Onírica', { silent: true })) {
-    charges.push({ label: '🏛️ Tasa municipal', amount: -tax });
+    charges.push({ label: censusOn() ? `🏛️ Tasa municipal (🏅 −${Math.round(CFG.censusTaxDiscount * 100)}%)` : '🏛️ Tasa municipal', amount: -tax });
     GS.lottery.pool += tax;
     Trust.add('mayor', 1, 'tax:ontime');   // Sec. 3.3: pagar la tasa a tiempo = +1 confianza/día con el Mayor
   } else {
@@ -3221,7 +3341,7 @@ function openHousePanel(tab) {
    - Tendencia del día (erizos): un objeto se vende el doble de fácil en el escaparate.
      Existe siempre (determinista por día + partida); el rumor solo la revela.
    - Pronóstico (Dax): el clima de mañana, que es determinista → la pista es real.
-   - Mayor: sus rumores de precios llegan con el mercado de la v0.8.
+   - Mayor: sus rumores de mercado (feria del Tablón) llegan en v0.8 (bloque «v0.8 · EL COMERCIANTE»).
    ========================================================= */
 const Trend = {
   forDay(day) {
@@ -3237,7 +3357,7 @@ DailySystem.onSettle(() => {
     const id = Trend.forDay(today); GS.housing.trendKnownDay = today;
     addLetter('🦔 Barnaby Jr. & Pip', `¡BRO! Rumor exclusivo: hoy ${ITEMS[id].icon} ${ITEMS[id].name} está EN TENDENCIA. Si lo pones en tu escaparate esta noche se vende el doble de fácil. No se lo digas a nadie (bueno, a mamá sí).`);
   }
-  if (Trust.level('dax') >= 3 && typeof Weather.forecast === 'function') {
+  if (Trust.level('dax') >= 3 && !climateOn() && typeof Weather.forecast === 'function') {   // v0.8: con el Climatizador avisa la estación (carta propia)
     const [a, b] = Weather.forecast(today + 1), wa = WEATHER_TYPES[a], wb = WEATHER_TYPES[b];
     addLetter('🦎 Professor Dax', `Pronóstico onírico para mañana (día ${today + 1}): por la mañana ${wa.icon} ${wa.name}, por la tarde ${wb.icon} ${wb.name}. ${a === 'rain' || b === 'rain' ? 'Con lluvia el Jardín da más trigo y pican peces raros.' : b === 'stars' ? 'Noche de estrellas: más fragmentos.' : a === 'fog' || b === 'fog' ? 'Con niebla aparecen más perlas y gemas.' : 'Día tranquilo.'} ¡Precisión del 98,7%! (Lo calculé yo… creo.)`);
   }
@@ -3738,6 +3858,7 @@ function updateNeon(dt, t) {
 function updateUnlocks(dt, t) {
   if (holo.visible) { holo.children[0].position.y = 3.2 + Math.sin(t * 1.5) * 0.08; holoLight.intensity = 3 + Math.sin(t * 8) * 0.6; holo.children[0].material.opacity = 0.88 + Math.sin(t * 20) * 0.04; }
   updateMailboxBadge(); animateEmbargoRunes(dt);   // v0.3: badge de buzón + runas de embargo
+  act2Update(dt, t);   // v0.8: orbe del Oráculo, anemómetro, globo, valla viral, faro del puente…
   for (const g of animatedBuilds) { // fuentes, molinos y estatuas (compradas o construidas)
     if (g.userData.drops) g.userData.drops.forEach(d => { const p = (d.userData.p + t * 0.4) % 1; d.position.set(Math.cos(d.userData.p * 6.28) * p * 1.1, 1.6 + Math.sin(p * Math.PI) * 1.2 - p * 1.1, Math.sin(d.userData.p * 6.28) * p * 1.1); });
     if (g.userData.blades) g.userData.blades.rotation.z += dt * 1.2;
@@ -3801,17 +3922,21 @@ const WEATHER_TYPES = {
   rain:  { name: 'Lluvia',              icon: '🌧️', msg: '🌧️ Empieza a llover: los peces pican mejor · velocidad −10%' },
   fog:   { name: 'Niebla onírica',      icon: '🌫️', msg: '🌫️ Niebla onírica: las conchas esconden más perlas' },
   stars: { name: 'Lluvia de estrellas', icon: '✨', msg: '✨ Esta noche lloverán estrellas: más Fragmentos de Estrella' },
+  sun:   { name: 'Ola de sol',          icon: '🔆', msg: '🔆 Ola de sol: el hambre aprieta más rápido · el Oso paga mejor' },   // v0.8 · Climatizador
+  storm: { name: 'Tormenta',            icon: '⛈️', msg: '⛈️ ¡Tormenta! La mejor pesca del sueño: Pez Dorado ×3 también de día' },   // v0.8 · Climatizador
 };
 const Weather = (() => {
-  let _id = null, _forced = null, _forcedSlot = -1, _rain = null, _fog = null;
+  let _id = null, _forced = null, _forcedSlot = -1, _rain = null, _fog = null, _flash = 0;
   const _q = new THREE.Quaternion(), _v = new THREE.Vector3();
   const hourNow = () => (GS.daily.clockMs / 3600000) % 24;
   const slotNow = () => GS.daily.dayCount * 2 + (hourNow() >= 14 ? 1 : 0);
   function hash(n) { let x = (n * 2654435761) >>> 0; x ^= x >>> 16; x = Math.imul(x, 2246822507) >>> 0; x ^= x >>> 13; x = Math.imul(x, 3266489909) >>> 0; x ^= x >>> 16; return (x >>> 0) / 4294967296; }
   function roll(slot) {
-    const t = CFG.weatherChances, r = hash(slot + 7919) * 100;
+    const climate = GS.bigJobs?.dax?.status === 2, seed = climate && GS.act2?.climate?.seeds?.[slot];   // v0.8: Climatizador (tabla ampliada + siembra de nubes)
+    if (seed && WEATHER_TYPES[seed]) return seed;
+    const t = climate ? CFG.climateChances : CFG.weatherChances, r = hash(slot + 7919) * 100;
     let acc = 0, pick = 'clear';
-    for (const k of ['clear', 'rain', 'fog', 'stars']) { acc += t[k] || 0; if (r < acc) { pick = k; break; } }
+    for (const k of ['clear', 'rain', 'fog', 'sun', 'storm', 'stars']) { acc += t[k] || 0; if (r < acc) { pick = k; break; } }   // sin Climatizador sun/storm valen 0 → mismo resultado que v0.5
     if (pick === 'stars' && slot % 2 === 0) pick = 'clear';   // las estrellas solo caen en la franja de tarde-noche
     return pick;
   }
@@ -3832,17 +3957,19 @@ const Weather = (() => {
     const id = current();
     if (id !== _id) { const prev = _id; _id = id; if (prev !== null && SaveSystem.started) showToast(WEATHER_TYPES[id].msg, 'text-white'); refreshChip(); }
     /* Lluvia: partículas alrededor del jugador, cayendo hacia el centro del planeta */
-    if (id === 'rain') {
+    if (id === 'rain' || id === 'storm') {
       if (!_rain) _rain = buildRain();
       _rain.visible = true;
       _rain.position.copy(player.position);
       _rain.quaternion.copy(_q.setFromUnitVectors(UP_Y, _v.copy(player.position).normalize()));
       const a = _rain.geometry.attributes.position, arr = a.array;
-      for (let i = 1; i < arr.length; i += 3) { arr[i] -= dt * 18; if (arr[i] < 0) arr[i] += 14; }
+      for (let i = 1; i < arr.length; i += 3) { arr[i] -= dt * (id === 'storm' ? 28 : 18); if (arr[i] < 0) arr[i] += 14; }
       a.needsUpdate = true;
     } else if (_rain) _rain.visible = false;
     /* Niebla: solo cerca del jugador (en Modo Planeta se desvanece) y más oscura de noche */
-    const want = id === 'fog' ? CFG.weatherFogDensity : id === 'rain' ? CFG.weatherRainFogDensity : 0;
+    if (id === 'storm') { _flash = Math.max(0, _flash - dt * 4); if (Math.random() < dt * 0.25) { _flash = 1; setTimeout(() => playBeep(55, 0.5, 'sawtooth'), 300); } amb.intensity += _flash * 1.4; }   // relámpagos
+    else if (id === 'sun') { sun.intensity *= 1.12; amb.intensity *= 1.08; }
+    const want = id === 'fog' ? CFG.weatherFogDensity : id === 'rain' ? CFG.weatherRainFogDensity : id === 'storm' ? CFG.climateStormFogDensity : 0;
     const camDist = camera.position.distanceTo(player.position);
     const k = want * clamp(1 - (camDist - 30) / 30, 0, 1);
     if (k > 0.0005) {
@@ -3858,12 +3985,20 @@ const Weather = (() => {
     current, update, refreshChip,
     forecast: (day) => [roll(day * 2), roll(day * 2 + 1)],   // v0.5: rumor de Dax (el clima es determinista por franja)
     id: () => _id || 'clear',
-    speedMult: () => is('rain') ? CFG.weatherRainSpeedMult : 1,
+    speedMult: () => is('rain') || is('storm') ? CFG.weatherRainSpeedMult : 1,
     pearlMult: () => is('fog') ? CFG.weatherFogPearlMult : 1,
     gemMult: () => is('fog') ? CFG.weatherFogGemMult : 1,
-    fishRareMult: () => is('rain') ? CFG.weatherRainFishRareMult : 1,
+    fishRareMult: () => is('rain') ? CFG.weatherRainFishRareMult : is('storm') ? CFG.climateStormRareMult : 1,
     gardenBonus: () => is('rain') ? CFG.weatherRainGardenBonus : 0,
     starShardMult: () => is('stars') ? CFG.weatherStarsShardMult : 1,
+    /* v0.8 · efectos del Climatizador Onírico (Sec. 7.4) — solo con el Trabajo Mayor de Dax */
+    climate: () => GS.bigJobs?.dax?.status === 2,
+    gardenWheat: (base) => !is('rain') ? base : GS.bigJobs?.dax?.status === 2 ? base * CFG.climateRainGardenMult : base + CFG.weatherRainGardenBonus,
+    fruitMult: () => is('rain') && GS.bigJobs?.dax?.status === 2 ? CFG.climateRainFruitMult : 1,
+    tropicalMult: () => is('rain') && GS.bigJobs?.dax?.status === 2 ? CFG.climateRainTropicalMult : 1,
+    goldenAlways: () => is('storm'),
+    hungerMult: () => is('sun') ? CFG.climateSunHungerMult : 1,
+    climateStars: () => is('stars') && GS.bigJobs?.dax?.status === 2,
     debugForce(id) { if (!WEATHER_TYPES[id]) { console.warn('[Weather] tipos: ' + Object.keys(WEATHER_TYPES).join(', ')); return; } _forced = id; _forcedSlot = slotNow(); },
   };
 })();
@@ -3984,7 +4119,7 @@ const Fishing = (() => {
   function rollCatch() {
     const t = CFG.fishTable, night = isNightNow();
     const rare = Weather.fishRareMult() * (1 + clamp(_depth / 1.5, 0, 1) * CFG.fishDepthRareBonus) * (typeof AuraFX !== 'undefined' ? AuraFX.rareLootBoost() : 1);
-    const w = { fish: t.fish, tropical_fish: t.tropical_fish * rare, golden_fish: t.golden_fish * rare * (night ? CFG.fishNightGoldenMult : 1), old_boot: t.old_boot };
+    const w = { fish: t.fish, tropical_fish: t.tropical_fish * rare * Weather.tropicalMult(), golden_fish: t.golden_fish * rare * (night || Weather.goldenAlways() ? CFG.fishNightGoldenMult : 1), old_boot: t.old_boot };   // v0.8: ⛈️ Pez Dorado ×3 también de día · 🌧️ +tropical
     let r = Math.random() * Object.values(w).reduce((a, b) => a + b, 0);
     for (const [id, v] of Object.entries(w)) { if ((r -= v) < 0) return id; }
     return 'fish';
@@ -4379,6 +4514,7 @@ const StarFall = (() => {
   const _v = new THREE.Vector3(), _t1 = new THREE.Vector3();
   function nightKey() { const h = (GS.daily.clockMs / 3600000) % 24; return h >= CFG.nightStartHour ? GS.daily.dayCount : (h < CFG.nightEndHour ? GS.daily.dayCount - 1 : null); }
   function rollCount() {
+    if (Weather.climateStars()) return CFG.climateStarsMin + Math.floor(Math.random() * (CFG.climateStarsMax - CFG.climateStarsMin + 1));   // v0.8 · 🌠 lluvia de estrellas del Climatizador
     if (new Date().getDay() === 5) return CFG.starFridayMin + Math.floor(Math.random() * (CFG.starFridayMax - CFG.starFridayMin + 1));
     return Math.round((CFG.starMin + Math.floor(Math.random() * (CFG.starMax - CFG.starMin + 1))) * Weather.starShardMult());
   }
@@ -4788,6 +4924,494 @@ function wardrobeSummaryHTML() {
 }
 
 /* =========================================================
+   v0.8 · EL COMERCIANTE — LOS 7 SISTEMAS DE LOS TRABAJOS MAYORES (Guía Sec. 7.4, 7.6, 4.9, 11.4)
+   - Estado persistente: GS.bigJobs[id] = { status 0|1|2, generated, completedAt } + GS.act2 (datos de cada sistema).
+   - Cada Trabajo Mayor: laptop (mismo modal) → recompensa (Wallet) + 30 confianza (Trust) + sistema permanente.
+   - BIG_UNLOCKS son IDEMPOTENTES: se ejecutan al completar y al restaurar (applyGameStateToWorld).
+   - Todo número de balance vive en CFG (bloque v0.8). Lo simulado se etiqueta (P5).
+   ========================================================= */
+function act2State() { if (!GS.act2) GS.act2 = defaultGameState().act2; return GS.act2; }
+function bigJobState(id) { GS.bigJobs ||= {}; return (GS.bigJobs[id] ||= { status: 0, generated: false, completedAt: null }); }
+function bigJobDone(id) { return GS.bigJobs?.[id]?.status === 2; }
+function bigJobReady(id) { return GS.missions?.[id]?.status === 2 && Trust.level(id) >= CFG.bigJobTrustLevel; }
+function setBigJobStatus(id, s) { const st = bigJobState(id); if (st.status === 2) return; st.status = s; refreshMissionUI(); SaveSystem.save('bigjob:' + id); }
+const v08pct = (m) => `${m >= 0 ? '+' : '−'}${Math.round(Math.abs(m) * 100)}%`;
+const catLabel = (c) => `${CATEGORIES[c]?.icon || ''} ${CATEGORIES[c]?.name || c}`;
+const itemLabel = (id) => `${ITEMS[id]?.icon || ''} ${ITEMS[id]?.name || id}`;
+
+/** Diálogo del NPC cuando su misión principal ya está hecha: oferta / espera / sistema activo del Trabajo Mayor */
+function bigJobDialog(id) {
+  const def = BIG_JOBS[id]; if (!def) return null; const st = bigJobState(id);
+  const lapBtn = (label) => dialogButton(label, 'bg-cyan-300 text-[#2b2b3d]', () => { if (bigJobState(id).status === 0) setBigJobStatus(id, 1); openLaptop('bj:' + id); });
+  if (st.status === 2) return { text: typeof def.doneLine === 'function' ? def.doneLine() : def.done, btns: [] };
+  if (st.status === 1) return { text: def.waiting, btns: [lapBtn('💻 Laptop: Trabajo Mayor')] };
+  if (!bigJobReady(id)) return { text: `${npcById[id].done} ${def.teaser}`, btns: [] };
+  return { text: def.intro, btns: [lapBtn('💼 Aceptar Trabajo Mayor')] };
+}
+/** Botones de los sistemas del Acto 2 en el diálogo de cada vecino (se añaden a serviceBtns) */
+function act2ServiceBtns(npcId) {
+  const b = [], B = (label, cls, fn) => b.push(dialogButton(label, `${cls} text-[#2b2b3d]`, fn));
+  if (npcId === 'bear' && bigJobDone('bear')) B('📦 Pedido OsoExpress', 'bg-orange-200', () => BakeryOrders.open());
+  if (npcId === 'mayor' && bigJobDone('mayor')) B('📊 Censo Digital', 'bg-blue-200', () => Census.open());
+  if (npcId === 'mayor' && Feria.on()) B('📈 Feria del Tablón', 'bg-emerald-200', () => Feria.open());
+  if (npcId === 'glover' && bigJobDone('glover')) B(Bridge.done() ? '🌉 Puente del Horizonte' : '🌉 Donar a la Gran Obra', 'bg-amber-200', () => Bridge.open());
+  if (npcId === 'sombra' && bigJobDone('sombra')) B('🔮 El Oráculo', 'bg-purple-200', () => Oracle.open());
+  if (npcId === 'dax' && bigJobDone('dax')) B('🌦️ Climatizador', 'bg-sky-200', () => Climate.open());
+  if (npcId === 'sam' && bigJobDone('sam')) B('🚢 Muelle de Ultramar', 'bg-sky-200', () => Imports.open());
+  if (npcId === 'hedgehogs' && bigJobDone('hedgehogs')) B('🔥 Agencia Viral', 'bg-fuchsia-200', () => Viral.open());
+  return b;
+}
+/** Entrega del Trabajo Mayor (desde la laptop). Nunca paga dos veces. */
+function completeBigJob(id) {
+  const n = npcById[id], def = BIG_JOBS[id], st = bigJobState(id), obj = npcObjs[id];
+  if (!def || st.status === 2) return false;
+  st.status = 2; st.generated = true; st.completedAt = Date.now();
+  GS.stats.bigJobsCompleted = (GS.stats.bigJobsCompleted || 0) + 1;
+  Trust.add(id, CFG.missionTrustReward, 'bigjob'); addTokens(CFG.bigJobRewards[id] || 0, `Trabajo Mayor: ${def.short}`);
+  BIG_UNLOCKS[id]();
+  refreshMissionUI(); SaveSystem.saveNow('bigjob-complete:' + id);
+  if (obj) { obj.userData.celebrateUntil = performance.now() + 3200; spawnConfetti(obj.position.clone().addScaledVector(obj.userData.up, 2.5)); }
+  const p = id === 'glover' ? Bridge.parts?.decks?.[0] : bigProps[id]; if (p && p.position && p.position.lengthSq() > 1) spawnConfetti(p.position.clone().setLength(p.position.length() + 3), 40);
+  playChime();
+  startDialog(id); ui.dialogButtons.innerHTML = '';
+  typeText(ui.dialogText, def.celebrate, 16, () => ui.dialogButtons.append(dialogButton('¡A trabajar! 💼', 'bg-yellow-300 text-[#2b2b3d]', endDialog), ...act2ServiceBtns(id)));
+  setTimeout(() => showToast(`🏗️ Sistema permanente: ${def.system}`, 'text-amber-200'), 600);
+  if (bigJobsDoneCount() >= CFG.act2BigJobs) setTimeout(() => showToast('🏆 ¡Los 7 Trabajos Mayores! El pueblo entero trabaja contigo', 'text-amber-200'), 3800);
+  return true;
+}
+/** Burbuja sobre cada vecino: ★ si su Trabajo Mayor está disponible o en curso (tras la misión principal) */
+function refreshNpcBubbles() {
+  if (typeof npcObjs === 'undefined') return;
+  NPCS.forEach(n => {
+    if (GS.missions?.[n.id]?.status !== 2) return;
+    const o = npcObjs[n.id]; if (!o) return; const st = GS.bigJobs?.[n.id]?.status | 0;
+    const sym = st === 1 || (st === 0 && bigJobReady(n.id)) ? '★' : '✓';
+    if (o.userData.bubbleSym === sym) return; o.userData.bubbleSym = sym;
+    o.userData.bubble.material.map = bubbleTexture(sym, sym === '★' ? '#ffb74d' : '#7dffa8'); o.userData.bubble.material.needsUpdate = true;
+  });
+}
+
+/* ---------- 🌍 Huellas permanentes en el mundo 3D (primitivas, idempotentes) ---------- */
+const bigProps = {};
+function ensureBigProp(id) {
+  if (bigProps[id]) return bigProps[id];
+  const g = new THREE.Group(); g.userData = {};
+  if (id === 'bear') {   // 🛺 Triciclo de reparto OsoExpress junto a la panadería
+    g.add(box(1.0, 0.6, 0.7, mat(0xff8fb1), 0, 0.75, 0.2)); g.add(box(1.04, 0.08, 0.74, mat(0xffffff), 0, 1.06, 0.2));
+    g.add(mesh(new THREE.PlaneGeometry(0.95, 0.26), new THREE.MeshBasicMaterial({ map: textTexture('OsoExpress', { bg: '#ffffff', color: '#d81b60', font: 'bold 70px Fredoka, Arial' }) }), 0, 0.78, 0.56, false));
+    [[-0.45, 0.45], [0.45, 0.45], [0, -0.55]].forEach(([wx, wz]) => { const w = cyl(0.22, 0.22, 0.08, mat(0x2b2b3d), wx, 0.22, wz, 12); w.rotation.z = Math.PI / 2; g.add(w); });
+    g.add(box(0.08, 0.7, 0.08, mat(0x90a4ae), 0, 0.6, -0.5)); g.add(box(0.6, 0.06, 0.06, mat(0x90a4ae), 0, 0.95, -0.55));
+    const sp = new THREE.Group(); sp.add(cyl(0.05, 0.05, 1.7, mat(0x5d4037), 0, 0.85, 0, 6)); sp.add(mesh(new THREE.PlaneGeometry(1.0, 0.5), new THREE.MeshBasicMaterial({ map: textTexture('🥐 PEDIDOS', { bg: '#fff3e0', color: '#bf360c', font: 'bold 60px Fredoka, Arial' }), side: THREE.DoubleSide }), 0, 1.55, 0.04, false)); sp.position.set(1.1, 0, 0); g.add(sp);
+    addProp(g, S_V, 2.8, -3.6, 0.6, 0, 0.7);
+  } else if (id === 'mayor') {   // 🏅 Quiosco del Censo Digital con estrella de Ciudadano Ejemplar
+    g.add(cyl(0.6, 0.7, 0.3, mat(0xeceff1), 0, 0.15, 0, 12)); g.add(box(0.5, 1.5, 0.35, mat(0x1e3a8a), 0, 1.05, 0));
+    g.add(mesh(new THREE.PlaneGeometry(0.44, 0.7), new THREE.MeshBasicMaterial({ map: textTexture('CENSO', { w: 256, h: 384, bg: '#0b1d4a', color: '#7ef0c0', font: 'bold 64px Fredoka, Arial' }) }), 0, 1.25, 0.18, false));
+    const star = mesh(new THREE.OctahedronGeometry(0.32, 0), glow(0xffd54f, 0xffab00, 1.2, { metalness: 0.6, roughness: 0.3 }), 0, 2.2, 0); g.add(star); g.userData.star = star;
+    const l = new THREE.PointLight(0xffd54f, 1.6, 5, 2); l.position.y = 2.2; g.add(l);
+    addProp(g, SITES.townhall, 4.6, -0.4, -0.4, 0, 0.7);
+  } else if (id === 'sombra') {   // 🔮 La Bola Rentable flotando sobre la carpa
+    const orb = new THREE.Group(); orb.add(sphere(0.6, glow(0xb388ff, 0x7c4dff, 1.4, { transparent: true, opacity: 0.85 }), 0, 0, 0, 20));
+    const rings = [0, 1].map(i => { const r = mesh(new THREE.TorusGeometry(0.95 + i * 0.25, 0.04, 8, 32), glow(0xffd54f, 0xffab00, 1.2), 0, 0, 0, false); r.rotation.x = i ? 1.1 : 0.4; orb.add(r); return r; });
+    const l = new THREE.PointLight(0x9c27b0, 3, 10, 2); orb.add(l); g.add(orb); g.userData.orb = orb; g.userData.rings = rings;
+    addProp(g, SITES.sombra, 0, -1.5, 0, 5.4);
+  } else if (id === 'dax') {   // 🌦️ Estación del Climatizador: mástil, anemómetro, antena y pantalla con el clima actual
+    g.add(cyl(0.5, 0.6, 0.25, mat(0x90a4ae), 0, 0.12, 0, 10)); g.add(cyl(0.07, 0.09, 3.2, mat(0xeceff1), 0, 1.7, 0, 8));
+    const cups = new THREE.Group(); cups.position.y = 3.35; for (let i = 0; i < 3; i++) { const arm = new THREE.Group(); arm.rotation.y = i * 2.094; arm.add(box(0.6, 0.04, 0.04, mat(0x37474f), 0.3, 0, 0)); arm.add(sphere(0.1, mat(0xff7043), 0.6, 0, 0, 8)); cups.add(arm); } g.add(cups); g.userData.cups = cups;
+    const dish = mesh(new THREE.SphereGeometry(0.45, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2.4), mat(0xffffff, { side: THREE.DoubleSide }), 0, 2.4, 0.25); dish.rotation.x = -1.1; g.add(dish);
+    const scr = mesh(new THREE.PlaneGeometry(1.1, 0.55), new THREE.MeshBasicMaterial({ map: textTexture('☀️', { w: 512, h: 256, bg: '#00363a', color: '#e0f7fa', font: 'bold 80px Fredoka, Arial' }) }), 0, 1.3, 0.12, false); g.add(scr); g.userData.screen = scr;
+    const l = new THREE.PointLight(0x4dd0e1, 1.5, 5, 2); l.position.set(0, 1.4, 0.6); g.add(l); g.userData.light = l;
+    addProp(g, SITES.lab, -4.4, 0.8, 0.5, 0, 0.6);
+  } else if (id === 'sam') {   // 🧭 Poste de las Rutas de Ultramar: globo giratorio y flechas a sitios que no existen
+    g.add(cyl(0.07, 0.09, 3, mat(0x6d4c41), 0, 1.5, 0, 8));
+    [['ULTRAMAR', 2.3, 0.4], ['EL BORDE', 1.85, -0.7], ['ARRIBA ↑', 1.4, 1.6]].forEach(([t, y, rot]) => { const a = new THREE.Group(); a.add(mesh(new THREE.PlaneGeometry(1.2, 0.3), new THREE.MeshBasicMaterial({ map: textTexture(t, { w: 512, h: 128, bg: '#fff8e1', color: '#0d47a1', font: 'bold 58px Fredoka, Arial' }), side: THREE.DoubleSide }), 0.62, 0, 0, false)); a.position.y = y; a.rotation.y = rot; g.add(a); });
+    const globe = new THREE.Group(); globe.position.y = 3.25; globe.add(sphere(0.35, glow(0x42a5f5, 0x1565c0, 0.5), 0, 0, 0, 16)); [[0.2, 0.1, 0.25], [-0.25, -0.05, 0.2], [0.05, 0.25, -0.25]].forEach(([x, y, z]) => globe.add(sphere(0.12, mat(0x66bb6a), x, y, z, 8))); g.add(globe); g.userData.globe = globe;
+    const l = new THREE.PointLight(0xffe082, 1.6, 6, 2); l.position.y = 3.2; g.add(l);
+    addProp(g, SITES.port, 2.4, -1.8, 0, 0, 0.5);
+  } else if (id === 'hedgehogs') {   // 🔥 Valla de la Agencia Viral con la tendencia del día (se redibuja cada día onírico)
+    [-1.3, 1.3].forEach(x => g.add(cyl(0.07, 0.07, 2.2, mat(0x333333), x, 1.1, 0, 6)));
+    Viral.canvas = document.createElement('canvas'); Viral.canvas.width = 512; Viral.canvas.height = 256; Viral.tex = new THREE.CanvasTexture(Viral.canvas); Viral.tex.colorSpace = THREE.SRGBColorSpace;
+    g.add(box(2.9, 1.55, 0.08, mat(0x1c1b2e), 0, 2.45, -0.05)); g.add(mesh(new THREE.PlaneGeometry(2.8, 1.4), new THREE.MeshBasicMaterial({ map: Viral.tex }), 0, 2.45, 0.0, false));
+    const l = new THREE.PointLight(0xff4081, 1.8, 6, 2); l.position.set(0, 2.4, 1); g.add(l);
+    addProp(g, SITES.studio, -3.8, 1.2, 0.5, 0, 0.5); Viral.boardDay = -1; Viral.refreshBoard();
+  } else if (id === 'glover') { Bridge.refreshVisual(); return (bigProps.glover = Bridge.parts?.root || g); }
+  bigProps[id] = g; return g;
+}
+const BIG_UNLOCKS = {
+  bear: () => { ensureBigProp('bear'); },
+  mayor: () => { ensureBigProp('mayor'); drawBoard(); },
+  glover: () => { ensureBigProp('glover'); Bridge.refreshVisual(); },
+  sombra: () => { ensureBigProp('sombra'); const o = act2State().oracle; if (!o.since) o.since = GS.daily.dayCount; },
+  dax: () => { ensureBigProp('dax'); },
+  sam: () => { ensureBigProp('sam'); },
+  hedgehogs: () => { ensureBigProp('hedgehogs'); },
+};
+let _act2Acc = 0;
+function act2Update(dt, t) {
+  const o = bigProps.sombra; if (o) { o.userData.rings.forEach((r, i) => { r.rotation.z += dt * (0.7 + i * 0.5); }); o.userData.orb.position.y = Math.sin(t * 1.2) * 0.18; }
+  const d = bigProps.dax; if (d) { const w = Weather.id(); d.userData.cups.rotation.y += dt * (w === 'storm' ? 10 : w === 'rain' ? 5 : 2);
+    if (d.userData.wx !== w) { d.userData.wx = w; const wt = WEATHER_TYPES[w] || WEATHER_TYPES.clear, old = d.userData.screen.material.map; d.userData.screen.material.map = textTexture(`${wt.icon} ${wt.name}`, { w: 512, h: 256, bg: '#00363a', color: '#e0f7fa', font: 'bold 52px Fredoka, Arial' }); d.userData.screen.material.needsUpdate = true; if (old && old.dispose) old.dispose(); d.userData.light.color.setHex(w === 'sun' ? 0xffb74d : w === 'storm' ? 0x7c4dff : w === 'rain' ? 0x4fc3f7 : 0x4dd0e1); } }
+  const m = bigProps.mayor; if (m) m.userData.star.rotation.y += dt * 1.5;
+  const s = bigProps.sam; if (s) s.userData.globe.rotation.y += dt * 0.6;
+  if (bigProps.hedgehogs && Viral.boardDay !== GS.daily.dayCount) Viral.refreshBoard();
+  if (Bridge.parts && Bridge.done()) { Bridge.parts.light.intensity = 2.2 + Math.sin(t * 2) * 0.8; Bridge.parts.beacon.material.emissiveIntensity = 1.8 + Math.sin(t * 2) * 0.6; Bridge.parts.ray.material.opacity = 0.35 + Math.sin(t * 2) * 0.15; }
+  _act2Acc += dt; if (_act2Acc > 2) { _act2Acc = 0; refreshNpcBubbles(); }
+}
+
+/* ---------- 🐻 1 · PEDIDOS DEL HORNO (OsoExpress) ---------- */
+const BakeryOrders = {
+  forDay(day) {
+    const pool = CFG.bakeryOrders, items = pool[Math.floor(mulberry32(_hashStr(GS.meta.saveId + ':oso:' + day))() * pool.length)];
+    const base = items.reduce((a, [id, q]) => a + (ITEMS[id]?.sell || 0) * q, 0);
+    return { items, base, pay: Math.round(base * CFG.bakeryOrderMult) };
+  },
+  today() { const o = act2State().orders, d = GS.daily.dayCount; if (o.day !== d) { o.day = d; o.done = false; } return { ...this.forDay(d), done: !!o.done }; },
+  missing(o) { return o.items.filter(([id, q]) => !Inventory.has(id, q)); },
+  deliver() {
+    if (!bigJobDone('bear')) return false;
+    const o = this.today(); if (o.done) { showToast('📦 El pedido de hoy ya está servido. ¡Mañana, otro!', 'text-white'); return false; }
+    if (this.missing(o).length) { showToast('❌ Te faltan productos para el pedido', 'text-red-200'); return false; }
+    o.items.forEach(([id, q]) => Inventory.remove(id, q));
+    const s = act2State().orders; s.done = true; s.served = (s.served | 0) + 1; GS.stats.ordersServed = (GS.stats.ordersServed || 0) + 1;
+    Wallet.add(o.pay, 'Pedido OsoExpress'); Trust.add('bear', CFG.bakeryOrderTrust, 'order');
+    playChime(); showToast('🐻 "¡Pedido servido! ¡Los clientes van a llorar de felicidad!"', 'text-white'); SaveSystem.saveNow('oso-order'); return true;
+  },
+  open() {
+    openApp('📦 OsoExpress · Pedido del día', '', (body) => {
+      const render = () => {
+        const o = this.today(), ok = !this.missing(o).length;
+        body.innerHTML = balanceBar() + `<div class="app-card p-4 mb-3"><div class="text-sm text-slate-600 mb-2"><b class="text-[#2b2b3d]">🐻 Oso:</b> “${o.done ? '¡Pedido de hoy servido! Mañana la web traerá otro. ¡Eres mi proveedor oficial!' : '¡Socio! La web ha traído este pedido. ¿Me lo preparas en tu cocina?'}”</div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">${o.items.map(([id, q]) => { const have = Inventory.count(id); return `<div class="flex items-center gap-2 p-2 rounded-lg ${have >= q ? 'bg-emerald-50' : 'bg-slate-100'}"><span class="text-2xl">${ITEMS[id].icon}</span><div class="text-xs flex-1"><b>${q}× ${esc(ITEMS[id].name)}</b><div class="${have >= q ? 'text-emerald-600' : 'text-red-500'}">tienes ${have}/${q}</div></div></div>`; }).join('')}</div>
+          <div class="text-sm mt-3">Pago: <b class="text-amber-600">🪙 ${fmt(o.pay)} $T</b> <span class="text-xs text-slate-500">(valor de tienda ${fmt(o.base)} × ${String(CFG.bakeryOrderMult).replace('.', ',')}) · +${CFG.bakeryOrderTrust} confianza</span></div>
+          <div class="flex justify-end mt-3">${o.done ? '<span class="text-emerald-600 font-bold text-sm">✅ Servido</span>' : `<button data-deliver class="btn-game px-4 py-2 text-sm ${ok ? 'bg-emerald-300' : 'bg-slate-200 opacity-60'}" ${ok ? '' : 'disabled'}>📦 Entregar pedido</button>`}</div></div>
+          <div class="text-[11px] text-slate-500">Un pedido al día, fijo para hoy (no cambia al recargar) · caduca a medianoche onírica · pedidos servidos: ${act2State().orders.served | 0}. Se cocina en 🍳 Mi Casa: Mermelada (2 🍋), Pastel Dorado (Villa), Pan, Pescado a la brasa.</div>`;
+        const d = body.querySelector('[data-deliver]'); if (d) d.onclick = () => { this.deliver(); render(); };
+      };
+      render();
+    });
+  },
+};
+
+/* ---------- 🐶 2 · CENSO DIGITAL (título −10% tasa + estadísticas + pozo en el Tablón) ---------- */
+function censusOn() { return GS.bigJobs?.mayor?.status === 2; }
+function censusTaxMult() { return censusOn() ? 1 - CFG.censusTaxDiscount : 1; }
+const Census = {
+  rank() { const rows = [...market.holders.map(h => [h[0], h[1]]), ['🧑‍💻 Tú', Math.floor(GS.economy.money)]].sort((a, b) => b[1] - a[1]); return { pos: rows.findIndex(r => r[0].startsWith('🧑')) + 1, n: rows.length, rows }; },
+  open() {
+    openApp('📊 Censo Digital · Ayuntamiento', '', (body) => {
+      const s = GS.stats, r = this.rank(), row = (k, v) => `<div class="flex justify-between gap-3 py-1 border-b border-slate-100 last:border-0 text-xs"><span class="text-slate-600">${k}</span><b class="text-[#2b2b3d]">${v}</b></div>`;
+      body.innerHTML = `<div class="app-card p-4 mb-3 text-center"><div class="text-4xl">🏅</div><div class="font-bold text-[#2b2b3d]">Ciudadano Ejemplar</div><div class="text-xs text-slate-500 mt-1">“¡Ejem! Con su correspondiente descuento fisc— administrativo.” · Tasa de residencia <b>−${Math.round(CFG.censusTaxDiscount * 100)}%</b> para siempre (${CFG.taxRatePct}% → ${(CFG.taxRatePct * censusTaxMult()).toLocaleString('es-ES')}% del capital/día)</div></div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div class="app-card p-3"><div class="font-bold text-sm mb-1">📋 Registro del soñador</div>${row('Días vividos en el sueño', GS.daily.dayCount)}${row('Tiempo jugado', Math.floor((GS.meta.playTimeSec || 0) / 60) + ' min')}${row('Recursos recogidos', fmt(s.itemsCollected || 0))}${row('Frutas Doradas cosechadas', fmt(s.fruitsHarvested || 0))}${row('Peces pescados', fmt(s.fishCaught || 0))}${row('Nodos minados', fmt(s.nodesMined || 0))}${row('Estrellas recogidas', fmt(s.starsCollected || 0))}${row('Platos cocinados', fmt(s.dishesCooked || 0))}${row('Construcciones', fmt(s.built || 0))}</div>
+          <div class="app-card p-3"><div class="font-bold text-sm mb-1">🏛️ Economía municipal</div>${row('Objetos vendidos / comprados', `${fmt(s.itemsSold || 0)} / ${fmt(s.itemsBought || 0)}`)}${row('Misiones · Trabajos Mayores', `${missionsDoneCount()}/7 · ${bigJobsDoneCount()}/7`)}${row('Pedidos OsoExpress servidos', fmt(s.ordersServed || 0))}${row('Importaciones recibidas', fmt(s.importsReceived || 0))}${row('Ganado en toda la partida', fmt(GS.economy.lifetimeEarned) + ' $T')}${row('Gastado en toda la partida', fmt(GS.economy.lifetimeSpent) + ' $T')}${row('🎫 Pozo de la lotería (público)', fmt(Math.floor(GS.lottery.pool)) + ' $T')}</div>
+        </div>
+        <div class="app-card p-3 mt-3"><div class="font-bold text-sm mb-1">🏆 Ranking local · puesto ${r.pos}/${r.n}</div>${r.rows.map((x, i) => `<div class="flex justify-between text-xs py-0.5 ${x[0].startsWith('🧑') ? 'font-bold text-amber-600' : 'text-slate-600'}"><span>${i + 1}. ${esc(x[0])}</span><span>${fmt(x[1])}</span></div>`).join('')}
+          <div class="text-[10px] text-slate-400 mt-1">Tus cifras son reales (tu partida). Los saldos de los vecinos son la simulación del Tablón Holográfico.</div></div>`;
+    });
+  },
+};
+
+/* ---------- 🦫 3 · EL PUENTE DEL HORIZONTE (5 fases = 5 días de donaciones → monumento + −15% construcción) ---------- */
+function bridgeDiscount() { return GS.bigJobs?.glover?.status === 2 && (GS.act2?.bridge?.phase | 0) >= CFG.bridgePhases.length ? CFG.bridgeBuildDiscount : 0; }
+function buildCost(def) { return Math.round(def.cost * (1 - bridgeDiscount())); }
+const Bridge = {
+  parts: null,
+  st() { return act2State().bridge; },
+  phases() { return CFG.bridgePhases.length; },
+  phase() { return clamp(this.st().phase | 0, 0, this.phases()); },
+  done() { return bigJobDone('glover') && this.phase() >= this.phases(); },
+  need() { return CFG.bridgePhases[this.phase()] || null; },
+  canToday() { return (this.st().lastPhaseDay | 0) !== GS.daily.dayCount; },
+  donate() {
+    if (!bigJobDone('glover') || this.done()) return false;
+    if (!this.canToday()) { showToast('🦫 "Una fase al día. El cemento onírico necesita su noche."', 'text-white'); return false; }
+    const need = this.need(), miss = Object.entries(need).filter(([id, q]) => !Inventory.has(id, q));
+    if (miss.length) { showToast(`❌ Faltan: ${miss.map(([id, q]) => `${ITEMS[id].icon}×${q - Inventory.count(id)}`).join(' ')}`, 'text-red-200'); return false; }
+    Object.entries(need).forEach(([id, q]) => Inventory.remove(id, q));
+    const s = this.st(); s.phase = this.phase() + 1; s.lastPhaseDay = GS.daily.dayCount; s.donated = (s.donated | 0) + Object.values(need).reduce((a, b) => a + b, 0);
+    this.refreshVisual(); playChime();
+    if (this.done()) {
+      s.doneDay = GS.daily.dayCount;
+      addLetter('🦫 Glover', 'Está terminado. Un puente que mira al horizonte, con tu nombre en la placa al lado del mío. Lo medimos dos veces y salió bien. No preguntes por qué lo quería tanto. Gracias, socio. (Desde hoy, todo lo que construyas te sale más barato: los materiales saben quién eres.)');
+      showToast(`🌉 ¡Puente del Horizonte terminado! −${Math.round(CFG.bridgeBuildDiscount * 100)}% en construcciones para siempre`, 'text-amber-200');
+      if (this.parts) spawnConfetti(this.parts.finale.position.clone().setLength(this.parts.finale.position.length() + 2), 60);
+    } else showToast(`🌉 Fase ${s.phase}/${this.phases()} de la Gran Obra terminada. Mañana, la siguiente`, 'text-white');
+    refreshMissionUI(); SaveSystem.saveNow('bridge'); return true;
+  },
+  open() {
+    openApp('🌉 La Gran Obra · Puente del Horizonte', '', (body) => {
+      const render = () => {
+        const p = this.phase(), N = this.phases(), done = this.done(), need = this.need();
+        let html = `<div class="app-card p-4 mb-3"><div class="text-sm text-slate-600"><b class="text-[#2b2b3d]">🦫 Glover:</b> “${done ? 'Ahí lo tienes. Mira al horizonte. Yo ya no pregunto.' : this.canToday() ? 'Trae los materiales de esta fase. Ni un milímetro de más, ni uno de menos.' : 'Hoy ya hemos avanzado. El cemento necesita su noche: vuelve mañana.'}”</div>
+          <div class="h-3 rounded-full bg-slate-200 border border-[#2b2b3d] overflow-hidden mt-3"><div class="h-full" style="width:${p / N * 100}%;background:linear-gradient(90deg,#ffb74d,#ffd54f)"></div></div><div class="text-xs text-slate-500 mt-1">Fase ${p}/${N} · 1 fase por día onírico${done ? ` · terminado el día ${this.st().doneDay}` : ''}</div></div>`;
+        html += `<div class="app-card p-3 mb-3"><div class="font-bold text-sm mb-1">Fases de obra</div>` + CFG.bridgePhases.map((ph, i) => `<div class="flex items-center gap-2 text-xs py-1 ${i < p ? 'text-emerald-600' : i === p ? 'text-[#2b2b3d] font-bold' : 'text-slate-400'}"><span>${i < p ? '✅' : i === p ? '🏗️' : '▫️'}</span><span>Fase ${i + 1}: ${Object.entries(ph).map(([id, q]) => `${q}× ${ITEMS[id].icon} ${esc(ITEMS[id].name)}${i === p ? ` <span class="${Inventory.count(id) >= q ? 'text-emerald-600' : 'text-red-500'}">(${Inventory.count(id)})</span>` : ''}`).join(' + ')}</span></div>`).join('') + `</div>`;
+        if (!done && need) { const ok = this.canToday() && Object.entries(need).every(([id, q]) => Inventory.has(id, q)); html += `<div class="flex justify-end"><button data-donate class="btn-game px-4 py-2 text-sm ${ok ? 'bg-amber-300' : 'bg-slate-200 opacity-60'}" ${ok ? '' : 'disabled'}>🧱 Donar materiales de la fase ${p + 1}</button></div>`; }
+        html += `<div class="text-[11px] text-slate-500 mt-2">Al terminar: puente-mirador permanente en la costa del puerto (con placa), y <b>−${Math.round(CFG.bridgeBuildDiscount * 100)}% en el coste de las construcciones</b> para siempre${done ? ' (✅ activo)' : ''}. Las gemas (💎) salen al minar con el pico.</div>`;
+        body.innerHTML = html; const b = body.querySelector('[data-donate]'); if (b) b.onclick = () => { this.donate(); render(); };
+      };
+      render();
+    });
+  },
+  ensureMesh() {
+    if (this.parts) return; const s = SITES.port, N = 10, root = new THREE.Group(); scene.add(root);
+    const deckM = mat(0xd7ccc8), railM = mat(0x8d6e63), postM = mat(0x6d4c41), scafM = mat(0xffb74d);
+    const at = (x, z, lift) => { const d = siteDir(s, x, z); return { d, r: Math.max(heightAt(d) + 0.15, SEA + 0.3) + lift }; };
+    const decks = [], posts = [];
+    for (let i = 0; i < N; i++) {   // tablero que sube hacia el mar: "apunta al horizonte"
+      const lift = 0.25 + (i / (N - 1)) * 1.5, { d, r } = at(-3.6, 0.6 + i * 0.85, lift);
+      const seg = new THREE.Group(); seg.add(box(1.5, 0.14, 0.9, deckM, 0, 0, 0)); [-0.72, 0.72].forEach(x => seg.add(box(0.06, 0.5, 0.9, railM, x, 0.3, 0)));
+      placeOnPlanet(seg, d, 0, 0, s.S, r); root.add(seg); decks.push(seg);
+      if (i % 2 === 0) { const h = lift + 1.6, pg = new THREE.Group(); [-0.6, 0.6].forEach(x => pg.add(cyl(0.09, 0.11, h, postM, x, -h / 2, 0, 6))); placeOnPlanet(pg, d, 0, 0, s.S, r); root.add(pg); posts.push(pg); }
+    }
+    const scaffold = new THREE.Group(); root.add(scaffold);
+    for (let i = 0; i < N; i += 3) { const { d, r } = at(-3.6, 0.6 + i * 0.85, 0); const sc = new THREE.Group(); [-0.85, 0.85].forEach(x => sc.add(box(0.06, 2.6, 0.06, scafM, x, 1.3, 0))); sc.add(box(1.8, 0.06, 0.06, scafM, 0, 2.5, 0)); sc.add(box(1.8, 0.06, 0.06, scafM, 0, 1.4, 0)); placeOnPlanet(sc, d, 0, 0, s.S, r); scaffold.add(sc); }
+    const end = at(-3.6, 0.6 + (N - 1) * 0.85 + 1.1, 0.25 + 1.5), fin = new THREE.Group();
+    fin.add(cyl(1.1, 1.1, 0.18, deckM, 0, 0, 0, 16));
+    const arch = mesh(new THREE.TorusGeometry(1.0, 0.09, 8, 24, Math.PI), glow(0xffe082, 0xffb300, 0.6), 0, 0.1, 0); fin.add(arch);
+    const beacon = sphere(0.24, glow(0xfff8e1, 0xffd54f, 2.2), 0, 1.15, 0, 12); fin.add(beacon);
+    const ray = mesh(new THREE.CylinderGeometry(0.05, 0.35, 6, 10, 1, true), new THREE.MeshBasicMaterial({ color: 0xfff59d, transparent: true, opacity: 0.4, depthWrite: false, side: THREE.DoubleSide }), 0, 1.15, 3.2, false); ray.rotation.x = Math.PI / 2; fin.add(ray);   // haz que apunta al horizonte
+    const light = new THREE.PointLight(0xffd54f, 2.5, 12, 2); light.position.y = 1.2; fin.add(light);
+    fin.add(mesh(new THREE.PlaneGeometry(1.7, 0.42), new THREE.MeshBasicMaterial({ map: textTexture('PUENTE DEL HORIZONTE · Glover & tú', { w: 768, h: 128, bg: '#3e2723', color: '#ffe082', font: 'bold 44px Fredoka, Arial' }), side: THREE.DoubleSide }), 0, 0.42, -1.12, false));
+    placeOnPlanet(fin, end.d, 0, 0, s.S, end.r); root.add(fin);
+    this.parts = { root, decks, posts, scaffold, finale: fin, beacon, light, ray };
+  },
+  refreshVisual() {
+    if (!bigJobDone('glover')) return; this.ensureMesh();
+    const N = this.parts.decks.length, done = this.done(), shown = done ? N : Math.round(N * this.phase() / this.phases());
+    this.parts.decks.forEach((d, i) => d.visible = i < shown); this.parts.posts.forEach((d, i) => d.visible = i * 2 < Math.max(shown, 2));
+    this.parts.finale.visible = done; this.parts.scaffold.visible = !done;
+  },
+};
+
+/* ---------- 📈 FERIA DEL TABLÓN (sustrato del Oráculo y de los rumores · diseño propio: la Guía no detalla la feria) ----------
+   Cada día onírico, por categoría: una SUBE (+feriaUpPct), otra BAJA (−feriaDownPct), el resto casi plano (±feriaFlatPct).
+   Determinista por (partida, día): no se puede rerollear. "Lotes a un día": compras hoy, se liquidan en la medianoche
+   con el movimiento de mañana. Sin información, la esperanza es ≈ −1% (comisión). Con Oráculo/rumores, positiva. */
+const FERIA_CATS = ['resource', 'ingredient', 'valuable', 'consumable', 'material'];
+function feriaOpenStake() { const l = GS.act2?.feria?.lots; return Array.isArray(l) ? l.reduce((a, x) => a + (x.stake || 0), 0) : 0; }   // capital invertido en lotes: cuenta para la tasa de residencia (sin escapatoria fiscal nocturna)
+const Feria = {
+  on() { return !!GS.story?.act1Done && !!GS.unlocks?.board; },
+  layout(day) { const r = mulberry32(_hashStr(GS.meta.saveId + ':feria:' + day)), c = [...FERIA_CATS]; for (let i = c.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [c[i], c[j]] = [c[j], c[i]]; } return { up: c[0], down: c[1] }; },
+  move(day, cat) { const l = this.layout(day); if (cat === l.up) return CFG.feriaUpPct; if (cat === l.down) return -CFG.feriaDownPct; return (mulberry32(_hashStr(GS.meta.saveId + ':ff:' + day + ':' + cat))() * 2 - 1) * CFG.feriaFlatPct; },
+  lots() { const f = act2State().feria; if (!Array.isArray(f.lots)) f.lots = []; return f.lots; },
+  stakedToday() { const d = GS.daily.dayCount; return this.lots().filter(l => l.day === d).reduce((a, l) => a + l.stake, 0); },
+  capLeft() { return Math.max(0, Math.floor((Wallet.balance + this.stakedToday()) * CFG.feriaStakeCapPct) - this.stakedToday()); },
+  buy(cat, side, amount) {
+    if (!this.on()) { showToast('📈 La Feria del Tablón abre en el Acto 2', 'text-white'); return false; }
+    amount = Math.floor(+amount || 0); if (!FERIA_CATS.includes(cat) || !['up', 'down'].includes(side)) return false;
+    if (amount < CFG.feriaMinStake) { showToast(`📈 Lote mínimo: ${fmt(CFG.feriaMinStake)} $T`, 'text-red-200'); return false; }
+    if (amount > this.capLeft()) { showToast(`🐶 "¡Ejem! El reglamento limita los lotes al ${Math.round(CFG.feriaStakeCapPct * 100)}% de su capital por día."`, 'text-red-200'); return false; }
+    if (!Wallet.spend(amount, `Feria: lote ${side === 'up' ? 'al alza' : 'a la baja'} · ${CATEGORIES[cat].name}`)) return false;
+    this.lots().push({ day: GS.daily.dayCount, cat, side, stake: amount }); SaveSystem.saveNow('feria-buy');
+    showToast(`📈 Lote de ${fmt(amount)} $T ${side === 'up' ? 'al alza' : 'a la baja'} en ${catLabel(cat)} · se liquida a medianoche`, 'text-white'); return true;
+  },
+  /** Hook de la liquidación (día D que empieza): los lotes de días anteriores se pagan con el movimiento del día siguiente al de compra */
+  settle() {
+    const f = act2State().feria, D = GS.daily.dayCount, lots = this.lots(), due = lots.filter(l => l.day < D); if (!due.length) return;
+    let back = 0, staked = 0; const lines = [];
+    due.forEach(l => { const m = this.move(l.day + 1, l.cat), r = l.side === 'up' ? m : -m, pay = Math.max(0, Math.floor(l.stake * (1 + r) * (1 - CFG.feriaCommission))); back += pay; staked += l.stake; lines.push(`${catLabel(l.cat)} ${l.side === 'up' ? '📈' : '📉'} ${fmt(l.stake)} → ${fmt(pay)} (${v08pct(m)})`); });
+    f.lots = lots.filter(l => l.day >= D);
+    if (back) Wallet.add(back, 'Feria: liquidación de lotes', { silent: true });
+    f.lastResult = { day: D, staked, back }; (f.log ||= []).unshift({ day: D, staked, back }); if (f.log.length > 10) f.log.length = 10;
+    (GS.daily.lastCharges ||= []).push({ label: '📈 Feria: lotes liquidados', note: `${fmt(staked)} → ${fmt(back)} $T` });
+    addLetter('🏛️ Tablón · Feria', `Liquidación de lotes (simulación):\n${lines.join('\n')}\nTotal: ${fmt(staked)} → ${fmt(back)} $T (comisión ${Math.round(CFG.feriaCommission * 100)}%).`);
+  },
+  open() {
+    openApp('📈 Feria del Tablón · simulación', '', (body) => {
+      let cat = FERIA_CATS[0], side = 'up';
+      const render = () => {
+        const D = GS.daily.dayCount, cap = this.capLeft(), mine = this.lots().filter(l => l.day === D);
+        const hints = [];
+        if (Oracle.on()) { const p = Oracle.pred(D + 1); hints.push(`🔮 Oráculo (~${Math.round(CFG.oracleAccuracy * 100)}%): ${catLabel(p.cat)} ${p.dir === 'up' ? 'SUBIRÁ' : 'BAJARÁ'}`); }
+        (act2State().rumors.log || []).filter(r => r.day === D + 1).forEach(r => hints.push(`${npcById[r.npc]?.emoji || '📰'} Rumor: ${esc(r.short || '')}`));
+        let html = balanceBar() + `<div class="app-card p-3 mb-3"><div class="font-bold text-sm mb-1">Índices de hoy (día ${D})</div><div class="grid grid-cols-1 sm:grid-cols-2 gap-1">${FERIA_CATS.map(c => { const m = this.move(D, c); return `<div class="flex justify-between text-xs p-1.5 rounded-lg bg-slate-50"><span>${catLabel(c)}</span><b class="${m > 0.05 ? 'text-emerald-600' : m < -0.05 ? 'text-red-500' : 'text-slate-500'}">${v08pct(m)}</b></div>`; }).join('')}</div><div class="text-[10px] text-slate-400 mt-1">Cada día una categoría sube fuerte (${v08pct(CFG.feriaUpPct)}), otra baja (${v08pct(-CFG.feriaDownPct)}) y el resto apenas se mueve. Nadie sabe cuál mañana… salvo pistas.</div></div>`;
+        html += `<div class="app-card p-3 mb-3"><div class="font-bold text-sm mb-1">🔎 Pistas para mañana</div>${hints.length ? hints.map(h => `<div class="text-xs py-0.5">${h}</div>`).join('') : '<div class="text-xs text-slate-500">Ninguna. Sin información, la feria es una moneda al aire con comisión.</div>'}<div class="text-[10px] text-slate-400 mt-1">Fuentes: 🔮 Oráculo de Sombra (acierta ~${Math.round(CFG.oracleAccuracy * 100)}%), rumores del Mayor (❤️ Socio) y de los encargos 💼 premium (pistas reales).</div></div>`;
+        html += `<div class="app-card p-3 mb-3"><div class="font-bold text-sm mb-2">Comprar lote para mañana</div><div class="flex flex-wrap gap-1 mb-2">${FERIA_CATS.map(c => `<button data-cat="${c}" class="btn-game px-2 py-1 text-[11px] ${cat === c ? 'active' : 'bg-white'}">${catLabel(c)}</button>`).join('')}</div>
+          <div class="flex flex-wrap gap-2 items-center"><button data-side="up" class="btn-game px-3 py-1 text-xs ${side === 'up' ? 'active' : 'bg-white'}">📈 Al alza</button><button data-side="down" class="btn-game px-3 py-1 text-xs ${side === 'down' ? 'active' : 'bg-white'}">📉 A la baja</button>
+          <input data-amt type="number" min="${CFG.feriaMinStake}" max="${cap}" placeholder="${fmt(Math.min(cap, Math.max(CFG.feriaMinStake, Math.floor(cap / 2))))}" class="game w-28 text-xs"><button data-pct="0.25" class="btn-game px-2 py-1 text-[11px] bg-white">25%</button><button data-pct="1" class="btn-game px-2 py-1 text-[11px] bg-white">Máx</button><button data-buy class="btn-game px-3 py-1.5 text-xs bg-emerald-300">Comprar lote</button></div>
+          <div class="text-[11px] text-slate-500 mt-1">Disponible hoy: <b>${fmt(cap)} $T</b> (tope ${Math.round(CFG.feriaStakeCapPct * 100)}% del capital/día) · mín. ${fmt(CFG.feriaMinStake)} · comisión ${Math.round(CFG.feriaCommission * 100)}% · pago = lote × (1 ± movimiento de mañana).</div></div>`;
+        html += `<div class="app-card p-3"><div class="font-bold text-sm mb-1">Tus lotes de hoy</div>${mine.length ? mine.map(l => `<div class="text-xs py-0.5">${catLabel(l.cat)} ${l.side === 'up' ? '📈 al alza' : '📉 a la baja'} · <b>${fmt(l.stake)} $T</b></div>`).join('') : '<div class="text-xs text-slate-500">Ninguno.</div>'}${act2State().feria.lastResult ? `<div class="text-[11px] text-slate-500 mt-1">Última liquidación (día ${act2State().feria.lastResult.day}): ${fmt(act2State().feria.lastResult.staked)} → ${fmt(act2State().feria.lastResult.back)} $T</div>` : ''}
+          <div class="text-[10px] text-slate-400 mt-1">⚠️ Simulación de mercado (Pilar P5). Puedes perder hasta un ${Math.round(Math.max(CFG.feriaUpPct, CFG.feriaDownPct) * 100)}% del lote. “Los mercados también sueñan, soñador.”</div></div>`;
+        body.innerHTML = html;
+        body.querySelectorAll('[data-cat]').forEach(b => b.onclick = () => { cat = b.dataset.cat; render(); });
+        body.querySelectorAll('[data-side]').forEach(b => b.onclick = () => { side = b.dataset.side; render(); });
+        const amt = body.querySelector('[data-amt]');
+        body.querySelectorAll('[data-pct]').forEach(b => b.onclick = () => { amt.value = Math.floor(cap * +b.dataset.pct); });
+        body.querySelector('[data-buy]').onclick = () => { if (this.buy(cat, side, +amt.value || +amt.placeholder.replace(/\D/g, ''))) render(); };
+      };
+      render();
+    });
+  },
+};
+
+/* ---------- 🐈‍⬛ 4 · EL ORÁCULO DE LOS MERCADOS (1 predicción gratis al día · acierta ~70% · etiquetado honesto) ---------- */
+const Oracle = {
+  on() { return bigJobDone('sombra'); },
+  /** Predicción determinista para el día `day`: correcta con prob. CFG.oracleAccuracy (si falla, nombra otra categoría) */
+  pred(day) {
+    const r = mulberry32(_hashStr(GS.meta.saveId + ':oracle:' + day)), correct = r() < CFG.oracleAccuracy, dir = r() < 0.5 ? 'up' : 'down';
+    const l = Feria.layout(day), real = dir === 'up' ? l.up : l.down; let cat = real;
+    if (!correct) { const others = FERIA_CATS.filter(c => c !== real); cat = others[Math.floor(r() * others.length)]; }
+    return { day, cat, dir, correct };
+  },
+  /** Liquidación del día D: puntúa la predicción de hoy (honestidad: historial real) y escribe la carta de mañana */
+  settle(D) {
+    const o = act2State().oracle;
+    if ((o.since | 0) && D > o.since) { const p = this.pred(D); o.total = (o.total | 0) + 1; if (p.correct) o.hits = (o.hits | 0) + 1; (o.log ||= []).unshift({ day: D, cat: p.cat, dir: p.dir, correct: p.correct }); if (o.log.length > 10) o.log.length = 10; }
+    const n = this.pred(D + 1);
+    addLetter('🐈‍⬛ El Oráculo', `Mmm… la bola habla, soñador. Mañana (día ${D + 1}) ${catLabel(n.cat)} ${n.dir === 'up' ? 'SUBIRÁ' : 'BAJARÁ'} en la feria del Tablón. El azar también tiene derechos.\n\n🔮 Predicción simulada · precisión anunciada ~${Math.round(CFG.oracleAccuracy * 100)}% · tu historial: ${o.hits | 0}/${o.total | 0}.`);
+  },
+  open() {
+    openApp('🔮 El Oráculo de los Mercados', '', (body) => {
+      const D = GS.daily.dayCount, p = this.pred(D + 1), o = act2State().oracle, acc = o.total ? Math.round(o.hits / o.total * 100) : null;
+      body.innerHTML = `<div class="app-card p-4 mb-3 text-center"><div class="text-5xl">🔮</div><div class="font-bold text-[#2b2b3d] mt-1">Mañana (día ${D + 1}): ${catLabel(p.cat)} ${p.dir === 'up' ? '📈 SUBIRÁ' : '📉 BAJARÁ'}</div><div class="text-xs text-slate-500 mt-1">“Curioso. La bola muestra tu futuro y solo veo… un escritorio. Debe estar estropeada. Mmm.”</div></div>
+        <div class="app-card p-3 mb-3 text-xs text-slate-600"><b>Honestidad del Oráculo (P5):</b> es una predicción <b>simulada</b> que acierta aproximadamente el <b>${Math.round(CFG.oracleAccuracy * 100)}%</b> de los días. Tu historial real: <b>${o.hits | 0}/${o.total | 0}</b>${acc !== null ? ` (${acc}%)` : ''}. Úsala en la 📈 Feria del Tablón (ayuntamiento). Llega gratis cada noche a tu buzón.</div>
+        <div class="app-card p-3"><div class="font-bold text-sm mb-1">Últimas lecturas</div>${(o.log || []).length ? o.log.map(x => `<div class="text-xs py-0.5">${x.correct ? '✅' : '❌'} Día ${x.day}: ${catLabel(x.cat)} ${x.dir === 'up' ? 'subía' : 'bajaba'}</div>`).join('') : '<div class="text-xs text-slate-500">Aún ninguna puntuada: la primera se comprueba mañana.</div>'}</div>`;
+    });
+  },
+};
+
+/* ---------- 📰 RUMORES (Mayor ❤️ 3 y encargos 💼 premium): pistas REALES sobre mañana ---------- */
+const RUMOR_KIND = { bear: 'order', mayor: 'up', glover: 'up', sombra: 'down', dax: 'weather', sam: 'down', hedgehogs: 'trend' };
+function rumorFor(npcId, day) {
+  let kind = RUMOR_KIND[npcId] || 'trend';
+  if ((kind === 'up' || kind === 'down') && !Feria.on()) kind = 'trend';
+  if (kind === 'order' && !bigJobDone('bear')) kind = 'trend';
+  const l = Feria.layout(day), tr = Trend.forDay(day);
+  if (kind === 'up' || kind === 'down') { const c = kind === 'up' ? l.up : l.down, short = `${catLabel(c)} ${kind === 'up' ? 'subirá' : 'bajará'} en la feria`;
+    const txt = { mayor: `¡Ejem! Extraoficialmente: mañana se firma una licencia que hará ${kind === 'up' ? 'SUBIR' : 'BAJAR'} ${catLabel(c)} en la feria del Tablón. Usted no ha oído nada. Formulario 0-0.`, glover: `Entre tú y yo: mañana ${catLabel(c)} sube en la feria. Lo he medido dos veces.`, sombra: `Mmm… mañana ${catLabel(c)} caerá en la feria. La bola no miente cuando susurra, soñador.`, sam: `Arrr, grumete: los mercaderes dicen que mañana ${catLabel(c)} se hunde como un ancla en la feria.` }[npcId] || `Mañana ${short}.`;
+    return { kind, short, text: txt }; }
+  if (kind === 'weather') { const [a, b] = Weather.forecast(day), wa = WEATHER_TYPES[a], wb = WEATHER_TYPES[b]; return { kind, short: `clima: ${wa.icon} mañana · ${wb.icon} tarde`, text: `¡¡DATO EXCLUSIVO!! Mañana: ${wa.icon} ${wa.name} por la mañana y ${wb.icon} ${wb.name} por la tarde. ¡CIENCIA!` }; }
+  if (kind === 'order') { const o = BakeryOrders.forDay(day); return { kind, short: `pedido OsoExpress: ${o.items.map(([id, q]) => `${q}× ${ITEMS[id].icon}`).join(' + ')}`, text: `¡Psst, socio! Mañana la web traerá este pedido: ${o.items.map(([id, q]) => `${q}× ${itemLabel(id)}`).join(' + ')}. ¡Ve calentando el horno!` }; }
+  return { kind: 'trend', short: `${itemLabel(tr)} en tendencia`, text: `Bro, exclusiva: mañana ${itemLabel(tr)} va a estar EN TENDENCIA. (Fuente: nosotros.) (Y el algoritmo.)` };
+}
+function giveRumor(npcId, day = GS.daily.dayCount + 1) {
+  const r = rumorFor(npcId, day), n = npcById[npcId], log = (act2State().rumors.log ||= []);
+  log.unshift({ day, npc: npcId, kind: r.kind, short: r.short }); if (log.length > 14) log.length = 14;
+  addLetter(`${n?.emoji || '📰'} ${n?.name || npcId} · rumor`, `${r.text}\n\n📰 Pista real para el día ${day}.`);
+  if (typeof updateMailboxBadge === 'function') updateMailboxBadge();
+  showToast(`📰 Rumor de ${n?.name || npcId}: ${r.short} (mañana)`, 'text-amber-200'); return r;
+}
+
+/* ---------- 🦎 5 · EL CLIMATIZADOR ONÍRICO (extiende Weather: ola de sol, tormenta, efectos, aviso y siembra de nubes) ---------- */
+function climateOn() { return GS.bigJobs?.dax?.status === 2; }
+function climateBearMult() { return climateOn() && Weather.id() === 'sun' ? CFG.climateSunBearMult : 1; }
+const CLIMATE_FX = {
+  clear: 'Día tranquilo.',
+  rain: `cosechas del Jardín y Frutas Doradas ×${CFG.climateRainGardenMult}, más Peces Tropicales, velocidad −10%.`,
+  fog: 'más perlas en las conchas y gemas al minar.',
+  sun: `el hambre baja un ${Math.round((CFG.climateSunHungerMult - 1) * 100)}% más rápido y el Oso paga ${v08pct(CFG.climateSunBearMult - 1)} por lo que le vendes.`,
+  storm: `la mejor pesca del sueño: raros ×${CFG.climateStormRareMult} y Pez Dorado ×${CFG.fishNightGoldenMult} también de día.`,
+  stars: `lluvia de estrellas: ${CFG.climateStarsMin}–${CFG.climateStarsMax} Fragmentos esta noche.`,
+};
+const Climate = {
+  slotName: (slot) => slot % 2 ? 'tarde (14–24 h)' : 'mañana (0–14 h)',
+  letter(day) { const [a, b] = Weather.forecast(day), wa = WEATHER_TYPES[a], wb = WEATHER_TYPES[b];
+    addLetter('🦎 Climatizador Onírico', `¡¡AVISO CON UN DÍA DE ANTELACIÓN!! Día ${day}: por la mañana ${wa.icon} ${wa.name} (${CLIMATE_FX[a]}) · por la tarde ${wb.icon} ${wb.name} (${CLIMATE_FX[b]}) ¡CIENCIA! (Aplicada al 98,7%.)`); },
+  prune() { const s = act2State().climate.seeds || {}, now = GS.daily.dayCount * 2; Object.keys(s).forEach(k => { if (+k < now) delete s[k]; }); },
+  seed(slot, type) {
+    if (!climateOn()) return false; const c = act2State().climate, D = GS.daily.dayCount;
+    if (!['rain', 'sun', 'storm', 'clear'].includes(type) || Math.floor(slot / 2) !== D + 1) return false;
+    if ((c.lastSeedDay | 0) === D) { showToast('🦎 "¡Una siembra de nubes al día! ¡Las nubes también descansan!"', 'text-white'); return false; }
+    if (!Wallet.spend(CFG.climateSeedCost, 'Climatizador: siembra de nubes')) return false;
+    (c.seeds ||= {})[slot] = type; c.lastSeedDay = D; SaveSystem.saveNow('climate-seed');
+    showToast(`🌦️ Mañana por la ${slot % 2 ? 'tarde' : 'mañana'}: ${WEATHER_TYPES[type].icon} ${WEATHER_TYPES[type].name}. ¡El clima obedece a la CIENCIA!`, 'text-white'); return true;
+  },
+  open() {
+    openApp('🌦️ Climatizador Onírico', '', (body) => {
+      let slot = (GS.daily.dayCount + 1) * 2 + 1, type = 'storm';
+      const render = () => {
+        const D = GS.daily.dayCount, [ta, tb] = Weather.forecast(D), [ma, mb] = Weather.forecast(D + 1), c = act2State().climate, canSeed = (c.lastSeedDay | 0) !== D;
+        const cell = (lbl, id) => `<div class="p-2 rounded-lg bg-slate-50 text-xs"><div class="text-slate-500">${lbl}</div><div class="font-bold">${WEATHER_TYPES[id].icon} ${WEATHER_TYPES[id].name}</div><div class="text-[10px] text-slate-500">${CLIMATE_FX[id]}</div></div>`;
+        body.innerHTML = balanceBar() + `<div class="app-card p-3 mb-3"><div class="font-bold text-sm mb-1">Ahora: ${WEATHER_TYPES[Weather.id()].icon} ${WEATHER_TYPES[Weather.id()].name}</div><div class="grid grid-cols-1 sm:grid-cols-2 gap-2">${cell(`Hoy (día ${D}) · mañana`, ta)}${cell(`Hoy · tarde`, tb)}${cell(`Mañana (día ${D + 1}) · mañana`, ma)}${cell('Mañana · tarde', mb)}</div><div class="text-[10px] text-slate-400 mt-1">El pronóstico es exacto: el clima onírico es determinista. También llega cada noche a tu buzón.</div></div>
+          <div class="app-card p-3 mb-3"><div class="font-bold text-sm mb-1">☁️ Siembra de nubes (1 al día)</div><div class="flex flex-wrap gap-1 mb-2">${[[(D + 1) * 2, 'Mañana · mañana'], [(D + 1) * 2 + 1, 'Mañana · tarde']].map(([s, l]) => `<button data-slot="${s}" class="btn-game px-2 py-1 text-[11px] ${slot === s ? 'active' : 'bg-white'}">${l}</button>`).join('')}</div>
+            <div class="flex flex-wrap gap-1 mb-2">${['rain', 'sun', 'storm', 'clear'].map(t => `<button data-type="${t}" class="btn-game px-2 py-1 text-[11px] ${type === t ? 'active' : 'bg-white'}">${WEATHER_TYPES[t].icon} ${WEATHER_TYPES[t].name}</button>`).join('')}</div>
+            <button data-seed class="btn-game px-3 py-1.5 text-xs ${canSeed ? 'bg-sky-300' : 'bg-slate-200 opacity-60'}" ${canSeed ? '' : 'disabled'}>🌦️ Sembrar (${fmt(CFG.climateSeedCost)} $T)</button>
+            <div class="text-[10px] text-slate-400 mt-1">${canSeed ? 'Fija el clima de una franja de mañana.' : 'Hoy ya sembraste: vuelve mañana.'} La lluvia de estrellas no se puede sembrar (es cosa del cielo). Diseño propio: la Guía no define la siembra.</div></div>
+          <div class="text-[11px] text-slate-500">“¡¡AHORA SÍ!! ¡El clima obedece a la CIENCIA! (Susurro) bueno, al 98,7% de la ciencia.”</div>`;
+        body.querySelectorAll('[data-slot]').forEach(b => b.onclick = () => { slot = +b.dataset.slot; render(); });
+        body.querySelectorAll('[data-type]').forEach(b => b.onclick = () => { type = b.dataset.type; render(); });
+        const s = body.querySelector('[data-seed]'); if (s) s.onclick = () => { this.seed(slot, type); render(); };
+      };
+      render();
+    });
+  },
+};
+
+/* ---------- 🦤 6 · RUTAS DEL HORIZONTE (importaciones por atraque + telas imposibles en el muelle) ---------- */
+function importsOn() { return GS.bigJobs?.sam?.status === 2; }
+function rollImport() { const t = CFG.importLoot, tot = t.reduce((a, e) => a + e[1], 0); let r = Math.random() * tot; for (const [id, w] of t) { if ((r -= w) < 0) return id; } return t[0][0]; }
+/** Al recoger la caja del muelle: 1 objeto exclusivo de Ultramar por atraque (tope diario en CFG por el ciclo de 62 s del prototipo) */
+function importsOnCrate() {
+  if (!importsOn()) return null; const im = act2State().imports, d = GS.daily.dayCount; if (im.day !== d) { im.day = d; im.count = 0; }
+  if (im.count >= CFG.importsPerDayCap) { showToast(`🚢 Hoy ya llegaron ${CFG.importsPerDayCap} importaciones de Ultramar: más mañana`, 'text-white'); return null; }
+  const id = rollImport(); if (!Inventory.add(id, 1, { silent: true })) { showToast('🎒 Sin hueco: la importación vuelve al barco', 'text-red-200'); return null; }
+  im.count++; im.total = (im.total | 0) + 1; GS.stats.importsReceived = (GS.stats.importsReceived || 0) + 1;
+  showToast(`🚢 De Ultramar: ${itemLabel(id)} (se vende por ${fmt(ITEMS[id].sell)} $T)`, 'text-amber-200'); SaveSystem.save('import'); return id;
+}
+const Imports = {
+  offer() {
+    if (!importsOn() || !state.shipDocked) return null; if (state.fabricBoughtDock != null && state.fabricBoughtDock === state.dockCount) return { sold: true };
+    const own = GS.avatar.wardrobe || [], cand = AVATAR_PARTS.filter(p => p.origin === 'import' && !own.includes(p.key)); if (!cand.length) return { all: true };
+    const p = cand[Math.floor(mulberry32(((state.dockCount | 0) * 7919) ^ _hashStr(GS.meta.saveId))() * cand.length)];
+    return { part: p, price: CFG.importPrices[p.rarity] || CFG.importPrices.rare };
+  },
+  buyFabric() {
+    const o = this.offer(); if (!o || !o.part) return false;
+    if (!Wallet.spend(o.price, `Tela de Ultramar: ${o.part.name}`)) return false;
+    (GS.avatar.wardrobe ||= []).push(o.part.key); state.fabricBoughtDock = state.dockCount;
+    showToast(`🧵 ${o.part.name} → a tu armario 🪞 (combínala en el probador)`, 'text-white'); playChime(); SaveSystem.saveNow('fabric:' + o.part.key); return true;
+  },
+  open() {
+    openApp('🚢 Muelle de Ultramar', '', (body) => {
+      liveApp(body, () => {
+        const im = act2State().imports, today = im.day === GS.daily.dayCount ? im.count : 0, o = this.offer();
+        body.innerHTML = balanceBar() + `<div class="app-card p-3 mb-3 text-sm text-slate-600"><b class="text-[#2b2b3d]">🦤 Sam:</b> “Arrr… las nuevas rutas traen cosas que no existen en ningún mapa, grumete. Porque el mapa… bueno. Tú ya sabes del mapa.”</div>
+          <div class="app-card p-3 mb-3"><div class="font-bold text-sm mb-1">📦 Importaciones en la caja del muelle</div><div class="text-xs text-slate-600">Cada atraque, la caja trae 1 objeto exclusivo de Ultramar. Hoy: <b>${today}/${CFG.importsPerDayCap}</b> · total: ${im.total | 0}. Barco: <b>${state.shipDocked ? '⚓ atracado: ¡recoge la caja!' : 'en ruta'}</b></div>
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-2">${(() => { const tot = CFG.importLoot.reduce((a, e) => a + e[1], 0); return CFG.importLoot.map(([id, w]) => `<div class="p-2 rounded-lg bg-slate-50 text-center text-[11px]"><div class="text-2xl">${ITEMS[id].icon}</div><b>${esc(ITEMS[id].name)}</b><div>${fmt(ITEMS[id].sell)} $T · ${Math.round(w / tot * 100)}%</div></div>`).join(''); })()}</div></div>
+          <div class="app-card p-3"><div class="font-bold text-sm mb-1">🧵 Tela imposible del atraque</div>${!state.shipDocked ? '<div class="text-xs text-slate-500">Llega con el próximo atraque (1 tela por barco).</div>' : o?.sold ? '<div class="text-xs text-emerald-600 font-bold">✓ Ya compraste la tela de este barco.</div>' : o?.all ? '<div class="text-xs text-emerald-600 font-bold">✓ Tienes las 12 telas imposibles. Arrr, coleccionista.</div>' : o?.part ? `<div class="flex items-center gap-3"><span class="text-3xl">🧵</span><div class="flex-1 text-xs"><b>${esc(o.part.name)}</b> · <span style="color:${RARITY[o.part.rarity]?.color}">${RARITY[o.part.rarity]?.name || ''}</span><div class="text-slate-500">Cosmético para tu armario (la ropa nunca da ventaja).</div></div><button data-fabric class="btn-game px-3 py-1.5 text-xs ${Wallet.canAfford(o.price) ? 'bg-amber-300' : 'bg-slate-200 opacity-60'}">${fmt(o.price)} $T</button></div>` : ''}</div>`;
+        const f = body.querySelector('[data-fabric]'); if (f) f.onclick = () => this.buyFabric();
+      });
+    });
+  },
+};
+
+/* ---------- 🦔 7 · AGENCIA VIRAL (Tendencia del Día: precio de venta a NPCs ×2 + 🔥 en mochila y tiendas) ---------- */
+function viralOn() { return GS.bigJobs?.hedgehogs?.status === 2; }
+function viralItemToday() { return viralOn() ? Trend.forDay(GS.daily.dayCount) : null; }
+function viralSellMult(itemId) { return viralOn() && Trend.forDay(GS.daily.dayCount) === itemId ? CFG.viralSellMult : 1; }
+function viralFlame(itemId) { return viralSellMult(itemId) > 1 ? ' 🔥' : ''; }
+const Viral = {
+  canvas: null, tex: null, boardDay: -1,
+  refreshBoard() {
+    if (!this.canvas) return; this.boardDay = GS.daily.dayCount; const id = Trend.forDay(GS.daily.dayCount), it = ITEMS[id], ctx = this.canvas.getContext('2d');
+    const g = ctx.createLinearGradient(0, 0, 512, 256); g.addColorStop(0, '#ff4081'); g.addColorStop(1, '#7c4dff'); ctx.fillStyle = g; ctx.fillRect(0, 0, 512, 256);
+    ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.font = 'bold 38px Fredoka, Arial'; ctx.fillText('🔥 EN TENDENCIA HOY', 256, 44);
+    ctx.font = '96px serif'; ctx.fillText(it.icon, 256, 132); ctx.font = 'bold 34px Fredoka, Arial'; ctx.fillText(it.name, 256, 206); ctx.font = 'bold 20px Fredoka, Arial'; ctx.fillText(`×${CFG.viralSellMult} al vender · Agencia Viral`, 256, 238);
+    this.tex.needsUpdate = true;
+  },
+  open() {
+    openApp('🔥 Agencia Viral · Tendencia del Día', '', (body) => {
+      const id = Trend.forDay(GS.daily.dayCount), it = ITEMS[id], best = Object.keys(SHOPS).filter(s => shopBuysItem(s, id)).map(s => [s, shopSellPrice(s, id)]).sort((a, b) => b[1] - a[1])[0];
+      body.innerHTML = balanceBar() + `<div class="app-card p-4 mb-3 text-center"><div class="text-5xl">${it.icon}</div><div class="font-bold text-[#2b2b3d] mt-1">🔥 ${esc(it.name)} está en tendencia hoy</div><div class="text-xs text-slate-500 mt-1">Precio de venta a los vecinos <b>×${CFG.viralSellMult}</b> durante todo el día onírico ${GS.daily.dayCount}${best ? ` · ahora mismo: <b>${fmt(best[1])} $T</b> en ${SHOPS[best[0]].icon} ${SHOPS[best[0]].name}` : ''} · en el escaparate se vende el doble de fácil esta noche · llevas ${Inventory.count(id)}.</div></div>
+        <div class="app-card p-3 text-sm text-slate-600"><b class="text-[#2b2b3d]">🦔 Barnaby Jr.:</b> “¡BRO! ¡Hemos hackeado el algoritmo!” <b class="text-[#2b2b3d]">Pip:</b> “(Era solo una ruleta.)” <b class="text-[#2b2b3d]">Barnaby:</b> “¡NO DIGAS ESO, PIP!”<div class="text-[11px] text-slate-500 mt-1">Honestidad (P5): la tendencia es un sorteo diario determinista entre ${CFG.trendPool.length} objetos. Cambia cada medianoche onírica. La de mañana se la cuentan a los Socios ❤️ (rumor).</div></div>`;
+    });
+  },
+};
+
+/* ---------- 🌙 Liquidación diaria del Acto 2 (registrada tras facturas, rumores v0.5 y escaparate) ---------- */
+DailySystem.onSettle(() => {
+  const D = GS.daily.dayCount, ch = (GS.daily.lastCharges ||= []);
+  Feria.settle();
+  if (Oracle.on()) Oracle.settle(D);
+  if (Feria.on() && Trust.level('mayor') >= 3 && mulberry32(_hashStr(GS.meta.saveId + ':mrum:' + D))() < CFG.mayorRumorChance) giveRumor('mayor', D + 1);   // Sec. 2.3: rumores de mercado del Mayor desde ❤️ 3
+  if (climateOn()) { Climate.prune(); Climate.letter(D + 1); }
+  if (viralOn()) { const id = Trend.forDay(D); ch.push({ label: `🔥 Tendencia de hoy: ${itemLabel(id)}`, note: `×${CFG.viralSellMult} al vender` }); }
+  if (bigJobDone('bear')) { const o = BakeryOrders.forDay(D); ch.push({ label: '📦 Pedido OsoExpress de hoy', note: `paga ${fmt(o.pay)} $T` }); }
+  const rl = act2State().rumors.log; if (Array.isArray(rl)) act2State().rumors.log = rl.filter(r => r.day >= D);
+  if (typeof updateMailboxBadge === 'function') updateMailboxBadge();
+});
+
+/* =========================================================
    20. MENÚ DE ENTRADA → PLAY
    ========================================================= */
 const $ = (id) => document.getElementById(id);
@@ -4811,6 +5435,8 @@ function applyGameStateToWorld() {
   setLaptopSkin(LAPTOP_SKINS[GS.cosmetics.laptopSkin] ? GS.cosmetics.laptopSkin : 'default');
   NPCS.forEach(n => { if (GS.missions[n.id].status === 2) { UNLOCKS[n.id](); const o = npcObjs[n.id]; o.userData.bubble.material.map = bubbleTexture('✓', '#7dffa8'); o.userData.bubble.material.needsUpdate = true; } });
   if (GS.unlocks.neon) state.neonT = 1;
+  NPCS.forEach(n => { if (GS.bigJobs?.[n.id]?.status === 2) BIG_UNLOCKS[n.id](); });   // v0.8: Trabajos Mayores → sistemas + huellas 3D (idempotente)
+  refreshNpcBubbles();
   if (Array.isArray(GS.player.dir) && GS.player.dir.length === 3) { player.userData.dir.fromArray(GS.player.dir).normalize(); if (Array.isArray(GS.player.fwd)) player.userData.fwd.fromArray(GS.player.fwd); }
   state.tokensShown = GS.economy.money; ui.tokenValue.textContent = state.tokensShown.toLocaleString('es-ES');
   refreshMissionUI();
@@ -4832,7 +5458,8 @@ cam.dist = cam.tDist = 70; cam.pitch = cam.tPitch = 0.35; // vista desde el espa
 { const p = camPose(); applyLook(p.pos, p.target, p.up); }
 animate();
 // 🛠️ DEBUG (temporal, se eliminará en v1.0): permite inspeccionar y forzar el estado desde la consola F12
-window._dbg = { get GS() { return GS; }, AvatarParts: AVATAR_PARTS, AV_STYLES, AVATAR_SLOTS, buildAvatar, applyAvatar, avSanitize, avatarCombinations, Fitting, Boutique, INSIGNIAS, grantInsignia, deliverPendingFashion, grantRandomImport, grantSpecialPiece, maybeOpenCreator, refreshMissionUI, Inventory, Wallet, Needs, Production, Trust, Trend, Weather, openHousePanel, placedBuildings, settleDay, updateEmbargo, enterBuildMode, interactWith: (o) => interactWith(o), set clock(fictMs) { GS.daily.clockMs = fictMs; }, set hunger(v) { GS.needs.hunger = v; } };
+window._dbg = { get GS() { return GS; }, AvatarParts: AVATAR_PARTS, AV_STYLES, AVATAR_SLOTS, buildAvatar, applyAvatar, avSanitize, avatarCombinations, Fitting, Boutique, INSIGNIAS, grantInsignia, deliverPendingFashion, grantRandomImport, grantSpecialPiece, maybeOpenCreator, refreshMissionUI, Inventory, Wallet, Needs, Production, Trust, Trend, Weather, openHousePanel, placedBuildings, settleDay, updateEmbargo, enterBuildMode, interactWith: (o) => interactWith(o), set clock(fictMs) { GS.daily.clockMs = fictMs; }, set hunger(v) { GS.needs.hunger = v; },
+  /* v0.8 · El Comerciante */ BIG_JOBS, BIG_UNLOCKS, completeBigJob, bigJobState, bigJobReady, bigJobDialog, bigProps, act2State, BakeryOrders, Census, Bridge, Feria, Oracle, Climate, Imports, Viral, giveRumor, rumorFor, deliverEncargo, currentEncargo, importsOnCrate, buildCost, censusTaxMult, laptopProj, openLaptop, shopSellPrice };
 if (!SaveSystem.persistent) $('storageWarn').classList.remove('hidden');
 if (hadSave) {
   $('saveSummary').classList.remove('hidden');
@@ -4995,6 +5622,19 @@ const DBG = (() => {
       'DBG.unlockAll(insignias)  -> desbloquea todas las piezas (true = también insignias)',
       "DBG.ally('dax')           -> sube a Aliado vía Trust.add (entrega la insignia)",
       'DBG.insignias()           -> tabla de insignias · DBG.fashion() -> prenda de 7 sellos',
+      '--- v0.8 · El Comerciante ---',
+      'DBG.bigJobs()             -> tabla de los 7 Trabajos Mayores (estado, requisitos, recompensa, sistema)',
+      "DBG.readyBigJob('bear')   -> misión principal hecha + confianza Socio (para que el NPC ofrezca su Trabajo Mayor)",
+      "DBG.completeBigJob('dax') -> completa un Trabajo Mayor por el camino real (paga + 30 confianza + sistema + huella 3D)",
+      'DBG.bigJobsAll()          -> los 7 completados por el camino real (recompensas incluidas)',
+      'DBG.order() · DBG.orderKit() -> pedido OsoExpress de hoy / te da los productos para servirlo',
+      'DBG.bridge(fase) · DBG.bridgeKit() -> fija la fase del puente (0-5) / te da los materiales de la fase y permite donar hoy',
+      'DBG.feria(dia) · DBG.oracle(n) -> movimientos de la feria / predicciones del Oráculo vs realidad en n días',
+      "DBG.feriaSim(capital, dias, 'oraculo'|'rumor'|'azar') -> simula la curva de capital con los datos deterministas de ESTA partida",
+      "DBG.seed('storm', 1)      -> siembra mañana (0 = mañana, 1 = tarde) · DBG.weather('sun') fuerza el clima ahora",
+      'DBG.dock() · DBG.importNow() -> fuerza un atraque del mercante / da una importación de Ultramar',
+      "DBG.viral() · DBG.rumor('mayor') · DBG.premium('sam') -> tendencia de hoy / rumor real / prepara un encargo premium",
+      'DBG.economy(capital)      -> estimación de ingresos diarios por sistema (cordura de balance)',
       'IDs NPC: ' + NPC_IDS.join(', ')
     ].join('\n'));
   }
@@ -5046,7 +5686,7 @@ DBG.builds = () => console.table((GS.world.buildings || []).map(r => ({ id: r.id
 DBG.demolish = (id, refund = 0.5) => removeBuilding(id ?? GS.world.buildings?.at(-1)?.id, refund);
 // ---- v0.6 · Acto 2 en el HUD ----
 DBG.act2 = (on = true) => { const s = storyState(); s.act1Done = !!on; if (on) s.revealed = true; refreshGoalHUD(true); state.missionTab = null; refreshMissionUI(); DBG.save('debug_act2'); console.log('[DBG] act1Done = ' + s.act1Done + ' · HUD: ' + document.getElementById('missionLabel').textContent + ' ' + ui.missionCount.textContent); };
-DBG.bigJob = (id, status = 2) => { if (!npcById[id]) { console.warn('[DBG] NPC desconocido'); return; } GS.bigJobs[id] = { ...(GS.bigJobs[id] || {}), status: status | 0, generated: status >= 1, completedAt: status === 2 ? Date.now() : null }; refreshMissionUI(); DBG.save('debug_bigjob'); console.log('[DBG] Trabajos Mayores: ' + bigJobsDoneCount() + '/' + CFG.act2BigJobs); };
+DBG.bigJob = (id, status = 2) => { if (!npcById[id]) { console.warn('[DBG] NPC desconocido'); return; } GS.bigJobs[id] = { ...(GS.bigJobs[id] || {}), status: status | 0, generated: status >= 1, completedAt: status === 2 ? Date.now() : null }; if ((status | 0) === 2) BIG_UNLOCKS[id](); refreshMissionUI(); DBG.save('debug_bigjob'); console.log('[DBG] Trabajos Mayores: ' + bigJobsDoneCount() + '/' + CFG.act2BigJobs); };
 // ---- v0.7 · Avatar, armario, Boutique, insignias ----
 DBG.creator = () => { storyState().creatorPending = true; maybeOpenCreator(() => console.log('[DBG] creador cerrado · creatorPending = ' + storyState().creatorPending)); };
 DBG.wardrobe = () => Fitting.open('wardrobe');
@@ -5059,6 +5699,53 @@ DBG.unlockAll = (insignias = false) => { const w = (GS.avatar.wardrobe ||= []); 
 DBG.ally = (id) => { if (!INSIGNIAS[id]) { console.warn('[DBG] NPC: ' + Object.keys(INSIGNIAS).join(', ')); return; } const need = CFG.trustThresholds[3] - Trust.points(id); if (need > 0) Trust.add(id, need, 'debug'); console.log('[DBG] ' + id + ' nivel ' + Trust.level(id) + ' · insignia: ' + (GS.avatar.wardrobe || []).includes(INSIGNIAS[id].key)); };
 DBG.insignias = () => console.table(Object.entries(INSIGNIAS).map(([id, i]) => ({ npc: id, nivel: Trust.level(id), pieza: AV_PART_BY_KEY[i.key].name, key: i.key, ganada: (GS.avatar.wardrobe || []).includes(i.key), enBoutique: Boutique.pool().some(p => p.key === i.key) })));
 DBG.fashion = () => { GS.weekly.pendingFashion = (GS.weekly.pendingFashion | 0) + 1; console.log('[DBG] Prendas entregadas: ' + deliverPendingFashion()); };
+
+// ---- v0.8 · El Comerciante (Trabajos Mayores y sus 7 sistemas) ----
+DBG.bigJobs = () => console.table(NPCS.map(n => ({ npc: n.id, trabajo: BIG_JOBS[n.id].short, estado: GS.bigJobs?.[n.id]?.status | 0, generado: !!GS.bigJobs?.[n.id]?.generated, mision: GS.missions[n.id].status, confianza: Trust.level(n.id), listo: bigJobReady(n.id), recompensa: CFG.bigJobRewards[n.id], sistema: BIG_JOBS[n.id].system })));
+DBG.readyBigJob = (id) => { if (!BIG_JOBS[id]) { console.warn('[DBG] NPC: ' + Object.keys(BIG_JOBS).join(', ')); return; } if (GS.missions[id].status !== 2) { GS.missions[id].status = 2; GS.missions[id].generated = true; UNLOCKS[id](); } const need = CFG.trustThresholds[CFG.bigJobTrustLevel - 1] - Trust.points(id); if (need > 0) Trust.add(id, need, 'debug'); storyAct1Check(); refreshMissionUI(); DBG.save('debug_bjready'); console.log('[DBG] ' + id + ' listo para su Trabajo Mayor: ' + bigJobReady(id)); };
+DBG.completeBigJob = (id) => { DBG.readyBigJob(id); const before = GS.economy.money; const ok = completeBigJob(id); console.log('[DBG] ' + id + (ok ? ` completado · +${fmt(GS.economy.money - before)} $T · Trabajos Mayores ${bigJobsDoneCount()}/7` : ' ya estaba completado')); };
+DBG.bigJobsAll = () => { Object.keys(BIG_JOBS).forEach(id => { if (!bigJobDone(id)) DBG.completeBigJob(id); }); try { endDialog(); } catch (e) {} };
+DBG.order = () => { const o = BakeryOrders.today(); console.log('[DBG] Pedido OsoExpress día ' + GS.daily.dayCount + ': ' + o.items.map(([id, q]) => q + '× ' + id).join(' + ') + ' · paga ' + o.pay + ' (base ' + o.base + ') · ' + (o.done ? 'servido' : 'pendiente')); return o; };
+DBG.orderKit = () => { BakeryOrders.today().items.forEach(([id, q]) => Inventory.add(id, q, { silent: true })); console.log('[DBG] Productos del pedido en la mochila'); };
+DBG.bridge = (phase = CFG.bridgePhases.length) => { const b = act2State().bridge; b.phase = clamp(phase | 0, 0, CFG.bridgePhases.length); if (Bridge.done()) b.doneDay ||= GS.daily.dayCount; Bridge.refreshVisual(); refreshMissionUI(); DBG.save('debug_bridge'); console.log('[DBG] Puente fase ' + Bridge.phase() + '/' + Bridge.phases() + ' · descuento construcción ' + Math.round(bridgeDiscount() * 100) + '%'); };
+DBG.bridgeKit = () => { const n = Bridge.need(); if (!n) { console.log('[DBG] Puente terminado'); return; } Object.entries(n).forEach(([id, q]) => Inventory.add(id, q, { silent: true })); act2State().bridge.lastPhaseDay = 0; console.log('[DBG] Materiales de la fase ' + (Bridge.phase() + 1) + ' en la mochila (y donación de hoy permitida)'); };
+DBG.feria = (day = GS.daily.dayCount) => { const l = Feria.layout(day); console.table(FERIA_CATS.map(c => ({ dia: day, categoria: c, movimiento: v08pct(Feria.move(day, c)), papel: c === l.up ? 'SUBE' : c === l.down ? 'BAJA' : 'plana' }))); };
+DBG.oracle = (n = 10) => { let hits = 0; const rows = []; for (let d = GS.daily.dayCount + 1; d <= GS.daily.dayCount + n; d++) { const p = Oracle.pred(d); hits += p.correct; rows.push({ dia: d, prediccion: p.cat + (p.dir === 'up' ? ' ↑' : ' ↓'), real_sube: Feria.layout(d).up, real_baja: Feria.layout(d).down, acierto: p.correct }); } console.table(rows); console.log(`[DBG] Aciertos ${hits}/${n} (anunciado ~${Math.round(CFG.oracleAccuracy * 100)}%)`); };
+DBG.feriaSim = (capital = 10000, days = 30, mode = 'oraculo') => {
+  let C = capital; const out = []; const d0 = GS.daily.dayCount;
+  for (let d = d0 + 1; d <= d0 + days; d++) {
+    const stake = Math.floor(C * CFG.feriaStakeCapPct); let cat, side;
+    if (mode === 'rumor') { cat = Feria.layout(d).up; side = 'up'; } else if (mode === 'azar') { const r = mulberry32(d * 31)(); cat = FERIA_CATS[Math.floor(r * 5)]; side = 'up'; } else { const p = Oracle.pred(d); cat = p.cat; side = p.dir; }
+    const m = Feria.move(d, cat), r = side === 'up' ? m : -m; C = C - stake + Math.floor(stake * (1 + r) * (1 - CFG.feriaCommission));
+    C -= Math.max(CFG.taxMin, Math.floor(C * CFG.taxRatePct / 100 * censusTaxMult())); out.push(C);
+  }
+  console.log(`[DBG] Feria ${mode}: ${fmt(capital)} → ${fmt(C)} $T en ${days} días oníricos (tope ${Math.round(CFG.feriaStakeCapPct * 100)}%/día, comisión ${Math.round(CFG.feriaCommission * 100)}%, tasa ${CFG.taxRatePct}%${censusOn() ? ' −10%' : ''}). Hitos: ` + [1e5, 1e6, 5e6, 4e7].map(t => { const i = out.findIndex(v => v >= t); return `${fmt(t)} día ${i < 0 ? '—' : i + 1}`; }).join(' · '));
+  return out;
+};
+DBG.seed = (type = 'storm', half = 1) => { if (!climateOn()) { console.warn('[DBG] Requiere el Climatizador (DBG.completeBigJob("dax"))'); return; } act2State().climate.lastSeedDay = 0; const slot = (GS.daily.dayCount + 1) * 2 + (half ? 1 : 0); GS.economy.money += CFG.climateSeedCost; console.log('[DBG] siembra ' + (Climate.seed(slot, type) ? 'OK' : 'fallida') + ' · pronóstico mañana: ' + Weather.forecast(GS.daily.dayCount + 1).join(' / ')); };
+DBG.dock = () => { if (!GS.unlocks.ship) { console.warn('[DBG] Requiere la misión de Sam (barco)'); return; } state.shipTime = SHIP_CYCLE.approach + 0.5; console.log('[DBG] El mercante atraca ya (caja en el muelle)'); };
+DBG.importNow = () => { const id = importsOnCrate(); console.log('[DBG] Importación: ' + (id || 'ninguna (¿Rutas sin desbloquear o tope diario?)')); };
+DBG.viral = () => { const id = Trend.forDay(GS.daily.dayCount); console.log(`[DBG] Tendencia de hoy: ${id} · Agencia ${viralOn() ? 'activa' : 'inactiva'} · Rocco paga ${shopSellPrice('store', id)} $T (sell ${ITEMS[id].sell})`); };
+DBG.rumor = (npc = 'mayor') => { const r = giveRumor(npc); console.log('[DBG] Rumor (' + r.kind + '): ' + r.short); };
+DBG.premium = (npc = 'sam') => { if (!NPC_SOCIAL[npc]?.encargos?.length) { console.warn('[DBG] NPC sin encargos'); return; } const need = CFG.trustThresholds[2] - Trust.points(npc); if (need > 0) Trust.add(npc, need, 'debug'); const cur = currentEncargo(npc); Inventory.add(cur.q.item, cur.q.qty * CFG.premiumMult, { silent: true }); console.log(`[DBG] ${npc}: ${cur.q.qty * CFG.premiumMult}× ${cur.q.item} en la mochila · entrega con _dbg.deliverEncargo('${npc}', true) o desde el diálogo`); };
+DBG.economy = (capital = GS.economy.money) => {
+  const avg = (a) => a.reduce((x, y) => x + y, 0) / a.length;
+  const orders = avg(CFG.bakeryOrders.map(items => Math.round(items.reduce((a, [id, q]) => a + ITEMS[id].sell * q, 0) * CFG.bakeryOrderMult)));
+  const tot = CFG.importLoot.reduce((a, e) => a + e[1], 0), imp = CFG.importLoot.reduce((a, [id, w]) => a + ITEMS[id].sell * w / tot, 0) * CFG.importsPerDayCap;
+  const stake = capital * CFG.feriaStakeCapPct, eUp = (1 + CFG.oracleAccuracy * CFG.feriaUpPct - (1 - CFG.oracleAccuracy) * CFG.feriaDownPct / 4) * (1 - CFG.feriaCommission) - 1, eDn = (1 + CFG.oracleAccuracy * CFG.feriaDownPct - (1 - CFG.oracleAccuracy) * CFG.feriaUpPct / 4) * (1 - CFG.feriaCommission) - 1;
+  const rows = [
+    { sistema: '🐻 Pedidos del Horno (media)', dia: Math.round(orders) },
+    { sistema: '🐶 Censo (ahorro de tasa)', dia: Math.round(capital * CFG.taxRatePct / 100 * CFG.censusTaxDiscount) },
+    { sistema: '🦫 Puente (−15% construcción, puntual)', dia: 0 },
+    { sistema: '🐈‍⬛ Oráculo → Feria (60% capital)', dia: Math.round(stake * (eUp + eDn) / 2) },
+    { sistema: '📰 Rumor real (sube) → Feria', dia: Math.round(stake * ((1 + CFG.feriaUpPct) * (1 - CFG.feriaCommission) - 1)) },
+    { sistema: '🦎 Clima (lluvia ×2 frutas/jardín, tormenta, estrellas)', dia: Math.round(0.25 * 36 * ITEMS.golden_fruit.sell + 0.05 * 6.5 * ITEMS.star_shard.sell) },
+    { sistema: `🦤 Importaciones (${CFG.importsPerDayCap}/día)`, dia: Math.round(imp) },
+    { sistema: '🦔 Tendencia ×2 (10 uds de ~100 $T)', dia: 10 * 100 },
+    { sistema: '🏛️ Tasa diaria (gasto)', dia: -Math.round(capital * CFG.taxRatePct / 100 * censusTaxMult()) },
+  ];
+  console.table(rows); return rows;
+};
 </script>
 </body>
 </html>
