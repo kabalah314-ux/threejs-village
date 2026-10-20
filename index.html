@@ -575,7 +575,7 @@ const CFG = {
     // QW7 · variación de color del planeta (calculada al cargar, coste 0 en juego)
     planet: { noise: 1, slopeDark: 0.12, slopeCol: 0x5fae48, wetSand: 0xd8c48a, wetRel: 0.03, snowTint: 0xe9e6f7, snowMix: 0.35 },
     // QW9 · agua sin shader
-    water: { color: 0x46c2e8, roughness: 0.15, metalness: 0, opacity: 0.8, deep: 0x2a8fd6, shallow: 0x7fe3e0, foam: 0xfffdf5, shoreDepth: 1.1, opacityShoreDeep: [0.78, 0.92] },   // v1.5 · Etapa 4: degradado de profundidad + espuma
+    water: { color: 0x46c2e8, roughness: 0.15, metalness: 0, opacity: 0.8, deep: 0x2a8fd6, shallow: 0x5fd6d8, foam: 0xfffdf5, shoreDepth: 1.1, edgeRings: [[0.03, 1], [0.065, 0.55]], opacityShoreDeep: [0.86, 0.94] },   // v1.5 · Etapa 4: degradado de profundidad + espuma
     // QW10 · halo atmosférico del planeta (opacidad de cerca → en Modo Planeta/menú)
     halo: { scale: 1.09, pow: 3, near: 0.35, far: 0.8, nearDist: 14, farDist: 30 },
     // QW11 · viñeta CSS (opacidad en menú / en juego)
@@ -1660,16 +1660,23 @@ scene.add(planet);
    Fresnel con el cielo, destello del sol (HDR → bloom) y reflejo de la luna; anillos al nadar. Sin texturas de profundidad: vale también en Baja. */
 const WATER_SEG = GFX.id === 'high' ? [128, 96] : GFX.id === 'low' ? [72, 52] : [96, 70];
 const waterGeo = new THREE.SphereGeometry(1, ...WATER_SEG);
-{ const p = waterGeo.attributes.position, sh = new Float32Array(p.count), d = new THREE.Vector3();
-  for (let i = 0; i < p.count; i++) { d.fromBufferAttribute(p, i).normalize(); const h = heightAt(d); sh[i] = h >= SEA ? 1 : clamp(1 - (SEA - h) / CFG.gfx.water.shoreDepth, 0, 1); }
-  waterGeo.setAttribute('aShore', new THREE.BufferAttribute(sh, 1)); waterGeo.boundingSphere = new THREE.Sphere(new THREE.Vector3(), SEA + 0.3); }
+{ const p = waterGeo.attributes.position, sh = new Float32Array(p.count), ed = new Float32Array(p.count), d = new THREE.Vector3(), q = new THREE.Vector3(), t1 = new THREE.Vector3(), t2 = new THREE.Vector3(), W = CFG.gfx.water;
+  for (let i = 0; i < p.count; i++) {
+    d.fromBufferAttribute(p, i).normalize(); const h = heightAt(d); sh[i] = h >= SEA ? 1 : clamp(1 - (SEA - h) / W.shoreDepth, 0, 1);
+    if (h >= SEA) { ed[i] = 1; continue; }
+    // aEdge: cercanía horizontal a tierra (2 anillos × 6 direcciones) → la espuma sigue la costa también en lagos poco hondos
+    t1.set(Math.abs(d.y) < 0.9 ? 0 : 1, Math.abs(d.y) < 0.9 ? 1 : 0, 0).cross(d).normalize(); t2.crossVectors(d, t1); let e = 0;
+    for (const [ang, val] of W.edgeRings) { for (let k = 0; k < 6 && !e; k++) { const a = k * Math.PI / 3; q.copy(d).addScaledVector(t1, Math.cos(a) * ang).addScaledVector(t2, Math.sin(a) * ang).normalize(); if (heightAt(q) >= SEA) e = val; } if (e) break; }
+    ed[i] = e;
+  }
+  waterGeo.setAttribute('aShore', new THREE.BufferAttribute(sh, 1)); waterGeo.setAttribute('aEdge', new THREE.BufferAttribute(ed, 1)); waterGeo.boundingSphere = new THREE.Sphere(new THREE.Vector3(), SEA + 0.3); }
 const WATER_U = { uTime: { value: 0 }, uSea: { value: SEA }, uDeep: { value: new THREE.Color(CFG.gfx.water.deep) }, uShallow: { value: new THREE.Color(CFG.gfx.water.shallow) }, uFoam: { value: new THREE.Color(CFG.gfx.water.foam) },
   uSkyTop: { value: null }, uSunV: { value: new THREE.Vector3(0, 1, 0) }, uSunC: { value: new THREE.Color(1, 1, 1) }, uDay: { value: 1 }, uPlayer: { value: new THREE.Vector3() }, uSwim: { value: 0 }, uFancy: { value: GFX.id === 'low' ? 0 : 1 }, uOp: { value: new THREE.Vector2(...CFG.gfx.water.opacityShoreDeep) } };
 const waterMat = new THREE.MeshStandardMaterial({ color: CFG.gfx.water.color, roughness: CFG.gfx.water.roughness, metalness: CFG.gfx.water.metalness, transparent: true, opacity: CFG.gfx.water.opacity, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 });
 waterMat.customProgramCacheKey = () => 'water-v15';
 waterMat.onBeforeCompile = (sh) => {
   Object.assign(sh.uniforms, WATER_U);
-  sh.vertexShader = `attribute float aShore; uniform float uTime, uSea; varying float vShore; varying vec3 vOP;
+  sh.vertexShader = `attribute float aShore, aEdge; uniform float uTime, uSea; varying float vShore, vEdge; varying vec3 vOP;
     float wv(vec3 n){ return 0.07 * sin(n.x * 9.0 + n.y * 4.0 + uTime * 1.4) + 0.06 * cos(n.z * 8.0 + n.y * 6.0 - uTime); }
 ` + sh.vertexShader
     .replace('#include <beginnormal_vertex>', `vec3 n0 = normalize(position); float ca = cos(n0.x * 9.0 + n0.y * 4.0 + uTime * 1.4), sb = sin(n0.z * 8.0 + n0.y * 6.0 - uTime);
@@ -1677,12 +1684,12 @@ waterMat.onBeforeCompile = (sh) => {
       #ifdef USE_TANGENT
         vec3 objectTangent = vec3(tangent.xyz);
       #endif`)
-    .replace('#include <begin_vertex>', `vec3 transformed = n0 * (uSea + wv(n0)); vShore = aShore; vOP = transformed;`);
-  sh.fragmentShader = `uniform float uTime, uDay, uSwim, uFancy; uniform vec3 uDeep, uShallow, uFoam, uSkyTop, uSunV, uSunC, uPlayer; uniform vec2 uOp; varying float vShore; varying vec3 vOP;
+    .replace('#include <begin_vertex>', `vec3 transformed = n0 * (uSea + wv(n0)); vShore = aShore; vEdge = aEdge; vOP = transformed;`);
+  sh.fragmentShader = `uniform float uTime, uDay, uSwim, uFancy; uniform vec3 uDeep, uShallow, uFoam, uSkyTop, uSunV, uSunC, uPlayer; uniform vec2 uOp; varying float vShore, vEdge; varying vec3 vOP;
 ` + sh.fragmentShader
     .replace('vec4 diffuseColor = vec4( diffuse, opacity );', `float sh = clamp(vShore, 0.0, 1.0); vec4 diffuseColor = vec4(mix(uDeep, uShallow, sh * sqrt(sh)), mix(uOp.y, uOp.x, sh));
-      float foam = smoothstep(0.86, 0.94, sh + 0.05 * sin(uTime * 2.0 + vOP.x * 30.0) * sin(vOP.z * 27.0));
-      foam = max(foam, smoothstep(0.025, 0.0, abs(sh - (0.7 + 0.07 * sin(uTime * 1.3 + vOP.y * 3.0)))) * 0.6);   // ola que llega a la orilla
+      float eg = clamp(vEdge, 0.0, 1.0), foam = smoothstep(0.72, 0.9, eg + 0.12 * sin(uTime * 2.0 + vOP.x * 30.0) * sin(vOP.z * 27.0));
+      foam = max(foam, smoothstep(0.05, 0.0, abs(eg - (0.5 + 0.12 * sin(uTime * 1.3 + vOP.y * 3.0)))) * 0.55);   // ola que llega a la orilla
       float pd = distance(vOP, uPlayer), ring = uSwim * max(sin(pd * 20.0 - uTime * 6.0), 0.0) * exp(-pd * 3.0);
       diffuseColor.rgb = mix(diffuseColor.rgb, uFoam, clamp(foam + ring * 0.8, 0.0, 1.0)); diffuseColor.a = max(diffuseColor.a, foam * 0.95);`)
     .replace('#include <opaque_fragment>', `{ vec3 V = normalize(vViewPosition); float F = pow(1.0 - max(dot(normal, V), 0.0), 3.0) * uFancy;
