@@ -238,6 +238,10 @@ body.mobile .zone-banner { top: 70px; font-size: 13px; padding: 6px 14px; }
       </div>
       <p id="gfxInfo" class="text-[11px] text-slate-500 mt-2"></p>
     </div>
+    <div class="step p-3 mb-3 text-sm text-[#2b2b3d]">
+      <div class="font-bold">📊 Estadísticas anónimas</div>
+      <label class="flex items-start gap-2 text-xs text-slate-600 mt-1 cursor-pointer"><input id="metricsOn" type="checkbox" class="mt-0.5" checked><span>Contar de forma anónima cuántos vuelven a los 1, 7 y 30 días, cuántos llegan al Acto 2 y cuántos compran el billete. Solo se envía un número aleatorio de este navegador y el tipo de evento: nada de tu cuenta, tu partida ni datos personales.</span></label>
+    </div>
     <div class="step p-3 text-sm text-[#2b2b3d]">
       <div class="font-bold text-red-600">🗑️ Nueva partida</div>
       <p class="text-xs text-slate-600 mt-1">Borra el progreso guardado en este navegador y empieza de cero. Te pediremos confirmación.</p>
@@ -3812,6 +3816,7 @@ function maybeRevealDream(after) {
 function storyAct1Check() {
   const s = storyState(); if (s.act1Done || missionsDoneCount() < CFG.act1Missions) return;
   s.act1Done = true; s.revealed = true; refreshGoalHUD(true); state.missionTab = 'big'; refreshMissionUI(); SaveSystem.saveNow('story:act1');   // v0.6: el HUD pasa a «ACTO 2: Trabajos Mayores»
+  Metrics.ping('act2');   // v3.0 · H8
   setTimeout(() => showStoryScene('🐈', 'Madame Sombra', SOMBRA_ACT1,
     () => showToast('📜 Acto 1 completado · Empieza «El Comerciante»', 'text-purple-200')), 2500);
 }
@@ -6531,7 +6536,7 @@ function buyDreamTicket() {
   if (!Wallet.canAfford(CFG.ticketPrice)) { showToast(`❌ Necesitas ${fmt(CFG.ticketPrice)} $TOKEN`, 'text-red-200'); return false; }
   if (!Inventory.canAdd('dream_ticket', 1)) { showToast('🎒 Haz hueco en la mochila para el billete', 'text-red-200'); return false; }
   if (!Wallet.spend(CFG.ticketPrice, 'Billete del Despertar')) return false;
-  Inventory.add('dream_ticket', 1, { silent: true });
+  Inventory.add('dream_ticket', 1, { silent: true }); Metrics.ping('ticket');   // v3.0 · H8
   startAwakening();   // v0.9: arranca la Cadena del Despertar (Sec. 7.5) · aviso de Sombra (Anexo A.2)
   addLetter('🔮 M. Sombra', 'El billete es mío; el combustible es cosa del pelícano. Habla con Sam: su avión necesita 5 Gasolinas Gasil. Mmm… y luego ven a verme.');
   showToast('🎫 ¡BILLETE DEL DESPERTAR! Ya tienes la salida…', 'text-white'); playChime();
@@ -8395,7 +8400,7 @@ function awakeningChainHTML() {
    Nota: la 🎪 Feria del Sábado (puestos de los vecinos, ofertas de tienda) NO es la
    📈 Feria del Tablón de la v0.8 (especulación por categorías): conviven sin tocarse.
    ========================================================= */
-const GAME_VERSION = '2.9.3', GAME_TAG = 'Decorar la casa';
+const GAME_VERSION = '3.0', GAME_TAG = 'Tiendas reales y métricas';
 /* ---------- 🗓️ EVENTOS: calendario REAL → flags que leen los sistemas existentes (Sec. 10.10) ---------- */
 const Events = {
   _force: null,   // DBG.weekday(n): simula el día de la semana real (0 = domingo … 6 = sábado)
@@ -11309,8 +11314,10 @@ const NetWorld = {
   shopLayout(o = {}) {
     if (o.real) {   // v2.4 · tienda de un jugador real: su escaparate y su avatar como tendero
       const S = o.real, RT = RealShops.TIERS[S.tier] || RealShops.TIERS.puesto, mine = S.owner === Online.me?.id, col = NET_ORIGINS[S.profile]?.color || 0xffb74d;
-      const def = INTERIOR_LAYOUTS.shop({ items: S.items.filter(i => i.qty > 0).map(i => ({ id: i.item, price: i.price })), title: S.name, keeperLine: mine ? 'Tu tienda vende aunque no estés.' : `¡Hola! Soy ${S.who}. Mira el escaparate.` });
-      const keeper = def.pieces.find(p => p.type === 'keeper'); if (keeper) keeper.o = { fur: col, apron: 0xffca28 };
+      const line = S.sealed ? (mine ? '🔒 Tu tienda está sellada por impago: paga la cuota en Mercado real → Mi tienda.' : `🔒 Hoy no vendo: la tienda de ${S.who} está sellada por impago.`)
+        : mine ? 'Tu dependiente vende por ti aunque no estés.' : S.away ? `Soy el dependiente de ${S.who}. No está, pero yo te atiendo: mira el escaparate.` : `¡Hola! Soy ${S.who}. Mira el escaparate.`;   // v3.0 · H5
+      const def = INTERIOR_LAYOUTS.shop({ items: S.items.filter(i => i.qty > 0).map(i => ({ id: i.item, price: i.price })), title: S.name, keeperLine: line });
+      const keeper = def.pieces.find(p => p.type === 'keeper'); if (keeper) { keeper.o = S.away || mine ? { fur: 0xbcaaa4, apron: 0x26a69a } : { fur: col, apron: 0xffca28 }; keeper.label = S.away || mine ? '🛎️ Hablar con el dependiente' : `🦊 Hablar con ${S.who}`; }
       if (S.tier === 'boutique') def.palette = { wall: 0x2a1b47, trim: 0xffca28, floor: ['#4a3b6b', '#3b2d58'], void: 0x120a24 };
       else if (S.tier === 'local') def.palette = { wall: 0xe3f2fd, trim: 0x546e7a, floor: ['#d7ccc8', '#bcaaa4'], void: 0x150f26 };
       Object.assign(def, { net: true, netZone: o.zone, real: true, title: `${RT.icon} ${S.name} · Red real`, welcome: `${RT.icon} ${S.name} · ${mine ? 'tu tienda' : `de ${S.who}`}`,
@@ -11916,7 +11923,7 @@ const Online = (() => {
   api.boot = async () => {
     const fromEmail = /access_token=|[?&]code=|cuenta=ok/.test(location.hash + location.search);   // vuelves del enlace de confirmación del email
     try { if (!fromEmail && !localStorage.getItem('crossia.auth')) return; } catch (e) { if (!fromEmail) return; }
-    try { await lib(); const { data } = await sb.auth.getSession(); session = data.session; if (session) await refreshMe(); if (me) api.syncCheck();   // v2.9.3: ¿la nube tiene esta partida?
+    try { await lib(); const { data } = await sb.auth.getSession(); session = data.session; if (session) await refreshMe(); if (me) { api.syncCheck(); setTimeout(() => RealShops.notices().catch(() => {}), 5000); }   // v2.9.3: ¿la nube tiene esta partida? · v3.0: avisos de tu tienda real
       if (fromEmail) { try { history.replaceState(null, '', location.pathname); } catch (e) {}
         if (session) { api.pendingWelcome = true; showToast(me ? `✅ Cuenta confirmada · hola, ${me.name}` : '✅ Cuenta confirmada: elige tu nombre en el online', 'text-white'); } }
     } catch (e) { console.warn('[online]', e.message); } };
@@ -11925,7 +11932,7 @@ const Online = (() => {
     session = data.session; return !!session; };
   api.signIn = async (email, password) => { await lib(); const { data, error } = await sb.auth.signInWithPassword({ email, password }); if (error) throw new Error(tr(error.message)); session = data.session; await refreshMe(); if (me) api.syncCheck(); return me; };   // v2.9.3: al entrar se comparan las dos partidas
   api.signOut = async () => { if (!sb) return; leave(); await sb.auth.signOut(); session = null; me = null; api.status = 'off'; api.sync = 'idle'; GS.meta.profile = { type: PROFILE.GUEST, accountId: null, displayName: 'Invitado' }; };
-  api.register = async (name) => { me = await rpc('crossia_register', { p_name: name, p_profile: Number.isInteger(Net.origin()) ? Net.origin() : 0 }); await refreshMe(); SaveSystem.saveNow('account-link'); if ((await api.syncCheck()) === 'ok') await api.push(true); return me; };
+  api.register = async (name) => { me = await rpc('crossia_register', { p_name: name, p_profile: Number.isInteger(Net.origin()) ? Net.origin() : 0 }); await refreshMe(); SaveSystem.saveNow('account-link'); Metrics.ping('online'); if ((await api.syncCheck()) === 'ok') await api.push(true); return me; };
   /** ☁️ Subir la partida (manual o cada CFG.online.autosaveMin minutos mientras juegas) */
   api.push = async (force = false, opts = {}) => {
     if (!me || (!force && Date.now() - lastPush < C.autosaveMin * 60000)) return null; lastPush = Date.now();
@@ -12127,14 +12134,15 @@ const RealMarket = {
 /* ===== v1.9 · 🏪 TIENDAS DE JUGADORES (F3): se compran con $T de la Aduana (puesto 5.000 · local 50.000 · boutique 500.000), viven en su barrio
    (Mercadillo, Paseo, Distrito Dorado) y venden aunque el dueño no esté. El dueño pone precios y una condición de entrada (saldo mínimo). ===== */
 const RealShops = {
-  TIERS: { puesto: { icon: '⛺', name: 'Puesto', zone: 'mercadillo', cost: 5000, slots: 25, fee: 2 }, local: { icon: '🏪', name: 'Local', zone: 'paseo', cost: 50000, slots: 40, fee: 1 }, boutique: { icon: '💎', name: 'Boutique', zone: 'dorado', cost: 500000, slots: 60, fee: 0 } },   // v2.4: 25 / 40 / 60 huecos
+  TIERS: { puesto: { icon: '⛺', name: 'Puesto', zone: 'mercadillo', cost: 5000, slots: 25, fee: 2, rent: 200, rank: 1 }, local: { icon: '🏪', name: 'Local', zone: 'paseo', cost: 50000, slots: 40, fee: 1, rent: 1500, rank: 2 }, boutique: { icon: '💎', name: 'Boutique', zone: 'dorado', cost: 500000, slots: 60, fee: 0, rent: 10000, rank: 3 } },   // v2.4: 25 / 40 / 60 huecos · v3.0 (H5): cuota diaria como en la demo
+  UP_DAYS: 7, SEAL_DAYS: 7,   // v3.0 · H5: días con tu tienda antes de subir de nivel · días sellada antes de perderla
   SPOTS: { mercadillo: [[-8, 0], [-2, 0], [4, 0], [10, 0]], paseo: [[-10, 0], [-4, 0], [2, 0], [8, 0]], dorado: [[-3.2, 0], [3.2, 0]] },
   rpc: (fn, args = {}) => RealMarket.rpc(fn, args),
   /** Directorio (todas o una zona) */
   async listHTML(zone = null) {
     const L = await this.rpc('crossia_shops', { p_zone: zone });
     if (!L.length) return '<div class="app-card p-3 text-xs text-slate-500">Todavía no hay tiendas de jugadores. ¡Sé el primero en abrir una!</div>';
-    return L.map(s => `<div class="app-card p-2 mb-1.5 flex items-center gap-2 text-xs"><span class="text-2xl">${this.TIERS[s.tier].icon}</span><div class="flex-1"><b>${esc(s.name)}</b> · ${NET_ORIGINS[s.profile]?.icon || ''} ${esc(s.who)}<div class="text-slate-500">${NET_ZONES[s.zone]?.name || s.zone} · ${s.items} artículo(s)${s.min ? ` · solo clientes con ${fmt(s.min)}+ $T` : ''}</div></div><button data-visit="${s.owner}" class="btn-game px-2 py-1 text-[11px] bg-emerald-200">Entrar</button></div>`).join('');
+    return L.map(s => `<div class="app-card p-2 mb-1.5 flex items-center gap-2 text-xs"><span class="text-2xl">${this.TIERS[s.tier].icon}</span><div class="flex-1"><b>${esc(s.name)}</b> · ${NET_ORIGINS[s.profile]?.icon || ''} ${esc(s.who)}<div class="text-slate-500">${NET_ZONES[s.zone]?.name || s.zone} · ${s.items} artículo(s)${s.min ? ` · solo clientes con ${fmt(s.min)}+ $T` : ''}${s.sealed ? ' · <b class="text-purple-700">🔒 sellada</b>' : s.away ? ' · 🛎️ atiende el dependiente' : ' · 🙋 el dueño está'}</div></div><button data-visit="${s.owner}" class="btn-game px-2 py-1 text-[11px] bg-emerald-200">Entrar</button></div>`).join('');
   },
   /** Entrar en una tienda */
   visit(owner) {
@@ -12146,8 +12154,8 @@ const RealShops = {
         const T = this.TIERS[S.tier], mine = S.owner === Online.me.id;
         setAppTitle(`${T.icon} ${S.name}`);
         body.innerHTML = (msg ? `<div class="app-card p-2 mb-2 text-xs ${/^❌/.test(msg) ? 'bg-red-50' : 'bg-emerald-50'}">${msg}</div>` : '') +
-          `<div class="app-card p-3 mb-2 text-xs" style="background:linear-gradient(180deg,#${(NET_ORIGINS[S.profile]?.color || 0xffffff).toString(16).padStart(6, '0')}22,#fff)"><b class="text-sm">${esc(S.name)}</b> · ${T.name} de ${NET_ORIGINS[S.profile]?.icon || ''} ${esc(S.who)}<br>${NET_ZONES[S.zone]?.name || ''}${S.min ? ` · 💎 solo clientes con ${fmt(S.min)}+ $T en la Aduana` : ''} · pagas desde tu Aduana</div>` +
-          (S.items.filter(i => i.qty > 0).map(i => `<div class="app-card p-2 mb-1.5 flex items-center gap-2 text-xs"><div class="flex-1"><b>${RealMarket.name(i.item)}</b> · quedan ${i.qty}<div class="text-slate-500">${fmt(i.price)} $T/u</div></div>${mine ? '<span class="text-slate-400">tuya</span>' : `<input data-q="${i.item}" type="number" min="1" max="${i.qty}" value="1" class="game w-12 text-xs px-1 py-1"><button data-b="${i.item}" data-p="${i.price}" class="btn-game px-2 py-1 text-[11px] bg-emerald-200">Comprar</button>`}</div>`).join('') || '<div class="app-card p-3 text-xs text-slate-500">El escaparate está vacío.</div>');
+          `<div class="app-card p-3 mb-2 text-xs" style="background:linear-gradient(180deg,#${(NET_ORIGINS[S.profile]?.color || 0xffffff).toString(16).padStart(6, '0')}22,#fff)"><b class="text-sm">${esc(S.name)}</b> · ${T.name} de ${NET_ORIGINS[S.profile]?.icon || ''} ${esc(S.who)}<br>${NET_ZONES[S.zone]?.name || ''}${S.min ? ` · 💎 solo clientes con ${fmt(S.min)}+ $T en la Aduana` : ''} · pagas desde tu Aduana${this.attendHTML(S, mine)}</div>` +
+          (S.items.filter(i => i.qty > 0).map(i => `<div class="app-card p-2 mb-1.5 flex items-center gap-2 text-xs"><div class="flex-1"><b>${RealMarket.name(i.item)}</b> · quedan ${i.qty}<div class="text-slate-500">${fmt(i.price)} $T/u</div></div>${mine ? '<span class="text-slate-400">tuya</span>' : S.sealed ? '<span class="text-purple-700">🔒</span>' : `<input data-q="${i.item}" type="number" min="1" max="${i.qty}" value="1" class="game w-12 text-xs px-1 py-1"><button data-b="${i.item}" data-p="${i.price}" class="btn-game px-2 py-1 text-[11px] bg-emerald-200">Comprar</button>`}</div>`).join('') || '<div class="app-card p-3 text-xs text-slate-500">El escaparate está vacío.</div>');
         body.querySelectorAll('input').forEach(x => x.onkeydown = (e) => e.stopPropagation());
         body.querySelectorAll('[data-b]').forEach(b => b.onclick = async () => { const id = b.dataset.b, q = Math.floor(+body.querySelector(`[data-q="${id}"]`).value || 0);
           try { const r = await this.rpc('crossia_shop_buy', { p_owner: owner, p_item: id, p_qty: q, p_price: +b.dataset.p }); playChime(); Online.push(true).catch(() => {}); render(`✓ Compraste ${q}× ${RealMarket.name(id)} por ${fmt(r.cost)} $T · está en tu Aduana`); } catch (e) { render('❌ ' + e.message); } });
@@ -12155,27 +12163,57 @@ const RealShops = {
       render();
     });
   },
+  /** v3.0 · H5: quién atiende (el dueño o su dependiente) y si está sellada */
+  attendHTML(S, mine = false) {
+    if (S.sealed) return `<div class="mt-1.5 p-1.5 rounded-lg bg-purple-50 text-purple-800 font-semibold">🔒 Sellada por impago: ${mine ? 'no vende hasta que pagues la cuota' : `no vende hasta que ${esc(S.who)} pague la cuota`} (${S.sealedDays}/${S.sealLimit || this.SEAL_DAYS} días; al ${S.sealLimit || this.SEAL_DAYS}.º la parcela vuelve al barrio)</div>`;
+    if (mine) return '';
+    return `<div class="mt-1">${S.away ? `🛎️ Te atiende su dependiente: ${esc(S.who)} no está ahora mismo` : `🙋 ${esc(S.who)} está en la tienda`}</div>`;
+  },
+  LOG: { open: ['🏪', 'Licencia', -1], rent: ['💸', 'Cuotas', -1], sealed: ['🔒', 'Sellada por impago', 0], debt_paid: ['✓', 'Cuota pendiente pagada', -1], transfer: ['🔁', 'Traspaso (90 % de la licencia anterior)', 1], revoked: ['🔮', 'Tienda perdida por impago', 0] },
+  logHTML(L) {
+    if (!Array.isArray(L) || !L.length) return '';
+    return `<div class="sec-h">Cuotas y avisos</div><div class="app-card p-2 mb-2 text-[11px] text-slate-600">` + L.slice(0, 6).map(l => { const [ic, tx, sg] = this.LOG[l.kind] || ['•', l.kind, 0];
+      return `<div class="flex justify-between gap-2 py-0.5 border-b border-slate-100 last:border-0"><span>${ic} ${tx}${l.kind === 'rent' && l.note ? ` (${l.note} día${l.note === '1' ? '' : 's'})` : ''}</span><span class="${sg < 0 ? 'text-red-600' : sg > 0 ? 'text-emerald-700' : 'text-slate-500'}">${sg ? (sg < 0 ? '−' : '+') + fmt(l.amount) + ' $T' : new Date(l.at).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}</span></div>`; }).join('') + '</div>';
+  },
   /** Gestión de mi tienda (pestaña del Mercado real) */
   async mineHTML(D) {
     const S = await this.rpc('crossia_my_shop', {});
-    if (!S) return `<div class="app-card p-3 mb-2 text-xs">Abre tu tienda en la Red: vende aunque no estés conectado. La licencia se paga con $T de la Aduana (tienes ${fmt(D.coins)}).</div>` +
-      Object.entries(this.TIERS).map(([k, t]) => `<div class="app-card p-2.5 mb-1.5 flex items-center gap-3 text-xs"><span class="text-3xl">${t.icon}</span><div class="flex-1"><b class="text-sm">${t.name}</b> · ${NET_ZONES[t.zone].name}<div class="text-slate-500">${t.slots} huecos · comisión ${t.fee} % · licencia ${fmt(t.cost)} $T</div></div><button data-open="${k}" class="btn-game px-2 py-1 text-[11px] bg-amber-200" ${D.coins >= t.cost ? '' : 'disabled style="opacity:.45"'}>Abrir</button></div>`).join('') +
-      `<input data-sname maxlength="24" placeholder="Nombre de tu tienda" class="game w-full text-sm px-3 py-2 mt-1">`;
-    const T = this.TIERS[S.tier], stockIds = Object.keys(D.stock);
+    if (!S || S.revoked) return (S?.revoked ? `<div class="app-card p-3 mb-2 text-xs bg-purple-50 text-purple-800">🔮 <b>Perdiste tu tienda:</b> estuvo ${this.SEAL_DAYS} días sellada sin pagar la cuota. Tus objetos están en tu Aduana. Puedes volver a empezar con un Puesto.</div>` : '') +
+      `<div class="app-card p-3 mb-2 text-xs">Abre tu tienda en la Red: vende aunque no estés conectado (te atiende tu dependiente). La licencia y la cuota diaria se pagan con $T de la Aduana (tienes ${fmt(D.coins)}). Se empieza con un Puesto y, tras ${this.UP_DAYS} días, se sube a Local y luego a Boutique: al subir te devuelven el 90 % de la licencia anterior.</div>` +
+      Object.entries(this.TIERS).map(([k, t]) => `<div class="app-card p-2.5 mb-1.5 flex items-center gap-3 text-xs"><span class="text-3xl">${t.icon}</span><div class="flex-1"><b class="text-sm">${t.name}</b> · ${NET_ZONES[t.zone].name}<div class="text-slate-500">${t.slots} huecos · comisión ${t.fee} % · licencia ${fmt(t.cost)} $T · cuota ${fmt(t.rent)} $T/día</div></div>${t.rank === 1 ? `<button data-open="${k}" class="btn-game px-2 py-1 text-[11px] bg-amber-200" ${D.coins >= t.cost ? '' : 'disabled style="opacity:.45"'}>Abrir</button>` : `<span class="text-[10px] text-slate-400 text-right">se sube desde<br>${Object.values(this.TIERS).find(x => x.rank === t.rank - 1).name}</span>`}</div>`).join('') +
+      `<input data-sname maxlength="24" placeholder="Nombre de tu tienda" class="game w-full text-sm px-3 py-2 mt-1">` + this.logHTML(S?.log);
+    const T = this.TIERS[S.tier], stockIds = Object.keys(D.stock), next = Object.entries(this.TIERS).find(([, t]) => t.rank === T.rank + 1);
+    const days = Math.max(0, Math.floor((Date.now() - Date.parse(S.since || Date.now())) / 864e5)), up = (() => { if (!next) return ''; const [k, NT] = next, back = Math.floor(T.cost * 0.9), net = NT.cost - back, ready = days >= this.UP_DAYS;
+      return `<div class="mt-2 p-2 rounded-lg bg-amber-50 text-[11px] leading-relaxed">⬆️ Subir a ${NT.icon} <b>${NT.name}</b> (${NET_ZONES[NT.zone].name}, ${NT.slots} huecos): licencia ${fmt(NT.cost)} $T − traspaso ${fmt(back)} $T = <b>${fmt(net)} $T</b> · cuota ${fmt(NT.rent)} $T/día. ${ready ? '' : `Se puede en ${this.UP_DAYS - days} día${this.UP_DAYS - days === 1 ? '' : 's'}.`}
+        <button data-open="${k}" class="btn-game px-2 py-1 text-[11px] bg-amber-200 ml-1" ${ready && !S.sealed && D.coins >= net ? '' : 'disabled style="opacity:.45"'}>Subir</button></div>`; })();
     return `<div class="app-card p-3 mb-2 text-xs"><b class="text-sm">${T.icon} ${esc(S.name)}</b> · ${T.name} en ${NET_ZONES[S.zone].name} · ${S.items.filter(i => i.qty > 0).length}/${T.slots} huecos
+        <div class="mt-1 text-slate-600">💸 Cuota diaria: <b>${fmt(T.rent)} $T</b>, se cobra sola de tu Aduana · llevas pagado ${fmt(S.rentPaid || 0)} $T · ${days} día${days === 1 ? '' : 's'} como ${T.name}</div>
+        ${S.sealed ? `${this.attendHTML(S, true)}<button data-shpay class="btn-game px-3 py-1.5 text-xs bg-purple-200 mt-1.5">💸 Pagar ${fmt(S.debt)} $T y quitar el sello</button>` : ''}
         <div class="flex gap-1 mt-2 items-center"><input data-sname maxlength="24" value="${esc(S.name)}" class="game flex-1 text-xs px-2 py-1"><label class="whitespace-nowrap">Saldo mín. <input data-smin type="number" min="0" value="${S.min}" class="game w-20 text-xs px-1 py-1"></label><button data-sset class="btn-game px-2 py-1 text-[11px] bg-slate-200">Guardar</button></div>
         <div class="text-[10px] text-slate-500 mt-1">Saldo mínimo = condición de compra: solo entran clientes con ese dinero en su Aduana (tiendas exclusivas).</div>
-        ${Object.keys(this.TIERS).filter(k => k !== S.tier && this.TIERS[k].cost > T.cost).map(k => `<button data-open="${k}" class="btn-game px-2 py-1 text-[11px] bg-amber-200 mt-2 mr-1">Mudarme a ${this.TIERS[k].icon} ${this.TIERS[k].name} (${fmt(this.TIERS[k].cost)} $T)</button>`).join('')}</div>
+        ${up}</div>
       <div class="sec-h">Escaparate</div>` + (S.items.map(i => `<div class="app-card p-2 mb-1.5 flex items-center gap-2 text-xs"><div class="flex-1"><b>${RealMarket.name(i.item)}</b> · ${i.qty} a la venta</div><input data-np="${i.item}" type="number" min="1" value="${i.price}" class="game w-20 text-xs px-1 py-1"><button data-pp="${i.item}" class="btn-game px-2 py-1 text-[11px] bg-slate-200">Precio</button><button data-tk="${i.item}" data-q="${i.qty}" class="btn-game px-2 py-1 text-[11px] bg-sky-100" ${i.qty ? '' : 'disabled style="opacity:.45"'}>Retirar</button></div>`).join('') || '<div class="text-xs text-slate-400 mb-2">Vacío.</div>') +
-      `<div class="sec-h">Poner a la venta (desde tu Aduana)</div>` + (stockIds.length ? `<div class="app-card p-2 text-xs flex gap-1 items-center flex-wrap"><select data-pi class="game text-xs px-1 py-1">${stockIds.map(id => `<option value="${id}">${RealMarket.name(id)} (${D.stock[id]})</option>`).join('')}</select><label>Cant. <input data-pq type="number" min="1" value="1" class="game w-14 text-xs px-1 py-1"></label><label>Precio <input data-pr type="number" min="1" value="60" class="game w-20 text-xs px-1 py-1"></label><button data-put class="btn-game px-2 py-1 text-[11px] bg-emerald-200">Poner</button></div>` : '<div class="text-xs text-slate-400">Tu Aduana está vacía: ingresa objetos primero.</div>');
+      `<div class="sec-h">Poner a la venta (desde tu Aduana)</div>` + (stockIds.length ? `<div class="app-card p-2 text-xs flex gap-1 items-center flex-wrap"><select data-pi class="game text-xs px-1 py-1">${stockIds.map(id => `<option value="${id}">${RealMarket.name(id)} (${D.stock[id]})</option>`).join('')}</select><label>Cant. <input data-pq type="number" min="1" value="1" class="game w-14 text-xs px-1 py-1"></label><label>Precio <input data-pr type="number" min="1" value="60" class="game w-20 text-xs px-1 py-1"></label><button data-put class="btn-game px-2 py-1 text-[11px] bg-emerald-200">Poner</button></div>` : '<div class="text-xs text-slate-400">Tu Aduana está vacía: ingresa objetos primero.</div>') + this.logHTML(S.log);
   },
   bindMine(body, run) {
     const v = (s) => body.querySelector(s)?.value;
-    body.querySelectorAll('[data-open]').forEach(b => b.onclick = () => run(async () => { const n = (v('[data-sname]') || '').trim() || `Tienda de ${Online.me.name}`; const r = await this.rpc('crossia_shop_open', { p_tier: b.dataset.open, p_name: n }); playChime(); return `✓ ¡Tienda abierta en ${NET_ZONES[r.zone].name}!`; }));
+    body.querySelectorAll('[data-open]').forEach(b => b.onclick = () => run(async () => { const n = (v('[data-sname]') || '').trim() || `Tienda de ${Online.me.name}`; const r = await this.rpc('crossia_shop_open', { p_tier: b.dataset.open, p_name: n }); playChime(); return r.back ? `✓ ¡Subiste de nivel! Ya estás en ${NET_ZONES[r.zone].name} (traspaso: +${fmt(r.back)} $T)` : `✓ ¡Tienda abierta en ${NET_ZONES[r.zone].name}!`; }));
+    const pay = body.querySelector('[data-shpay]'); if (pay) pay.onclick = () => run(async () => { const r = await this.rpc('crossia_shop_pay', {}); return r?.paid ? `✓ Cuota pagada (${fmt(r.paid)} $T): tu tienda vuelve a vender` : '✓ No debías nada'; });   // v3.0 · H5
     const set = body.querySelector('[data-sset]'); if (set) set.onclick = () => run(async () => { await this.rpc('crossia_shop_set', { p_name: v('[data-sname]'), p_min_coins: Math.floor(+v('[data-smin]') || 0) }); return '✓ Tienda actualizada'; });
     body.querySelectorAll('[data-pp]').forEach(b => b.onclick = () => run(async () => { await this.rpc('crossia_shop_put', { p_item: b.dataset.pp, p_qty: 0, p_price: Math.floor(+v(`[data-np="${b.dataset.pp}"]`) || 0) }); return '✓ Precio cambiado'; }));
     body.querySelectorAll('[data-tk]').forEach(b => b.onclick = () => run(async () => { await this.rpc('crossia_shop_take', { p_item: b.dataset.tk, p_qty: +b.dataset.q }); return '✓ Retirado a tu Aduana'; }));
     const put = body.querySelector('[data-put]'); if (put) put.onclick = () => run(async () => { await this.rpc('crossia_shop_put', { p_item: v('[data-pi]'), p_qty: Math.floor(+v('[data-pq]') || 0), p_price: Math.floor(+v('[data-pr]') || 0) }); return '✓ A la venta en tu escaparate'; });
+  },
+  /** v3.0 · H5: cartas de Sombra si tu tienda real se selló o se perdió mientras no estabas (una vez por aviso) */
+  async notices() {
+    if (!Online.me) return; let S; try { S = await this.rpc('crossia_my_shop', {}); } catch (e) { return; }
+    const L = Array.isArray(S?.log) ? S.log : []; if (!L.length) return;
+    const seen = Date.parse(GS.realShopSeen || '') || (Date.now() - 3 * 864e5);   // la primera vez, solo lo de los últimos 3 días
+    L.filter(l => Date.parse(l.at) > seen).reverse().forEach(l => {
+      if (l.kind === 'sealed') addLetter('🔮 M. Sombra', `Tu tienda de la Red real no pagó su cuota, soñador. Le he puesto runas: no vende hasta que pagues lo pendiente (Mercado real → Mi tienda). A los ${this.SEAL_DAYS} días sellada, la parcela vuelve al barrio.`);
+      else if (l.kind === 'revoked') addLetter('🔮 M. Sombra', `Siete días de runas. Tu tienda de la Red real vuelve al barrio, soñador. Tus objetos están en tu Aduana: no he tocado ni uno. Mmm… casi.`);
+    });
+    GS.realShopSeen = L[0].at; SaveSystem.save('real-shop-seen');
   },
   /* --- 3D: puestos de jugadores reales en su barrio de la Red (mientras estás conectado) --- */
   _root: null, _zone: null, _at: 0, _objs: [],
@@ -12337,6 +12375,7 @@ const Account = {
       <p class="mt-2"><b>3. Sin trampas.</b> Nada de bots propios, partidas trucadas ni cuentas múltiples para sacar ventaja. La Aduana revisa los saltos raros de capital.</p>
       <p class="mt-2"><b>4. Wallet.</b> Registrarse y jugar online es libre. Para vincular una wallet y operar con $CROSSIA hay que ser mayor de 18 años; se confirma en el momento de vincularla.</p>
       <p class="mt-2"><b>5. Tus datos.</b> Guardamos tu email, tu partida en la nube y tu actividad en la Red. Puedes borrar tu cuenta cuando quieras desde Cuenta online.</p>
+      <p class="mt-2"><b>6. Estadísticas anónimas.</b> Para saber si el juego engancha contamos cuántos vuelven a los 1, 7 y 30 días, cuántos llegan al Acto 2 y cuántos compran el billete. Solo se envía un número aleatorio de este navegador y el tipo de evento: nada de tu cuenta, tu partida ni datos personales. Se apaga en Ajustes.</p>
       <p class="mt-2 text-slate-500 text-xs">Si alguien incumple las normas, toca su nombre y pulsa Reportar. Con 3 reportes de personas distintas en 24 h su chat queda en pausa hasta que se revise.</p></div>`);
   },
   open() {
@@ -12645,6 +12684,29 @@ const SyncGuard = {
   },
 };
 
+/* ===== v3.0 · H8 · 📊 MÉTRICAS ANÓNIMAS (Guía 1, Sec. 10.9) =====
+   Retención a 1, 7 y 30 días, cuántos llegan al Acto 2 y cuántos compran el billete. Se envía un número aleatorio de este
+   navegador (no es la cuenta ni la partida) y el tipo de evento, nada más: crossia_metric guarda una fila por día y los hitos
+   una sola vez. Solo desde la web publicada (https), nunca en pruebas ni con ?debug=1. Se apaga en Ajustes. */
+const Metrics = {
+  KINDS: ['start', 'day', 'act2', 'ticket', 'online'],
+  on() { try { return localStorage.getItem('crossia.metrics') !== 'off'; } catch (e) { return false; } },
+  set(v) { try { localStorage.setItem('crossia.metrics', v ? 'on' : 'off'); } catch (e) {} },
+  id() {
+    try { let v = localStorage.getItem('crossia.mid'); if (!/^[0-9a-f]{32}$/.test(v || '')) { const a = new Uint8Array(16); crypto.getRandomValues(a); v = [...a].map(b => b.toString(16).padStart(2, '0')).join(''); localStorage.setItem('crossia.mid', v); } return v; } catch (e) { return null; }
+  },
+  allowed() { return this.on() && location.protocol === 'https:' && !/[?&]debug=1\b/.test(location.search || ''); },
+  ping(kind) {
+    if (!this.KINDS.includes(kind) || !this.allowed()) return false;
+    const day = new Date().toISOString().slice(0, 10), key = 'crossia.m.' + kind; let last = null; try { last = localStorage.getItem(key); } catch (e) {}
+    if (kind === 'day' ? last === day : !!last) return false;   // un «día» por día · los hitos, una vez
+    const id = this.id(); if (!id) return false;
+    try { localStorage.setItem(key, day); } catch (e) {}
+    try { fetch(`${CFG.online.url}/rest/v1/rpc/crossia_metric`, { method: 'POST', headers: { apikey: CFG.online.key, 'Content-Type': 'application/json' }, body: JSON.stringify({ p_anon: id, p_kind: kind }), keepalive: true }).catch(() => {}); } catch (e) {}
+    return true;
+  },
+};
+
 /** Botones de los vecinos: fabricación multiorigen (Glover y Dax) cuando ya tienes origen */
 function netServiceBtns(npcId) {
   const out = []; if (!Net.on()) return out;
@@ -12731,6 +12793,7 @@ const startGameFromMenu = () => {
   try { audioCtx ||= new (window.AudioContext || window.webkitAudioContext)(); audioCtx.resume(); } catch (e) {}
   playChime();
   SaveSystem.started = true; SaveSystem.saveNow(hadSave ? 'session-start' : 'new-game'); setTimeout(seasonTick, 2500);   // v2.9.2: aviso del evento de temporada
+  if (!hadSave) Metrics.ping('start'); Metrics.ping('day');   // v3.0 · H8: métricas anónimas (nueva partida · día jugado)
   cam.rate = 1.7; cam.tDist = 9; cam.tPitch = 0.42; // zoom cinematográfico desde el espacio hasta el personaje
   setTimeout(() => {
     state.menuOpen = false; cam.rate = 10;
@@ -12765,6 +12828,7 @@ function confirmDialog({ title, text, okLabel = 'ACEPTAR' }) {
 }
 let settingsFromGame = false;
 function refreshSettingsInfo() {
+  { const mo = $('metricsOn'); if (mo) { mo.checked = Metrics.on(); mo.onchange = () => Metrics.set(mo.checked); } }   // v3.0 · H8
   const m = GS.meta;
   $('profileInfo').innerHTML = `${GS.achievements?.equippedTitle ? `🏷️ Título: <b>«${esc(GS.achievements.equippedTitle)}»</b><br>` : ''}Tipo: <b>${m.profile.type === PROFILE.GUEST ? 'Invitado (sin cuenta)' : 'Cuenta vinculada'}</b> · ID de partida: <code>${String(m.saveId).slice(0, 8)}</code><br>Creada ${timeAgo(m.createdAt)} · Tiempo jugado: ${Math.floor(m.playTimeSec / 60)} min`;
   $('saveInfo').innerHTML = `Almacenamiento: <b>${SaveSystem.persistent ? 'este navegador (local)' : '⚠️ solo memoria, no persistente'}</b><br>Último guardado: <b>${timeAgo(m.lastSavedAt)}</b> · Guardados: ${m.saveCount}<br>${COIN} ${GS.economy.money.toLocaleString('es-ES')} $TOKEN · Misiones ${missionsDone()}/${NPCS.length} · Casa nivel ${GS.house.level} · Objetos: ${GS.purchases.owned.length}`;
@@ -13145,7 +13209,7 @@ DBG.refs = DBG_REFS;
 if (/[?&]debug=1\b/.test(location.search)) window._dbg = DBG_REFS;   // v1.0: ya no es global por defecto
 /* v1.1 · Interior caminable de la casa (Sec. 6.9 Fase 2) */
 /** v1.5 · capturas: DBG.tp(x, z) lleva al jugador a (x, z) del pueblo · DBG.view(dist, pitch, yaw) fija la cámara · DBG.shot('B'|'C'|'D'|'G'|'H') prepara la escena del protocolo */
-DBG.g = { World, WGEO, WorldFX, TRAVEL_POSTS, Island, Voyage, TRIBE, ship, state, IconStudio, ItemArt, itemIcon, PhGlyph, startDialog, openInventory, openHousePanel, addLetter, endDialog, openShop, openGiftPicker, openEncargo, acceptCourier, refreshMissionUI, SeasonDecor, Snow, claimSeasonGift, seasonNow, openWeeklyPanel, openRoulette, Weather, Decorate, SyncGuard, Online, Gather, Mining, npcObjs, interactables, colliders, SITES, NPCS, CFG, get house() { return house; }, scene, renderer, camera, cam, sky, water, atmo, clouds, PostFX, SkyEnv, PlanetAO, WATER_U, POST_U, Gather, Studio, ToolAnim, Profiles, Hub, Decor, Fitting, player, Interiors };   // v1.5: referencias gráficas para depurar
+DBG.g = { World, WGEO, WorldFX, TRAVEL_POSTS, Island, Voyage, TRIBE, ship, state, IconStudio, ItemArt, itemIcon, PhGlyph, startDialog, openInventory, openHousePanel, addLetter, endDialog, openShop, openGiftPicker, openEncargo, acceptCourier, refreshMissionUI, SeasonDecor, Snow, claimSeasonGift, seasonNow, openWeeklyPanel, openRoulette, Weather, Decorate, SyncGuard, Online, RealShops, RealMarket, Metrics, Gather, Mining, npcObjs, interactables, colliders, SITES, NPCS, CFG, get house() { return house; }, scene, renderer, camera, cam, sky, water, atmo, clouds, PostFX, SkyEnv, PlanetAO, WATER_U, POST_U, Gather, Studio, ToolAnim, Profiles, Hub, Decor, Fitting, player, Interiors };   // v1.5: referencias gráficas para depurar
 DBG.post = (v = !PostFX.active) => { PostFX.active = !!v; POST_U.uPost.value = v ? 1 : 0; return PostFX.active; };
 DBG.env = (v = !SkyEnv.enabled) => SkyEnv.setEnabled(v);
 DBG.ao = (v = true) => { if (!PlanetAO.on) return false; if (v) PlanetAO.bake(); else { const c = planet.geometry.attributes.color; PlanetAO.reset(); c.needsUpdate = true; } return v; };
