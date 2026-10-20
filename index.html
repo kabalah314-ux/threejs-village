@@ -1437,7 +1437,7 @@ const starsMat = new THREE.ShaderMaterial({
   uniforms: { ...POST_U, uTime: { value: 0 }, uPR: { value: 1 }, uOpacity: { value: 0.2 }, uTw: { value: CFG.gfx.stars.twinkle }, uSpeed: { value: CFG.gfx.stars.speed } },
   vertexShader: `attribute float aSize; attribute float aPhase; attribute vec3 aCol; uniform float uTime, uPR, uTw, uSpeed; varying vec3 vCol; varying float vTw;
     void main(){ vCol = aCol; float tw = (1.0 - uTw) + uTw * sin(uTime * uSpeed + aPhase); vTw = 0.55 + 0.45 * tw; gl_PointSize = aSize * tw * uPR; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
-  fragmentShader: POST_GLSL + `uniform float uOpacity; varying vec3 vCol; varying float vTw; void main(){ float r = length(gl_PointCoord - 0.5); float a = smoothstep(0.5, 0.12, r); if (a < 0.01) discard; gl_FragColor = vec4(postOut(vCol), a * uOpacity * vTw); }`,
+  fragmentShader: POST_GLSL + `uniform float uOpacity; varying vec3 vCol; varying float vTw; void main(){ float r = length(gl_PointCoord - 0.5); float a = smoothstep(0.5, 0.12, r); if (a < 0.01) discard; gl_FragColor = vec4(postOut(min(vCol * 0.82, vec3(0.82))), a * uOpacity * vTw); }`   // sin HDR extremo: con alfa, un blanco «infinito» saturaba el cuadrado entero del punto,
 });
 { const n = GFX.T.stars, [s0, s1] = CFG.gfx.stars.size, pts = [], sz = [], ph = [], col = [], tint = [[1, 0.82, 0.92], [0.78, 0.9, 1]];
   for (let i = 0; i < n; i++) { const d = randomDir(); pts.push(d.x * 380, d.y * 380, d.z * 380); sz.push(s0 + Math.pow(Math.random(), 2.2) * (s1 - s0)); ph.push(Math.random() * 6.283); const c = Math.random() < CFG.gfx.stars.tint ? tint[i % 2] : [1, 1, 1]; col.push(...c); }
