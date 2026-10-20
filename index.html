@@ -555,9 +555,9 @@ const CFG = {
      Todo lo visual en un sitio para afinarlo tras la revisión con capturas. Nada de esto vive en GS (el nivel va en localStorage 'crossia.gfx'). */
   gfx: {
     tiers: {   // pr = tope de pixel ratio (escritorio / móvil) · shadow = mapa del sol · lights = PointLight decorativas que se CREAN al cargar (nunca cambia en caliente)
-      low:  { name: 'Baja',  pr: 1.0, prMobile: 1.0,  shadow: 512,  interiorShadow: false, lights: false, botShadow: false, stars: 500,  rain: 260, decor: 0.6, backdrop: 1, env: false, ao: false },
-      med:  { name: 'Media', pr: 1.5, prMobile: 1.25, shadow: 1024, interiorShadow: true,  lights: true,  botShadow: false, stars: 800,  rain: 450, decor: 1,   backdrop: 2, env: true,  ao: true  },
-      high: { name: 'Alta',  pr: 2.0, prMobile: 2.0,  shadow: 2048, interiorShadow: true,  lights: true,  botShadow: true,  stars: 1200, rain: 700, decor: 1,   backdrop: 2, env: true,  ao: true  },
+      low:  { name: 'Baja',  pr: 1.0, prMobile: 1.0,  shadow: 512,  interiorShadow: false, lights: false, botShadow: false, stars: 500,  rain: 260, decor: 0.6, backdrop: 1, env: false, ao: false, grass: 160 },
+      med:  { name: 'Media', pr: 1.5, prMobile: 1.25, shadow: 1024, interiorShadow: true,  lights: true,  botShadow: false, stars: 800,  rain: 450, decor: 1,   backdrop: 2, env: true,  ao: true,  grass: 450 },
+      high: { name: 'Alta',  pr: 2.0, prMobile: 2.0,  shadow: 2048, interiorShadow: true,  lights: true,  botShadow: true,  stars: 1200, rain: 700, decor: 1,   backdrop: 2, env: true,  ao: true,  grass: 900 },
     },
     guard: { warmupS: 6, windowS: 4, maxDtMs: 22, dynStep: 0.85, dynMin: 0.75 },   // gobernador de FPS: tras 6 s jugando, si la media de dt > 22 ms durante 4 s → resolución ×0,85 (mín. 0,75) y luego un nivel menos (solo en Auto, 1 vez por sesión)
     // QW1 · luz: hemisférica más fuerte con rebote verde-pastel, ambiente mucho menor (los volúmenes ganan forma)
@@ -2443,11 +2443,71 @@ NPCS.forEach(n => {
    10. VEGETACIÓN Y DECORACIÓN GLOBAL
    ========================================================= */
 const treeDirs = [];
+/* ===== v1.5 · Etapa 6 · DECORACIÓN INSTANCIADA + VIENTO =====
+   Árboles del mundo, palmeras, rocas, flores (en matas) e hierba: cada tipo es un prototipo cuyas piezas se fusionan por material y se dibujan
+   como InstancedMesh → de ~1.500 draw calls a ~15. Viento en el vertex shader (med/alta, más fuerte con lluvia y tormenta, flojo de noche).
+   Decor.clearAround(dir, ang) esconde flores, hierba y rocas bajo una construcción nueva. */
+const WIND_U = { uTime: { value: 0 }, uWind: { value: 1 } };
+const Decor = (() => {
+  const sets = new Map(), dummy = new THREE.Object3D(), ZERO = new THREE.Matrix4().makeScale(0, 0, 0), windOn = GFX.id !== 'low';
+  const mergeGeos = (list) => {   // [{geo, m4}] → una BufferGeometry no indexada (position + normal)
+    let n = 0; const parts = list.map(({ geo, m4 }) => { const g = (geo.index ? geo.toNonIndexed() : geo.clone()).applyMatrix4(m4); n += g.attributes.position.count; return g; });
+    const pos = new Float32Array(n * 3), nor = new Float32Array(n * 3); let o = 0;
+    parts.forEach(g => { pos.set(g.attributes.position.array, o * 3); nor.set(g.attributes.normal.array, o * 3); o += g.attributes.position.count; g.dispose(); });
+    const out = new THREE.BufferGeometry(); out.setAttribute('position', new THREE.BufferAttribute(pos, 3)); out.setAttribute('normal', new THREE.BufferAttribute(nor, 3)); return out;
+  };
+  function windMat(base, amp, H, white) {
+    const m = base.clone(); if (white) m.color.setHex(0xffffff); m.userData.envI = base.userData.envI;
+    if (!windOn || !amp) return m;
+    m.onBeforeCompile = (sh) => { sh.uniforms.uTime = WIND_U.uTime; sh.uniforms.uWind = WIND_U.uWind;
+      sh.vertexShader = 'uniform float uTime, uWind;\n' + sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
+        #ifdef USE_INSTANCING
+          float hh = max(position.y, 0.0) / ${H.toFixed(2)}; vec3 wp = (modelMatrix * instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0)).xyz; float ph = dot(wp, vec3(0.37, 0.21, 0.29));
+          transformed.x += sin(uTime * 1.7 + ph) * ${amp.toFixed(3)} * uWind * hh * hh; transformed.z += cos(uTime * 1.3 + ph * 1.3) * ${(amp * 0.6).toFixed(3)} * uWind * hh * hh;
+        #endif`); };
+    m.customProgramCacheKey = () => 'wind-' + amp + '-' + H + (white ? 'w' : ''); return m;
+  }
+  const api = {
+    /** key: tipo · proto(): Group de piezas (escala 1) · opts: { amp, H, shadow, colors (instancia), clear (se puede esconder bajo construcciones) } */
+    add(key, proto, opts, dir, yaw = 0, scale = 1, lift = 0, extra = null, color = null) {
+      let S = sets.get(key); if (!S) { S = { proto, opts, items: [], meshes: [] }; sets.set(key, S); }
+      S.items.push({ dir: dir.clone(), yaw, scale, lift, extra, color }); return S.items.length - 1;
+    },
+    build() {
+      for (const [key, S] of sets) {
+        if (S.meshes.length || !S.items.length) continue;
+        const g = S.proto(); g.updateMatrixWorld(true); const byMat = new Map();
+        g.traverse(o => { if (!o.isMesh) return; let l = byMat.get(o.material); if (!l) byMat.set(o.material, l = []); l.push({ geo: o.geometry, m4: o.matrixWorld }); });
+        const O = S.opts, N = S.items.length;
+        for (const [m, list] of byMat) {
+          const im = new THREE.InstancedMesh(mergeGeos(list), windMat(m, O.amp, O.H || 1, !!O.colors && m.userData.tint), N);
+          S.items.forEach((it, i) => { placeOnPlanet(dummy, it.dir, it.yaw, it.lift); if (it.extra) dummy.rotateX(it.extra); dummy.scale.setScalar(it.scale); dummy.updateMatrix(); im.setMatrixAt(i, dummy.matrix); if (O.colors && m.userData.tint) im.setColorAt(i, _decCol.setHex(it.color)); });
+          im.castShadow = !!O.shadow; im.receiveShadow = true; im.userData.decor = key; im.raycast = () => {}; scene.add(im); S.meshes.push(im);
+        }
+        g.traverse(o => { if (o.isMesh && !o.material.userData.shared) o.material.dispose?.(); });
+      }
+    },
+    /** Esconde las instancias «clear» a menos de ang rad de dir (bajo una construcción) */
+    clearAround(dir, ang) {
+      const c = Math.cos(ang);
+      for (const S of sets.values()) { if (!S.opts.clear) continue; let hit = false;
+        S.items.forEach((it, i) => { if (!it.hidden && it.dir.dot(dir) > c) { it.hidden = true; hit = true; S.meshes.forEach(im => im.setMatrixAt(i, ZERO)); } });
+        if (hit) S.meshes.forEach(im => { im.instanceMatrix.needsUpdate = true; }); }
+    },
+    stats() { const o = {}; for (const [k, S] of sets) o[k] = { n: S.items.length, calls: S.meshes.length }; return o; },
+  };
+  return api;
+})();
+const _decCol = new THREE.Color();
+const _treeProto = (color) => () => makeTree(1, color);
+const TREE_COLORS = [0x4caf50, 0x43a047, 0x66bb6a];
 function addTreeAt(dir, scale) {
   const p = dir.clone().multiplyScalar(heightAt(dir));
   if (colliders.some(c => c.pos.distanceTo(p) < c.r + 1.2)) return false;
-  const t = heightAt(dir) - SEA < 0.45 ? makePalm() : makeTree(scale);
-  placeOnPlanet(t, dir, Math.random() * 6.28); scene.add(t); colliders.push({ pos: t.position.clone(), r: 0.6 * scale }); treeDirs.push(dir); return true;
+  const palm = heightAt(dir) - SEA < 0.45, yaw = Math.random() * 6.28;
+  if (palm) Decor.add('palm', makePalm, { amp: 0.08, H: 2.6, shadow: true }, dir, yaw, 1);
+  else { const ci = Math.floor(Math.random() * 3); Decor.add('tree' + ci, _treeProto(TREE_COLORS[ci]), { amp: 0.03, H: 4, shadow: true }, dir, yaw, scale); }   // v1.5 · Etapa 6: instanciado
+  colliders.push({ pos: p.clone().setLength(heightAt(dir)), r: 0.6 * scale }); treeDirs.push(dir); return true;
 }
 function scatter(count, tries, fn) { let placed = 0; for (let i = 0; i < tries && placed < count; i++) if (fn(randomDir())) placed++; }
 [[-10, -6, 1.1], [-11.5, 1, 0.9], [-9, 7, 1.2], [-3, 10, 1], [4, 10.5, 0.9], [10, 6, 1.1], [11.5, -1, 1], [9, -8.5, 1.2], [2, -11, 1], [-5, -11, 0.9], [-1, -6.5, 0.8], [7.5, 4.5, 0.85]]
@@ -2455,10 +2515,17 @@ function scatter(count, tries, fn) { let placed = 0; for (let i = 0; i < tries &
 const nearAnySite = (d, margin) => Object.values(SITES).some(s => angleBetween(d, s.dir) < s.r0 + margin);
 scatter(110, 1200, d => isLand(d) && !nearAnySite(d, 0.05) && heightAt(d) - SEA < 1.7 && !treeDirs.some(t => angleBetween(t, d) < 0.08) && addTreeAt(d, 0.8 + Math.random() * 0.5));
 const rockMat = mat(0x9e9aa8, { flatShading: true });
-scatter(40, 300, d => { if (!isLand(d) || nearAnySite(d, 0)) return false; const r = mesh(new THREE.DodecahedronGeometry(0.35 + Math.random() * 0.45, 0), rockMat); placeOnPlanet(r, d, Math.random() * 6, -0.1); r.rotateX(Math.random()); scene.add(r); return true; });
+scatter(40, 300, d => { if (!isLand(d) || nearAnySite(d, 0)) return false; Decor.add('rock', () => { const g = new THREE.Group(); g.add(mesh(new THREE.DodecahedronGeometry(1, 0), rockMat)); return g; }, { shadow: true, clear: true }, d, Math.random() * 6, 0.35 + Math.random() * 0.45, -0.1, Math.random()); return true; });   // v1.5 · Etapa 6: instanciado
 const flowerColors = [0xff6b9d, 0xffd93d, 0xff8c42, 0xc77dff, 0xffffff];
-scatter(Math.round(240 * GFX.T.decor), 700, d => { if (!isLand(d) || heightAt(d) - SEA > 1.4) return false; const f = new THREE.Group(); f.add(mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.35, 4), matC(0x3f8f3a), 0, 0.17, 0, false)); f.add(mesh(new THREE.SphereGeometry(0.11, 6, 6), matC(flowerColors[Math.floor(Math.random() * 5)]), 0, 0.38, 0, false)); placeOnPlanet(f, d); scene.add(f); return true; });
-scatter(Math.round(160 * GFX.T.decor), 400, d => { if (!isLand(d)) return false; const w = new THREE.Group(); w.add(mesh(new THREE.ConeGeometry(0.15, 0.5, 4), matC(0x5cbf4a, true), 0, 0.25, 0, false)); placeOnPlanet(w, d, Math.random() * 6); scene.add(w); return true; });
+const FLOWER_HEAD = mat(0xffffff); FLOWER_HEAD.userData.tint = true;
+const flowerProto = () => { const f = new THREE.Group(); f.add(mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.35, 4), matC(0x3f8f3a), 0, 0.17, 0, false)); f.add(mesh(new THREE.SphereGeometry(0.11, 6, 6), FLOWER_HEAD, 0, 0.38, 0, false)); return f; };
+{ const total = Math.round(240 * GFX.T.decor), q = new THREE.Vector3(); let placed = 0;   // v1.5 · Etapa 6: flores en matas de 3–7 (aspecto de jardín) e instanciadas
+  for (let i = 0; i < 900 && placed < total; i++) { const d = randomDir(); if (!isLand(d) || heightAt(d) - SEA > 1.4) continue; const col = flowerColors[Math.floor(Math.random() * 5)], k = 3 + Math.floor(Math.random() * 5);
+    for (let j = 0; j < k && placed < total; j++) { q.copy(d).add(randomDir().multiplyScalar(0.025)).normalize(); if (!isLand(q) || heightAt(q) - SEA > 1.4) continue; Decor.add('flower', flowerProto, { amp: 0.05, H: 0.45, colors: true, clear: true }, q, Math.random() * 6, 0.8 + Math.random() * 0.4, 0, null, Math.random() < 0.8 ? col : flowerColors[Math.floor(Math.random() * 5)]); placed++; } } }
+{ const n = GFX.T.grass ?? 160, G = matC(0x5cbf4a, true);   // v1.5 · Etapa 6: matas de 3 hojas instanciadas (más densas en Alta)
+  const grassProto = () => { const g = new THREE.Group(); [[0, 0, 0], [0.09, 0.35, 2.1], [-0.08, -0.3, 4.2]].forEach(([x, tilt, ry]) => { const c = mesh(new THREE.ConeGeometry(0.07, 0.42, 3), G, x, 0.2, 0, false); c.rotation.set(tilt, ry, tilt * 0.5); g.add(c); }); return g; };
+  scatter(n, n * 3, d => { if (!isLand(d) || heightAt(d) - SEA > 1.6 || nearAnySite(d, 0.02)) return false; Decor.add('grass', grassProto, { amp: 0.06, H: 0.42, clear: true }, d, Math.random() * 6, 0.8 + Math.random() * 0.6); return true; }); }
+Decor.build();
 /* ===== v1.5 · Etapa 1 · AO horneado en el color del planeta (med/alta) =====
    Por cara: oscurece el suelo cerca de árboles, casas, puestos y construcciones (colliders sin noAO). Se hornea al aplicar la partida
    y se re-hornea solo la zona al construir o demoler. Coste 0 en juego (solo cambia el atributo de color). */
@@ -2636,6 +2703,7 @@ function placeBuilding(rec) {
   const col = { pos: g.position.clone(), r: def.r || 1 }; colliders.push(col);
   placedBuildings[rec.id] = { group: g, collider: col };
   if (PlanetAO.baked) PlanetAO.bake(dir);   // v1.5 · Etapa 1: re-hornea el AO de la zona
+  Decor.clearAround(dir, (def.r || 1) / R + 0.02);   // v1.5 · Etapa 6: sin flores ni hierba atravesando la construcción
   Production.register(g, rec);   // v0.4: Jardín / Molino / Fuente se usan con E
 }
 function restoreBuildings() {
@@ -5420,7 +5488,7 @@ function updateGoalHUD() {
 function animate() {
   requestAnimationFrame(animate);
   const rawDt = clock.getDelta(), dt = Math.min(rawDt, 0.05), t = clock.elapsedTime; GFX.update(dt, rawDt);   // v1.4: gobernador de FPS + viñeta
-  updatePlayer(dt); if (!state.cinematic) Needs.update(dt); updateNPCs(dt, t); Awakening.update(dt, t); /* v0.9: el sueño se detiene durante la escena del puerto */ updateCamera(dt); updateSun(); updateNeon(dt, t); updateUnlocks(dt, t); updateShip(dt); updateConfetti(dt); updateWater(t); V10.update(dt, t); ShootingStars.update(dt, 1 - (state.dayAmt ?? 1));
+  updatePlayer(dt); if (!state.cinematic) Needs.update(dt); updateNPCs(dt, t); Awakening.update(dt, t); /* v0.9: el sueño se detiene durante la escena del puerto */ updateCamera(dt); updateSun(); updateNeon(dt, t); updateUnlocks(dt, t); updateShip(dt); updateConfetti(dt); updateWater(t); V10.update(dt, t); ShootingStars.update(dt, 1 - (state.dayAmt ?? 1)); WIND_U.uTime.value = t; { const w = Weather.id(), tw = (w === 'storm' ? 2.8 : w === 'rain' ? 2 : 1) * lerp(0.5, 1, state.dayAmt ?? 1); WIND_U.uWind.value += (tw - WIND_U.uWind.value) * Math.min(1, dt * 0.8); }
   clouds.children.forEach(p => { p.rotateY(p.userData.speed * dt); const c = p.userData.bob; if (c) c.position.z = c.userData.z0 + Math.sin(t * 0.3 + c.userData.ph) * 0.25; });   // v1.5: las nubes «respiran» arriba y abajo
   updateTokens(); updateGoalHUD(); updateClockHUD(); Weather.update(dt); Fishing.update(dt); Mining.update(dt); StarFall.update(dt); Net.update(dt);
   if (SaveSystem.started && !state.menuOpen && !state.cinematic) {
