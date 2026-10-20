@@ -594,6 +594,8 @@ const CFG = {
     clouds: { emi: 0.16, emiNight: 0.03, dusk: 0xffc1a6, night: 0x8a90b8 },
     aerial: { density: 0.012, near: 14, far: 26 },
     shooting: { every: [18, 38], dur: 0.9, len: 26 },
+    // Etapa 5 · personajes: contorno (grosor en u de objeto, radio mínimo de malla), rim, squash & stretch (muelle k/amortiguación)
+    chars: { ink: 0x2b2b3d, outline: 0.022, minR: 0.075, rim: 0.32, rimNight: 0x9fb5ff, sqStart: -0.08, sqStop: 0.05, sqSplash: -0.15, sqK: 180, sqD: 14, sqWalk: 0.035, hideDist: 30 },
     // QW13 · exposición según la hora
     exposure: { night: 0.95, day: 1.08, dusk: 0.05 },
     // Lluvia: gota con textura de trazo suave (antes cuadrados blancos)
@@ -1591,6 +1593,34 @@ const _matC = new Map();
 const matC = (hex, flat = false) => { const k = hex + (flat ? 'f' : ''); let m = _matC.get(k); if (!m) { m = mat(hex, flat ? { flatShading: true } : {}); m.userData.shared = true; _matC.set(k, m); } return m; };
 /** v1.4 · QW4: brillo de los ojos (un único material blanco sin luz) */
 const EYE_HI = new THREE.MeshBasicMaterial({ color: 0xffffff }); EYE_HI.userData.shared = true;
+/* ===== v1.5 · Etapa 5 · PERSONAJES: contorno de tinta (#2b2b3d, como los bordes de la UI), rim light y wrap lighting =====
+   Contorno = «casco invertido»: copia de cada malla con BackSide, inflada en el vertex shader (esferas por la normal, cajas hacia sus esquinas
+   para no abrir grietas). Hija de la malla → sigue animaciones y escala. Solo Media/Alta; se oculta en Modo Planeta. */
+const OUTLINE_U = { uOutline: { value: CFG.gfx.chars.outline } };
+const _outlineMat = (box) => { const m = new THREE.MeshBasicMaterial({ color: CFG.gfx.chars.ink, side: THREE.BackSide, fog: true });
+  m.onBeforeCompile = (sh) => { sh.uniforms.uOutline = OUTLINE_U.uOutline; sh.vertexShader = 'uniform float uOutline;\n' + sh.vertexShader.replace('#include <begin_vertex>', box ? 'vec3 transformed = position + sign(position) * uOutline * 0.8;' : 'vec3 transformed = position + normalize(normal) * uOutline;'); };
+  m.customProgramCacheKey = () => 'outline-' + (box ? 'b' : 's'); m.userData.shared = true; m.userData.outline = true; return m; };
+const OUTLINE_MAT = _outlineMat(false), OUTLINE_BOX = _outlineMat(true);
+const OUTLINE_ON = GFX.id !== 'low';
+/** Añade el contorno a las mallas opacas de un personaje (excluye ojos/chispas, transparentes, sprites y sombras de contacto) */
+function addOutline(root) {
+  if (!OUTLINE_ON) return root; const list = [];
+  root.traverse(o => { if (!o.isMesh || o.userData.outlineOf || o.userData.blob || o.userData.noOutline) return; const m = o.material; if (!m || Array.isArray(m) || m.transparent || m === EYE_HI || m.isMeshBasicMaterial || m.userData.outline) return;
+    const g = o.geometry; if (!g.boundingSphere) g.computeBoundingSphere(); if (g.boundingSphere.radius < CFG.gfx.chars.minR) return; list.push(o); });
+  list.forEach(o => { const box = o.geometry.type === 'BoxGeometry', h = new THREE.Mesh(o.geometry, box ? OUTLINE_BOX : OUTLINE_MAT); h.castShadow = h.receiveShadow = false; h.raycast = () => {}; h.userData.outlineOf = o; o.add(h); });
+  return root;
+}
+/** Rim light + terminador suave (wrap) en los materiales de personaje: un único programa compartido */
+const RIM_U = { uRim: { value: CFG.gfx.chars.rim }, uRimCol: { value: new THREE.Color(0xa9dcff) } };
+function charMat(m) {
+  if (!m || m.userData.charRim || !m.isMeshStandardMaterial) return m; m.userData.charRim = true;
+  const prev = m.onBeforeCompile;
+  m.onBeforeCompile = (sh, r) => { prev && prev.call(m, sh, r); sh.uniforms.uRim = RIM_U.uRim; sh.uniforms.uRimCol = RIM_U.uRimCol;
+    sh.fragmentShader = 'uniform float uRim; uniform vec3 uRimCol;\n' + sh.fragmentShader
+      .replace('#include <opaque_fragment>', '{ vec3 Vv = normalize(vViewPosition); float rim = pow(1.0 - abs(dot(normal, Vv)), 2.5); outgoingLight += uRimCol * rim * uRim; }\n#include <opaque_fragment>'); };
+  m.customProgramCacheKey = () => 'char-rim' + (m.map ? '-map' : '') + (m.flatShading ? '-f' : ''); return m;
+}
+const charify = (root) => { root.traverse(o => { if (o.isMesh && !o.userData.outlineOf) charMat(o.material); }); return root; };
 const eyeHi = (g, r, x, y, z) => { const m = mesh(new THREE.SphereGeometry(r, 6, 5), EYE_HI, x, y, z, false); m.raycast = () => {}; g.add(m); return m; };
 function mesh(geo, material, x = 0, y = 0, z = 0, shadow = true) { const m = new THREE.Mesh(geo, material); m.position.set(x, y, z); m.castShadow = shadow; m.receiveShadow = shadow; return m; }
 const box = (w, h, d, m, x, y, z) => mesh(new THREE.BoxGeometry(w, h, d), m, x, y, z);
@@ -1747,11 +1777,13 @@ function makeCritter({ fur, belly, ears = 'round', eye = 0x2b2b3d, eyeSize = 0.0
   if (ears === 'round') { g.add(sphere(0.17, F, -0.4, 2.02, 0, 10)); g.add(sphere(0.17, F, 0.4, 2.02, 0, 10)); }
   if (ears === 'pointy') [-1, 1].forEach(s => { const e = cone(0.16, 0.42, F, s * 0.35, 2.15, 0, 6); e.rotation.z = -s * 0.3; g.add(e); });
   if (ears === 'droop') [-1, 1].forEach(s => { const e = sphere(0.17, F, s * 0.55, 1.45, 0, 10); e.scale.set(0.7, 1.7, 0.6); g.add(e); });
-  g.add(sphere(eyeSize, D, -0.2, 1.72, 0.48, 6)); g.add(sphere(eyeSize, D, 0.2, 1.72, 0.48, 6));
-  [-1, 1].forEach(s => eyeHi(g, eyeSize * CFG.gfx.eyeHi, s * 0.2 + eyeSize * 0.3, 1.72 + eyeSize * 0.45, 0.48 + eyeSize * 0.8));   // v1.4 · QW4: chispa en los ojos
+  const eyes = [sphere(eyeSize, D, -0.2, 1.72, 0.48, 6), sphere(eyeSize, D, 0.2, 1.72, 0.48, 6)]; eyes.forEach(e => { e.userData.noOutline = true; g.add(e); });
+  [-1, 1].forEach(s => eyes.push(eyeHi(g, eyeSize * CFG.gfx.eyeHi, s * 0.2 + eyeSize * 0.3, 1.72 + eyeSize * 0.45, 0.48 + eyeSize * 0.8)));   // v1.4 · QW4: chispa en los ojos
+  g.userData.eyes = eyes; g.userData.nextBlink = performance.now() + 1500 + Math.random() * 3000;   // v1.5 · Etapa 5: parpadeo
   g.add(sphere(0.22, F, -0.62, 0.88, 0.2, 10)); g.add(sphere(0.22, F, 0.62, 0.88, 0.2, 10));
   g.add(sphere(0.22, F, -0.3, 0.2, 0.1, 10)); g.add(sphere(0.22, F, 0.3, 0.2, 0.1, 10));
   decorate && decorate(g, F);
+  charify(g); addOutline(g);   // v1.5 · Etapa 5
   g.scale.setScalar(scale); return g;
 }
 const SPECIES = {
@@ -2148,7 +2180,7 @@ const player = new THREE.Group();
 function applyAvatar(cfg, wardrobe) {
   const old = player.userData.body, rotY = old ? old.rotation.y : 0;
   if (old) { player.remove(old); old.traverse(o => { if (o.isMesh && o.geometry !== _avHeartGeo) o.geometry.dispose(); }); }   // materiales cacheados: no se liberan
-  const body = buildAvatar(cfg, wardrobe); body.rotation.y = rotY;
+  const body = buildAvatar(cfg, wardrobe); body.rotation.y = rotY; charify(body); addOutline(body);   // v1.5 · Etapa 5: rim + contorno
   player.add(body); player.userData.body = body; player.userData.parts = body.userData.parts;
   return body;
 }
@@ -4572,6 +4604,16 @@ function openMunicipalJob() {
    18. ACTUALIZACIÓN: JUGADOR, NPCs, EFECTOS
    ========================================================= */
 const _fwd = new THREE.Vector3(), _right = new THREE.Vector3(), _move = new THREE.Vector3();
+/** v1.5 · Etapa 5 · squash & stretch del cuerpo del avatar (muelle): al arrancar, al parar, al caer al agua y al andar (conserva volumen) */
+const _sq = { x: 0, v: 0, moving: false, swim: false };
+function squash(dt, moving, swim = false) {
+  const C = CFG.gfx.chars, body = player.userData.body; if (!body) return;
+  if (moving && !_sq.moving) _sq.x = C.sqStart; else if (!moving && _sq.moving) _sq.x = C.sqStop;
+  if (swim && !_sq.swim) _sq.x = C.sqSplash; _sq.moving = moving; _sq.swim = swim;
+  const a = -C.sqK * _sq.x - C.sqD * _sq.v; _sq.v += a * dt; _sq.x += _sq.v * dt;
+  const walk = moving && !swim ? C.sqWalk * Math.cos(state.walkCycle * 2) : 0, sy = 1 + _sq.x + walk, sxz = 1 - (sy - 1) * 0.5;
+  body.scale.set(sxz, sy, sxz);
+}
 function updatePlayer(dt) {
   if (Interiors.active) { Interiors.tick(dt); return; }   // v1.1: movimiento plano dentro de un interior
   const pd = player.userData, parts = pd.parts, up = pd.dir; let moving = false;
@@ -4610,7 +4652,7 @@ function updatePlayer(dt) {
   if (state.swimming) { state.walkCycle += dt * 6; const s = Math.sin(state.walkCycle); parts.armL.rotation.x = Math.PI + s * 1.2; parts.armR.rotation.x = Math.PI - s * 1.2; parts.legL.rotation.x = s * 0.4; parts.legR.rotation.x = -s * 0.4; bob = Math.sin(performance.now() * 0.004) * 0.08; }
   else if (moving) { state.walkCycle += dt * 11; const s = Math.sin(state.walkCycle); parts.legL.rotation.x = s * 0.7; parts.legR.rotation.x = -s * 0.7; parts.armL.rotation.x = -s * 0.6; parts.armR.rotation.x = s * 0.6; bob = Math.abs(s) * 0.06; }
   else { ['legL', 'legR', 'armL', 'armR'].forEach(p => parts[p].rotation.x *= 0.85); bob = Math.sin(performance.now() * 0.003) * 0.02; }
-  player.position.copy(pd.dir).multiplyScalar(surfaceR(pd.dir) + bob);
+  player.position.copy(pd.dir).multiplyScalar(surfaceR(pd.dir) + bob); squash(dt, moving, state.swimming);   // v1.5 · Etapa 5
   playerBlob.position.y = CFG.gfx.blob.y - bob; playerBlob.visible = !state.swimming;   // v1.4: la sombra se queda en el suelo al botar · fuera al nadar
   if (marker.material.opacity > 0) { marker.material.opacity -= dt * 0.8; marker.scale.addScalar(dt * 0.8); }
   const near = canControl() ? getNearbyInteractable() : null; ui.hint.classList.toggle('hidden', !near); if (near) ui.hintText.textContent = near.obj.userData.interact.label;
@@ -4618,9 +4660,16 @@ function updatePlayer(dt) {
   if (IS_MOBILE) { document.getElementById('joystick').style.display = canControl() ? 'block' : 'none'; actionBtn.style.display = near ? 'flex' : 'none'; if (near) actionLabel.textContent = near.obj.userData.interact.label.replace('Hablar con ', '').replace('Cosechar Fruta Dorada', 'Cosechar'); }
   aura.rotation.y += dt * 2.2; aura.children.forEach(c => { if (c.isMesh && c.userData.i !== undefined) c.position.y = Math.sin(performance.now() * 0.004 + c.userData.i) * 0.15; });
 }
+/** v1.5 · Etapa 5: parpadeo (cada 2,5–5 s, 90 ms) de cualquier grupo con userData.eyes (busca en hijos directos: NPC con decorados) */
+function blink(obj) {
+  const g = obj.userData.eyes ? obj : obj.children.find(c => c.userData.eyes); if (!g) return; const u = g.userData, now = performance.now();
+  if (now >= u.nextBlink) { u.blinkEnd = now + 90; u.nextBlink = now + 2500 + Math.random() * 2500; }
+  const sy = now < u.blinkEnd ? 0.12 : 1; if (u._sy !== sy) { u._sy = sy; u.eyes.forEach(e => { e.scale.y = sy; }); }
+}
 function updateNPCs(dt, t) {
   NPCS.forEach(n => {
     const obj = npcObjs[n.id], u = obj.userData, b = u.bubble; const baseY = n.species === 'hedgehogs' ? 2.8 : 3.4;
+    blink(obj);   // v1.5 · Etapa 5
     b.position.y = baseY + Math.sin(t * 3 + obj.position.x) * 0.15; b.material.rotation = Math.sin(t * 2) * 0.1;
     b.scale.setScalar(clamp(cam.dist / 9, 1, 5)); // el "!" se ve desde lejos en modo planeta
     if (performance.now() < u.celebrateUntil) { obj.quaternion.multiply(_q.setFromAxisAngle(UP_Y, dt * 6)); obj.scale.y = 1 + Math.sin(t * 24) * 0.05; obj.position.copy(u.dir).multiplyScalar(heightAt(u.dir) + Math.abs(Math.sin(t * 12)) * 0.6); }
@@ -4702,7 +4751,9 @@ function updateSun() {
     _c1.lerpColors(SKY_NIGHT[pal], SKY_DAY[pal], dayAmt); _c2.lerpColors(_c1, SKY_DUSK[pal], duskAmt * 0.65); skyU[key].value.copy(_c2);
   }
   skyU.sunDir.value.copy(_sunDir); skyU.sunCol.value.copy(sun.color); skyU.uDay.value = dayAmt;   // v1.4 · QW5: disco de sol y luna
-  skyU.uUp.value.copy(camera.up); skyU.uGlow.value = duskAmt * L.sky.glowI;   // v1.5 · Etapa 3: el horizonte del cielo es el del jugador
+  skyU.uUp.value.copy(camera.up); skyU.uGlow.value = duskAmt * L.sky.glowI;
+  RIM_U.uRimCol.value.copy(skyU.midColor.value).lerp(_c1.setHex(L.chars.rimNight), 1 - dayAmt);   // v1.5 · Etapa 5
+  { const far = cam.dist > L.chars.hideDist && !Interiors.active; OUTLINE_MAT.visible = OUTLINE_BOX.visible = !far; OUTLINE_U.uOutline.value = L.chars.outline * clamp(cam.dist / 9, 1, 2.5); }   // v1.5 · Etapa 3: el horizonte del cielo es el del jugador
   atmo.material.uniforms.uSunV.value.copy(_sunDir).transformDirection(camera.matrixWorldInverse);
   { const C = L.clouds; cloudMat.color.setHex(0xffffff).lerp(_c1.setHex(C.dusk), duskAmt * 0.6).lerp(_c2.setHex(C.night), (1 - dayAmt) * 0.85); cloudMat.emissiveIntensity = lerp(C.emiNight, C.emi, dayAmt); }
   const SU = starsMat.uniforms; SU.uOpacity.value = lerp(L.stars.nightMax, L.stars.dayMin, dayAmt); SU.uTime.value = performance.now() / 1000; SU.uPR.value = renderer.getPixelRatio();   // v1.4 · QW6
@@ -7859,7 +7910,7 @@ const Interiors = {
     let bob;
     if (moving) { state.walkCycle += dt * 11; const s = Math.sin(state.walkCycle); parts.legL.rotation.x = s * 0.7; parts.legR.rotation.x = -s * 0.7; parts.armL.rotation.x = -s * 0.6; parts.armR.rotation.x = s * 0.6; bob = Math.abs(s) * 0.06; }
     else { ['legL', 'legR', 'armL', 'armR'].forEach(p => parts[p].rotation.x *= 0.85); bob = Math.sin(performance.now() * 0.003) * 0.02; }
-    this._placePlayer(bob); playerBlob.position.y = CFG.gfx.blob.y - bob; playerBlob.visible = true;
+    this._placePlayer(bob); squash(dt, moving); playerBlob.position.y = CFG.gfx.blob.y - bob; playerBlob.visible = true;
     if (marker.material.opacity > 0) { marker.material.opacity -= dt * 0.8; marker.scale.addScalar(dt * 0.8); }
     const near = canControl() && !this._busy ? this.nearby() : null; ui.hint.classList.toggle('hidden', !near); if (near) ui.hintText.textContent = near.obj.userData.interact.label;
     if (IS_MOBILE) { document.getElementById('joystick').style.display = canControl() ? 'block' : 'none'; actionBtn.style.display = near ? 'flex' : 'none'; if (near) actionLabel.textContent = near.obj.userData.interact.label; }
