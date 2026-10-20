@@ -476,6 +476,8 @@ const CFG = {
     detect: { perDay: 3, ang: 0.9, range: 7, loot: [['old_coin', 30, [2, 4]], ['fossil', 22, 1], ['buried_chest', 18, 1], ['raw_gem', 14, 1], ['pearl', 10, 1], ['star_shard', 6, 1]] },
     bug: { day: 5, night: 7, perDay: 10, rare: 0.06, escape: 0.15, lifeS: 60 },
   },
+  /* ===== v1.7 · ONLINE REAL (F1) · Supabase compartido con NEURON (esquema crossia) · la clave publicable es pública por diseño ===== */
+  online: { url: 'https://glsmahzpvzabeeucyqif.supabase.co', key: 'sb_publishable_SmbXr1nXApZ8HRF1ezbXcg_lqtr2yaZ', lib: 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm', autosaveMin: 5, posEvery: 0.25 },
   /* ===== v1.6 · ESTUDIO DEL PERFIL ===== */
   studio: { pos: [-2.8, -7.8], perDay: 3, secs: 2.4, hunger: 4, maint: 9, fixFee: 80, fixMats: [['wood_log', 2], ['stone', 1]], bonusP: 0.35, inspireP: 0.12 },
   /* ===== v0.4 · PESCA (Sec. 5.5–5.6) ===== */
@@ -5830,10 +5832,11 @@ const Studio = (() => {
 // v1.6: el pico y la caña también se animan
 { const _hit = Mining.hit; Mining.hit = (g) => { if (state.toolBusy || !Tools.usable('pickaxe')) return _hit.call(Mining, g); ToolAnim.play('pickaxe', () => _hit.call(Mining, g), undefined, g.position.clone()); }; }
 { const _cast = Fishing.cast; Fishing.cast = () => { if (state.toolBusy || !Tools.usable('fishing_rod')) return _cast.call(Fishing); ToolAnim.play('fishing_rod', () => _cast.call(Fishing)); }; }
+let _chatIn = -1;
 function animate() {
   requestAnimationFrame(animate);
   const rawDt = clock.getDelta(), dt = Math.min(rawDt, 0.05), t = clock.elapsedTime; GFX.update(dt, rawDt);   // v1.4: gobernador de FPS + viñeta
-  updatePlayer(dt); ToolAnim.update(dt); Gather.update(dt, t); Studio.update(t); if (!state.cinematic) Needs.update(dt); updateNPCs(dt, t); Awakening.update(dt, t); /* v0.9: el sueño se detiene durante la escena del puerto */ updateCamera(dt); updateSun(); updateNeon(dt, t); updateUnlocks(dt, t); updateShip(dt); updateConfetti(dt); updateWater(t); V10.update(dt, t); ShootingStars.update(dt, 1 - (state.dayAmt ?? 1)); WIND_U.uTime.value = t; { const w = Weather.id(), tw = (w === 'storm' ? 2.8 : w === 'rain' ? 2 : 1) * lerp(0.5, 1, state.dayAmt ?? 1); WIND_U.uWind.value += (tw - WIND_U.uWind.value) * Math.min(1, dt * 0.8); }
+  updatePlayer(dt); ToolAnim.update(dt); Gather.update(dt, t); Studio.update(t); Online.update(dt); if ((NetWorld.inside() ? 1 : 0) !== _chatIn) { _chatIn = NetWorld.inside() ? 1 : 0; NetChat.render(); } if (!state.cinematic) Needs.update(dt); updateNPCs(dt, t); Awakening.update(dt, t); /* v0.9: el sueño se detiene durante la escena del puerto */ updateCamera(dt); updateSun(); updateNeon(dt, t); updateUnlocks(dt, t); updateShip(dt); updateConfetti(dt); updateWater(t); V10.update(dt, t); ShootingStars.update(dt, 1 - (state.dayAmt ?? 1)); WIND_U.uTime.value = t; { const w = Weather.id(), tw = (w === 'storm' ? 2.8 : w === 'rain' ? 2 : 1) * lerp(0.5, 1, state.dayAmt ?? 1); WIND_U.uWind.value += (tw - WIND_U.uWind.value) * Math.min(1, dt * 0.8); }
   clouds.children.forEach(p => { p.rotateY(p.userData.speed * dt); const c = p.userData.bob; if (c) c.position.z = c.userData.z0 + Math.sin(t * 0.3 + c.userData.ph) * 0.25; });   // v1.5: las nubes «respiran» arriba y abajo
   updateTokens(); updateGoalHUD(); updateClockHUD(); Weather.update(dt); Fishing.update(dt); Mining.update(dt); StarFall.update(dt); Net.update(dt);
   if (SaveSystem.started && !state.menuOpen && !state.cinematic) {
@@ -9356,7 +9359,8 @@ const NetWorld = {
   zone() { return Interiors.active?.def?.netZone || null; },
   /** Entrar = dormirse delante de la pantalla y aparecer en la Estación de la Red (Doc 2) */
   enter(zone = 'plaza') {
-    if (!Net.on()) Net.activate();
+    if (!Number.isInteger(Net.origin())) { Profiles.ensure(() => this.enter(zone)); return false; }   // v1.6: el perfil se elige, nunca se sortea
+    if (!Net.on()) Net.activate({ origin: Net.origin() });
     if (!Net.on()) return false;
     NetEco.W.pDay = NetEco.W.day;
     const opts = { zone, spawn: NET_ZONES[zone].spawn, fade: '#1a1033' };
@@ -9541,7 +9545,7 @@ const NetUI = {
       const st = Net.st(), on = Net.on(), o = on ? NET_ORIGINS[st.origin] : null;
       let html = balanceBar() + `<div class="app-card p-3 mb-2"><div class="font-bold text-[#2b2b3d]">🌐 La Red del Sueño</div><div class="text-xs text-slate-600 mt-1">Una bolsa de comercio onírica: lo que a ti te sobra, a otro le falta. Te duermes delante de la pantalla y apareces en la Estación de la Red.</div>
         <button data-demo class="btn-game px-3 py-2 text-sm mt-2 bg-violet-300 w-full">🌙 Modo demo (bots) · ${on ? 'entrar' : 'empezar'}</button>
-        <button disabled class="btn-game px-3 py-2 text-sm mt-2 bg-slate-200 opacity-60 w-full">🔒 Red real: próximamente (requiere cuenta)</button>
+        <button data-real class="btn-game px-3 py-2 text-sm mt-2 bg-emerald-200 w-full">🌍 Red real ${Online.me ? `· entrar como ${esc(Online.me.name)}` : '· iniciar sesión'}</button>
         <div class="text-[10px] text-slate-500 mt-1">La demo es del modo offline: 50–100 comerciantes bot, solo $TOKEN del juego. Nada de token real (ni compras ni premios).</div></div>`;
       if (on) {
         const reqs = Net.genRequests(), sh = st.shop, T = Net.shopDef(), open = Net.myOrders();
@@ -9553,6 +9557,7 @@ const NetUI = {
       }
       body.innerHTML = html;
       this.on(body, '[data-demo]', () => { closeApp(); if (!Number.isInteger(st.origin)) { Profiles.ensure(() => NetWorld.enter()); return; } if (!Net.on()) { st.intro = true; Net.activate({ origin: st.origin }); this.originCard(() => NetWorld.enter()); return; } NetWorld.enter(); });   // v1.6: el perfil se elige, no se sortea
+      this.on(body, '[data-real]', () => { closeApp(); if (!Online.me) { Account.open(); return; } if (!Number.isInteger(st.origin)) { Profiles.ensure(() => NetWorld.enter()); return; } NetWorld.enter(); });   // v1.7: con cuenta, en la Red ves a jugadores reales (y los bots siguen ahí)
       this.on(body, '[data-origin]', () => this.originCard());
       this.on(body, '[data-reqs]', () => this.requests());
       this.on(body, '[data-box]', () => { const n = Net.collectBox(); showToast(n ? `💰 +${fmt(n)} $T de la caja de tu tienda` : 'La caja está vacía', 'text-white'); re(); });
@@ -9926,6 +9931,7 @@ const Hub = {
         { ic: '🧭', ti: 'Guía de recursos', de: 'Qué se consigue, dónde y con qué', fn: () => this.guide() },
       ]],
       ['SISTEMA', [
+        { ic: '🌍', ti: 'Cuenta online', de: Online.me ? `${Online.me.name} · partida en la nube` : 'Partida en la nube y jugadores reales', bd: Online.me ? 'ON' : '', fn: () => Account.open() },
         { ic: '⚙️', ti: 'Ajustes y guardado', de: 'Calidad gráfica, sonido, exportar partida', fn: () => openSettings(true) },
         { ic: '🎮', ti: 'Controles', de: 'Teclado, ratón y táctil', fn: () => this.controls() },
       ]],
@@ -9972,6 +9978,146 @@ const Hub = {
   },
 };
 { const b = document.getElementById('btnMenu'); if (b) b.onclick = () => { if (canControl()) Hub.open(); }; }
+/* ===== v1.7 · 🌍 ONLINE REAL · F1: cuenta, jugador (nombre + perfil), partida en la nube, presencia y chat en la Red =====
+   Servidor: Supabase (proyecto compartido con NEURON, esquema propio «crossia», solo funciones public.crossia_*).
+   La librería se descarga solo al usarla (import dinámico). Sin conexión o sin cuenta, el juego sigue siendo 100 % offline.
+   Presencia y chat en vivo: canales Realtime «crossia-<zona>» (track = quién está; broadcast = posición y mensajes);
+   los mensajes también se guardan (crossia_chat_post) para ver los últimos al entrar. */
+const Online = (() => {
+  const C = CFG.online; let sb = null, loading = null, session = null, me = null, chan = null, chanZone = null, lastPush = 0, lastPos = '', posAcc = 0;
+  const peers = new Map();   // id → { name, profile, x, z, yaw, tx, tz, g, seen }
+  const chat = [];           // [{ name, profile, text, me, t }]
+  const api = { get me() { return me; }, get session() { return session; }, get ready() { return !!sb; }, peers, chat, status: 'off', err: '' };
+  async function lib() {
+    if (sb) return sb; if (loading) return loading;
+    loading = import(C.lib).then(({ createClient }) => { sb = createClient(C.url, C.key, { auth: { persistSession: true, storageKey: 'crossia.auth', autoRefreshToken: true } });
+      sb.auth.onAuthStateChange((_e, s) => { session = s; if (!s) { me = null; leave(); } }); return sb; })
+      .catch(e => { loading = null; api.err = 'No se pudo cargar el online (¿sin conexión?)'; throw e; });
+    return loading;
+  }
+  const rpc = async (fn, args = {}) => { const { data, error } = await (await lib()).rpc(fn, args); if (error) throw new Error(error.message); return data; };
+  async function refreshMe() { me = session ? await rpc('crossia_me') : null; api.status = me ? 'on' : session ? 'noplayer' : 'off';
+    if (me) { GS.meta.profile = { type: PROFILE.ACCOUNT, accountId: me.id, displayName: me.name }; } return me; }
+  /** Al arrancar: si hay sesión guardada, reconecta en silencio */
+  api.boot = async () => { try { if (!localStorage.getItem('crossia.auth')) return; } catch (e) { return; }
+    try { await lib(); const { data } = await sb.auth.getSession(); session = data.session; if (session) await refreshMe(); } catch (e) { console.warn('[online]', e.message); } };
+  api.signUp = async (email, password, name) => { await lib(); const { data, error } = await sb.auth.signUp({ email, password, options: { data: { app: 'crossia', username: name } } }); if (error) throw new Error(error.message); session = data.session; return !!session; };
+  api.signIn = async (email, password) => { await lib(); const { data, error } = await sb.auth.signInWithPassword({ email, password }); if (error) throw new Error(error.message); session = data.session; await refreshMe(); return me; };
+  api.signOut = async () => { if (!sb) return; leave(); await sb.auth.signOut(); session = null; me = null; api.status = 'off'; GS.meta.profile = { type: PROFILE.GUEST, accountId: null, displayName: 'Invitado' }; };
+  api.register = async (name) => { me = await rpc('crossia_register', { p_name: name, p_profile: Number.isInteger(Net.origin()) ? Net.origin() : 0 }); await refreshMe(); SaveSystem.saveNow('account-link'); await api.push(true); return me; };
+  /** ☁️ Subir la partida (manual o cada CFG.online.autosaveMin minutos mientras juegas) */
+  api.push = async (force = false) => { if (!me || (!force && Date.now() - lastPush < C.autosaveMin * 60000)) return null; lastPush = Date.now(); SaveSystem.saveNow('cloud');
+    const r = await rpc('crossia_save_put', { p_data: JSON.parse(SaveSystem.exportJSON()), p_version: SAVE_VERSION }); GS.meta.cloudAt = r.updated_at; return r; };
+  api.pull = async () => rpc('crossia_save_get');
+  /* --- 🌐 Red real: presencia, posiciones y chat por zona --- */
+  function leave() { if (chan) { try { sb.removeChannel(chan); } catch (e) {} } chan = null; chanZone = null; peers.forEach(p => p.g?.parent?.remove(p.g)); peers.clear(); }
+  function avatarOf(p) {
+    const o = NET_ORIGINS[p.profile] || NET_ORIGINS[0], g = new THREE.Group(), col = mat(o.color);
+    g.add(cyl(0.32, 0.38, 0.9, col, 0, 0.55, 0, 12)); g.add(sphere(0.36, mat(0xf1c9a5), 0, 1.3, 0, 14)); g.add(sphere(0.37, mat(0x4e342e), 0, 1.42, -0.04, 12));
+    const tag = new THREE.Sprite(new THREE.SpriteMaterial({ map: textTexture(`${o.icon} ${p.name}`, { w: 512, h: 96, bg: '#fffdf5', font: 'bold 44px Fredoka, Arial' }), depthWrite: false })); tag.scale.set(1.9, 0.36, 1); tag.position.y = 2.05; g.add(tag);
+    addBlob(g, 0.9); g.traverse(m => { m.raycast = () => {}; }); charify(g); addOutline(g); return g;
+  }
+  async function join(zone) {
+    if (!me || !sb) return; if (chanZone === zone) return; leave(); chanZone = zone;
+    chan = sb.channel('crossia-' + zone, { config: { presence: { key: me.id }, broadcast: { self: false } } });
+    chan.on('presence', { event: 'sync' }, () => { const st = chan.presenceState(); const ids = new Set(Object.keys(st));
+      peers.forEach((p, id) => { if (!ids.has(id)) { p.g?.parent?.remove(p.g); peers.delete(id); } });
+      ids.forEach(id => { if (id === me.id) return; const m = st[id][0]; if (!peers.has(id)) peers.set(id, { name: m.name, profile: m.profile, x: m.x || 0, z: m.z || 0, tx: m.x || 0, tz: m.z || 0, yaw: 0, seen: Date.now() }); }); });
+    chan.on('broadcast', { event: 'pos' }, ({ payload: m }) => { const p = peers.get(m.id); if (p) { p.tx = m.x; p.tz = m.z; p.yaw = m.yaw; p.seen = Date.now(); } });
+    chan.on('broadcast', { event: 'chat' }, ({ payload: m }) => { pushChat(m.name, m.profile, m.text, false); });
+    chan.subscribe(async (s) => { if (s === 'SUBSCRIBED') await chan.track({ name: me.name, profile: me.profile, x: Interiors.px, z: Interiors.pz }); });
+    try { const h = await rpc('crossia_chat_recent', { p_zone: zone }); chat.length = 0; (h || []).forEach(m => chat.push({ name: m.name, profile: m.profile, text: m.text, me: m.player === me.id, t: Date.parse(m.created_at) })); NetChat.render(); } catch (e) {}
+  }
+  function pushChat(name, profile, text, mine) { chat.push({ name, profile, text, me: mine, t: Date.now() }); while (chat.length > 60) chat.shift(); NetChat.render(); if (!mine) NetChat.ping(); }
+  api.say = async (text) => { if (!me) throw new Error('Inicia sesión para chatear'); const r = await rpc('crossia_chat_post', { p_zone: chanZone || 'plaza', p_text: text });
+    pushChat(me.name, me.profile, r.text, true); chan?.send({ type: 'broadcast', event: 'chat', payload: { name: me.name, profile: me.profile, text: r.text } }); return r; };
+  api.report = async (name) => { const p = [...peers.entries()].find(([, v]) => v.name === name); if (!p) throw new Error('No encuentro a ese jugador aquí'); return rpc('crossia_report', { p_target: p[0], p_chat: null, p_reason: 'chat' }); };
+  api.update = (dt) => {
+    if (me && session && SaveSystem.started && !state.menuOpen && Date.now() - lastPush > C.autosaveMin * 60000) api.push().catch(e => console.warn('[online] push', e.message));
+    const z = NetWorld.inside() ? NetWorld.zone() : null;
+    if (!me || !sb) return;
+    if (z && z !== chanZone) join(z); else if (!z && chanZone) leave();
+    if (!chan || !z) return;
+    posAcc += dt; if (posAcc > C.posEvery) { posAcc = 0; const k = `${Interiors.px.toFixed(2)},${Interiors.pz.toFixed(2)}`; if (k !== lastPos) { lastPos = k; chan.send({ type: 'broadcast', event: 'pos', payload: { id: me.id, x: Interiors.px, z: Interiors.pz, yaw: Interiors.yaw } }); } }
+    const root = Interiors.root; if (!root) return;
+    peers.forEach(p => { if (!p.g) { p.g = avatarOf(p); p.g.position.set(p.x, 0, p.z); root.add(p.g); }
+      if (p.g.parent !== root) root.add(p.g);
+      p.x += (p.tx - p.x) * Math.min(1, dt * 8); p.z += (p.tz - p.z) * Math.min(1, dt * 8); p.g.position.set(p.x, Math.abs(Math.sin((p.x + p.z) * 3)) * 0.04, p.z); p.g.rotation.y += ((p.yaw || 0) - p.g.rotation.y) * Math.min(1, dt * 8); });
+  };
+  api.lib = lib;
+  return api;
+})();
+
+/* ===== 💬 Chat de la Red (en vivo con jugadores reales; si no hay sesión, invita a entrar) ===== */
+const NetChat = {
+  el: null, open: false, unread: 0,
+  ensure() {
+    if (this.el) return this.el; const d = document.createElement('div'); d.id = 'netChat';
+    d.style.cssText = 'position:fixed;left:12px;bottom:12px;z-index:25;width:min(340px,calc(100vw - 24px));font-family:Fredoka,sans-serif;display:none';
+    document.body.appendChild(d); this.el = d; return d;
+  },
+  ping() { if (!this.open) { this.unread++; this.render(); } },
+  render() {
+    const d = this.ensure(), inside = NetWorld.inside(); d.style.display = inside && SaveSystem.started ? 'block' : 'none'; if (!inside) return;
+    const on = !!Online.me, n = Online.peers.size;
+    if (!this.open) { d.innerHTML = `<button data-o class="btn-game px-3 py-2 bg-[#fff6c2] text-[#2b2b3d] text-sm">💬 Chat ${on ? `· ${n + 1} aquí` : '(sin conexión)'}${this.unread ? ` <span class="ml-1 px-1.5 rounded-full bg-red-500 text-white text-[10px]">${this.unread}</span>` : ''}</button>`; d.querySelector('[data-o]').onclick = () => { this.open = true; this.unread = 0; this.render(); }; return; }
+    const log = Online.chat.slice(-30).map(m => `<div style="align-self:${m.me ? 'flex-end' : 'flex-start'};background:${m.me ? '#d1fae5' : '#fff'};border:2px solid #e2e8f0;border-radius:12px;padding:3px 8px;max-width:88%"><b style="font-size:11px">${NET_ORIGINS[m.profile]?.icon || ''} ${esc(m.name)}</b><div style="font-size:12px">${esc(m.text)}</div></div>`).join('');
+    d.innerHTML = `<div class="panel p-2" style="background:#fffdf5"><div class="flex items-center justify-between mb-1"><b class="text-sm text-[#2b2b3d]">💬 Chat de la ${esc(NET_ZONES[NetWorld.zone()]?.name || 'Red')}</b><span class="text-[11px] text-slate-500">${on ? `${n + 1} conectado(s)` : ''}</span><button data-x class="btn-game px-2 py-0.5 text-xs bg-slate-200">✕</button></div>
+      ${on ? `<div data-log style="display:flex;flex-direction:column;gap:4px;max-height:180px;overflow:auto;margin-bottom:6px">${log || '<div class="text-xs text-slate-400">Nadie ha escrito todavía. ¡Saluda!</div>'}</div>
+      <div class="flex flex-wrap gap-1 mb-1">${NetUI.QUICK.map((q, k) => `<button data-q="${k}" class="btn-game px-1.5 py-0.5 text-[10px] bg-sky-100">${q}</button>`).join('')}</div>
+      <div class="flex gap-1"><input data-in maxlength="140" placeholder="Escribe…" class="game flex-1 text-xs px-2 py-1"><button data-s class="btn-game px-2 py-1 text-xs bg-emerald-200">Enviar</button></div>`
+      : `<div class="text-xs text-slate-600 mb-2">Estás en la demo con bots. Entra con tu cuenta para ver a otros jugadores y hablar con ellos.</div><button data-acc class="btn-game px-3 py-1.5 text-xs bg-violet-200 w-full">🌍 Entrar al online</button>`}</div>`;
+    d.querySelector('[data-x]').onclick = () => { this.open = false; this.render(); };
+    const acc = d.querySelector('[data-acc]'); if (acc) acc.onclick = () => Account.open();
+    const inp = d.querySelector('[data-in]'); if (!inp) return; const lg = d.querySelector('[data-log]'); if (lg) lg.scrollTop = 1e6;
+    const send = async (t) => { try { await Online.say(t); } catch (e) { showToast('💬 ' + e.message, 'text-red-200'); } };
+    d.querySelector('[data-s]').onclick = () => { const v = inp.value.trim(); if (v) { inp.value = ''; send(v); } };
+    inp.onkeydown = (e) => { e.stopPropagation(); if (e.key === 'Enter') { const v = inp.value.trim(); if (v) { inp.value = ''; send(v); } } };
+    inp.onkeyup = (e) => e.stopPropagation();
+    d.querySelectorAll('[data-q]').forEach(b => b.onclick = () => send(NetUI.QUICK[+b.dataset.q]));
+  },
+};
+
+/* ===== 👤 Cuenta online: entrar / crear cuenta / elegir nombre / nube ===== */
+const Account = {
+  open() {
+    openApp('🌍 Cuenta online', '', async (body) => {
+      const render = async (msg = '') => {
+        const me = Online.me, o = Number.isInteger(Net.origin()) ? NET_ORIGINS[Net.origin()] : null;
+        let html = msg ? `<div class="app-card p-2 mb-2 text-xs ${/^❌/.test(msg) ? 'bg-red-50' : 'bg-emerald-50'}">${msg}</div>` : '';
+        if (me) {
+          const cloud = GS.meta.cloudAt ? new Date(GS.meta.cloudAt).toLocaleString('es-ES') : 'todavía no';
+          html += `<div class="app-card p-3 mb-2 flex items-center gap-3"><div class="text-4xl">${NET_ORIGINS[me.profile]?.icon || '👤'}</div><div class="flex-1"><div class="font-bold text-[#2b2b3d]">${esc(me.name)}</div><div class="text-xs text-slate-500">${NET_ORIGINS[me.profile]?.name || ''} · cuenta online activa</div></div><button data-out class="btn-game px-2 py-1 text-xs bg-slate-200">Salir</button></div>
+            <div class="sec-h">Partida en la nube</div><div class="app-card p-3 mb-2 text-xs">Última copia: <b>${cloud}</b> · se guarda sola cada ${CFG.online.autosaveMin} min mientras juegas.
+              <div class="flex gap-2 mt-2"><button data-push class="btn-game px-3 py-1.5 text-xs bg-emerald-200 flex-1">☁️⬆ Subir ahora</button><button data-pull class="btn-game px-3 py-1.5 text-xs bg-sky-200 flex-1">☁️⬇ Traer la de la nube</button></div></div>
+            <div class="sec-h">Red del Sueño real</div><div class="app-card p-3 text-xs">Entra en la Red desde el PC de tu casa: verás a los jugadores conectados en tu misma zona y podrás chatear con ellos. El comercio entre jugadores llega en la siguiente fase.</div>`;
+        } else if (Online.session) {
+          html += `<div class="app-card p-3 mb-2 text-sm">Último paso: elige tu nombre en el online.${o ? ` Tu perfil será ${o.icon} ${o.name}.` : ''}</div><input data-name maxlength="18" placeholder="Nombre (3–18)" class="game w-full text-sm px-3 py-2 mb-2"><button data-reg class="btn-play w-full" style="font-size:12px;padding:12px">CREAR MI JUGADOR</button>`;
+        } else {
+          html += `<div class="app-card p-3 mb-2 text-xs text-slate-600">Con una cuenta tu partida se guarda en la nube (la recuperas en otro dispositivo) y en la Red del Sueño ves a otros jugadores reales y hablas con ellos. Es gratis. Edad mínima: 13 años.</div>
+            <input data-email type="email" placeholder="Email" class="game w-full text-sm px-3 py-2 mb-2"><input data-pass type="password" placeholder="Contraseña (mín. 6)" class="game w-full text-sm px-3 py-2 mb-2"><input data-name maxlength="18" placeholder="Nombre en el juego (solo para crear cuenta)" class="game w-full text-sm px-3 py-2 mb-2">
+            <div class="flex gap-2"><button data-in class="btn-game px-3 py-2 text-sm bg-emerald-300 flex-1">Entrar</button><button data-up class="btn-game px-3 py-2 text-sm bg-violet-200 flex-1">Crear cuenta</button></div>
+            <div class="text-[10px] text-slate-500 mt-2">Al crear la cuenta puede llegarte un email para confirmarla. Tus datos: email y partida; nada más. Cuenta de OOOX compartida con otros juegos de OOOX.</div>`;
+        }
+        body.innerHTML = html;
+        const $b = (s) => body.querySelector(s), val = (s) => ($b(s)?.value || '').trim(), stop = (el) => { if (el) el.onkeydown = (e) => e.stopPropagation(); };
+        body.querySelectorAll('input').forEach(stop);
+        const run = async (fn, ok) => { try { const r = await fn(); await render(typeof ok === 'function' ? ok(r) : ok); } catch (e) { await render('❌ ' + e.message); } };
+        $b('[data-in]') && ($b('[data-in]').onclick = () => run(() => Online.signIn(val('[data-email]'), val('[data-pass]')), (m) => m ? `✓ Hola de nuevo, ${esc(m.name)}` : '✓ Sesión iniciada'));
+        $b('[data-up]') && ($b('[data-up]').onclick = () => run(async () => { const n = val('[data-name]'); if (n.length < 3) throw new Error('Pon un nombre de 3–18 caracteres'); const s = await Online.signUp(val('[data-email]'), val('[data-pass]'), n); if (s) await Online.register(n); return s; }, (s) => s ? '✓ ¡Cuenta creada y partida subida a la nube!' : '📧 Te hemos enviado un email: confírmalo y luego pulsa «Entrar» aquí.'));
+        $b('[data-reg]') && ($b('[data-reg]').onclick = () => run(() => Online.register(val('[data-name]')), '✓ Jugador creado y partida subida a la nube'));
+        $b('[data-out]') && ($b('[data-out]').onclick = () => run(() => Online.signOut(), 'Has salido de tu cuenta (sigues jugando en local)'));
+        $b('[data-push]') && ($b('[data-push]').onclick = () => run(() => Online.push(true), (r) => `✓ Subida (${Math.round((r?.bytes || 0) / 1024)} KB)`));
+        $b('[data-pull]') && ($b('[data-pull]').onclick = () => run(async () => { const r = await Online.pull(); if (!r?.data) throw new Error('No hay ninguna partida en la nube'); const when = new Date(r.updated_at).toLocaleString('es-ES');
+          if (!(await confirmDialog({ title: '☁️ Traer la partida de la nube', text: `¿Cargar la partida guardada en la nube (${when})? La de este navegador se sustituirá.`, okLabel: 'CARGAR' }))) return 'Cancelado';
+          SaveSystem.importJSON(JSON.stringify(r.data)); location.reload(); return '…'; }, (m) => m));
+      };
+      render(Online.ready || Online.session ? '' : '').catch(() => {});
+      if (!Online.ready) { try { await Online.lib(); } catch (e) { body.innerHTML = `<div class="app-card p-3 text-sm">❌ No se pudo conectar con el servidor. Comprueba tu conexión.</div>`; } }
+    });
+  },
+};
+
 /** Botones de los vecinos: fabricación multiorigen (Glover y Dax) cuando ya tienes origen */
 function netServiceBtns(npcId) {
   const out = []; if (!Net.on()) return out;
@@ -10007,6 +10153,7 @@ function applyGameStateToWorld() {
   V10.apply();         // v1.0: museo (pedestales + piezas + trofeos), puestos de la feria, logros retroactivos, HUD del calendario
   if (Array.isArray(GS.player.dir) && GS.player.dir.length === 3) { player.userData.dir.fromArray(GS.player.dir).normalize(); if (Array.isArray(GS.player.fwd)) player.userData.fwd.fromArray(GS.player.fwd); }
   PlanetAO.bake();     // v1.5 · Etapa 1: AO horneado (med/alta)
+  if (typeof Online !== 'undefined') Online.boot();   // v1.7: reconecta la cuenta online si había sesión
   Net.apply();         // v1.3
   Studio.place();      // v1.6: estudio del perfil junto a casa (si ya tienes perfil): Red del Sueño (re-engancha el mundo de bots; si recargaste dentro, despiertas en casa)
   state.tokensShown = GS.economy.money; ui.tokenValue.textContent = state.tokensShown.toLocaleString('es-ES');
