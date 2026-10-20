@@ -10042,6 +10042,7 @@ const Online = (() => {
     const z = NetWorld.inside() ? NetWorld.zone() : null;
     if (!me || !sb) return;
     if (z && z !== chanZone) join(z); else if (!z && chanZone) leave();
+    RealShops.update();   // v1.9: puestos de jugadores reales en su barrio
     if (!chan || !z) return;
     posAcc += dt; if (posAcc > C.posEvery) { posAcc = 0; const k = `${Interiors.px.toFixed(2)},${Interiors.pz.toFixed(2)}`; if (k !== lastPos) { lastPos = k; chan.send({ type: 'broadcast', event: 'pos', payload: { id: me.id, x: Interiors.px, z: Interiors.pz, yaw: Interiors.yaw } }); } }
     const root = Interiors.root; if (!root) return;
@@ -10099,7 +10100,7 @@ const RealMarket = {
       const render = async (msg = '') => {
         body.innerHTML = `<div class="app-card p-3 text-sm text-slate-500">Cargando el mercado…</div>`;
         let D; try { D = await this.load(); } catch (e) { body.innerHTML = `<div class="app-card p-3 text-sm">❌ ${esc(e.message)}</div>`; return; }
-        const me = Online.me, mine = NET_ORIGINS[me.profile], tabs = [['market', '📈 Mercado'], ['aduana', '🛃 Mi Aduana'], ['orders', `📋 Mis órdenes (${D.mine.length})`]];
+        const me = Online.me, mine = NET_ORIGINS[me.profile], tabs = [['market', '📈 Mercado'], ['aduana', '🛃 Aduana'], ['orders', `📋 Órdenes (${D.mine.length})`], ['shops', '🏪 Tiendas'], ['myshop', '🏬 Mi tienda']];
         let html = (msg ? `<div class="app-card p-2 mb-2 text-xs ${/^❌/.test(msg) ? 'bg-red-50' : 'bg-emerald-50'}">${msg}</div>` : '') +
           `<div class="app-card p-2.5 mb-2 flex items-center gap-3 text-xs"><span class="text-2xl">${mine.icon}</span><div class="flex-1"><b class="text-sm">${esc(me.name)}</b> · ${D.players} jugador(es) en la Red<br>Aduana: <b>${fmt(D.coins)} $T</b> · ${Object.values(D.stock).reduce((a, b) => a + b, 0)} objeto(s) · en tu partida: ${fmt(GS.economy.money)} $T</div></div>
           <div class="flex gap-1 mb-2">${tabs.map(([k, l]) => `<button data-tab="${k}" class="btn-game px-3 py-1.5 text-xs ${this.tab === k ? 'bg-[#fff6c2]' : 'bg-white'}">${l}</button>`).join('')}</div>`;
@@ -10114,6 +10115,10 @@ const RealMarket = {
             <div class="sec-h">Tus objetos de ${mine.icon} ${mine.name} (se ingresan con tope diario)</div>` +
             own.map((id, j) => { const cap = j < 4 ? [10, 8, 5, 3][j] : 1, used = D.depToday[id] || 0, have = Inventory.count(id); return `<div class="app-card p-2 mb-1.5 flex items-center gap-2 text-xs"><div class="flex-1"><b>${this.name(id)}</b><div class="text-slate-500">En tu mochila ${have} · ingresados ${j < 4 ? 'hoy' : 'esta semana'} ${used}/${cap}</div></div><button data-di="${id}" class="btn-game px-2 py-1 text-[11px] bg-emerald-200" ${have && used < cap ? '' : 'disabled style="opacity:.45"'}>Ingresar 1</button></div>`; }).join('') +
             `<div class="sec-h">En la Aduana (retirables a tu partida)</div>` + (Object.entries(D.stock).map(([id, q]) => `<div class="app-card p-2 mb-1.5 flex items-center gap-2 text-xs"><div class="flex-1"><b>${this.name(id)}</b> ×${q}</div><button data-wi="${id}" class="btn-game px-2 py-1 text-[11px] bg-sky-200">Retirar 1</button><button data-wa="${id}" data-q="${q}" class="btn-game px-2 py-1 text-[11px] bg-sky-100">Todo</button></div>`).join('') || '<div class="text-xs text-slate-400 mb-2">Vacía.</div>');
+        } else if (this.tab === 'shops') {
+          html += `<div class="text-[11px] text-slate-500 mb-1">Tiendas de jugadores reales: venden aunque su dueño no esté. También las ves como puestos en su barrio de la Red.</div>` + await RealShops.listHTML();
+        } else if (this.tab === 'myshop') {
+          html += await RealShops.mineHTML(D);
         } else {
           html += `<div class="sec-h">Abiertas</div>` + (D.mine.map(o => `<div class="app-card p-2 mb-1.5 flex items-center gap-2 text-xs"><div class="flex-1">${o.side === 'buy' ? '🟢 Compra' : '🔵 Venta'} <b>${this.name(o.item)}</b> · ${o.rem}/${o.qty} a ${fmt(o.price)} $T</div><button data-cancel="${o.id}" class="btn-game px-2 py-1 text-[11px] bg-rose-200">Cancelar</button></div>`).join('') || '<div class="text-xs text-slate-400">Ninguna.</div>') +
             `<div class="sec-h">Tus últimas operaciones</div>` + (D.trades.map(t => `<div class="text-xs py-1 border-b border-slate-100">${t.side === 'buy' ? '🟢 Compraste' : '🔵 Vendiste'} ${t.qty}× ${this.name(t.item)} a ${fmt(t.price)} $T · ${new Date(t.at).toLocaleString('es-ES')}</div>`).join('') || '<div class="text-xs text-slate-400">Todavía ninguna.</div>');
@@ -10121,6 +10126,8 @@ const RealMarket = {
         body.innerHTML = html;
         const q$ = (s) => body.querySelectorAll(s), run = async (fn) => { if (this.busy) return; this.busy = true; let m; try { m = await fn(); Online.push(true).catch(() => {}); } catch (e) { m = '❌ ' + e.message; } this.busy = false; render(m); };
         body.querySelectorAll('input').forEach(i => i.onkeydown = (e) => e.stopPropagation());
+        q$('[data-visit]').forEach(b => b.onclick = () => { closeApp(); setTimeout(() => RealShops.visit(b.dataset.visit), 30); });
+        if (this.tab === 'myshop') RealShops.bindMine(body, run);
         q$('[data-tab]').forEach(b => b.onclick = () => { this.tab = b.dataset.tab; render(); });
         q$('[data-f]').forEach(b => b.onclick = () => { this.filter = +b.dataset.f; render(); });
         q$('[data-buy]').forEach(b => b.onclick = () => this.orderForm(body, 'buy', b.dataset.buy, D, render));
@@ -10157,6 +10164,86 @@ const RealMarket = {
     };
   },
 };
+
+/* ===== v1.9 · 🏪 TIENDAS DE JUGADORES (F3): se compran con $T de la Aduana (puesto 5.000 · local 50.000 · boutique 500.000), viven en su barrio
+   (Mercadillo, Paseo, Distrito Dorado) y venden aunque el dueño no esté. El dueño pone precios y una condición de entrada (saldo mínimo). ===== */
+const RealShops = {
+  TIERS: { puesto: { icon: '⛺', name: 'Puesto', zone: 'mercadillo', cost: 5000, slots: 6, fee: 2 }, local: { icon: '🏪', name: 'Local', zone: 'paseo', cost: 50000, slots: 16, fee: 1 }, boutique: { icon: '💎', name: 'Boutique', zone: 'dorado', cost: 500000, slots: 30, fee: 0 } },
+  SPOTS: { mercadillo: [[-8, 0], [-2, 0], [4, 0], [10, 0]], paseo: [[-10, 0], [-4, 0], [2, 0], [8, 0]], dorado: [[-3.2, 0], [3.2, 0]] },
+  rpc: (fn, args = {}) => RealMarket.rpc(fn, args),
+  /** Directorio (todas o una zona) */
+  async listHTML(zone = null) {
+    const L = await this.rpc('crossia_shops', { p_zone: zone });
+    if (!L.length) return '<div class="app-card p-3 text-xs text-slate-500">Todavía no hay tiendas de jugadores. ¡Sé el primero en abrir una!</div>';
+    return L.map(s => `<div class="app-card p-2 mb-1.5 flex items-center gap-2 text-xs"><span class="text-2xl">${this.TIERS[s.tier].icon}</span><div class="flex-1"><b>${esc(s.name)}</b> · ${NET_ORIGINS[s.profile]?.icon || ''} ${esc(s.who)}<div class="text-slate-500">${NET_ZONES[s.zone]?.name || s.zone} · ${s.items} artículo(s)${s.min ? ` · solo clientes con ${fmt(s.min)}+ $T` : ''}</div></div><button data-visit="${s.owner}" class="btn-game px-2 py-1 text-[11px] bg-emerald-200">Entrar</button></div>`).join('');
+  },
+  /** Entrar en una tienda */
+  visit(owner) {
+    if (!Online.me) { Account.open(); return; }
+    openApp('🏪 Tienda', '', (body) => {
+      const render = async (msg = '') => {
+        let S; try { S = await this.rpc('crossia_shop_view', { p_owner: owner }); } catch (e) { body.innerHTML = `<div class="app-card p-3 text-sm">❌ ${esc(e.message)}</div>`; return; }
+        if (!S) { body.innerHTML = '<div class="app-card p-3 text-sm">Esta tienda ha cerrado.</div>'; return; }
+        const T = this.TIERS[S.tier], mine = S.owner === Online.me.id;
+        document.getElementById('appTitle').textContent = `${T.icon} ${S.name}`;
+        body.innerHTML = (msg ? `<div class="app-card p-2 mb-2 text-xs ${/^❌/.test(msg) ? 'bg-red-50' : 'bg-emerald-50'}">${msg}</div>` : '') +
+          `<div class="app-card p-3 mb-2 text-xs" style="background:linear-gradient(180deg,#${(NET_ORIGINS[S.profile]?.color || 0xffffff).toString(16).padStart(6, '0')}22,#fff)"><b class="text-sm">${esc(S.name)}</b> · ${T.name} de ${NET_ORIGINS[S.profile]?.icon || ''} ${esc(S.who)}<br>${NET_ZONES[S.zone]?.name || ''}${S.min ? ` · 💎 solo clientes con ${fmt(S.min)}+ $T en la Aduana` : ''} · pagas desde tu Aduana</div>` +
+          (S.items.filter(i => i.qty > 0).map(i => `<div class="app-card p-2 mb-1.5 flex items-center gap-2 text-xs"><div class="flex-1"><b>${RealMarket.name(i.item)}</b> · quedan ${i.qty}<div class="text-slate-500">${fmt(i.price)} $T/u</div></div>${mine ? '<span class="text-slate-400">tuya</span>' : `<input data-q="${i.item}" type="number" min="1" max="${i.qty}" value="1" class="game w-12 text-xs px-1 py-1"><button data-b="${i.item}" data-p="${i.price}" class="btn-game px-2 py-1 text-[11px] bg-emerald-200">Comprar</button>`}</div>`).join('') || '<div class="app-card p-3 text-xs text-slate-500">El escaparate está vacío.</div>');
+        body.querySelectorAll('input').forEach(x => x.onkeydown = (e) => e.stopPropagation());
+        body.querySelectorAll('[data-b]').forEach(b => b.onclick = async () => { const id = b.dataset.b, q = Math.floor(+body.querySelector(`[data-q="${id}"]`).value || 0);
+          try { const r = await this.rpc('crossia_shop_buy', { p_owner: owner, p_item: id, p_qty: q, p_price: +b.dataset.p }); playChime(); Online.push(true).catch(() => {}); render(`✓ Compraste ${q}× ${RealMarket.name(id)} por ${fmt(r.cost)} $T · está en tu Aduana`); } catch (e) { render('❌ ' + e.message); } });
+      };
+      render();
+    });
+  },
+  /** Gestión de mi tienda (pestaña del Mercado real) */
+  async mineHTML(D) {
+    const S = await this.rpc('crossia_my_shop', {});
+    if (!S) return `<div class="app-card p-3 mb-2 text-xs">Abre tu tienda en la Red: vende aunque no estés conectado. La licencia se paga con $T de la Aduana (tienes ${fmt(D.coins)}).</div>` +
+      Object.entries(this.TIERS).map(([k, t]) => `<div class="app-card p-2.5 mb-1.5 flex items-center gap-3 text-xs"><span class="text-3xl">${t.icon}</span><div class="flex-1"><b class="text-sm">${t.name}</b> · ${NET_ZONES[t.zone].name}<div class="text-slate-500">${t.slots} huecos · comisión ${t.fee} % · licencia ${fmt(t.cost)} $T</div></div><button data-open="${k}" class="btn-game px-2 py-1 text-[11px] bg-amber-200" ${D.coins >= t.cost ? '' : 'disabled style="opacity:.45"'}>Abrir</button></div>`).join('') +
+      `<input data-sname maxlength="24" placeholder="Nombre de tu tienda" class="game w-full text-sm px-3 py-2 mt-1">`;
+    const T = this.TIERS[S.tier], stockIds = Object.keys(D.stock);
+    return `<div class="app-card p-3 mb-2 text-xs"><b class="text-sm">${T.icon} ${esc(S.name)}</b> · ${T.name} en ${NET_ZONES[S.zone].name} · ${S.items.filter(i => i.qty > 0).length}/${T.slots} huecos
+        <div class="flex gap-1 mt-2 items-center"><input data-sname maxlength="24" value="${esc(S.name)}" class="game flex-1 text-xs px-2 py-1"><label class="whitespace-nowrap">Saldo mín. <input data-smin type="number" min="0" value="${S.min}" class="game w-20 text-xs px-1 py-1"></label><button data-sset class="btn-game px-2 py-1 text-[11px] bg-slate-200">Guardar</button></div>
+        <div class="text-[10px] text-slate-500 mt-1">Saldo mínimo = condición de compra: solo entran clientes con ese dinero en su Aduana (tiendas exclusivas).</div>
+        ${Object.keys(this.TIERS).filter(k => k !== S.tier && this.TIERS[k].cost > T.cost).map(k => `<button data-open="${k}" class="btn-game px-2 py-1 text-[11px] bg-amber-200 mt-2 mr-1">Mudarme a ${this.TIERS[k].icon} ${this.TIERS[k].name} (${fmt(this.TIERS[k].cost)} $T)</button>`).join('')}</div>
+      <div class="sec-h">Escaparate</div>` + (S.items.map(i => `<div class="app-card p-2 mb-1.5 flex items-center gap-2 text-xs"><div class="flex-1"><b>${RealMarket.name(i.item)}</b> · ${i.qty} a la venta</div><input data-np="${i.item}" type="number" min="1" value="${i.price}" class="game w-20 text-xs px-1 py-1"><button data-pp="${i.item}" class="btn-game px-2 py-1 text-[11px] bg-slate-200">Precio</button><button data-tk="${i.item}" data-q="${i.qty}" class="btn-game px-2 py-1 text-[11px] bg-sky-100" ${i.qty ? '' : 'disabled style="opacity:.45"'}>Retirar</button></div>`).join('') || '<div class="text-xs text-slate-400 mb-2">Vacío.</div>') +
+      `<div class="sec-h">Poner a la venta (desde tu Aduana)</div>` + (stockIds.length ? `<div class="app-card p-2 text-xs flex gap-1 items-center flex-wrap"><select data-pi class="game text-xs px-1 py-1">${stockIds.map(id => `<option value="${id}">${RealMarket.name(id)} (${D.stock[id]})</option>`).join('')}</select><label>Cant. <input data-pq type="number" min="1" value="1" class="game w-14 text-xs px-1 py-1"></label><label>Precio <input data-pr type="number" min="1" value="60" class="game w-20 text-xs px-1 py-1"></label><button data-put class="btn-game px-2 py-1 text-[11px] bg-emerald-200">Poner</button></div>` : '<div class="text-xs text-slate-400">Tu Aduana está vacía: ingresa objetos primero.</div>');
+  },
+  bindMine(body, run) {
+    const v = (s) => body.querySelector(s)?.value;
+    body.querySelectorAll('[data-open]').forEach(b => b.onclick = () => run(async () => { const n = (v('[data-sname]') || '').trim() || `Tienda de ${Online.me.name}`; const r = await this.rpc('crossia_shop_open', { p_tier: b.dataset.open, p_name: n }); playChime(); return `✓ ¡Tienda abierta en ${NET_ZONES[r.zone].name}!`; }));
+    const set = body.querySelector('[data-sset]'); if (set) set.onclick = () => run(async () => { await this.rpc('crossia_shop_set', { p_name: v('[data-sname]'), p_min_coins: Math.floor(+v('[data-smin]') || 0) }); return '✓ Tienda actualizada'; });
+    body.querySelectorAll('[data-pp]').forEach(b => b.onclick = () => run(async () => { await this.rpc('crossia_shop_put', { p_item: b.dataset.pp, p_qty: 0, p_price: Math.floor(+v(`[data-np="${b.dataset.pp}"]`) || 0) }); return '✓ Precio cambiado'; }));
+    body.querySelectorAll('[data-tk]').forEach(b => b.onclick = () => run(async () => { await this.rpc('crossia_shop_take', { p_item: b.dataset.tk, p_qty: +b.dataset.q }); return '✓ Retirado a tu Aduana'; }));
+    const put = body.querySelector('[data-put]'); if (put) put.onclick = () => run(async () => { await this.rpc('crossia_shop_put', { p_item: v('[data-pi]'), p_qty: Math.floor(+v('[data-pq]') || 0), p_price: Math.floor(+v('[data-pr]') || 0) }); return '✓ A la venta en tu escaparate'; });
+  },
+  /* --- 3D: puestos de jugadores reales en su barrio de la Red (mientras estás conectado) --- */
+  _root: null, _zone: null, _at: 0, _objs: [],
+  stall(s, x, z) {
+    const o = NET_ORIGINS[s.profile] || NET_ORIGINS[0], T = this.TIERS[s.tier], g = new THREE.Group();
+    g.add(box(1.8, 0.95, 0.9, mat(0xfff3e0), 0, 0.48, 0)); g.add(box(1.9, 0.08, 1.0, mat(0x8d6e63), 0, 0.98, 0));
+    [-0.85, 0.85].forEach(px => g.add(cyl(0.05, 0.05, 1.5, mat(0xffffff), px, 1.65, -0.35, 6)));
+    const aw = box(2.1, 0.08, 1.2, mat(o.color), 0, 2.4, -0.05); aw.rotation.x = 0.2; g.add(aw);
+    const sign = new THREE.Sprite(new THREE.SpriteMaterial({ map: textTexture(`${T.icon} ${s.name}`, { w: 512, h: 96, bg: '#fffdf5', font: 'bold 42px Fredoka, Arial' }), depthWrite: false })); sign.scale.set(2.3, 0.43, 1); sign.position.y = 2.95; g.add(sign);
+    g.position.set(x, 0, z); g.traverse(m => { if (m.isMesh || m.isSprite) m.userData.root = g; });
+    Object.assign(g.userData, { interact: { type: 'interior', act: 'realshop', label: `${T.icon} ${s.name} (${s.who})`, range: 2.2 }, owner: s.owner, lx: x, lz: z, hx: 0.95, hz: 0.5, fx: 0, fz: 1, fd2: 0.45 });
+    return g;
+  },
+  async update() {
+    const z = NetWorld.inside() ? NetWorld.zone() : null, root = Interiors.root;
+    if (!Online.me || !z || !this.SPOTS[z] || !root) { this._root = null; return; }
+    if (root === this._root && Date.now() - this._at < 30000) return;
+    this._at = Date.now(); const sameRoot = root === this._root; this._root = root; this._zone = z;
+    let L = []; try { L = await this.rpc('crossia_shops', { p_zone: z }); } catch (e) { return; }
+    if (Interiors.root !== root) return;
+    this._objs.forEach(o => { root.remove(o); const k = Interiors.interactables.indexOf(o); if (k >= 0) Interiors.interactables.splice(k, 1); const j = Interiors.boxes.indexOf(o.userData._box); if (j >= 0) Interiors.boxes.splice(j, 1); });
+    this._objs = [];
+    L.slice(0, this.SPOTS[z].length).forEach((s, i) => { const [x, zz] = this.SPOTS[z][i], g = this.stall(s, x, zz); root.add(g); Interiors.interactables.push(g); const bx = { x, z: zz, hx: 0.95, hz: 0.5 }; Interiors.boxes.push(bx); g.userData._box = bx; this._objs.push(g); });
+    if (!sameRoot && L.length) showToast(`🏪 ${L.length} tienda(s) de jugadores en ${NET_ZONES[z].name}`, 'text-white');
+  },
+};
+Interiors.actions.realshop = (obj) => RealShops.visit(obj.userData.owner);
 
 /* ===== 👤 Cuenta online: entrar / crear cuenta / elegir nombre / nube ===== */
 const Account = {
