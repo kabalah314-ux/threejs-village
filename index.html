@@ -7,7 +7,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Fredoka:wght@400;500;600;700&display=swap" rel="stylesheet">
-<script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js" } }</script>
+<script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/" } }</script>
 <style>
   html, body { margin: 0; height: 100%; overflow: hidden; background: #7cc4ff; }
   body { font-family: 'Fredoka', system-ui, sans-serif; }
@@ -555,9 +555,9 @@ const CFG = {
      Todo lo visual en un sitio para afinarlo tras la revisión con capturas. Nada de esto vive en GS (el nivel va en localStorage 'crossia.gfx'). */
   gfx: {
     tiers: {   // pr = tope de pixel ratio (escritorio / móvil) · shadow = mapa del sol · lights = PointLight decorativas que se CREAN al cargar (nunca cambia en caliente)
-      low:  { name: 'Baja',  pr: 1.0, prMobile: 1.0,  shadow: 512,  interiorShadow: false, lights: false, botShadow: false, stars: 500,  rain: 260, decor: 0.6, backdrop: 1 },
-      med:  { name: 'Media', pr: 1.5, prMobile: 1.25, shadow: 1024, interiorShadow: true,  lights: true,  botShadow: false, stars: 800,  rain: 450, decor: 1,   backdrop: 2 },
-      high: { name: 'Alta',  pr: 2.0, prMobile: 2.0,  shadow: 2048, interiorShadow: true,  lights: true,  botShadow: true,  stars: 1200, rain: 700, decor: 1,   backdrop: 2 },
+      low:  { name: 'Baja',  pr: 1.0, prMobile: 1.0,  shadow: 512,  interiorShadow: false, lights: false, botShadow: false, stars: 500,  rain: 260, decor: 0.6, backdrop: 1, env: false, ao: false },
+      med:  { name: 'Media', pr: 1.5, prMobile: 1.25, shadow: 1024, interiorShadow: true,  lights: true,  botShadow: false, stars: 800,  rain: 450, decor: 1,   backdrop: 2, env: true,  ao: true  },
+      high: { name: 'Alta',  pr: 2.0, prMobile: 2.0,  shadow: 2048, interiorShadow: true,  lights: true,  botShadow: true,  stars: 1200, rain: 700, decor: 1,   backdrop: 2, env: true,  ao: true  },
     },
     guard: { warmupS: 6, windowS: 4, maxDtMs: 22, dynStep: 0.85, dynMin: 0.75 },   // gobernador de FPS: tras 6 s jugando, si la media de dt > 22 ms durante 4 s → resolución ×0,85 (mín. 0,75) y luego un nivel menos (solo en Auto, 1 vez por sesión)
     // QW1 · luz: hemisférica más fuerte con rebote verde-pastel, ambiente mucho menor (los volúmenes ganan forma)
@@ -580,6 +580,13 @@ const CFG = {
     halo: { scale: 1.09, pow: 3, near: 0.35, far: 0.8, nearDist: 14, farDist: 30 },
     // QW11 · viñeta CSS (opacidad en menú / en juego)
     vignette: { menu: 1, game: 0.5 },
+    // Etapa 1 · entorno PMREM del cielo (med/alta): reflejo suave del cielo en todo · con él la hemisférica y el ambiente bajan (el entorno ya rellena)
+    env: { intensity: 0.6, planet: 0.35, water: 1.2, regenDay: 0.04, regenDusk: 0.05, regenUp: 0.12, minGapS: { med: 3, high: 1 }, ground: 0x6fae55, sunPow: 24, sunI: 0.6,
+      hemiDay: 0.55, hemiNight: 0.18, ambDay: 0.08, ambNight: 0.08, room: 0.04, roomI: 0.5, roomHemi: 0.35, roomAmb: 0.06 },
+    // Etapa 1 · AO horneado en el color del planeta bajo árboles, casas y construcciones (med/alta, coste 0 en juego)
+    ao: { strength: 0.28, reach: 1.25, inner: 0.55, rebakeAng: 0.16 },
+    // Etapa 1 · caja de sombra del sol según la distancia de cámara (cerca / media / Modo Planeta = todo el planeta)
+    shadowBox: { near: 14, mid: 24, nearDist: 14, midDist: 30, planet: 21 },
     // QW13 · exposición según la hora
     exposure: { night: 0.95, day: 1.08, dusk: 0.05 },
     // Lluvia: gota con textura de trazo suave (antes cuadrados blancos)
@@ -1442,6 +1449,40 @@ sun.shadow.camera.near = 1; sun.shadow.camera.far = 120; sun.shadow.camera.left 
 sun.shadow.bias = LOOK.shadowBias; sun.shadow.normalBias = LOOK.shadowNormalBias; sun.shadow.radius = LOOK.shadowRadius;   // v1.4 · QW2
 scene.add(sun, sun.target);
 GFX.init(renderer);
+/* ===== v1.5 · Etapa 1 · ENTORNO (PMREM) =====
+   Fuera: un mini-domo del cielo (mismos uniforms) con suelo verde según el «arriba» del jugador → reflejo y relleno suaves.
+   Se regenera solo cuando cambia la luz (día/atardecer) o el jugador da la vuelta al planeta; nunca recompila (misma textura cúbica).
+   Dentro (interiores y Red del Sueño): RoomEnvironment (luz de estudio). En Baja no hay entorno. */
+const SkyEnv = (() => {
+  const E = CFG.gfx.env, on = !!GFX.L.env, seen = new WeakSet();
+  const api = { on, room: null, update() {}, tag() {} };
+  if (!on) return api;
+  const pmrem = new THREE.PMREMGenerator(renderer), U = sky.material.uniforms;
+  const envMat = new THREE.ShaderMaterial({ side: THREE.BackSide, depthWrite: false,
+    uniforms: { topColor: U.topColor, midColor: U.midColor, sunDir: U.sunDir, sunCol: U.sunCol, uDay: U.uDay, uGround: { value: new THREE.Color(E.ground) }, uUp: { value: new THREE.Vector3(0, 1, 0) }, uSun: { value: new THREE.Vector2(E.sunPow, E.sunI) } },
+    vertexShader: `varying vec3 vPos; void main(){ vPos = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+    fragmentShader: `uniform vec3 topColor, midColor, sunDir, sunCol, uGround, uUp; uniform float uDay; uniform vec2 uSun; varying vec3 vPos;
+      void main(){ vec3 d = normalize(vPos); float h = dot(d, uUp);
+        vec3 c = h > 0.0 ? mix(midColor, topColor, pow(h, 0.55)) : mix(midColor, uGround * (0.3 + 0.7 * uDay), smoothstep(0.0, 0.3, -h));
+        c += sunCol * pow(max(dot(d, sunDir), 0.0), uSun.x) * uSun.y * uDay;
+        gl_FragColor = vec4(pow(c, vec3(2.2)), 1.0); }` });   // el cielo pinta en sRGB: aquí se pasa a lineal (el PMREM trabaja en lineal)
+  const envScene = new THREE.Scene(); envScene.add(new THREE.Mesh(new THREE.SphereGeometry(10, 32, 16), envMat));
+  let rt = null, last = { day: -9, dusk: -9, t: -1e9 }; const lastUp = new THREE.Vector3(0, 0, 0);
+  api.tag = (root) => root.traverse(o => { if (!o.isMesh) return; (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => { if (!m || seen.has(m) || !m.isMeshStandardMaterial) return; seen.add(m); m.envMapIntensity = m.userData.envI ?? E.intensity; }); });
+  api.update = (dayAmt, duskAmt, up, force = false) => {
+    const now = performance.now() / 1000, gap = E.minGapS[GFX.load] ?? 3;
+    const changed = Math.abs(dayAmt - last.day) > E.regenDay || Math.abs(duskAmt - last.dusk) > E.regenDusk || lastUp.angleTo(up) > E.regenUp || lastUp.lengthSq() === 0;
+    if (!force && (!changed || now - last.t < gap)) return false;
+    envMat.uniforms.uUp.value.copy(up); lastUp.copy(up); last = { day: dayAmt, dusk: duskAmt, t: now };
+    const old = rt; rt = pmrem.fromScene(envScene, 0, 0.1, 100); scene.environment = rt.texture; if (old) old.dispose();
+    api.tag(scene); return true;
+  };
+  import('three/addons/environments/RoomEnvironment.js').then(({ RoomEnvironment }) => {
+    const r = new RoomEnvironment(renderer); api.room = pmrem.fromScene(r, E.room).texture; api.room.userData.shared = true;
+    if (typeof Interiors !== 'undefined' && Interiors.scene) { Interiors.scene.environment = api.room; api.tag(Interiors.scene); }
+  }).catch(e => console.warn('[gfx] RoomEnvironment no disponible', e));
+  return api;
+})();
 
 /* =========================================================
    4. HELPERS LOW-POLY
@@ -1514,12 +1555,12 @@ const planet = (() => {
   }
   geo.setAttribute('color', new THREE.BufferAttribute(colors, 3)); geo.computeVertexNormals();
   const m = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9, flatShading: true }));
-  m.receiveShadow = true; m.castShadow = true; return m;
+  m.receiveShadow = true; m.castShadow = true; m.material.userData.envI = CFG.gfx.env.planet; return m;
 })();
 scene.add(planet);
 const waterGeo = new THREE.SphereGeometry(1, 84, 60); const waterBase = waterGeo.attributes.position.array.slice();
 const water = new THREE.Mesh(waterGeo, new THREE.MeshStandardMaterial({ color: CFG.gfx.water.color, roughness: CFG.gfx.water.roughness, metalness: CFG.gfx.water.metalness, transparent: true, opacity: CFG.gfx.water.opacity }));   // v1.4 · QW9: sin flatShading (el wobble facetado parpadeaba)
-water.receiveShadow = true; scene.add(water);
+water.receiveShadow = true; water.material.userData.envI = CFG.gfx.env.water; scene.add(water);
 /* v1.4 · QW10 · halo atmosférico del planeta (menú y Modo Planeta): esfera BackSide aditiva con el color del horizonte del cielo */
 const atmo = new THREE.Mesh(new THREE.SphereGeometry(R * CFG.gfx.halo.scale, GFX.id === 'low' ? 48 : 64, GFX.id === 'low' ? 32 : 40), new THREE.ShaderMaterial({
   side: THREE.BackSide, blending: THREE.AdditiveBlending, transparent: true, depthWrite: false,
@@ -2230,7 +2271,7 @@ const vendor = (() => {
   } });
   const bubble = new THREE.Sprite(new THREE.SpriteMaterial({ map: bubbleTexture('🛒', '#c8f7c5'), depthTest: false })); bubble.position.set(0, 3.3, 0); bubble.renderOrder = 10; g.add(bubble); g.userData.bubble = bubble;
   addBlob(g);   // v1.4 · QW3
-  placeAtSite(g, S_V, -3.6, 4.4, Math.PI * 0.55); registerInteractable(g, { type: 'vendor', label: 'Comerciar con Rocco' }); scene.add(g); colliders.push({ pos: g.position.clone(), r: 0.9 }); return g;
+  placeAtSite(g, S_V, -3.6, 4.4, Math.PI * 0.55); registerInteractable(g, { type: 'vendor', label: 'Comerciar con Rocco' }); scene.add(g); colliders.push({ pos: g.position.clone(), r: 0.9, noAO: true }); return g;
 })();
 /** Diálogo del tendero (reutiliza el panel de diálogo y el zoom de cámara) */
 function startVendorDialog() {
@@ -2256,7 +2297,7 @@ NPCS.forEach(n => {
   addBlob(g, n.species === 'hedgehogs' ? CFG.gfx.blob.hedgehogs : 1);   // v1.4 · QW3
   placeAtSite(g, SITES[n.site], n.pos[0], n.pos[1], n.yaw);
   registerInteractable(g, { type: 'npc', label: `Hablar con ${n.name}` }, n.id);
-  scene.add(g); colliders.push({ pos: g.position.clone(), r: 0.9 }); npcObjs[n.id] = g;
+  scene.add(g); colliders.push({ pos: g.position.clone(), r: 0.9, noAO: true }); npcObjs[n.id] = g;
 });
 
 /* =========================================================
@@ -2279,6 +2320,32 @@ scatter(40, 300, d => { if (!isLand(d) || nearAnySite(d, 0)) return false; const
 const flowerColors = [0xff6b9d, 0xffd93d, 0xff8c42, 0xc77dff, 0xffffff];
 scatter(Math.round(240 * GFX.T.decor), 700, d => { if (!isLand(d) || heightAt(d) - SEA > 1.4) return false; const f = new THREE.Group(); f.add(mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.35, 4), matC(0x3f8f3a), 0, 0.17, 0, false)); f.add(mesh(new THREE.SphereGeometry(0.11, 6, 6), matC(flowerColors[Math.floor(Math.random() * 5)]), 0, 0.38, 0, false)); placeOnPlanet(f, d); scene.add(f); return true; });
 scatter(Math.round(160 * GFX.T.decor), 400, d => { if (!isLand(d)) return false; const w = new THREE.Group(); w.add(mesh(new THREE.ConeGeometry(0.15, 0.5, 4), matC(0x5cbf4a, true), 0, 0.25, 0, false)); placeOnPlanet(w, d, Math.random() * 6); scene.add(w); return true; });
+/* ===== v1.5 · Etapa 1 · AO horneado en el color del planeta (med/alta) =====
+   Por cara: oscurece el suelo cerca de árboles, casas, puestos y construcciones (colliders sin noAO). Se hornea al aplicar la partida
+   y se re-hornea solo la zona al construir o demoler. Coste 0 en juego (solo cambia el atributo de color). */
+const PlanetAO = (() => {
+  const on = !!GFX.L.ao, api = { on, baked: false, bake() {} };
+  if (!on) return api;
+  const geo = planet.geometry, col = geo.attributes.color, pos = geo.attributes.position, nF = pos.count / 3;
+  const base = col.array.slice(), cen = new Float32Array(nF * 3);
+  for (let f = 0; f < nF; f++) for (let k = 0; k < 3; k++) { const i = f * 3 + k; cen[f * 3] += pos.getX(i) / 3; cen[f * 3 + 1] += pos.getY(i) / 3; cen[f * 3 + 2] += pos.getZ(i) / 3; }
+  /** dir = null → todo el planeta · dir (unitario) → solo las caras a menos de rebakeAng rad */
+  api.bake = (dir = null) => {
+    const A = CFG.gfx.ao, src = colliders.filter(c => c && !c.noAO && c.pos), n = src.length, sx = new Float32Array(n), sy = new Float32Array(n), sz = new Float32Array(n), sr = new Float32Array(n), sR = new Float32Array(n);
+    src.forEach((c, j) => { sx[j] = c.pos.x; sy[j] = c.pos.y; sz[j] = c.pos.z; sr[j] = c.r * A.inner; sR[j] = c.r + A.reach; });
+    const cosL = dir ? Math.cos(A.rebakeAng) : -2, a = col.array;
+    for (let f = 0; f < nF; f++) {
+      const x = cen[f * 3], y = cen[f * 3 + 1], z = cen[f * 3 + 2];
+      if (dir && (x * dir.x + y * dir.y + z * dir.z) / Math.hypot(x, y, z) < cosL) continue;
+      let occ = 0;
+      for (let j = 0; j < n; j++) { const dx = x - sx[j], dy = y - sy[j], dz = z - sz[j], R2 = sR[j] * sR[j], d2 = dx * dx + dy * dy + dz * dz; if (d2 >= R2) continue; const d = Math.sqrt(d2); occ += d <= sr[j] ? 1 : 1 - (d - sr[j]) / (sR[j] - sr[j]); if (occ >= 1) { occ = 1; break; } }
+      const k = 1 - A.strength * occ;
+      for (let v = 0; v < 9; v++) a[f * 9 + v] = base[f * 9 + v] * k;
+    }
+    col.needsUpdate = true; api.baked = true;
+  };
+  return api;
+})();
 const marker = new THREE.Mesh(new THREE.RingGeometry(0.3, 0.45, 24), new THREE.MeshBasicMaterial({ color: 0xffde59, transparent: true, opacity: 0, side: THREE.DoubleSide, depthWrite: false }));
 scene.add(marker);
 
@@ -2428,6 +2495,7 @@ function placeBuilding(rec) {
   placeOnPlanet(g, dir, rec.yaw || 0, 0, SITES.village.S); scene.add(g);
   const col = { pos: g.position.clone(), r: def.r || 1 }; colliders.push(col);
   placedBuildings[rec.id] = { group: g, collider: col };
+  if (PlanetAO.baked) PlanetAO.bake(dir);   // v1.5 · Etapa 1: re-hornea el AO de la zona
   Production.register(g, rec);   // v0.4: Jardín / Molino / Fuente se usan con E
 }
 function restoreBuildings() {
@@ -2446,6 +2514,7 @@ function removeBuilding(id, refund = 0.5) {
   p.group.traverse(o => { if (o.isPointLight) { const k = nightLights.indexOf(o); if (k >= 0) nightLights.splice(k, 1); } });
   const ai = animatedBuilds.indexOf(p.group); if (ai >= 0) animatedBuilds.splice(ai, 1);
   const ci = colliders.indexOf(p.collider); if (ci >= 0) colliders.splice(ci, 1);
+  if (PlanetAO.baked) PlanetAO.bake(p.collider.pos.clone().normalize());   // v1.5 · Etapa 1
   delete placedBuildings[id]; GS.world.buildings.splice(i, 1);
   { const ii = interactables.indexOf(p.group); if (ii >= 0) interactables.splice(ii, 1); } if (GS.mill) delete GS.mill[id];
   removeEmbargoVisual(id); { const sb = GS.housing.sealedBuildings || [], k = sb.indexOf(id); if (k >= 0) sb.splice(k, 1); }
@@ -4395,10 +4464,17 @@ const SKY_NIGHT = { top: new THREE.Color(0x0b1035), mid: new THREE.Color(0x1a245
 const SKY_DAY   = { top: new THREE.Color(0x2f7fd8), mid: new THREE.Color(0xa9dcff), bot: new THREE.Color(0xffd6a8) };
 const SKY_DUSK  = { top: new THREE.Color(0x584a9e), mid: new THREE.Color(0xff9a6b), bot: new THREE.Color(0xffc78a) };
 const _sunDir = new THREE.Vector3(), _c1 = new THREE.Color(), _c2 = new THREE.Color();
+const _shC = new THREE.Vector3(), _shM = new THREE.Matrix4(), _shQ = new THREE.Quaternion(), _shQi = new THREE.Quaternion(), _zero3 = new THREE.Vector3(), _xAxis = new THREE.Vector3(1, 0, 0); let _envTagN = 0;
 function updateSun() {
   const t = dayT(), ang = (t - 0.25) * Math.PI * 2, elev = Math.sin(ang);
   _sunDir.set(Math.cos(ang), Math.max(elev, -0.35), 0.35).normalize();
-  sun.position.copy(_sunDir).multiplyScalar(50).add(player.position); sun.target.position.copy(player.position); sun.target.updateMatrixWorld();
+  // v1.5 · Etapa 1: caja de sombra adaptativa (cerca nítida · Modo Planeta = todo el planeta centrado) + ajuste al texel (la sombra no «nada» al andar)
+  const SB = CFG.gfx.shadowBox, far = cam.dist >= SB.midDist, ext = far ? SB.planet : cam.dist < SB.nearDist ? SB.near : SB.mid, sc = sun.shadow.camera;
+  if (sc.right !== ext) { sc.left = sc.bottom = -ext; sc.right = sc.top = ext; sc.updateProjectionMatrix(); }
+  _shC.copy(far ? _zero3 : player.position);
+  _shM.lookAt(_sunDir, _zero3, Math.abs(_sunDir.y) > 0.99 ? _xAxis : UP_Y); _shQ.setFromRotationMatrix(_shM); _shQi.copy(_shQ).invert();
+  const tx = (2 * ext) / sun.shadow.mapSize.x; _shC.applyQuaternion(_shQi); _shC.x = Math.round(_shC.x / tx) * tx; _shC.y = Math.round(_shC.y / tx) * tx; _shC.applyQuaternion(_shQ);
+  sun.position.copy(_sunDir).multiplyScalar(50).add(_shC); sun.target.position.copy(_shC); sun.target.updateMatrixWorld();
   const dayAmt = smoothstep(-0.06, 0.28, elev);            // 0 noche → 1 día pleno
   const duskAmt = Math.max(0, 1 - Math.abs(elev) / 0.28);  // pico en amanecer/atardecer
   state.dayAmt = dayAmt;
@@ -4406,7 +4482,8 @@ function updateSun() {
   sun.intensity = lerp(L.sunNight, L.sunDay, dayAmt);
   sun.color.setHex(0xfff1d6).lerp(_c1.setHex(0xffb27a), duskAmt * 0.8);
   if (dayAmt < 0.5) sun.color.lerp(_c1.setHex(0x8fb7ff), (0.5 - dayAmt) * 1.2);   // luz de luna azulada
-  hemi.intensity = lerp(L.hemiNight, L.hemiDay, dayAmt); amb.intensity = lerp(L.ambNight, L.ambDay, dayAmt); hemi.color.setHex(L.hemiSkyNight).lerp(_c1.setHex(L.hemiSkyDay), dayAmt);
+  const LH = SkyEnv.on ? L.env : L;   // v1.5 · Etapa 1: con entorno, menos hemisférica y ambiente (el cielo ya rellena)
+  hemi.intensity = lerp(LH.hemiNight, LH.hemiDay, dayAmt); amb.intensity = lerp(LH.ambNight, LH.ambDay, dayAmt); hemi.color.setHex(L.hemiSkyNight).lerp(_c1.setHex(L.hemiSkyDay), dayAmt);
   renderer.toneMappingExposure = lerp(L.exposure.night, L.exposure.day, dayAmt) + duskAmt * L.exposure.dusk;
   const skyU = sky.material.uniforms;
   for (const [key, pal] of [['topColor', 'top'], ['midColor', 'mid'], ['bottomColor', 'bot']]) {
@@ -4416,6 +4493,8 @@ function updateSun() {
   const SU = starsMat.uniforms; SU.uOpacity.value = lerp(L.stars.nightMax, L.stars.dayMin, dayAmt); SU.uTime.value = performance.now() / 1000; SU.uPR.value = renderer.getPixelRatio();   // v1.4 · QW6
   const H = L.halo; atmo.material.uniforms.uOpacity.value = lerp(H.near, H.far, smoothstep(H.nearDist, H.farDist, cam.dist));   // v1.4 · QW10
   nightLights.forEach(l => l.intensity = l.userData.base * (1 - dayAmt));
+  if (!Interiors.active) SkyEnv.update(dayAmt, duskAmt, player.userData.dir || UP_Y);   // v1.5 · Etapa 1
+  if (SkyEnv.on && ++_envTagN % 90 === 0) SkyEnv.tag(Interiors.active ? Interiors.scene : scene);   // materiales nuevos (construcciones, bots, tiendas) → intensidad de entorno
 }
 function updateTokens() { const money = GS.economy.money; if (state.tokensShown !== money) { const diff = money - state.tokensShown; state.tokensShown += Math.sign(diff) * Math.max(1, Math.ceil(Math.abs(diff) * 0.08)); if (Math.sign(money - state.tokensShown) !== Math.sign(diff)) state.tokensShown = money; ui.tokenValue.textContent = state.tokensShown.toLocaleString('es-ES'); } }
 
@@ -7443,7 +7522,9 @@ const Interiors = {
     const S = new THREE.Scene(); S.background = new THREE.Color(pal.void ?? 0x150f26);
     const root = new THREE.Group(); root.position.set(0, OY, 0); S.add(root);
     // luz: cielo de fuera por las ventanas (día/noche) + lámparas cálidas que se notan más de noche
-    const hemi = new THREE.HemisphereLight(0xfff4e0, 0x8d6e63, 0.5), amb = new THREE.AmbientLight(0xffffff, 0.22); S.add(hemi, amb);
+    const EV = CFG.gfx.env, room = SkyEnv.room;   // v1.5 · Etapa 1: con RoomEnvironment, menos hemisférica y ambiente
+    const hemi = new THREE.HemisphereLight(0xfff4e0, 0x8d6e63, room ? EV.roomHemi : 0.5), amb = new THREE.AmbientLight(0xffffff, room ? EV.roomAmb : 0.22); S.add(hemi, amb);
+    if (room) S.environment = room;
     const win = new THREE.DirectionalLight(0xfff1d6, 1); win.position.set(hw * 0.4, OY + H + 5, -hd - 4); win.target.position.set(0, OY, 0); S.add(win, win.target);
     win.castShadow = !IS_MOBILE && GFX.L.interiorShadow; if (win.castShadow) { const m = Math.max(hw, hd) + 1; Object.assign(win.shadow.camera, { left: -m, right: m, top: m, bottom: -m, near: 0.5, far: 40 }); win.shadow.mapSize.set(1024, 1024); win.shadow.bias = -0.0005; win.shadow.normalBias = 0.03; win.shadow.camera.updateProjectionMatrix(); }
     if (!def.outdoor) { const pts = []; for (let i = 0; i < 160; i++) { const v = randomDir(); pts.push(v.x * 60, OY + v.y * 60, v.z * 60); } const gg = new THREE.BufferGeometry(); gg.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3)); S.add(new THREE.Points(gg, new THREE.PointsMaterial({ color: 0xd1c4e9, map: DOT_TEX, size: 2.2, transparent: true, opacity: 0.7, sizeAttenuation: false, depthWrite: false }))); }   // el vacío onírico (v1.4: puntos redondos)
@@ -9145,6 +9226,7 @@ function applyGameStateToWorld() {
   Merchant.apply();    // v1.2: Licencias de Comerciante (normaliza GS.merchant, inicio de este sueño en NG+, cartel de la casa)
   V10.apply();         // v1.0: museo (pedestales + piezas + trofeos), puestos de la feria, logros retroactivos, HUD del calendario
   if (Array.isArray(GS.player.dir) && GS.player.dir.length === 3) { player.userData.dir.fromArray(GS.player.dir).normalize(); if (Array.isArray(GS.player.fwd)) player.userData.fwd.fromArray(GS.player.fwd); }
+  PlanetAO.bake();     // v1.5 · Etapa 1: AO horneado (med/alta)
   Net.apply();         // v1.3: Red del Sueño (re-engancha el mundo de bots; si recargaste dentro, despiertas en casa)
   state.tokensShown = GS.economy.money; ui.tokenValue.textContent = state.tokensShown.toLocaleString('es-ES');
   refreshMissionUI();
