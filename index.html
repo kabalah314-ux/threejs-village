@@ -569,7 +569,7 @@ const CFG = {
     // QW4 · brillo de los ojos (radio relativo al ojo)
     eyeHi: 0.35,
     // QW5 · disco de sol, halo y luna en el shader del cielo
-    sky: { disc: [0.9985, 0.9992], discI: 1.2, haloPow: 64, haloI: 0.35, moon: 0xdfe8ff, moonI: 0.6, moonDisc: [0.9990, 0.9995] },
+    sky: { glow: 0xffa07a, glowI: 0.55, disc: [0.9985, 0.9992], discI: 1.2, haloPow: 64, haloI: 0.35, moon: 0xdfe8ff, moonI: 0.6, moonDisc: [0.9990, 0.9995] },
     // QW6 · estrellas que parpadean (tamaño en px CSS · fracción teñida rosa/celeste · amplitud del parpadeo)
     stars: { size: [1.2, 3.0], tint: 0.1, twinkle: 0.25, speed: 2.0, dayMin: 0.04, nightMax: 0.95 },
     // QW7 · variación de color del planeta (calculada al cargar, coste 0 en juego)
@@ -590,6 +590,10 @@ const CFG = {
     // Etapa 2 · post-procesado (med/alta): bloom HDR + gradación cálida · el umbral sube de día (paredes al sol ≈ 2–3 en HDR) para que solo brillen sol, neón y luces
     post: { bloomDay: 0.22, bloomNight: 0.85, thrDay: 3.2, thrNight: 0.9, radius: 0.55, tierBloom: { med: 0.85, high: 1 }, samples: { med: 2, high: 4 }, dreamBloom: 0.7, dreamThr: 1.1,
       sat: 1.08, lift: [0.035, 0.025, 0.06], gain: [1.03, 1.0, 0.96], dusk: 0.6, dream: 1 },
+    // Etapa 3 · nubes (tinte de atardecer / noche) y perspectiva aérea (niebla suave de base, se suma a la del clima)
+    clouds: { emi: 0.16, emiNight: 0.03, dusk: 0xffc1a6, night: 0x8a90b8 },
+    aerial: { density: 0.012, near: 14, far: 26 },
+    shooting: { every: [18, 38], dur: 0.9, len: 26 },
     // QW13 · exposición según la hora
     exposure: { night: 0.95, day: 1.08, dusk: 0.05 },
     // Lluvia: gota con textura de trazo suave (antes cuadrados blancos)
@@ -1412,23 +1416,27 @@ function addBlob(parent, scale = 1) { const m = new THREE.Mesh(BLOB_GEO, BLOB_MA
    y el disco del sol (>1) acaba muy brillante en HDR → lo coge el bloom. uPost = 0 → sin cambios (nivel Baja o si el CDN falla). */
 const POST_U = { uPost: { value: 0 }, uExpo: { value: 1 } };
 const POST_GLSL = `uniform float uPost, uExpo;
-vec3 postOut(vec3 c){ if (uPost < 0.5) return c; c = max(c, 0.0);
-  vec3 l = mix(c / 12.92, pow((c + 0.055) / 1.055, vec3(2.4)), step(0.04045, c));
+vec3 invAces(vec3 l){
   vec3 x = clamp(mat3(vec3(0.643038, 0.059269, 0.005962), vec3(0.311187, 0.931436, 0.063929), vec3(0.045775, 0.009295, 0.930118)) * l, 0.0, 0.999);
   vec3 A = 1.0 - 0.983729 * x, B = 0.0245786 - 0.432951 * x, C = -0.000090537 - 0.238081 * x;
   vec3 v = (-B + sqrt(max(B * B - 4.0 * A * C, 0.0))) / (2.0 * A);
-  return max(mat3(vec3(1.764741, -0.147028, -0.036337), vec3(-0.675778, 1.160252, -0.162436), vec3(-0.088963, -0.013224, 1.198773)) * v, 0.0) * 0.6 / uExpo; }`;
+  return max(mat3(vec3(1.764741, -0.147028, -0.036337), vec3(-0.675778, 1.160252, -0.162436), vec3(-0.088963, -0.013224, 1.198773)) * v, 0.0) * 0.6 / uExpo; }
+vec3 postOut(vec3 c){ if (uPost < 0.5) return c; c = max(c, 0.0); return invAces(mix(c / 12.92, pow((c + 0.055) / 1.055, vec3(2.4)), step(0.04045, c))); }   // c = color de pantalla (sRGB)
+vec3 postOutLin(vec3 c){ c = max(c, 0.0); if (uPost > 0.5) return invAces(c); return mix(c * 12.92, 1.055 * pow(c, vec3(1.0 / 2.4)) - 0.055, step(0.0031308, c)); }`;   // c = lineal (los THREE.Color de los uniforms son lineales)
 const sky = new THREE.Mesh(new THREE.SphereGeometry(400, 32, 16), new THREE.ShaderMaterial({
   side: THREE.BackSide, depthWrite: false,
   uniforms: { ...POST_U, topColor: { value: new THREE.Color(0x2f7fd8) }, midColor: { value: new THREE.Color(0xa9dcff) }, bottomColor: { value: new THREE.Color(0xffd6a8) },
     sunDir: { value: new THREE.Vector3(0, 1, 0) }, sunCol: { value: new THREE.Color(0xfff1d6) }, moonCol: { value: new THREE.Color(CFG.gfx.sky.moon) }, uDay: { value: 1 },   // v1.4 · QW5
-    uDisc: { value: new THREE.Vector2(...CFG.gfx.sky.disc) }, uMoonDisc: { value: new THREE.Vector2(...CFG.gfx.sky.moonDisc) }, uSky: { value: new THREE.Vector4(CFG.gfx.sky.discI, CFG.gfx.sky.haloPow, CFG.gfx.sky.haloI, CFG.gfx.sky.moonI) } },
+    uDisc: { value: new THREE.Vector2(...CFG.gfx.sky.disc) }, uMoonDisc: { value: new THREE.Vector2(...CFG.gfx.sky.moonDisc) }, uSky: { value: new THREE.Vector4(CFG.gfx.sky.discI, CFG.gfx.sky.haloPow, CFG.gfx.sky.haloI, CFG.gfx.sky.moonI) },
+    uUp: { value: new THREE.Vector3(0, 1, 0) }, glowCol: { value: new THREE.Color(CFG.gfx.sky.glow) }, uGlow: { value: 0 } },   // v1.5 · Etapa 3: horizonte del jugador + resplandor del atardecer
   vertexShader: `varying vec3 vPos; void main(){ vPos = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
-  fragmentShader: POST_GLSL + `uniform vec3 topColor, midColor, bottomColor, sunDir, sunCol, moonCol; uniform float uDay; uniform vec2 uDisc, uMoonDisc; uniform vec4 uSky; varying vec3 vPos;
-    void main(){ vec3 d = normalize(vPos); float h = d.y; vec3 c = h > 0.0 ? mix(midColor, topColor, pow(h, 0.55)) : mix(midColor, bottomColor, pow(-h, 0.7));
+  fragmentShader: POST_GLSL + `uniform vec3 topColor, midColor, bottomColor, sunDir, sunCol, moonCol, uUp, glowCol; uniform float uDay, uGlow; uniform vec2 uDisc, uMoonDisc; uniform vec4 uSky; varying vec3 vPos;
+    void main(){ vec3 d = normalize(vPos); float h = dot(d, uUp); vec3 c = h > 0.0 ? mix(midColor, topColor, pow(h, 0.55)) : mix(midColor, bottomColor, pow(-h, 0.7));
+      vec3 dh = d - uUp * h, sh = sunDir - uUp * dot(sunDir, uUp); float side = dot(dh, dh) > 1e-5 && dot(sh, sh) > 1e-5 ? max(dot(normalize(dh), normalize(sh)), 0.0) : 0.0;
+      c += glowCol * exp(-abs(h) * 7.0) * mix(0.35, 1.0, side) * uGlow;   // banda cálida del horizonte, más fuerte del lado del sol
       float s = max(dot(d, sunDir), 0.0); c += sunCol * (smoothstep(uDisc.x, uDisc.y, s) * uSky.x + pow(s, uSky.y) * uSky.z) * (0.25 + 0.75 * uDay);
       float m = max(dot(d, -sunDir), 0.0); c += moonCol * (smoothstep(uMoonDisc.x, uMoonDisc.y, m) + pow(m, 220.0) * 0.25) * uSky.w * (1.0 - uDay);
-      gl_FragColor = vec4(postOut(c), 1.0); }`
+      gl_FragColor = vec4(postOutLin(c), 1.0); }`
 }));
 scene.add(sky);
 /* v1.4 · QW6 · estrellas que parpadean (ShaderMaterial: tamaño y fase por estrella, disco suave, 10 % teñidas) · uOpacity sustituye a la opacidad global */
@@ -1444,13 +1452,36 @@ const starsMat = new THREE.ShaderMaterial({
   const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3)); g.setAttribute('aSize', new THREE.Float32BufferAttribute(sz, 1)); g.setAttribute('aPhase', new THREE.Float32BufferAttribute(ph, 1)); g.setAttribute('aCol', new THREE.Float32BufferAttribute(col, 3));
   const p = new THREE.Points(g, starsMat); p.frustumCulled = false; scene.add(p); }   // v0.1: opacidad animada por el ciclo día/noche (uOpacity)
 
+/* v1.5 · Etapa 3 · estrellas fugaces (de noche, cada 18–38 s; ×3 con «Lluvia de estrellas») · una línea aditiva, coste ~0 */
+const ShootingStars = (() => {
+  const C = CFG.gfx.shooting, g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(6), 3)); g.setAttribute('color', new THREE.Float32BufferAttribute([1, 0.97, 0.9, 0, 0, 0], 3));
+  const m = new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, fog: false, toneMapped: false });
+  const line = new THREE.Line(g, m); line.frustumCulled = false; line.renderOrder = -1; line.visible = false; scene.add(line);
+  let next = 6, life = -1; const a = new THREE.Vector3(), td = new THREE.Vector3(), tmp = new THREE.Vector3();
+  return { update(dt, night) {
+    line.position.copy(camera.position);
+    if (life < 0) {
+      if (night < 0.6 || Interiors.active) return;
+      next -= dt * (Weather.id() === 'stars' ? 3 : 1); if (next > 0) return;
+      next = C.every[0] + Math.random() * (C.every[1] - C.every[0]); life = 0;
+      do { a.copy(randomDir()); } while (a.dot(camera.up) < 0.35);
+      td.copy(randomDir()).addScaledVector(a, -td.dot(a)).addScaledVector(camera.up, -0.4).normalize(); a.multiplyScalar(300);
+    }
+    life += dt; const k = life / C.dur;
+    if (k >= 1) { life = -1; line.visible = false; return; }
+    const p = g.attributes.position; tmp.copy(a).addScaledVector(td, C.len * k); p.setXYZ(0, tmp.x, tmp.y, tmp.z); tmp.addScaledVector(td, -C.len * 0.4 * Math.min(1, k * 3)); p.setXYZ(1, tmp.x, tmp.y, tmp.z); p.needsUpdate = true;
+    line.visible = true; m.opacity = Math.sin(k * Math.PI) * night;
+  } };
+})();
 const clouds = new THREE.Group();
-const cloudMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, flatShading: true });
+const cloudMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, emissive: 0xffffff, emissiveIntensity: CFG.gfx.clouds.emi });   // v1.5 · Etapa 3: algodón (sin facetas) con algo de luz propia · tinte por hora en updateSun
+cloudMat.userData.envI = 0.3;
+const CLOUD_SEG = GFX.id === 'high' ? [12, 9] : [9, 7];
 for (let i = 0; i < 18; i++) {
   const pivot = new THREE.Object3D(); pivot.quaternion.setFromUnitVectors(UP_Y, randomDir()); pivot.rotateY(Math.random() * 6.28);
   const c = new THREE.Group(); const n = 3 + Math.floor(Math.random() * 3);
-  for (let j = 0; j < n; j++) { const s = 0.8 + Math.random() * 1.2; const m = new THREE.Mesh(new THREE.SphereGeometry(s, 8, 6), cloudMat); m.position.set(j * 1.3 - n * 0.65, Math.random() * 0.4, (Math.random() - 0.5) * 1.2); m.scale.y = 0.6; m.castShadow = GFX.id !== 'low'; c.add(m); }
-  c.position.set(0, 0, R + 6 + Math.random() * 4); c.rotation.x = Math.PI / 2; pivot.add(c); pivot.userData.speed = 0.02 + Math.random() * 0.03; clouds.add(pivot);
+  for (let j = 0; j < n; j++) { const s = 0.8 + Math.random() * 1.2; const m = new THREE.Mesh(new THREE.SphereGeometry(s, ...CLOUD_SEG), cloudMat); m.position.set(j * 1.3 - n * 0.65, Math.random() * 0.4, (Math.random() - 0.5) * 1.2); m.scale.y = 0.6; m.castShadow = GFX.id !== 'low'; c.add(m); }
+  c.position.set(0, 0, R + 6 + Math.random() * 4); c.rotation.x = Math.PI / 2; pivot.add(c); pivot.userData.speed = 0.02 + Math.random() * 0.03; pivot.userData.bob = c; c.userData.z0 = c.position.z; c.userData.ph = Math.random() * 6.28; clouds.add(pivot);
 }
 scene.add(clouds);
 
@@ -1480,7 +1511,7 @@ const SkyEnv = (() => {
         vec3 c = h > 0.0 ? mix(midColor, topColor, pow(h, 0.55)) : mix(midColor, uGround * (0.3 + 0.7 * uDay), smoothstep(0.0, 0.3, -h));
         c += sunCol * pow(max(dot(d, sunDir), 0.0), uSun.x) * uSun.y * uDay;
         c = mix(c, uWarmCol * dot(c, vec3(0.299, 0.587, 0.114)), uWarm);   // relleno más cálido (look AC): el azul del cielo no enfría las paredes
-        gl_FragColor = vec4(pow(c, vec3(2.2)), 1.0); }` });   // el cielo pinta en sRGB: aquí se pasa a lineal (el PMREM trabaja en lineal)
+        gl_FragColor = vec4(c, 1.0); }` });   // los uniforms (THREE.Color) ya son lineales, igual que el PMREM
   const envScene = new THREE.Scene(); envScene.add(new THREE.Mesh(new THREE.SphereGeometry(10, 32, 16), envMat));
   let rt = null, last = { day: -9, dusk: -9, t: -1e9 }; const lastUp = new THREE.Vector3(0, 0, 0);
   api.tag = (root) => root.traverse(o => { if (!o.isMesh) return; (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => { if (!m || seen.has(m) || !m.isMeshStandardMaterial) return; seen.add(m); m.envMapIntensity = m.userData.envI ?? E.intensity; }); });
@@ -1630,9 +1661,9 @@ water.receiveShadow = true; water.material.userData.envI = CFG.gfx.env.water; sc
 /* v1.4 · QW10 · halo atmosférico del planeta (menú y Modo Planeta): esfera BackSide aditiva con el color del horizonte del cielo */
 const atmo = new THREE.Mesh(new THREE.SphereGeometry(R * CFG.gfx.halo.scale, GFX.id === 'low' ? 48 : 64, GFX.id === 'low' ? 32 : 40), new THREE.ShaderMaterial({
   side: THREE.BackSide, blending: THREE.AdditiveBlending, transparent: true, depthWrite: false,
-  uniforms: { ...POST_U, uCol: { value: sky.material.uniforms.midColor.value }, uOpacity: { value: CFG.gfx.halo.near }, uPow: { value: CFG.gfx.halo.pow } },
+  uniforms: { ...POST_U, uCol: { value: sky.material.uniforms.midColor.value }, uSunCol: { value: sky.material.uniforms.sunCol.value }, uSunV: { value: new THREE.Vector3(0, 1, 0) }, uOpacity: { value: CFG.gfx.halo.near }, uPow: { value: CFG.gfx.halo.pow } },
   vertexShader: `varying vec3 vN; varying vec3 vV; void main(){ vec4 mv = modelViewMatrix * vec4(position, 1.0); vN = normalize(normalMatrix * normal); vV = normalize(-mv.xyz); gl_Position = projectionMatrix * mv; }`,
-  fragmentShader: POST_GLSL + `uniform vec3 uCol; uniform float uOpacity, uPow; varying vec3 vN; varying vec3 vV; void main(){ float x = clamp(-dot(normalize(vN), normalize(vV)), 0.0, 1.0); float a = smoothstep(0.0, 0.32, x) * pow(1.0 - x, uPow) * 3.2; gl_FragColor = vec4(postOut(uCol * a * uOpacity), 1.0); }`,
+  fragmentShader: POST_GLSL + `uniform vec3 uCol, uSunCol, uSunV; uniform float uOpacity, uPow; varying vec3 vN; varying vec3 vV; void main(){ vec3 n = normalize(vN); float x = clamp(-dot(n, normalize(vV)), 0.0, 1.0); float a = smoothstep(0.0, 0.32, x) * pow(1.0 - x, uPow) * 3.2; vec3 col = mix(uCol, uSunCol * 1.1, pow(max(dot(n, uSunV), 0.0), 2.0) * 0.6); gl_FragColor = vec4(postOutLin(col * a * uOpacity), 1.0); }`   // v1.5 · Etapa 3: el limbo del lado del sol se ve cálido,
 }));
 atmo.renderOrder = -1; atmo.raycast = () => {}; scene.add(atmo);
 
@@ -4527,9 +4558,9 @@ function updateWater(t) { const p = waterGeo.attributes.position; for (let i = 0
 const DAY_MS = 86400000;
 const DAY_SCALE = DAY_MS / CFG.dayLengthMs;
 const dayT = () => GS.daily.clockMs / DAY_MS;           // 0 = 00:00 · 0.25 = 06:00 · 0.5 = 12:00 · 0.75 = 18:00
-const SKY_NIGHT = { top: new THREE.Color(0x0b1035), mid: new THREE.Color(0x1a2450), bot: new THREE.Color(0x2a1f3d) };
+const SKY_NIGHT = { top: new THREE.Color(0x0b1035), mid: new THREE.Color(0x24306a), bot: new THREE.Color(0x3b2a5a) };   // v1.5 · Etapa 3: paletas pastel
 const SKY_DAY   = { top: new THREE.Color(0x2f7fd8), mid: new THREE.Color(0xa9dcff), bot: new THREE.Color(0xffd6a8) };
-const SKY_DUSK  = { top: new THREE.Color(0x584a9e), mid: new THREE.Color(0xff9a6b), bot: new THREE.Color(0xffc78a) };
+const SKY_DUSK  = { top: new THREE.Color(0x6a5acd), mid: new THREE.Color(0xffa07a), bot: new THREE.Color(0xffc8a8) };
 const _sunDir = new THREE.Vector3(), _c1 = new THREE.Color(), _c2 = new THREE.Color();
 const _shC = new THREE.Vector3(), _shM = new THREE.Matrix4(), _shQ = new THREE.Quaternion(), _shQi = new THREE.Quaternion(), _zero3 = new THREE.Vector3(), _xAxis = new THREE.Vector3(1, 0, 0); let _envTagN = 0;
 function updateSun() {
@@ -4557,6 +4588,9 @@ function updateSun() {
     _c1.lerpColors(SKY_NIGHT[pal], SKY_DAY[pal], dayAmt); _c2.lerpColors(_c1, SKY_DUSK[pal], duskAmt * 0.65); skyU[key].value.copy(_c2);
   }
   skyU.sunDir.value.copy(_sunDir); skyU.sunCol.value.copy(sun.color); skyU.uDay.value = dayAmt;   // v1.4 · QW5: disco de sol y luna
+  skyU.uUp.value.copy(camera.up); skyU.uGlow.value = duskAmt * L.sky.glowI;   // v1.5 · Etapa 3: el horizonte del cielo es el del jugador
+  atmo.material.uniforms.uSunV.value.copy(_sunDir).transformDirection(camera.matrixWorldInverse);
+  { const C = L.clouds; cloudMat.color.setHex(0xffffff).lerp(_c1.setHex(C.dusk), duskAmt * 0.6).lerp(_c2.setHex(C.night), (1 - dayAmt) * 0.85); cloudMat.emissiveIntensity = lerp(C.emiNight, C.emi, dayAmt); }
   const SU = starsMat.uniforms; SU.uOpacity.value = lerp(L.stars.nightMax, L.stars.dayMin, dayAmt); SU.uTime.value = performance.now() / 1000; SU.uPR.value = renderer.getPixelRatio();   // v1.4 · QW6
   const H = L.halo; atmo.material.uniforms.uOpacity.value = lerp(H.near, H.far, smoothstep(H.nearDist, H.farDist, cam.dist));   // v1.4 · QW10
   nightLights.forEach(l => l.intensity = l.userData.base * (1 - dayAmt));
@@ -4581,7 +4615,7 @@ const WEATHER_TYPES = {
   storm: { name: 'Tormenta',            icon: '⛈️', msg: '⛈️ ¡Tormenta! La mejor pesca del sueño: Pez Dorado ×3 también de día' },   // v0.8 · Climatizador
 };
 const Weather = (() => {
-  let _id = null, _forced = null, _forcedSlot = -1, _rain = null, _fog = null, _flash = 0;
+  let _id = null, _forced = null, _forcedSlot = -1, _rain = null, _fog = null, _flash = 0; const _v3c = new THREE.Color();
   const _q = new THREE.Quaternion(), _v = new THREE.Vector3();
   const hourNow = () => (GS.daily.clockMs / 3600000) % 24;
   const slotNow = () => GS.daily.dayCount * 2 + (hourNow() >= 14 ? 1 : 0);
@@ -4627,11 +4661,12 @@ const Weather = (() => {
     const want = id === 'fog' ? CFG.weatherFogDensity : id === 'rain' ? CFG.weatherRainFogDensity : id === 'storm' ? CFG.climateStormFogDensity : 0;
     const camDist = camera.position.distanceTo(player.position);
     const k = want * clamp(1 - (camDist - 30) / 30, 0, 1);
-    if (k > 0.0005) {
+    const AE = CFG.gfx.aerial, base = AE.density * clamp(1 - (camDist - AE.near) / (AE.far - AE.near), 0, 1), tot = k + base;   // v1.5 · Etapa 3: perspectiva aérea + clima en una sola niebla
+    if (tot > 0.0005) {
       if (!_fog) _fog = new THREE.FogExp2(0xc9c3e6, 0);
       const h = hourNow(), light = clamp(Math.sin(((h - 6) / 12) * Math.PI) * 1.4, 0.15, 1);
-      _fog.color.setRGB(0.79 * light, 0.76 * light, 0.90 * light);
-      _fog.density += (k - _fog.density) * Math.min(1, dt * 1.5);
+      _fog.color.copy(sky.material.uniforms.midColor.value).lerp(_v3c.setRGB(0.79 * light, 0.76 * light, 0.90 * light), k / tot);
+      _fog.density += (tot - _fog.density) * Math.min(1, dt * 1.5);
       scene.fog = _fog;
     } else if (_fog && scene.fog) { _fog.density *= Math.max(0, 1 - dt * 1.5); if (_fog.density < 0.0005) scene.fog = null; }
   }
@@ -5339,8 +5374,8 @@ function updateGoalHUD() {
 function animate() {
   requestAnimationFrame(animate);
   const rawDt = clock.getDelta(), dt = Math.min(rawDt, 0.05), t = clock.elapsedTime; GFX.update(dt, rawDt);   // v1.4: gobernador de FPS + viñeta
-  updatePlayer(dt); if (!state.cinematic) Needs.update(dt); updateNPCs(dt, t); Awakening.update(dt, t); /* v0.9: el sueño se detiene durante la escena del puerto */ updateCamera(dt); updateSun(); updateNeon(dt, t); updateUnlocks(dt, t); updateShip(dt); updateConfetti(dt); updateWater(t); V10.update(dt, t);
-  clouds.children.forEach(p => p.rotateY(p.userData.speed * dt)); updateTokens(); updateGoalHUD(); updateClockHUD(); Weather.update(dt); Fishing.update(dt); Mining.update(dt); StarFall.update(dt); Net.update(dt);
+  updatePlayer(dt); if (!state.cinematic) Needs.update(dt); updateNPCs(dt, t); Awakening.update(dt, t); /* v0.9: el sueño se detiene durante la escena del puerto */ updateCamera(dt); updateSun(); updateNeon(dt, t); updateUnlocks(dt, t); updateShip(dt); updateConfetti(dt); updateWater(t); V10.update(dt, t); ShootingStars.update(dt, 1 - (state.dayAmt ?? 1));
+  clouds.children.forEach(p => { p.rotateY(p.userData.speed * dt); const c = p.userData.bob; c.position.z = c.userData.z0 + Math.sin(t * 0.3 + c.userData.ph) * 0.25; });   // v1.5: las nubes «respiran» arriba y abajo updateTokens(); updateGoalHUD(); updateClockHUD(); Weather.update(dt); Fishing.update(dt); Mining.update(dt); StarFall.update(dt); Net.update(dt);
   if (SaveSystem.started && !state.menuOpen && !state.cinematic) {
     GS.meta.playTimeSec += dt;
     GS.daily.clockMs += dt * 1000 * DAY_SCALE;                 // v0.1: el reloj onírico solo avanza jugando
@@ -7490,7 +7525,7 @@ function buildDreamSurroundings(S, root, def) {
     side: THREE.BackSide, depthWrite: false, fog: false,
     uniforms: { ...POST_U, topColor: { value: new THREE.Color(SK.top) }, midColor: { value: new THREE.Color(SK.mid) }, bottomColor: { value: new THREE.Color(SK.bot) } },
     vertexShader: `varying vec3 vPos; void main(){ vPos = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
-    fragmentShader: POST_GLSL + `uniform vec3 topColor, midColor, bottomColor; varying vec3 vPos; void main(){ float h = normalize(vPos).y; vec3 c = h > 0.0 ? mix(midColor, topColor, pow(h, 0.6)) : mix(midColor, bottomColor, pow(-h, 0.5)); gl_FragColor = vec4(postOut(c), 1.0); }`,
+    fragmentShader: POST_GLSL + `uniform vec3 topColor, midColor, bottomColor; varying vec3 vPos; void main(){ float h = normalize(vPos).y; vec3 c = h > 0.0 ? mix(midColor, topColor, pow(h, 0.6)) : mix(midColor, bottomColor, pow(-h, 0.5)); gl_FragColor = vec4(postOutLin(c), 1.0); }`,
   }));
   dome.renderOrder = -2; dome.raycast = () => {}; S.add(dome);
   { const pts = []; for (let i = 0; i < D.stars; i++) { const v = randomDir(); if (v.y < 0.12) v.y = 0.12 + Math.random() * 0.8; v.normalize(); pts.push(v.x * 140, v.y * 140, v.z * 140); }
