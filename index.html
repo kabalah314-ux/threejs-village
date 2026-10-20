@@ -582,7 +582,7 @@ const CFG = {
     vignette: { menu: 1, game: 0.5 },
     // Etapa 1 · entorno PMREM del cielo (med/alta): reflejo suave del cielo en todo · con él la hemisférica y el ambiente bajan (el entorno ya rellena)
     env: { intensity: 0.5, planet: 0.35, water: 1.2, warm: 0.4, warmCol: 0xfff0dc, regenDay: 0.04, regenDusk: 0.05, regenUp: 0.12, minGapS: { med: 3, high: 1 }, ground: 0x6fae55, sunPow: 24, sunI: 0.6,
-      hemiDay: 0.65, hemiNight: 0.18, ambDay: 0.1, ambNight: 0.09, room: 0.04, roomI: 0.5, roomHemi: 0.35, roomAmb: 0.06 },
+      hemiDay: 0.65, hemiNight: 0.28, ambDay: 0.1, ambNight: 0.13, room: 0.04, roomI: 0.3, roomHemi: 0.35, roomAmb: 0.06 },
     // Etapa 1 · AO horneado en el color del planeta bajo árboles, casas y construcciones (med/alta, coste 0 en juego)
     ao: { strength: 0.28, reach: 1.25, inner: 0.55, rebakeAng: 0.16 },
     // Etapa 1 · caja de sombra del sol según la distancia de cámara (cerca / media / Modo Planeta = todo el planeta)
@@ -1481,7 +1481,8 @@ const SkyEnv = (() => {
     api.tag(scene); return true;
   };
   import('three/addons/environments/RoomEnvironment.js').then(({ RoomEnvironment }) => {
-    const r = new RoomEnvironment(renderer); api.room = pmrem.fromScene(r, E.room).texture; api.room.userData.shared = true;
+    const r = new RoomEnvironment(renderer); r.traverse(o => { if (o.isLight) o.intensity *= E.roomI; if (o.material?.color) o.material.color.multiplyScalar(E.roomI); if (o.material?.emissive) o.material.emissive.multiplyScalar(E.roomI); });   // estudio atenuado: si no, las paredes se queman
+    api.room = pmrem.fromScene(r, E.room).texture; api.room.userData.shared = true;
     if (typeof Interiors !== 'undefined' && Interiors.scene) { Interiors.scene.environment = api.room; api.tag(Interiors.scene); }
   }).catch(e => console.warn('[gfx] RoomEnvironment no disponible', e));
   return api;
