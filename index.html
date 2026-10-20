@@ -142,6 +142,21 @@
 .zone-banner { position: fixed; left: 50%; top: 84px; transform: translate(-50%, -8px); opacity: 0; pointer-events: none; z-index: 40; display: flex; align-items: center; gap: 8px; padding: 7px 18px; border-radius: 999px; background: rgba(32,29,78,.84); color: #fff; font-family: var(--f-disp, Fredoka, sans-serif); font-size: 15px; letter-spacing: .02em; border: 1px solid rgba(255,255,255,.18); box-shadow: 0 6px 20px rgba(13,11,34,.25); transition: opacity .35s, transform .35s; }
 .zone-banner.on { opacity: 1; transform: translate(-50%, 0); }
 body.mobile .zone-banner { top: 70px; font-size: 13px; padding: 6px 14px; }
+  /* v2.9 · J1 · iconos de objetos en 3D (miniatura con borde blanco; el emoji queda de respaldo) */
+  .item-ic{display:inline-flex;align-items:center;justify-content:center;width:var(--ic,24px);height:var(--ic,24px);vertical-align:middle;flex:none;line-height:1}
+  .item-ic img{width:100%;height:100%;object-fit:contain;-webkit-user-drag:none;user-select:none;pointer-events:none}
+  .item-ic .emo{font-size:calc(var(--ic,24px)*0.8);line-height:1}
+  .item-big{display:flex;align-items:center;justify-content:center}
+  /* v2.9 · J2 · retratos de vecinos y J3 */
+  .npc-face{display:inline-flex;align-items:center;justify-content:center;width:var(--ic,24px);height:var(--ic,24px);border-radius:28%;overflow:hidden;vertical-align:middle;flex:none;line-height:1}
+  .npc-face img{width:100%;height:100%;object-fit:cover}
+  .npc-face .emo{font-size:calc(var(--ic,24px)*0.8)}
+  #dialogAvatar img{width:100%;height:100%;object-fit:cover;border-radius:14px}
+  .ic-chip img{width:100%;height:100%;object-fit:contain}
+  .ic-chip.face,.ic-chip.pic{padding:0;overflow:hidden;background:transparent!important}
+  .ic-chip.face img{object-fit:cover}
+  .unread-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#ef4444;margin-right:5px;vertical-align:middle}
+  #appBody .item-big,.inv-slot .item-big{filter:none!important}
 </style>
 </head>
 <body class="menu-open">
@@ -2069,12 +2084,34 @@ function textTexture(text, { w = 512, h = 128, bg = '#ffffff', color = '#2b2b3d'
   ctx.fillStyle = color; ctx.font = font; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(text, w / 2, h / 2 + 2);
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
 }
+/* ===== v2.9 · J3 · MARCADORES DEL MUNDO: placas redondas claras con el icono del juego (Phosphor) y sombra suave, sin el borde negro grueso.
+   Se dibujan en canvas como siempre (no cuestan rendimiento). Mientras carga la fuente de iconos se ve el símbolo de texto, y al cargar se redibujan. */
+const PhGlyph = (() => {
+  const cache = {}, waiting = []; let ready = false, tries = 0;
+  function read(name) { try { const el = document.createElement('i'); el.className = `ph-duotone ph-${name}`; el.style.cssText = 'position:absolute;left:-9999px;top:-9999px'; document.body.appendChild(el);
+      const cs = (p) => { const c = getComputedStyle(el, p).content || ''; return c === 'none' || c === 'normal' ? '' : c.replace(/^["']|["']$/g, ''); }, r = { bg: cs('::before'), fg: cs('::after') }; el.remove(); return r.fg ? r : null; } catch (e) { return null; } }
+  function check() {
+    if (ready || !document.fonts || !document.fonts.load) return;
+    document.fonts.load('48px "Phosphor-Duotone"').then(list => { if (list && list.length && read('check')) { ready = true; waiting.splice(0).forEach(f => { try { f(); } catch (e) {} }); } else if (++tries < 12) setTimeout(check, 1500); }).catch(() => { if (++tries < 12) setTimeout(check, 1500); });
+  }
+  if (typeof document !== 'undefined' && document.body) setTimeout(check, 300);
+  return { get ready() { return ready; }, get(name) { return name && ready ? (cache[name] ??= read(name)) : null; }, onReady(f) { if (ready) f(); else waiting.push(f); } };
+})();
+const BUBBLE_PH = { '!': 'exclamation-mark', '✓': 'check-fat', '★': 'star', '✈️': 'airplane-tilt', '✈': 'airplane-tilt', '🛒': 'shopping-cart', '🏷️': 'tag', '🏷': 'tag', '📮': 'envelope-simple' };
+const _hex2 = (hex, k) => { const n = parseInt(hex.slice(1), 16); let r = n >> 16, g = (n >> 8) & 255, b = n & 255; r = Math.round(r * k); g = Math.round(g * k); b = Math.round(b * k); return `rgb(${Math.min(255, r)},${Math.min(255, g)},${Math.min(255, b)})`; };
+function drawBubble(ctx, symbol, bg) {
+  const ph = PhGlyph.get(BUBBLE_PH[symbol]); ctx.clearRect(0, 0, 128, 128);
+  ctx.save(); ctx.shadowColor = 'rgba(30,25,60,0.35)'; ctx.shadowBlur = 10; ctx.shadowOffsetY = 4; ctx.fillStyle = '#fffdf7'; ctx.beginPath(); ctx.arc(64, 60, 50, 0, 6.29); ctx.fill(); ctx.restore();
+  ctx.fillStyle = bg; ctx.globalAlpha = 0.3; ctx.beginPath(); ctx.arc(64, 60, 44, 0, 6.29); ctx.fill(); ctx.globalAlpha = 1;
+  ctx.lineWidth = 6; ctx.strokeStyle = bg; ctx.beginPath(); ctx.arc(64, 60, 47, 0, 6.29); ctx.stroke();
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  if (ph) { ctx.font = '64px "Phosphor-Duotone"'; if (ph.bg) { ctx.globalAlpha = 0.45; ctx.fillStyle = _hex2(bg, 0.8); ctx.fillText(ph.bg, 64, 61); ctx.globalAlpha = 1; } ctx.fillStyle = '#2b2b3d'; ctx.fillText(ph.fg, 64, 61); return true; }
+  ctx.fillStyle = '#2b2b3d'; ctx.font = 'bold 64px Fredoka, Arial'; ctx.fillText(symbol, 64, 64); return false;
+}
 function bubbleTexture(symbol, bg) {
-  const c = document.createElement('canvas'); c.width = c.height = 128; const ctx = c.getContext('2d');
-  ctx.fillStyle = '#2b2b3d'; ctx.beginPath(); ctx.arc(64, 64, 60, 0, 6.29); ctx.fill();
-  ctx.fillStyle = bg; ctx.beginPath(); ctx.arc(64, 64, 52, 0, 6.29); ctx.fill();
-  ctx.fillStyle = '#2b2b3d'; ctx.font = 'bold 84px Fredoka, Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(symbol, 64, 70);
-  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+  const c = document.createElement('canvas'); c.width = c.height = 128; const ctx = c.getContext('2d'), t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
+  if (ctx && !drawBubble(ctx, symbol, bg) && BUBBLE_PH[symbol]) PhGlyph.onReady(() => { if (drawBubble(ctx, symbol, bg)) t.needsUpdate = true; });
+  return t;
 }
 const COIN = '<i class="ico-coin"></i>';   // v1.4: icono de moneda en SVG (el emoji de la moneda no existe en Windows 10: salía un cuadrado) · en texto plano usar «◎» o «$T»
 const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -2882,7 +2919,7 @@ function startVendorDialog() {
   const mid = player.position.clone().lerp(vendor.position, 0.55).addScaledVector(up, 1.35); const side = new THREE.Vector3().crossVectors(toNpc, up).normalize();
   const cA = mid.clone().addScaledVector(side, 4.4).addScaledVector(up, 1.2), cB = mid.clone().addScaledVector(side, -4.4).addScaledVector(up, 1.2);
   state.dialogPose = { pos: cA.distanceTo(storeBuilding.position) > cB.distanceTo(storeBuilding.position) ? cA : cB, target: mid, up: up.clone() }; tweenCamera(state.dialogPose, 0.9);
-  ui.hint.classList.add('hidden'); ui.dialog.classList.remove('hidden'); ui.dialogButtons.innerHTML = ''; ui.dialogAvatar.textContent = '🦝'; ui.dialogName.textContent = `ROCCO · TENDERO · ${trustLvIcon('rocco')} ${trustLvName('rocco')}`;   // v0.2: con Rocco la confianza es volumen de comercio (Sec. 5.8)
+  ui.hint.classList.add('hidden'); ui.dialog.classList.remove('hidden'); ui.dialogButtons.innerHTML = ''; setDialogAvatar('rocco', '🦝'); ui.dialogName.textContent = `ROCCO · TENDERO · ${trustLvIcon('rocco')} ${trustLvName('rocco')}`;   // v0.2: con Rocco la confianza es volumen de comercio (Sec. 5.8)
   const lines = ['¡Bienvenido a mi tienda! Compro de todo lo que encuentres por el planeta y vendo materiales, dulces y Gasolina Gasil. ¿Comerciamos?', '¡Hola de nuevo! Las conchas y las perlas se pagan bien hoy. ¿Qué me traes?', 'Psst… si construyes farolas y bancos la aldea sube de nivel. Yo te vendo la piedra y la madera.'];
   typeText(ui.dialogText, dejaVuGreeting('rocco') || lines[Math.floor(Math.random() * lines.length)], 16, () => ui.dialogButtons.append(dialogButton('🛒 Comerciar', 'bg-amber-200 text-[#2b2b3d]', () => openShop('store')), dialogButton('🎒 Mochila', 'bg-yellow-200 text-[#2b2b3d]', () => openInventory()), dialogButton('Hasta luego', 'bg-slate-200 text-[#2b2b3d]', endDialog)));
 }
@@ -3814,7 +3851,7 @@ function startDialog(npcId) {
   state.dialogPose = { pos: cA.distanceTo(bld.position) > cB.distanceTo(bld.position) ? cA : cB, target: mid, up: up.clone() };
   tweenCamera(state.dialogPose, 0.9);
   ui.hint.classList.add('hidden'); ui.dialog.classList.remove('hidden'); ui.dialogButtons.innerHTML = '';
-  ui.dialogAvatar.textContent = n.emoji;
+  setDialogAvatar(n.id, n.emoji);
   ui.dialogName.textContent = `${n.name.toUpperCase()} · ${trustLvIcon(npcId)} ${trustLvName(npcId)}`;   // v0.2: relación visible
   const greet = (typeof welcomeBackGreeting === 'function' && welcomeBackGreeting(npcId)) || dejaVuGreeting(npcId) || awakeningGreeting(npcId) || greetingFor(npcId);   // v1.0: bienvenida del Oso tras semanas fuera (Sec. 10.1)   // v0.9: déjà vu en NG+ (Sec. 10.7) · líneas de la cadena (Sec. 7.5)
   const giftBtn = dialogButton('🎁 Regalar', 'bg-pink-200 text-[#2b2b3d]', () => openGiftPicker(npcId));
@@ -3844,7 +3881,7 @@ function openGiftPicker(npcId) {
       body.innerHTML = `<div class="flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600 mb-3"><span>${trustLvIcon(npcId)} ${trustLvName(npcId)} · ${Trust.points(npcId)} pts de confianza</span><span>🎁 Regalos hoy: <b>${gs.used}/${CFG.giftCapPerDay}</b></span></div>` +
         (gs.left <= 0 ? `<div class="app-card p-4 text-sm text-slate-600">Ya has sorprendido bastante a ${n.name} por hoy. Vuelve mañana 🌙</div>`
         : giftable.length ? `<div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">` + giftable.map(s => { const it = ITEMS[s.id]; const liked = NPC_SOCIAL[npcId]?.giftPrefs?.[s.id]; const pts = Math.round(giftBase(npcId, s.id) * decay);
-          return `<div class="app-card p-2.5 flex flex-col items-center text-center" style="border-color:${liked ? RARITY[it.rarity].color : '#cbd5e1'}"><div class="text-3xl leading-none">${it.icon}</div><div class="text-[11px] font-bold text-[#2b2b3d] truncate w-full mt-1">${it.name} <span class="text-slate-400">×${s.qty}</span></div><div class="text-[10px] ${liked ? 'text-emerald-600 font-bold' : 'text-slate-500'} mt-0.5">${liked ? '❤️ le encanta' : 'gesto amable'} · ${pts > 0 ? '+' + pts : 'sin efecto hoy'}</div><button data-gift="${s.id}" class="btn-game px-3 py-1 text-xs bg-pink-200 mt-2" ${pts > 0 ? '' : 'disabled'}>Regalar 1</button></div>`; }).join('') + '</div>'
+          return `<div class="app-card p-2.5 flex flex-col items-center text-center" style="border-color:${liked ? RARITY[it.rarity].color : '#cbd5e1'}"><div class="text-3xl leading-none item-big">${itemIcon(it.id, 38)}</div><div class="text-[11px] font-bold text-[#2b2b3d] truncate w-full mt-1">${it.name} <span class="text-slate-400">×${s.qty}</span></div><div class="text-[10px] ${liked ? 'text-emerald-600 font-bold' : 'text-slate-500'} mt-0.5">${liked ? '❤️ le encanta' : 'gesto amable'} · ${pts > 0 ? '+' + pts : 'sin efecto hoy'}</div><button data-gift="${s.id}" class="btn-game px-3 py-1 text-xs bg-pink-200 mt-2" ${pts > 0 ? '' : 'disabled'}>Regalar 1</button></div>`; }).join('') + '</div>'
         : `<div class="app-card p-4 text-sm text-slate-600">Tu mochila está vacía. Recoge o compra algo que pueda gustarle.</div>`);
       body.querySelectorAll('[data-gift]').forEach(b => b.onclick = () => {
         const id = b.dataset.gift; if (!Inventory.remove(id, 1)) return;
@@ -3940,11 +3977,11 @@ function refreshMissionUI() {
     const bj = bigJobsDoneCount(), cur = NPCS.find(n => GS.bigJobs?.[n.id]?.status === 1);
     if (lbl) lbl.textContent = 'ACTO 2 · TRABAJOS MAYORES'; ui.missionCount.textContent = `${bj}/${CFG.act2BigJobs}`;
     const rdy = NPCS.find(n => (GS.bigJobs?.[n.id]?.status | 0) === 0 && bigJobReady(n.id));
-    ui.missionText.textContent = bj >= CFG.act2BigJobs ? '🏆 ¡Todos los Trabajos Mayores completados!' : cur ? `🏗️ ${cur.emoji} ${BIG_JOBS[cur.id].short} (usa la laptop)` : rdy ? `🏗️ ${rdy.emoji} ${BIG_JOBS[rdy.id].short}: habla con ${rdy.name}` : `🏗️ Sube a ${TRUST_LEVELS[CFG.bigJobTrustLevel].heart} ${TRUST_LEVELS[CFG.bigJobTrustLevel].name} con un vecino para su Trabajo Mayor`;
+    setRich(ui.missionText, bj >= CFG.act2BigJobs ? '🏆 ¡Todos los Trabajos Mayores completados!' : cur ? `🏗️ ${cur.emoji} ${BIG_JOBS[cur.id].short} (usa la laptop)` : rdy ? `🏗️ ${rdy.emoji} ${BIG_JOBS[rdy.id].short}: habla con ${rdy.name}` : `🏗️ Sube a ${TRUST_LEVELS[CFG.bigJobTrustLevel].heart} ${TRUST_LEVELS[CFG.bigJobTrustLevel].name} con un vecino para su Trabajo Mayor`);
   } else {
     if (lbl) lbl.textContent = 'MISIONES'; ui.missionCount.textContent = `${done}/${NPCS.length}`;
     const next = NPCS.find(n => state.missions[n.id].status === 1) || NPCS.find(n => state.missions[n.id].status === 0);
-    ui.missionText.textContent = done === NPCS.length ? '🏆 ¡Todas las misiones completadas!' : next ? `${next.emoji} ${state.missions[next.id].status === 1 ? next.mission.title + ' (usa la laptop)' : 'Habla con ' + next.name}` : '';
+    setRich(ui.missionText, done === NPCS.length ? '🏆 ¡Todas las misiones completadas!' : next ? `${next.emoji} ${state.missions[next.id].status === 1 ? next.mission.title + ' (usa la laptop)' : 'Habla con ' + next.name}` : '');
   }
   act3MissionHUD(lbl);   // v0.9: «ACTO 3 · EL DESPERTAR» mientras dura la cadena, y metas del post-juego tras el Final B
   const tab = state.missionTab || (act2 ? 'big' : 'main');
@@ -3953,16 +3990,16 @@ function refreshMissionUI() {
     const TL = TRUST_LEVELS[CFG.bigJobTrustLevel];
     html += NPCS.map(n => { const def = BIG_JOBS[n.id], st = GS.bigJobs?.[n.id]?.status | 0, mOk = state.missions[n.id].status === 2, tOk = Trust.level(n.id) >= CFG.bigJobTrustLevel; const ready = mOk && tOk;
       const sub = st === 2 ? `${def.system}${n.id === 'glover' && !Bridge.done() ? ` · obra ${Bridge.phase()}/${Bridge.phases()}` : ' · ✓ activo'}` : `${mOk ? '✅' : '▫️'} misión · ${tOk ? '✅' : '▫️'} ${TL.heart} ${TL.name} · +${fmt(CFG.bigJobRewards[n.id] || 0)} $T`;
-      return `<div class="flex items-center gap-2 text-xs font-semibold p-1.5 rounded-lg ${st === 2 ? 'bg-emerald-100' : st === 1 ? 'bg-amber-100' : 'bg-slate-100'}"><span class="text-base">${n.emoji}</span><div class="flex-1 min-w-0"><div class="truncate">${def.short}</div><div class="text-[10px] text-slate-500 truncate">${sub}</div></div><span>${st === 2 ? '✅' : st === 1 ? '⏳' : ready ? '❗' : '🔒'}</span><button data-go="${n.id}" class="btn-game px-2 py-0.5 bg-sky-200 text-[10px]">Ir</button></div>`; }).join('');
+      return `<div class="flex items-center gap-2 text-xs font-semibold p-1.5 rounded-lg ${st === 2 ? 'bg-emerald-100' : st === 1 ? 'bg-amber-100' : 'bg-slate-100'}">${npcFace(n.id, 22, n.emoji)}<div class="flex-1 min-w-0"><div class="truncate">${def.short}</div><div class="text-[10px] text-slate-500 truncate">${sub}</div></div><span>${st === 2 ? '✅' : st === 1 ? '⏳' : ready ? '❗' : '🔒'}</span><button data-go="${n.id}" class="btn-game px-2 py-0.5 bg-sky-200 text-[10px]">Ir</button></div>`; }).join('');
     html += `<div class="text-[10px] text-slate-500 mt-1 leading-snug">Requisitos (Sec. 7.4): su misión principal + confianza ${TL.heart} ${TL.name}. Se generan en la laptop 💻 y cada uno deja un sistema económico permanente.</div>`;
   } else if (tab === 'enc') {
     const rows = NPCS.map(n => { const cur = currentEncargo(n.id); const it = cur && cur.q && ITEMS[cur.q.item]; if (!it) return '';
-      return `<div class="flex items-center gap-2 text-xs font-semibold p-1.5 rounded-lg ${cur.done ? 'bg-emerald-100' : 'bg-slate-100'}"><span class="text-base">${n.emoji}</span><div class="flex-1 min-w-0"><div class="truncate">${it.icon} ${cur.q.qty}× ${esc(it.name)} <span class="text-slate-400">(${Inventory.count(cur.q.item)}/${cur.q.qty})</span></div><div class="text-[10px] text-slate-500">${n.name} · +${cur.q.tokens} $TOKEN · +${cur.q.trust} confianza${!cur.tutorial && !cur.done && Trust.level(n.id) >= 3 ? ' · 💼 premium ×3' : cur.enc?.premium ? ' · 💼 premium' : ''}</div></div><span>${cur.done ? '✅' : '📋'}</span>${cur.done ? '' : `<button data-go="${n.id}" class="btn-game px-2 py-0.5 bg-sky-200 text-[10px]">Ir</button>`}</div>`; }).join('');
+      return `<div class="flex items-center gap-2 text-xs font-semibold p-1.5 rounded-lg ${cur.done ? 'bg-emerald-100' : 'bg-slate-100'}">${npcFace(n.id, 22, n.emoji)}<div class="flex-1 min-w-0"><div class="truncate">${itemIcon(it.id, 18)} ${cur.q.qty}× ${esc(it.name)} <span class="text-slate-400">(${Inventory.count(cur.q.item)}/${cur.q.qty})</span></div><div class="text-[10px] text-slate-500">${n.name} · +${cur.q.tokens} $TOKEN · +${cur.q.trust} confianza${!cur.tutorial && !cur.done && Trust.level(n.id) >= 3 ? ' · 💼 premium ×3' : cur.enc?.premium ? ' · 💼 premium' : ''}</div></div><span>${cur.done ? '✅' : '📋'}</span>${cur.done ? '' : `<button data-go="${n.id}" class="btn-game px-2 py-0.5 bg-sky-200 text-[10px]">Ir</button>`}</div>`; }).join('');
     const oso = bigJobDone('bear') ? BakeryOrders.today() : null;   // v0.8 · Pedido del Horno
-    if (oso) html += `<div class="flex items-center gap-2 text-xs font-semibold p-1.5 rounded-lg ${oso.done ? 'bg-emerald-100' : 'bg-orange-100'}"><span class="text-base">📦</span><div class="flex-1 min-w-0"><div class="truncate">OsoExpress: ${oso.items.map(([id, q]) => `${q}× ${ITEMS[id].icon}`).join(' + ')}</div><div class="text-[10px] text-slate-500">Pedido del Horno · +${fmt(oso.pay)} $TOKEN</div></div><span>${oso.done ? '✅' : '📦'}</span>${oso.done ? '' : `<button data-go="bear" class="btn-game px-2 py-0.5 bg-sky-200 text-[10px]">Ir</button>`}</div>`;
+    if (oso) html += `<div class="flex items-center gap-2 text-xs font-semibold p-1.5 rounded-lg ${oso.done ? 'bg-emerald-100' : 'bg-orange-100'}"><span class="text-base">📦</span><div class="flex-1 min-w-0"><div class="truncate">OsoExpress: ${oso.items.map(([id, q]) => `${q}× ${itemIcon(id, 18)}`).join(' + ')}</div><div class="text-[10px] text-slate-500">Pedido del Horno · +${fmt(oso.pay)} $TOKEN</div></div><span>${oso.done ? '✅' : '📦'}</span>${oso.done ? '' : `<button data-go="bear" class="btn-game px-2 py-0.5 bg-sky-200 text-[10px]">Ir</button>`}</div>`;
     html += rows || (oso ? '' : `<div class="text-[11px] text-slate-500 p-1.5">Aún nadie te hace encargos. Los vecinos te los piden desde ${TRUST_LEVELS[2].heart} ${TRUST_LEVELS[2].name} (y el Oso tiene uno de bienvenida).</div>`);
     html += `<div class="text-[10px] text-slate-500 mt-1">Caducan a medianoche onírica: mañana, otros.</div>`;
-  } else html += NPCS.map(n => { const s = state.missions[n.id].status; const gate = s === 0 && !missionGateOk(n.id); const gateTxt = gate ? ` · 🔒 ${TRUST_LEVELS[NPC_SOCIAL[n.id]?.trustRequired ?? 0].name}` : ''; return `<div class="flex items-center gap-2 text-xs font-semibold p-1.5 rounded-lg ${s === 2 ? 'bg-emerald-100' : s === 1 ? 'bg-amber-100' : 'bg-slate-100'}"><span class="text-base">${n.emoji}</span><div class="flex-1 min-w-0"><div class="truncate">${n.mission.title}</div><div class="text-[10px] text-slate-500">${n.name} ${trustLvIcon(n.id)}${gateTxt} · +${n.reward} $TOKEN</div></div><span>${s === 2 ? '✅' : s === 1 ? '⏳' : gate ? '🔒' : '❗'}</span><button data-go="${n.id}" class="btn-game px-2 py-0.5 bg-sky-200 text-[10px]">Ir</button></div>`; }).join('');
+  } else html += NPCS.map(n => { const s = state.missions[n.id].status; const gate = s === 0 && !missionGateOk(n.id); const gateTxt = gate ? ` · 🔒 ${TRUST_LEVELS[NPC_SOCIAL[n.id]?.trustRequired ?? 0].name}` : ''; return `<div class="flex items-center gap-2 text-xs font-semibold p-1.5 rounded-lg ${s === 2 ? 'bg-emerald-100' : s === 1 ? 'bg-amber-100' : 'bg-slate-100'}">${npcFace(n.id, 22, n.emoji)}<div class="flex-1 min-w-0"><div class="truncate">${n.mission.title}</div><div class="text-[10px] text-slate-500">${n.name} ${trustLvIcon(n.id)}${gateTxt} · +${n.reward} $TOKEN</div></div><span>${s === 2 ? '✅' : s === 1 ? '⏳' : gate ? '🔒' : '❗'}</span><button data-go="${n.id}" class="btn-game px-2 py-0.5 bg-sky-200 text-[10px]">Ir</button></div>`; }).join('');
   ui.missionList.innerHTML = html;
   ui.missionList.querySelectorAll('[data-mtab]').forEach(b => b.onclick = (e) => { e.stopPropagation(); state.missionTab = b.dataset.mtab; refreshMissionUI(); });
   refreshNpcBubbles();   // v0.8: ★ sobre los vecinos con Trabajo Mayor disponible
@@ -4001,7 +4038,7 @@ function currentEncargo(npcId) {
 /** Botón 📋 de los diálogos (vacío si el NPC aún no ofrece encargos). La llama encBtns() desde startDialog. */
 function encargoBtns(npcId) {
   const cur = currentEncargo(npcId); if (!cur) return [];
-  return [dialogButton(cur.done ? '📋 Encargo ✓' : cur.tutorial ? '📋 Encargo: 3 🐚' : Trust.level(npcId) >= 3 ? '📋 Encargo del día (💼 premium)' : '📋 Encargo del día', 'bg-emerald-200 text-[#2b2b3d]', () => openEncargo(npcId))];
+  return [dialogButton(cur.done ? '📋 Encargo ✓' : cur.tutorial ? '📋 Encargo: 3 conchas' : Trust.level(npcId) >= 3 ? '📋 Encargo del día (💼 premium)' : '📋 Encargo del día', 'bg-emerald-200 text-[#2b2b3d]', () => openEncargo(npcId))];
 }
 /** Entrega: quita los objetos, paga $TOKEN y confianza, marca hecho. Devuelve true si se entregó. */
 function deliverEncargo(npcId, premium = false) {
@@ -4029,12 +4066,12 @@ function openEncargo(npcId) {
     const render = () => {
       if (cur.done) { body.innerHTML = `<div class="app-card p-5 text-center"><div class="text-4xl mb-2">✅</div><div class="font-bold text-[#2b2b3d]">¡Encargo completado!</div><div class="text-sm text-slate-600 mt-1">${n.name} está encantado contigo. Vuelve mañana 🌙</div></div>`; return; }
       const it = ITEMS[cur.q.item], have = Inventory.count(cur.q.item), ok = have >= cur.q.qty, prem = !cur.tutorial && Trust.level(npcId) >= 3, pq = cur.q.qty * CFG.premiumMult, pok = have >= pq;
-      body.innerHTML = `<div class="app-card p-4"><div class="flex items-start gap-3"><div class="text-4xl leading-none">${it.icon}</div><div class="flex-1 min-w-0">
+      body.innerHTML = `<div class="app-card p-4"><div class="flex items-start gap-3"><div class="text-4xl leading-none item-big">${itemIcon(it.id, 44)}</div><div class="flex-1 min-w-0">
         <div class="font-bold text-[#2b2b3d]">${n.emoji} ${n.name} pide:</div>
         <p class="text-sm text-slate-600 mt-1">“${cur.q.text}”</p>
-        <div class="text-sm font-bold mt-2 ${ok ? 'text-emerald-600' : 'text-red-600'}">${it.icon} ${it.name}: tienes ${have}/${cur.q.qty}</div>
+        <div class="text-sm font-bold mt-2 ${ok ? 'text-emerald-600' : 'text-red-600'}">${itemIcon(it.id, 20)} ${it.name}: tienes ${have}/${cur.q.qty}</div>
         <div class="text-xs text-slate-500 mt-1">Recompensa: <b class="text-amber-600">${COIN} ${cur.q.tokens} $TOKEN</b> + <b>🤝 ${cur.q.trust} de confianza</b>${cur.tutorial ? ' · <b>¡nivel completo!</b>' : ''}</div></div></div>
-        ${prem ? `<div class="mt-3 p-2 rounded-lg bg-amber-50 text-xs"><b class="text-amber-700">💼 Versión premium (${TRUST_LEVELS[3].heart} Socio):</b> ${pq}× ${it.icon} (tienes ${have}) → <b>${COIN} ${cur.q.tokens * CFG.premiumMult} $TOKEN</b> + <b>🤝 ${CFG.premiumTrust}</b> + <b>📰 1 rumor real de mercado para mañana</b></div>` : ''}
+        ${prem ? `<div class="mt-3 p-2 rounded-lg bg-amber-50 text-xs"><b class="text-amber-700">💼 Versión premium (${TRUST_LEVELS[3].heart} Socio):</b> ${pq}× ${itemIcon(it.id, 18)} (tienes ${have}) → <b>${COIN} ${cur.q.tokens * CFG.premiumMult} $TOKEN</b> + <b>🤝 ${CFG.premiumTrust}</b> + <b>📰 1 rumor real de mercado para mañana</b></div>` : ''}
         <div class="flex justify-end gap-2 mt-3 flex-wrap"><button data-deliver class="btn-game px-4 py-2 text-sm bg-emerald-300" ${ok ? '' : 'disabled'}>📦 Entregar encargo</button>${prem ? `<button data-premium class="btn-game px-4 py-2 text-sm bg-amber-300" ${pok ? '' : 'disabled'}>💼 Entregar premium ×${CFG.premiumMult}</button>` : ''}</div></div>`;
       const d = body.querySelector('[data-deliver]'); if (d) d.onclick = () => { if (deliverEncargo(npcId)) { cur.done = true; render(); } };
       const pb = body.querySelector('[data-premium]'); if (pb) pb.onclick = () => { if (deliverEncargo(npcId, true)) { cur.done = true; render(); } };
@@ -4116,8 +4153,10 @@ function completeMission(id) {
 const APP_TITLES = { bakery: 'Web de la Panadería', board: 'Tablón Holográfico', shop: 'Tienda de Mejoras del Mundo', secret: 'Tienda Secreta', farm: 'Cultivos de Frutas Doradas', port: 'Puerto & Mercado', memes: 'Generador de Memes' };
 /* ===== v2.1 · 🎨 ICONOS DE INTERFAZ: los emojis de botones, títulos y secciones se sustituyen por iconos Phosphor (duotono) con el color de su
    categoría. Los emojis de objetos y vecinos se quedan (son contenido). Si la hoja de iconos no carga, se deja el emoji tal cual. ===== */
-const UI_TINT = { gold: ['#c98a12', '#ffe9b5'], lilac: ['#6a59e6', '#e6e1ff'], mint: ['#1f9e73', '#d3f4e5'], sky: ['#2f7fd6', '#d9eafd'], coral: ['#d44b4b', '#ffe0e0'], rose: ['#c2477a', '#ffe0ee'], ink: ['#23244a', '#e6e2f3'] };
+const UI_TINT = { orange: ['#e0702e', '#ffe2cc'], gold: ['#c98a12', '#ffe9b5'], lilac: ['#6a59e6', '#e6e1ff'], mint: ['#1f9e73', '#d3f4e5'], sky: ['#2f7fd6', '#d9eafd'], coral: ['#d44b4b', '#ffe0e0'], rose: ['#c2477a', '#ffe0ee'], ink: ['#23244a', '#e6e2f3'] };
 const UI_ICONS = {
+  '☀': ['sun', 'gold'], '🌧': ['cloud-rain', 'sky'], '🌫': ['cloud-fog', 'ink'], '🔆': ['sun-dim', 'orange'], '⛈': ['cloud-lightning', 'lilac'], '❄': ['snowflake', 'sky'],   // v2.9: el tiempo
+  '💟': ['heart', 'ink'], '💛': ['heart', 'gold'], '🧡': ['heart', 'orange'], '❤': ['heart', 'coral'], '💜': ['heart', 'lilac'], '🙅': ['hand-palm', 'coral'], '🚫': ['prohibit', 'coral'], '❗': ['exclamation-mark', 'gold'],   // v2.9
   '✕': ['x', 'ink'], '✖': ['x', 'ink'], '☰': ['squares-four', 'lilac'], '←': ['arrow-left', 'ink'], '✓': ['check', 'mint'], '✔': ['check', 'mint'], '✅': ['check-circle', 'mint'], '❌': ['x-circle', 'coral'], '⚠': ['warning', 'gold'],
   '🏛': ['bank', 'gold'], '🔮': ['crystal-ball', 'lilac'], '🎲': ['dice-five', 'gold'], '🌍': ['globe-hemisphere-west', 'sky'], '🌐': ['planet', 'lilac'], '📦': ['package', 'gold'], '🏗': ['crane-tower', 'gold'],
   '📜': ['scroll', 'gold'], '🛏': ['bed', 'lilac'], '🎫': ['ticket', 'gold'], '🏆': ['trophy', 'gold'], '⚙': ['gear-six', 'ink'], '⬇': ['download-simple', 'sky'], '⬆': ['upload-simple', 'sky'], '✨': ['sparkle', 'lilac'],
@@ -4137,10 +4176,22 @@ const UI_EMO_RE = new RegExp('^\\s*(' + Object.keys(UI_ICONS).sort((a, b) => b.l
 /** Icono suelto (en línea con el texto) */
 function uiIco(emo, cls = 'ui-ic') { const k = (emo || '').replace(/️/g, ''), d = UI_ICONS[k]; if (!d) return esc(emo || ''); const [c1] = UI_TINT[d[1]]; return `<i class="ph-duotone ph-${d[0]} ${cls}" style="--t1:${c1}" aria-hidden="true"></i>`; }
 /** Icono en ficha de color (menú, cabeceras). Si no hay icono para ese emoji, el emoji va dentro de la ficha. */
-function uiChip(emo, size = '') { const k = (emo || '').replace(/️/g, ''), d = UI_ICONS[k]; if (!d) return `<span class="ic-chip emo ${size}" aria-hidden="true">${esc(emo || '')}</span>`; const [c1, c2] = UI_TINT[d[1]]; return `<span class="ic-chip ${size}" style="--t1:${c1};--t2:${c2}" aria-hidden="true"><i class="ph-duotone ph-${d[0]}"></i></span>`; }
+function uiChip(emo, size = '') { const k = (emo || '').replace(/️/g, ''), d = UI_ICONS[k]; if (!d) { let f = null, u = null; try { const npc = npcByEmoji(k); f = npc && IconStudio.face(npc); if (!f) { const iid = itemByEmoji(k); u = iid && IconStudio.url(iid); } } catch (e) {}   // v2.9: cara del vecino o miniatura del objeto
+    if (f) return `<span class="ic-chip face ${size}" aria-hidden="true"><img src="${f}" alt=""></span>`; if (u) return `<span class="ic-chip pic ${size}" aria-hidden="true"><img src="${u}" alt=""></span>`; return `<span class="ic-chip emo ${size}" aria-hidden="true">${esc(emo || '')}</span>`; } const [c1, c2] = UI_TINT[d[1]]; return `<span class="ic-chip ${size}" style="--t1:${c1};--t2:${c2}" aria-hidden="true"><i class="ph-duotone ph-${d[0]}"></i></span>`; }
 /** Separa "🏛️ Mercado real" → ['🏛️', 'Mercado real'] (si empieza por un emoji cualquiera) */
 function uiSplit(title) { const m = String(title || '').match(/^\s*((?:\p{Extended_Pictographic}|[☰←✕])(?:️|‍\p{Extended_Pictographic}|[\u{1F3FB}-\u{1F3FF}])*)\s*(.*)$/su); return m ? [m[1], m[2]] : ['', String(title || '')]; }
 function setAppTitle(title) { const el = ui.appTitle; el.dataset.raw = title; const [e, t] = uiSplit(title); el.innerHTML = (e ? uiChip(e, 'sm') : '') + `<span class="t">${esc(t)}</span>`; }
+/** v2.9 · J: cualquier emoji de interfaz conocido (UI_ICONS) dentro de paneles, HUD y botones del diálogo pasa a icono del juego.
+    Solo cuando la fuente de iconos ya cargó; nunca en desplegables, campos de texto ni en lo que dicen los vecinos. */
+const UI_EMO_ALL = new RegExp('(' + Object.keys(UI_ICONS).sort((a, b) => b.length - a.length).map(k => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|') + ')\uFE0F?', 'gu');
+function iconizeText(root) {
+  if (!root || !root.ownerDocument || typeof document.createTreeWalker !== 'function') return; let ok = false; try { ok = PhGlyph.ready; } catch (e) {} if (!ok) return;
+  const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, { acceptNode: (n) => { const p = n.parentElement; if (!p || p.closest('select, option, textarea, .no-ico, #laptopModal, #dialogText, script, style, #dialogName')) return NodeFilter.FILTER_REJECT; UI_EMO_ALL.lastIndex = 0; return UI_EMO_ALL.test(n.nodeValue) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP; } });
+  const list = []; while (w.nextNode()) list.push(w.currentNode);
+  for (const n of list) { const s = n.nodeValue, frag = document.createDocumentFragment(); let last = 0, m; UI_EMO_ALL.lastIndex = 0;
+    while ((m = UI_EMO_ALL.exec(s))) { if (m.index > last) frag.append(s.slice(last, m.index)); const t = document.createElement('span'); t.innerHTML = uiIco(m[1]); if (t.firstChild) frag.append(t.firstChild); last = m.index + m[0].length; }
+    if (last < s.length) frag.append(s.slice(last)); n.replaceWith(frag); }
+}
 /** Repaso del DOM: en botones, resúmenes y títulos de sección cambia el emoji inicial por su icono (una vez por nodo) */
 const UIDecor = {
   SEL: 'button, .btn-game, summary, .sec-h, #settingsModal .step > .font-bold, .menu-more summary',
@@ -4152,7 +4203,8 @@ const UIDecor = {
     const tmp = document.createElement('span'); tmp.innerHTML = uiIco(m[1]); const ic = tmp.firstChild; if (!ic || ic.nodeType !== 1) return;
     n.nodeValue = (n.nodeValue.slice(m[0].length) ? ' ' : '') + n.nodeValue.slice(m[0].length).replace(/^\s+/, ''); el.insertBefore(ic, n); if (!n.nodeValue.trim() && el.childNodes.length === 1) n.remove();
   },
-  run(root) { if (!root || !root.querySelectorAll) return; if (root.matches && root.matches(this.SEL)) this.fix(root); root.querySelectorAll(this.SEL).forEach(el => this.fix(el)); },
+  run(root) { if (!root || !root.querySelectorAll) return; if (root.matches && root.matches(this.SEL)) this.fix(root); root.querySelectorAll(this.SEL).forEach(el => this.fix(el));
+    if (root.closest && root.closest('#appModal, #hudTop, #dialog')) iconizeText(root); },   // v2.9: el resto de emojis de interfaz de los paneles, también a iconos
   init() {
     if (typeof MutationObserver === 'undefined' || !document.body || !document.body.querySelectorAll) return;
     this.run(document.body);
@@ -4162,6 +4214,437 @@ const UIDecor = {
   },
 };
 
+/* ===== v2.9 · 🎨 ICONOS DE OBJETOS EN 3D (Guía Maestra 2, Bloque J1) =====
+   Cada objeto tiene una miniatura low-poly (ITEM_ART: plantilla + colores) que se dibuja una vez con luz de estudio en un renderer pequeño
+   aparte, con borde blanco tipo pegatina y sombra suave. Se usa en la mochila, las tiendas, el mercado, los regalos, los encargos y el museo.
+   Si algo falla (sin WebGL, sin plantilla), se queda el emoji de siempre. */
+const ItemArt = (() => {
+  const geos = [], mats = new Map(), PI = Math.PI;
+  const keep = (g) => { geos.push(g); return g; };
+  /** Material cacheado: o.r rugosidad, o.m metal, o.e emisivo, o.ei intensidad, o.op opacidad, o.smooth sombreado suave, o.ds doble cara, o.wire alambre */
+  const M = (hex, o = {}) => {
+    const k = hex + '|' + JSON.stringify(o); let m = mats.get(k);
+    if (!m) { m = new THREE.MeshStandardMaterial({ color: hex, roughness: o.r ?? 0.55, metalness: o.m ?? 0, flatShading: !o.smooth, emissive: o.e ?? 0x000000, emissiveIntensity: o.ei ?? 1,
+      transparent: o.op != null, opacity: o.op ?? 1, side: o.ds ? THREE.DoubleSide : THREE.FrontSide, wireframe: !!o.wire, depthWrite: o.op == null || o.op > 0.6, envMapIntensity: o.m ? 1.1 : 0.45 }); mats.set(k, m); }
+    return m;
+  };
+  const G = () => new THREE.Group();
+  const sub = (g, r = [0, 0, 0], p = [0, 0, 0], s = 1) => { const n = new THREE.Group(); n.position.set(...p); n.rotation.set(...r); n.scale.setScalar(s); g.add(n); return n; };
+  /** Malla: put(padre, geometría, material, posición, rotación, escala) */
+  const put = (g, geo, mat, p = [0, 0, 0], r = [0, 0, 0], s = 1) => { const m = new THREE.Mesh(geo, mat); m.position.set(...p); m.rotation.set(...r); if (typeof s === 'number') m.scale.setScalar(s); else m.scale.set(...s); g.add(m); return m; };
+  const SG = (r, w = 16, h = 12, ...a) => keep(new THREE.SphereGeometry(r, w, h, ...a));
+  const CG = (rt, rb, h, seg = 16, ...a) => keep(new THREE.CylinderGeometry(rt, rb, h, seg, ...a));
+  const BG = (w, h, d) => keep(new THREE.BoxGeometry(w, h, d));
+  const KG = (r, h, seg = 12) => keep(new THREE.ConeGeometry(r, h, seg));
+  const TG = (R, r, rs = 8, ts = 24, arc = PI * 2) => keep(new THREE.TorusGeometry(R, r, rs, ts, arc));
+  const IG = (r, d = 0) => keep(new THREE.IcosahedronGeometry(r, d));
+  const OG = (r) => keep(new THREE.OctahedronGeometry(r));
+  const DG = (r) => keep(new THREE.DodecahedronGeometry(r));
+  const XG = (shape, depth, bevel = 0.04) => { const g = new THREE.ExtrudeGeometry(shape, { depth, bevelEnabled: bevel > 0, bevelThickness: bevel, bevelSize: bevel * 0.8, bevelSegments: 2, curveSegments: 10 }); g.center(); return keep(g); };
+  const starShape = (R = 0.5, r = 0.22, n = 5) => { const s = new THREE.Shape(); for (let i = 0; i < n * 2; i++) { const a = PI / 2 + i * PI / n, rr = i % 2 ? r : R; i ? s.lineTo(Math.cos(a) * rr, Math.sin(a) * rr) : s.moveTo(Math.cos(a) * rr, Math.sin(a) * rr); } s.closePath(); return s; };
+  const polyShape = (pts) => { const s = new THREE.Shape(); pts.forEach(([x, y], i) => i ? s.lineTo(x, y) : s.moveTo(x, y)); s.closePath(); return s; };
+  /** Tubo que se afina a lo largo de una curva (guindilla, cola…) */
+  const taperTube = (pts, r0, r1, segs = 28, rad = 12, rf = null) => { const curve = new THREE.CatmullRomCurve3(pts.map(p => new THREE.Vector3(...p))), geo = new THREE.TubeGeometry(curve, segs, 1, rad, false), P = geo.attributes.position, v = new THREE.Vector3();
+    for (let i = 0; i <= segs; i++) { const t = i / segs, c = curve.getPointAt(t), r = rf ? rf(t) : r0 + (r1 - r0) * Math.pow(t, 1.3); for (let j = 0; j <= rad; j++) { const k = i * (rad + 1) + j; v.fromBufferAttribute(P, k).sub(c).multiplyScalar(r).add(c); P.setXYZ(k, v.x, v.y, v.z); } }
+    geo.computeVertexNormals(); return keep(geo); };
+  const gearShape = (R = 0.5, teeth = 9, hole = 0.16) => { const s = new THREE.Shape(), N = teeth * 4; for (let i = 0; i <= N; i++) { const a = i / N * PI * 2, rr = (i % 4 < 2) ? R : R * 0.8; i ? s.lineTo(Math.cos(a) * rr, Math.sin(a) * rr) : s.moveTo(Math.cos(a) * rr, Math.sin(a) * rr); } const h = new THREE.Path(); h.absarc(0, 0, hole, 0, PI * 2, true); s.holes.push(h); return s; };
+  const GLOW = (hex, ei = 1.2) => M(hex, { e: hex, ei, smooth: true, r: 0.3 });
+  const GOLD = () => M(0xffc53d, { m: 0.65, r: 0.3 }), SILVER = () => M(0xdfe6ea, { m: 0.6, r: 0.28 }), INK = () => M(0x2b2b3d), WHITE = () => M(0xfbf8f2), WOOD = () => M(0x8d5a3b);
+  const eye = (g, p, s = 1) => { put(g, SG(0.07 * s, 10, 8), M(0xffffff, { smooth: true }), p); put(g, SG(0.038 * s, 8, 6), M(0x212121, { smooth: true }), [p[0] + 0.025 * s, p[1] + 0.005, p[2] + 0.045 * s]); };
+  const play = (g, p, s = 1, col = 0xffffff) => put(g, XG(polyShape([[-0.1, -0.12], [0.14, 0], [-0.1, 0.12]]), 0.03, 0.01), M(col), p, [0, 0, 0], s);
+
+  /* ---- plantillas: cada una devuelve un grupo de pie sobre y=0, de frente a +z ---- */
+  const T = {
+    fruit(c = 0xffd54f, leaf = 0x66bb6a, shine = 0) { const g = G(), s = sub(g, [0, 0, 0.55], [0, 0.55, 0]); const m = M(c, { smooth: true, r: 0.35, e: shine ? c : 0, ei: shine });
+      put(s, SG(0.42, 20, 16), m, [0, 0, 0], [0, 0, 0], [1, 1.22, 1]); put(s, KG(0.12, 0.2, 12), m, [0, 0.56, 0]); put(s, KG(0.1, 0.16, 12), m, [0, -0.55, 0], [PI, 0, 0]);
+      put(g, SG(0.2, 10, 8), M(leaf), [0.32, 1.04, 0.06], [0.3, 0, -0.75], [1.6, 0.3, 0.75]); return g; },
+    scallop(c = 0xffab91, c2 = 0xffd8c8) { const g = G(); for (let i = 0; i < 9; i++) { const a = -1.08 + i * (2.16 / 8); put(g, SG(0.16, 10, 8), M(i % 2 ? c : c2), [Math.sin(a) * 0.36, 0.14 + Math.cos(a) * 0.36, 0], [0, 0, -a], [0.78, 2.7, 0.5]); }
+      put(g, BG(0.46, 0.16, 0.16), M(c), [0, 0.06, 0]); return g; },
+    fish(c = 0x4fc3f7, fin = 0x0288d1, belly = 0xe1f5fe, stripes = 0) { const g = G(); put(g, SG(0.42, 18, 14), M(c, { smooth: true, r: 0.4 }), [0, 0.45, 0], [0, 0, 0], [1.5, 1, 0.62]);
+      put(g, SG(0.32, 14, 10), M(belly, { smooth: true }), [0.08, 0.34, 0.02], [0, 0, 0], [1.5, 0.55, 0.55]);
+      put(g, KG(0.3, 0.42, 4), M(fin), [-0.76, 0.45, 0], [0, 0, PI / 2], [1, 1, 0.35]); put(g, KG(0.17, 0.32, 4), M(fin), [-0.08, 0.86, 0], [0, 0, 0.35], [1, 1, 0.3]);
+      if (stripes) [-0.18, 0.18].forEach(x => put(g, SG(0.44, 12, 8), M(stripes, { smooth: true }), [x, 0.45, 0], [0, 0, 0], [0.12, 0.98, 0.64])); eye(g, [0.38, 0.54, 0.2]); return g; },
+    puffer(c = 0xffc107, spike = 0xff8f00) { const g = G(); put(g, SG(0.45, 18, 14), M(c, { smooth: true, r: 0.35, e: c, ei: 0.15 }), [0, 0.48, 0]);
+      for (let i = 0; i < 14; i++) { const u = (i * 0.618) % 1, v = (i / 14) * 2 - 1, th = u * PI * 2, ph = Math.acos(v), d = [Math.sin(ph) * Math.cos(th), Math.cos(ph), Math.sin(ph) * Math.sin(th)];
+        const k = put(g, KG(0.06, 0.18, 5), M(spike), [d[0] * 0.48, 0.48 + d[1] * 0.48, d[2] * 0.48]); k.lookAt(d[0] * 2, 0.48 + d[1] * 2, d[2] * 2); k.rotateX(PI / 2); }
+      put(g, KG(0.2, 0.3, 4), M(spike), [-0.55, 0.48, 0], [0, 0, PI / 2], [1, 1, 0.35]); eye(g, [0.3, 0.6, 0.3], 1.2); put(g, SG(0.06, 8, 6), M(0xe65100), [0.46, 0.44, 0.08]); return g; },
+    boot(c = 0x8d5a3b) { const g = G(), s = sub(g, [0, -0.35, 0]); put(s, BG(0.95, 0.1, 0.4), M(0x3e2723), [0.12, 0.05, 0]); put(s, BG(0.62, 0.3, 0.36), M(c), [0.02, 0.25, 0]); put(s, SG(0.21, 14, 10), M(c), [0.38, 0.2, 0], [0, 0, 0], [1.25, 0.95, 0.88]);
+      put(s, CG(0.21, 0.23, 0.6, 12), M(c), [-0.12, 0.62, 0]); put(s, TG(0.21, 0.045, 6, 16), M(0x5d4037), [-0.12, 0.92, 0], [PI / 2, 0, 0]); [0, 1, 2].forEach(i => put(s, BG(0.03, 0.02, 0.3), M(0xd7ccc8), [-0.02 + i * 0.07, 0.42 + i * 0.06, 0], [0, 0, -0.5]));
+      put(s, BG(0.14, 0.1, 0.02), M(0xbcaaa4), [-0.18, 0.5, 0.215], [0, 0, 0.3]); put(s, SG(0.05, 6, 5), M(0x80cbc4), [0.58, 0.16, 0.16]); return g; },
+    butterfly(w1 = 0x81d4fa, w2 = 0xce93d8, rainbow = false) { const g = G(), s = sub(g, [0, -0.35, 0], [0, 0.5, 0]); put(s, CG(0.045, 0.035, 0.56, 8), M(0x37474f), [0, 0, 0]); put(s, SG(0.06, 8, 6), M(0x37474f), [0, 0.3, 0]);
+      const RB = [0xef5350, 0xffca28, 0x42a5f5];
+      [-1, 1].forEach(k => { const up = sub(s, [0, k * 0.3, 0], [0, 0, 0]);
+        if (rainbow) { RB.forEach((col, i) => put(up, SG(0.3 - i * 0.07, 14, 10), M(col), [k * (0.3 - i * 0.02), 0.16 + i * 0.01, 0.01 * i], [0, 0, -k * 0.45], [1, 1.25, 0.07])); RB.slice().reverse().forEach((col, i) => put(up, SG(0.2 - i * 0.05, 12, 10), M(col), [k * (0.2 - i * 0.01), -0.17, 0.01 * i], [0, 0, k * 0.55], [1, 1.2, 0.07])); }
+        else { put(up, SG(0.3, 14, 10), M(w1), [k * 0.3, 0.16, 0], [0, 0, -k * 0.45], [1, 1.25, 0.07]); put(up, SG(0.08, 8, 6), M(0xffffff), [k * 0.36, 0.24, 0.03], [0, 0, 0], [1, 1, 0.25]); put(up, SG(0.2, 12, 10), M(w2), [k * 0.2, -0.17, 0], [0, 0, k * 0.55], [1, 1.2, 0.07]); }
+        put(s, CG(0.012, 0.012, 0.3, 4), INK(), [k * 0.07, 0.44, 0], [0, 0, -k * 0.45]); put(s, SG(0.035, 6, 5), INK(), [k * 0.135, 0.57, 0]); }); return g; },
+    jar(lid = 0x8d6e63, glow = 0xfff176, n = 6) { const g = G(); put(g, CG(0.34, 0.34, 0.78, 20), M(0xb3e5fc, { op: 0.32, r: 0.08, smooth: true }), [0, 0.4, 0]); put(g, CG(0.3, 0.36, 0.08, 20), M(0xe1f5fe, { op: 0.5, smooth: true }), [0, 0.81, 0]);
+      put(g, CG(0.33, 0.33, 0.12, 20), M(lid), [0, 0.88, 0]); [[0.1, 0.3, 0.1], [-0.12, 0.5, -0.05], [0.05, 0.62, -0.12], [-0.05, 0.22, 0.12], [0.14, 0.55, 0.08], [-0.15, 0.36, 0.1]].slice(0, n).forEach(p => put(g, SG(0.075, 8, 6), GLOW(glow, 1.4), p));
+      return g; },
+    log() { const g = G(), s = sub(g, [0, 1.2, PI / 2], [0, 0.32, 0]); put(s, CG(0.3, 0.3, 1.1, 12), M(0x8d6e63), [0, 0, 0]); [0.555, -0.555].forEach(y => put(s, CG(0.27, 0.27, 0.02, 12), M(0xe8c99b), [0, y, 0]));
+      [0.08, 0.17].forEach(r => put(s, TG(r, 0.012, 4, 18), M(0xb08a5e), [0, 0.57, 0], [PI / 2, 0, 0])); put(s, SG(0.09, 6, 5), M(0x66bb6a), [0.27, 0.15, 0.08], [0, 0, 0], [0.6, 1, 0.6]); return g; },
+    rock(c = 0x9e9e9e) { const g = G(); put(g, DG(0.45), M(c), [0, 0.32, 0], [0.3, 0.5, 0.1], [1.2, 0.75, 1]); put(g, DG(0.2), M(0xbdbdbd), [0.5, 0.14, 0.25], [0.6, 0.2, 0], [1, 0.8, 1]); put(g, DG(0.13), M(0x757575), [-0.45, 0.1, 0.3]); return g; },
+    drop(c = 0xffb300) { const g = G(); put(g, SG(0.38, 20, 16), M(c, { smooth: true, op: 0.88, r: 0.15, e: c, ei: 0.35 }), [0, 0.42, 0]); put(g, KG(0.33, 0.55, 20), M(c, { smooth: true, op: 0.88, r: 0.15, e: c, ei: 0.35 }), [0, 0.86, 0]);
+      put(g, SG(0.09, 8, 6), M(0xffffff, { op: 0.8, smooth: true }), [-0.14, 0.55, 0.28]); put(g, SG(0.08, 8, 6), M(c, { smooth: true, op: 0.88 }), [0.42, 0.08, 0.1]); return g; },
+    jamjar(c = 0xffb300, cloth = 0xe53935) { const g = G(); put(g, CG(0.34, 0.32, 0.66, 18), M(0xe3f2fd, { op: 0.35, smooth: true, r: 0.08 }), [0, 0.33, 0]); put(g, CG(0.3, 0.29, 0.56, 18), M(c, { smooth: true, e: c, ei: 0.2 }), [0, 0.3, 0]);
+      put(g, CG(0.36, 0.36, 0.1, 18), M(0xbdbdbd, { m: 0.4 }), [0, 0.7, 0]); put(g, SG(0.42, 16, 8, 0, PI * 2, 0, PI / 2), M(cloth, { ds: true }), [0, 0.68, 0], [0, 0, 0], [1, 0.35, 1]);
+      put(g, TG(0.35, 0.02, 4, 24), M(0xfafafa), [0, 0.72, 0], [PI / 2, 0, 0]); put(g, BG(0.32, 0.18, 0.02), WHITE(), [0, 0.34, 0.33]); return g; },
+    sprout(leaf = 0x66bb6a) { const g = G(); put(g, SG(0.42, 16, 8, 0, PI * 2, 0, PI / 2), M(0x795548), [0, 0, 0], [0, 0, 0], [1, 0.55, 1]); put(g, CG(0.035, 0.04, 0.5, 6), M(0x7cb342), [0, 0.42, 0]);
+      put(g, SG(0.2, 10, 8), M(leaf), [-0.2, 0.66, 0], [0, 0, 0.6], [1.5, 0.35, 0.8]); put(g, SG(0.2, 10, 8), M(leaf), [0.2, 0.72, 0], [0, 0, -0.6], [1.5, 0.35, 0.8]); put(g, SG(0.12, 10, 8), M(0xa1887f), [0.22, 0.2, 0.2], [0, 0, 0.5], [1, 1.35, 1]); return g; },
+    roll(c = 0x9ccc65, c2 = 0x689f38) { const g = G(), s = sub(g, [0, 0.5, PI / 2], [0, 0.3, 0]); put(s, CG(0.3, 0.3, 0.95, 16), M(c), [0, 0, 0]); [-0.3, 0, 0.3].forEach(y => put(s, CG(0.305, 0.305, 0.08, 16), M(c2), [0, y, 0]));
+      put(s, CG(0.08, 0.08, 0.97, 10), M(0xd7ccc8), [0, 0, 0]); put(g, BG(0.62, 0.02, 0.5), M(c), [0.2, 0.01, 0.42], [0, 0.5, 0]); return g; },
+    planks(c = 0xc88a4e) { const g = G(); [[0, 0.1, 0, 0], [0.04, 0.3, 0, 0.12], [-0.03, 0.5, 0, -0.08]].forEach(([x, y, z, r]) => put(g, BG(1.1, 0.18, 0.36), M(c), [x, y, z], [0, r, 0]));
+      [0.1, 0.3, 0.5].forEach(y => put(g, BG(1.12, 0.02, 0.02), M(0x8d5a3b), [0, y + 0.03, 0.17])); put(g, SG(0.08, 10, 8), M(0xffb300, { smooth: true, e: 0xffb300, ei: 0.3 }), [0.3, 0.62, 0.1], [0, 0, 0], [1, 1.3, 1]); return g; },
+    pouch(c = 0x8d6e63) { const g = G(); put(g, SG(0.42, 14, 12), M(c), [0, 0.38, 0], [0, 0, 0], [1.1, 0.82, 0.7]); put(g, BG(0.62, 0.38, 0.06), M(0x6d4c41), [0, 0.52, 0.27], [-0.25, 0, 0]);
+      put(g, SG(0.06, 8, 6), GOLD(), [0, 0.38, 0.33]); put(g, TG(0.28, 0.02, 4, 16, PI), M(0x5d4037), [0, 0.68, 0], [0, 0, 0]); return g; },
+    sparkles(c = 0xab47bc) { const g = G(); const star4 = (p, s) => { const n = sub(g, [0, 0.4, 0], p, s); put(n, OG(0.3), M(c, { r: 0.35, e: c, ei: 0.12 }), [0, 0, 0], [0, 0, 0], [0.3, 1, 0.3]); put(n, OG(0.3), M(c, { r: 0.35, e: c, ei: 0.12 }), [0, 0, 0], [0, 0, PI / 2], [0.3, 1, 0.3]); };
+      star4([0, 0.6, 0], 1.2); star4([0.45, 0.25, 0.1], 0.6); star4([-0.38, 0.2, 0.15], 0.5); put(g, KG(0.32, 0.18, 14), M(0xce93d8, { smooth: true }), [0, 0.09, 0]); return g; },
+    pearl() { const g = G(); put(g, SG(0.5, 16, 8, 0, PI * 2, PI / 2, PI / 2), M(0xf8bbd0, { ds: true }), [0, 0.32, 0], [0, 0, 0], [1, 0.6, 1]); put(g, SG(0.3, 24, 18), M(0xfafafa, { smooth: true, m: 0.2, r: 0.12, e: 0xffffff, ei: 0.15 }), [0, 0.45, 0]); return g; },
+    orb(c = 0xb39ddb) { const g = G(); put(g, CG(0.32, 0.4, 0.18, 12), GOLD(), [0, 0.09, 0]); put(g, TG(0.3, 0.05, 6, 20), GOLD(), [0, 0.2, 0], [PI / 2, 0, 0]);
+      put(g, SG(0.4, 24, 18), M(c, { op: 0.82, r: 0.1, e: c, ei: 0.45, smooth: true }), [0, 0.58, 0]); put(g, SG(0.16, 12, 10), GLOW(0xffffff, 0.8), [0.05, 0.6, 0.05]); put(g, SG(0.07, 8, 6), M(0xffffff, { op: 0.9, smooth: true }), [-0.15, 0.76, 0.28]); return g; },
+    crystals(c = 0x4dd0e1) { const g = G(); [[0, 0, 0, 0, 1], [0.28, 0, 0.1, -0.45, 0.7], [-0.25, 0, 0.12, 0.5, 0.65], [0.08, 0, -0.22, 0.25, 0.55]].forEach(([x, y, z, r, s]) => { const n = sub(g, [0.15, 0, r], [x, y, z], s); put(n, CG(0.16, 0.18, 0.7, 6), M(c, { r: 0.15, m: 0.1, e: c, ei: 0.2 }), [0, 0.35, 0]); put(n, KG(0.16, 0.26, 6), M(c, { r: 0.15, e: c, ei: 0.2 }), [0, 0.83, 0]); });
+      put(g, DG(0.32), M(0x8d8d8d), [0, 0, 0], [0, 0, 0], [1.4, 0.4, 1.1]); return g; },
+    star(c = 0xffd54f, trail = 0, glow = 0.5) { const g = G(); put(g, XG(starShape(0.5, 0.22), 0.16, 0.06), M(c, { e: c, ei: glow * 0.18, r: 0.32, m: 0.25 }), [0, 0.55, 0], [0, -0.25, 0]);
+      if (trail) [0, 1, 2].forEach(i => put(g, KG(0.1 - i * 0.02, 0.85 - i * 0.18, 10), M(trail, { op: 0.8 - i * 0.15, e: trail, ei: 0.35, smooth: true }), [-0.5 - i * 0.05, 0.22 + i * 0.13, -0.05 * i], [0, 0, 0.95 + i * 0.12])); return g; },
+    chili(c = 0xe53935) { const g = G(), m = M(c, { smooth: true, r: 0.25 }); put(g, taperTube([[-0.38, 0.86, 0], [-0.1, 0.62, 0.04], [0.12, 0.3, 0.02], [0.36, 0.14, 0], [0.46, 0.22, 0]], 0.16, 0.02), m);
+      put(g, SG(0.16, 12, 10), m, [-0.38, 0.86, 0]); put(g, CG(0.14, 0.17, 0.1, 10), M(0x388e3c), [-0.44, 0.93, 0], [0, 0, 0.75]); put(g, CG(0.03, 0.03, 0.22, 6), M(0x2e7d32), [-0.55, 1.04, 0], [0, 0, 0.25]); return g; },
+    compass(face = 0xfff8e1) { const g = G(), s = sub(g, [1.05, 0, 0], [0, 0.5, 0]); put(s, CG(0.5, 0.5, 0.14, 28), GOLD(), [0, 0, 0]); put(s, CG(0.43, 0.43, 0.15, 28), M(face), [0, 0.005, 0]);
+      put(s, KG(0.07, 0.36, 4), M(0xe53935), [0, 0.09, -0.17], [-PI / 2, 0, 0]); put(s, KG(0.07, 0.36, 4), M(0x78909c), [0, 0.09, 0.17], [PI / 2, 0, 0]); put(s, CG(0.05, 0.05, 0.06, 10), GOLD(), [0, 0.11, 0]);
+      put(s, TG(0.08, 0.025, 6, 12), GOLD(), [0, 0, -0.56], [0, 0, 0]); [0, 1, 2, 3].forEach(i => put(s, BG(0.02, 0.02, 0.07), M(0x5d4037), [Math.sin(i * PI / 2) * 0.37, 0.08, Math.cos(i * PI / 2) * 0.37], [0, i * PI / 2, 0])); return g; },
+    watch(c = 0xffc53d, face = 0xfffdf5, glow = 0) { const g = G(), s = sub(g, [PI / 2 - 0.25, 0, 0], [0, 0.5, 0]); put(s, CG(0.46, 0.46, 0.16, 28), M(c, { m: 0.5, r: 0.3, e: glow ? c : 0, ei: glow }), [0, 0, 0]);
+      put(s, CG(0.39, 0.39, 0.17, 28), M(face, { e: glow ? face : 0, ei: glow }), [0, 0.003, 0]); put(s, BG(0.04, 0.02, 0.28), INK(), [0.05, 0.1, -0.1], [0, 0.6, 0]); put(s, BG(0.04, 0.02, 0.2), M(0xe53935), [-0.07, 0.1, -0.05], [0, -0.9, 0]);
+      put(s, CG(0.1, 0.1, 0.14, 10), M(c, { m: 0.5 }), [0, 0, -0.52], [PI / 2, 0, 0]); put(s, CG(0.06, 0.06, 0.08, 8), M(c, { m: 0.5 }), [0, 0, -0.62], [PI / 2, 0, 0]);
+      [0, 1, 2, 3].forEach(i => put(s, BG(0.03, 0.02, 0.06), INK(), [Math.sin(i * PI / 2) * 0.32, 0.09, Math.cos(i * PI / 2) * 0.32], [0, i * PI / 2, 0])); return g; },
+    map() { const g = G(); [-1, 0, 1].forEach(i => { const p = sub(g, [-0.55, i * 0.32, 0], [i * 0.36, 0.42, -Math.abs(i) * 0.05]); put(p, BG(0.38, 0.62, 0.02), M(0xfff3d6), [0, 0, 0]);
+        put(p, SG(0.12, 8, 6), M(0x81c784), [i === 0 ? 0.04 : -0.06, 0.08 * i, 0.012], [0, 0, 0], [1.1, 0.8, 0.08]); });
+      [[-0.32, 0.5], [-0.16, 0.42], [0, 0.46], [0.16, 0.4]].forEach(([x, y]) => put(g, BG(0.06, 0.02, 0.02), M(0xe53935), [x, y, 0.06]));
+      put(g, BG(0.14, 0.03, 0.02), M(0xc62828), [0.33, 0.36, 0.08], [0, 0, 0.8]); put(g, BG(0.14, 0.03, 0.02), M(0xc62828), [0.33, 0.36, 0.08], [0, 0, -0.8]); return g; },
+    coins(c = 0xe2b33c) { const g = G(), m = M(c, { m: 0.55, r: 0.3 }); [0, 1, 2].forEach(i => put(g, CG(0.3, 0.3, 0.08, 18), m, [i * 0.03 - 0.25, 0.05 + i * 0.085, 0]));
+      const k = sub(g, [0.25, -0.5, 0.12], [0.25, 0.32, 0.1]); put(k, CG(0.3, 0.3, 0.08, 18), m, [0, 0, 0], [PI / 2, 0, 0]); put(k, BG(0.1, 0.1, 0.09), M(0x6d4c41), [0, 0, 0]);
+      put(k, TG(0.22, 0.015, 4, 20), M(0xb8860b, { m: 0.5 }), [0, 0, 0.045]); return g; },
+    bone(c = 0xf3e7cf) { const g = G(), s = sub(g, [0, 0.4, 0.45], [0, 0.42, 0]), m = M(c, { smooth: true }); put(s, CG(0.1, 0.1, 0.8, 10), m, [0, 0, 0], [0, 0, PI / 2]);
+      [[-0.42, 0.1], [-0.42, -0.1], [0.42, 0.1], [0.42, -0.1]].forEach(([x, y]) => put(s, SG(0.13, 10, 8), m, [x, y, 0])); put(s, SG(0.05, 6, 5), M(0xd7c4a3), [0.1, 0.06, 0.08]); return g; },
+    oyster() { const g = G(), out = M(0x78909c), inn = M(0xe3f2fd, { m: 0.35, r: 0.2, smooth: true }); put(g, SG(0.46, 16, 8, 0, PI * 2, PI / 2, PI / 2), out, [0, 0.22, 0], [0, 0, 0], [1, 0.45, 0.85]);
+      put(g, CG(0.44, 0.44, 0.02, 20), inn, [0, 0.23, 0], [0, 0, 0], [1, 1, 0.85]); const top = sub(g, [-0.95, 0, 0], [0, 0.24, -0.36]); put(top, SG(0.46, 16, 8, 0, PI * 2, 0, PI / 2), out, [0, 0, 0.36], [0, 0, 0], [1, 0.4, 0.85]);
+      put(top, CG(0.42, 0.42, 0.02, 20), inn, [0, -0.01, 0.36], [0, 0, 0], [1, 1, 0.85]); put(g, SG(0.13, 16, 12), M(0xfafafa, { smooth: true, m: 0.25, r: 0.1, e: 0xffffff, ei: 0.2 }), [0, 0.35, 0.05]); return g; },
+    tiki(c = 0x8d6e63) { const g = G(); put(g, CG(0.36, 0.4, 1.0, 8), M(c), [0, 0.5, 0]); put(g, BG(0.8, 0.12, 0.3), M(0x6d4c41), [0, 0.74, 0.22]); [-0.15, 0.15].forEach(x => { put(g, SG(0.09, 8, 6), WHITE(), [x, 0.62, 0.33]); put(g, SG(0.045, 6, 5), INK(), [x, 0.62, 0.41]); });
+      put(g, BG(0.34, 0.12, 0.08), M(0x4e342e), [0, 0.32, 0.36]); [0, 1, 2, 3, 4].forEach(i => { const f = put(g, KG(0.07, 0.42, 4), M([0xe53935, 0xfdd835, 0x43a047, 0x1e88e5, 0xff7043][i]), [-0.24 + i * 0.12, 1.15, 0], [0, 0, (2 - i) * 0.22]); }); return g; },
+    croissant(c = 0xe2a14a) { const g = G(), s = sub(g, [-0.5, 0, 0], [0, 0.32, 0]), pts = [], A = 1.25, Rr = 0.46, rf = (t) => 0.05 + 0.2 * Math.pow(Math.sin(PI * t), 0.75);
+      for (let i = 0; i <= 8; i++) { const a = -A + 2 * A * i / 8; pts.push([Math.sin(a) * Rr, Math.cos(a) * Rr * 0.85 - 0.3, 0]); }
+      put(s, taperTube(pts, 0, 0, 40, 14, rf), M(c, { smooth: true, r: 0.45 })); const curve = new THREE.CatmullRomCurve3(pts.map(p => new THREE.Vector3(...p)));
+      [0.2, 0.34, 0.5, 0.66, 0.8].forEach(t => { const p = curve.getPointAt(t), d = curve.getTangentAt(t), r = rf(t) * 1.01; const m = put(s, TG(r, 0.022, 6, 18), M(0xb8742e, { smooth: true }), [p.x, p.y, p.z]); m.lookAt(p.x + d.x, p.y + d.y, p.z + d.z); }); return g; },
+    cupcake(fro = 0xf8bbd0, liner = 0x4fc3f7) { const g = G(); put(g, CG(0.36, 0.26, 0.42, 14), M(liner), [0, 0.21, 0]); put(g, SG(0.4, 16, 12), M(fro, { smooth: true }), [0, 0.5, 0], [0, 0, 0], [1, 0.55, 1]);
+      put(g, KG(0.3, 0.34, 16), M(fro, { smooth: true }), [0, 0.76, 0]); put(g, SG(0.1, 10, 8), M(0xe53935, { smooth: true, r: 0.2 }), [0, 0.98, 0]);
+      [[0.2, 0.62, 0.22, 0xfff176], [-0.18, 0.6, 0.25, 0x81d4fa], [0.05, 0.7, 0.3, 0xa5d6a7]].forEach(([x, y, z, col]) => put(g, BG(0.07, 0.025, 0.025), M(col), [x, y, z], [0, 0, x * 3])); return g; },
+    cakeslice(top = 0xfafafa, cream = 0xf8bbd0) { const g = G(), s = sub(g, [0, 2.2, 0], [0.1, 0, 0.15]); const R = 0.72, A = PI / 3.2;
+      const wedge = (h) => { const sh = new THREE.Shape(); sh.moveTo(0, 0); sh.lineTo(R, 0); sh.absarc(0, 0, R, 0, A, false); sh.lineTo(0, 0); const geo = keep(new THREE.ExtrudeGeometry(sh, { depth: h, bevelEnabled: false, curveSegments: 12 })); geo.rotateX(-PI / 2); return geo; };
+      let y = 0; [[0.2, 0xfff1c1], [0.06, cream], [0.2, 0xfff1c1], [0.09, top]].forEach(([h, col]) => { put(s, wedge(h), M(col), [0, y, 0]); y += h; });
+      put(s, SG(0.11, 12, 10), M(0xe53935, { smooth: true, r: 0.3 }), [R * 0.62, y + 0.08, -R * 0.3], [0, 0, 0], [1, 1.2, 1]); put(s, KG(0.07, 0.08, 6), M(0x43a047), [R * 0.62, y + 0.21, -R * 0.3]);
+      put(s, SG(0.06, 8, 6), M(cream, { smooth: true }), [R * 0.35, y + 0.03, -R * 0.12]); return g; },
+    cake(c = 0xffcc33, cream = 0xfffde7) { const g = G(); put(g, CG(0.5, 0.5, 0.36, 24), M(c), [0, 0.18, 0]); put(g, CG(0.34, 0.34, 0.3, 24), M(c), [0, 0.51, 0]);
+      put(g, TG(0.5, 0.05, 6, 24), M(cream, { smooth: true }), [0, 0.36, 0], [PI / 2, 0, 0]); put(g, TG(0.34, 0.045, 6, 24), M(cream, { smooth: true }), [0, 0.66, 0], [PI / 2, 0, 0]);
+      [-0.15, 0, 0.15].forEach((x, i) => { put(g, CG(0.03, 0.03, 0.24, 8), M([0x42a5f5, 0xef5350, 0x66bb6a][i]), [x, 0.78, i === 1 ? 0.08 : 0]); put(g, KG(0.04, 0.1, 8), GLOW(0xffb300, 1.6), [x, 0.95, i === 1 ? 0.08 : 0]); }); return g; },
+    fuelcan(c = 0xe53935) { const g = G(); put(g, BG(0.62, 0.8, 0.32), M(c), [0, 0.4, 0]); put(g, BG(0.5, 0.28, 0.33), M(0xfdd835), [0, 0.38, 0]); put(g, TG(0.13, 0.04, 6, 12, PI), M(c), [-0.12, 0.8, 0]);
+      put(g, CG(0.05, 0.07, 0.3, 10), M(0x424242), [0.26, 0.9, 0], [0, 0, -0.6]); put(g, BG(0.3, 0.06, 0.34), M(0xb71c1c), [0, 0.06, 0]); return g; },
+    loaf(c = 0xd9933f) { const g = G(); put(g, SG(0.42, 16, 12), M(c, { smooth: true }), [0, 0.32, 0], [0, 0.4, 0], [1.4, 0.75, 0.9]); put(g, BG(1.0, 0.18, 0.66), M(c), [0, 0.12, 0], [0, 0.4, 0]);
+      [-0.25, 0, 0.25].forEach(x => put(g, BG(0.05, 0.03, 0.4), M(0xfff3d6), [x * Math.cos(0.4), 0.62, -x * Math.sin(0.4)], [0, 0.4 + 0.5, 0])); return g; },
+    baguette(c = 0xd09a52) { const g = G(), s = sub(g, [0.3, 0.5, 0.35], [0, 0.42, 0]), m = M(c, { smooth: true }); put(s, CG(0.17, 0.17, 1.2, 14), m, [0, 0, 0], [0, 0, PI / 2]); [-0.6, 0.6].forEach(x => put(s, SG(0.17, 14, 10), m, [x, 0, 0]));
+      [-0.36, -0.12, 0.12, 0.36].forEach(x => put(s, BG(0.04, 0.03, 0.2), M(0xf0d9a8), [x, 0.16, 0], [0, 0.7, 0])); return g; },
+    skewer() { const g = G(), s = sub(g, [0, 0.3, 0.35]); const f = T.fish(0xb9773a, 0x8d5a2b, 0xd7a86e); f.position.y = -0.05; s.add(f); put(s, CG(0.025, 0.025, 1.7, 6), M(0xd7b98a), [0.05, 0.4, 0], [0, 0, PI / 2]);
+      [-0.2, 0.05, 0.3].forEach(x => put(s, BG(0.04, 0.4, 0.02), M(0x4e342e), [x, 0.45, 0.24], [0, 0, 0.4])); return g; },
+    mug(c = 0xfafafa, liquid = 0x5d4037) { const g = G(); put(g, CG(0.34, 0.3, 0.62, 18), M(c), [0, 0.31, 0]); put(g, CG(0.3, 0.3, 0.02, 18), M(liquid), [0, 0.6, 0]); put(g, TG(0.15, 0.05, 8, 14, PI * 1.3), M(c), [0.36, 0.33, 0], [0, 0, -PI * 0.65]);
+      put(g, SG(0.08, 8, 6), M(0xffffff, { op: 0.6, smooth: true }), [0.02, 0.8, 0]); put(g, SG(0.065, 8, 6), M(0xffffff, { op: 0.45, smooth: true }), [-0.05, 0.95, 0.02]); put(g, BG(0.22, 0.12, 0.02), M(0xe57373), [0, 0.32, 0.31]); return g; },
+    coconut() { const g = G(); put(g, SG(0.38, 14, 12), M(0x6d4c41), [-0.22, 0.38, -0.1]); const h = sub(g, [0.7, 0, 0], [0.3, 0.26, 0.15]); put(h, SG(0.32, 14, 8, 0, PI * 2, PI / 2, PI / 2), M(0x795548, { ds: true }), [0, 0, 0]);
+      put(h, CG(0.3, 0.3, 0.02, 18), M(0xfafafa), [0, -0.005, 0]); put(h, CG(0.2, 0.2, 0.025, 16), M(0xe3f2fd, { op: 0.8 }), [0, 0, 0]); [-0.08, 0.06, 0.02].forEach((x, i) => put(g, SG(0.04, 6, 5), M(0x3e2723), [-0.22 + x, 0.6 + i * 0.05, 0.2])); return g; },
+    mango() { const g = G(), s = sub(g, [0, 0.3, 0.35], [0, 0.48, 0]); put(s, SG(0.4, 18, 14), M(0xffa726, { smooth: true, r: 0.35 }), [0, 0, 0], [0, 0, 0], [1.05, 1.2, 0.85]);
+      put(s, SG(0.3, 14, 10), M(0xef5350, { smooth: true, r: 0.35 }), [0.14, 0.18, 0.12], [0, 0, 0], [1, 1.1, 0.8]); put(s, CG(0.025, 0.03, 0.12, 6), M(0x5d4037), [0, 0.52, 0]); put(s, SG(0.16, 10, 8), M(0x43a047), [0.16, 0.58, 0], [0, 0, -0.6], [1.5, 0.3, 0.7]); return g; },
+    bento() { const g = G(); put(g, BG(1.0, 0.18, 0.7), M(0x8e2424), [0, 0.09, 0]); put(g, BG(0.9, 0.04, 0.6), M(0x2b1a1a), [0, 0.17, 0]); put(g, BG(0.04, 0.12, 0.6), M(0x8e2424), [0.1, 0.22, 0]);
+      const f = T.fish(0xffca28, 0xff8f00, 0xffecb3); f.scale.setScalar(0.42); f.position.set(-0.22, 0.12, 0); g.add(f); [[0.3, 0.12], [0.42, -0.12], [0.24, -0.14]].forEach(([x, z]) => put(g, SG(0.11, 10, 8), WHITE(), [x, 0.27, z]));
+      put(g, SG(0.08, 8, 6), M(0x66bb6a), [0.38, 0.3, 0.16], [0, 0, 0], [1.3, 0.5, 1]); return g; },
+    bowl(content = 0x8d6e63, bowl = 0xfafafa, garnish = 0, steam = false) { const g = G(); put(g, SG(0.5, 20, 10, 0, PI * 2, PI / 2, PI / 2), M(bowl, { ds: true, smooth: true }), [0, 0.42, 0], [0, 0, 0], [1, 0.75, 1]);
+      put(g, CG(0.46, 0.46, 0.04, 20), M(content, { smooth: true }), [0, 0.38, 0]); put(g, CG(0.2, 0.24, 0.08, 14), M(bowl), [0, 0.03, 0]); put(g, TG(0.48, 0.03, 6, 24), M(0x90caf9), [0, 0.41, 0], [PI / 2, 0, 0]);
+      if (garnish) [[0.12, 0.08], [-0.15, 0.1], [0.05, -0.16], [-0.1, -0.08], [0.2, -0.05]].forEach(([x, z], i) => put(g, i % 2 ? BG(0.1, 0.06, 0.1) : SG(0.06, 8, 6), M(i % 2 ? garnish : 0xffffff), [x, 0.43, z]));
+      if (steam) [[0, 0.6], [0.08, 0.76], [-0.04, 0.9]].forEach(([x, y], i) => put(g, SG(0.08 - i * 0.012, 8, 6), M(0xffffff, { op: 0.55 - i * 0.12, smooth: true }), [x, y, 0])); return g; },
+    sack(c = 0xd9c39a, spill = 0xffffff) { const g = G(); put(g, SG(0.46, 16, 12), M(c), [0, 0.42, 0], [0, 0, 0], [1.12, 0.95, 0.95]); put(g, CG(0.2, 0.34, 0.22, 14), M(c), [0, 0.86, 0]);
+      put(g, TG(0.2, 0.035, 6, 16), M(0x8d6e63), [0, 0.86, 0], [PI / 2, 0, 0]); put(g, CG(0.27, 0.22, 0.14, 14), M(c), [0, 1.02, 0]); put(g, SG(0.24, 14, 8, 0, PI * 2, 0, PI / 2), M(spill, { smooth: true }), [0, 1.06, 0], [0, 0, 0], [1, 0.55, 1]);
+      put(g, SG(0.2, 12, 8, 0, PI * 2, 0, PI / 2), M(spill, { smooth: true }), [0.42, 0.0, 0.32], [0, 0, 0], [1.3, 0.3, 1]); put(g, XG(starShape(0.13, 0.06, 4), 0.02, 0.006), M(0xc49a52), [0, 0.45, 0.385]); return g; },
+    donut(icing = 0xf48fb1) { const g = G(), s = sub(g, [-1.05, 0, 0], [0, 0.3, 0]); put(s, TG(0.32, 0.18, 12, 22), M(0xd9933f, { smooth: true }), [0, 0, 0]); put(s, TG(0.32, 0.165, 12, 22), M(icing, { smooth: true }), [0, 0, 0.05], [0, 0, 0], [1, 1, 0.75]);
+      [[0.3, 0.12], [-0.22, 0.25], [0.05, -0.36], [-0.32, -0.12], [0.2, -0.28], [0.12, 0.38]].forEach(([x, y], i) => put(s, BG(0.08, 0.025, 0.025), M([0xfff176, 0x81d4fa, 0xa5d6a7, 0xffffff][i % 4]), [x, y, 0.2], [0, 0, x * 4])); return g; },
+    gift(c = 0xef5350, rib = 0xfff176) { const g = G(); put(g, BG(0.72, 0.6, 0.72), M(c), [0, 0.3, 0]); put(g, BG(0.78, 0.14, 0.78), M(c), [0, 0.64, 0]); put(g, BG(0.15, 0.76, 0.74), M(rib), [0, 0.38, 0]); put(g, BG(0.74, 0.76, 0.15), M(rib), [0, 0.38, 0]);
+      [-1, 1].forEach(k => put(g, TG(0.13, 0.05, 6, 12), M(rib), [k * 0.13, 0.82, 0], [0, k * 0.4, k * 0.5])); put(g, SG(0.07, 8, 6), M(rib), [0, 0.76, 0]); return g; },
+    crate() { const g = G(); put(g, BG(0.8, 0.66, 0.8), M(0xc69c6d), [0, 0.33, 0]); [-0.25, 0, 0.25].forEach(y => { put(g, BG(0.82, 0.12, 0.04), M(0x9c6b3e), [0, 0.33 + y, 0.41]); put(g, BG(0.04, 0.12, 0.82), M(0x9c6b3e), [0.41, 0.33 + y, 0]); });
+      put(g, BG(0.82, 0.04, 0.82), M(0x9c6b3e), [0, 0.67, 0]); put(g, CG(0.1, 0.1, 0.02, 12), M(0x1565c0), [0.2, 0.42, 0.43], [PI / 2, 0, 0]); return g; },
+    bouquet() { const g = G(); put(g, KG(0.32, 0.7, 10), M(0xf8bbd0), [0, 0.35, 0], [PI, 0, 0]); [[0, 0.82, 0, 0xe53935], [-0.2, 0.74, 0.05, 0xfdd835], [0.2, 0.75, 0.04, 0xab47bc], [-0.08, 0.76, 0.2, 0xffffff], [0.1, 0.72, -0.18, 0xff8a65], [0.08, 0.95, 0.06, 0xf06292]].forEach(([x, y, z, c]) => put(g, SG(0.12, 10, 8), M(c), [x, y, z]));
+      [-1, 1].forEach(k => put(g, KG(0.06, 0.32, 4), M(0x43a047), [k * 0.3, 0.8, -0.05], [0, 0, -k * 0.7])); put(g, TG(0.1, 0.03, 6, 12), M(0xe91e63), [0, 0.32, 0.03], [PI / 2, 0, 0]); return g; },
+    ticket(c = 0xffd54f, c2 = 0xe91e63) { const g = G(), s = sub(g, [-0.35, 0.45, 0.25], [0, 0.45, 0]); put(s, BG(1.0, 0.52, 0.04), M(c), [0, 0, 0]); put(s, BG(0.06, 0.52, 0.045), M(0xfff8e1), [0.26, 0, 0]);
+      [-0.18, -0.06, 0.06, 0.18].forEach(y => put(s, CG(0.03, 0.03, 0.05, 8), M(0xb08a00), [0.26, y, 0.003], [PI / 2, 0, 0])); put(s, XG(starShape(0.15, 0.065), 0.03, 0.01), M(c2), [-0.15, 0, 0.03]); put(s, BG(0.18, 0.04, 0.045), M(c2), [0.4, 0.12, 0]); return g; },
+    chest(c = 0x8d5a3b) { const g = G(); put(g, BG(0.86, 0.46, 0.56), M(c), [0, 0.3, 0]); put(g, CG(0.28, 0.28, 0.86, 14, 1, false, 0, PI), M(c), [0, 0.53, 0], [0, 0, PI / 2], [1, 1, 1]);
+      [-0.3, 0.3].forEach(x => { put(g, BG(0.08, 0.48, 0.58), GOLD(), [x, 0.3, 0]); put(g, CG(0.29, 0.29, 0.08, 14, 1, false, 0, PI), GOLD(), [x, 0.53, 0], [0, 0, PI / 2]); });
+      put(g, BG(0.14, 0.16, 0.04), GOLD(), [0, 0.5, 0.3]); put(g, BG(0.04, 0.06, 0.02), INK(), [0, 0.47, 0.32]); put(g, SG(0.5, 14, 6, 0, PI * 2, 0, PI / 2), M(0xf2d79b), [0, 0, 0], [0, 0, 0], [1.3, 0.25, 1]); return g; },
+    toolbox(c = 0xe53935) { const g = G(); put(g, BG(0.9, 0.42, 0.5), M(c), [0, 0.21, 0]); put(g, BG(0.92, 0.08, 0.52), M(0xb71c1c), [0, 0.45, 0]); put(g, TG(0.2, 0.04, 6, 14, PI), M(0x424242), [0, 0.5, 0]);
+      [-0.32, 0.32].forEach(x => put(g, BG(0.1, 0.08, 0.04), SILVER(), [x, 0.4, 0.27])); const w = sub(g, [0, 0, 0.6], [0.05, 0.22, 0.27]); put(w, BG(0.07, 0.42, 0.04), SILVER(), [0, 0, 0]); put(w, TG(0.07, 0.03, 6, 10, PI * 1.5), SILVER(), [0, 0.24, 0], [0, 0, -PI * 0.25]); return g; },
+    charm(c = 0x26c6da) { const g = G(), s = sub(g, [1.15, 0, 0], [0, 0.62, -0.05]); for (let i = 0; i < 14; i++) { const a = i / 14 * PI * 2; put(s, SG(0.06, 8, 6), M(i % 3 ? 0xffffff : 0x8d6e63, { smooth: true }), [Math.cos(a) * 0.36, 0, Math.sin(a) * 0.36]); }
+      put(g, SG(0.16, 14, 10), M(c, { smooth: true, e: c, ei: 0.45, r: 0.2 }), [0, 0.2, 0.2], [0, 0, 0], [1, 1.3, 0.6]); put(g, KG(0.1, 0.16, 10), M(c, { smooth: true, e: c, ei: 0.45 }), [0, 0.42, 0.2]); return g; },
+    wheat(c = 0xffca28) { const g = G(); [-0.18, 0, 0.18].forEach((x, k) => { const s = sub(g, [0, 0, -x * 1.6], [x * 0.3, 0, 0]); put(s, CG(0.02, 0.025, 0.8, 5), M(0x9e8a3c), [0, 0.4, 0]);
+        for (let i = 0; i < 6; i++) [-1, 1].forEach(j => put(s, SG(0.06, 8, 6), M(c, { smooth: true }), [j * 0.05, 0.82 + i * 0.07, 0], [0, 0, -j * 0.4], [0.8, 1.5, 0.8])); });
+      put(g, TG(0.08, 0.03, 6, 12), M(0x6d4c41), [0, 0.32, 0], [PI / 2, 0, 0]); return g; },
+    /* --- herramientas --- */
+    rod() { const g = G(), s = sub(g, [0, 0, -0.75]); put(s, CG(0.025, 0.04, 1.5, 8), M(0x6d4c41), [0, 0.55, 0]); put(s, CG(0.12, 0.12, 0.08, 14), SILVER(), [0.08, 0.05, 0], [0, 0, PI / 2]);
+      put(g, CG(0.006, 0.006, 0.7, 4), M(0xeeeeee), [0.63, 0.55, 0]); put(g, SG(0.08, 10, 8, 0, PI * 2, 0, PI / 2), M(0xe53935, { smooth: true }), [0.63, 0.2, 0]); put(g, SG(0.08, 10, 8, 0, PI * 2, PI / 2, PI / 2), WHITE(), [0.63, 0.2, 0]); return g; },
+    pickaxe() { const g = G(), s = sub(g, [0, 0, -0.55]); put(s, CG(0.045, 0.05, 1.2, 8), WOOD(), [0, 0.5, 0]); put(s, TG(0.48, 0.07, 6, 16, PI * 0.8), M(0x90a4ae, { m: 0.45, r: 0.35 }), [0, 0.68, 0], [0, 0, PI * 0.1]);
+      put(s, BG(0.16, 0.16, 0.16), M(0x607d8b), [0, 1.13, 0]); return g; },
+    axe() { const g = G(), s = sub(g, [0, 0, -0.5]); put(s, CG(0.045, 0.05, 1.2, 8), WOOD(), [0, 0.5, 0]); put(s, XG(polyShape([[0, 0.12], [0.42, 0.28], [0.46, -0.24], [0, -0.1]]), 0.08, 0.02), M(0x90a4ae, { m: 0.45, r: 0.35 }), [0.22, 0.95, 0]);
+      put(s, BG(0.06, 0.24, 0.1), M(0x607d8b), [0, 0.95, 0]); return g; },
+    shovel() { const g = G(), s = sub(g, [0, 0, -0.55]); put(s, CG(0.04, 0.045, 0.95, 8), WOOD(), [0, 0.6, 0]); put(s, TG(0.1, 0.03, 6, 12), M(0x424242), [0, 1.15, 0]);
+      put(s, XG(polyShape([[-0.22, 0.22], [0.22, 0.22], [0.2, -0.12], [0, -0.3], [-0.2, -0.12]]), 0.04, 0.015), M(0x90a4ae, { m: 0.45, r: 0.35 }), [0, 0.0, 0]); return g; },
+    detector() { const g = G(), s = sub(g, [0, 0, 0.6]); put(s, CG(0.03, 0.03, 1.2, 8), M(0x78909c, { m: 0.4 }), [0, 0.6, 0]); put(s, BG(0.18, 0.12, 0.12), M(0x37474f), [0.02, 0.9, 0.06]);
+      put(s, CG(0.06, 0.06, 0.03, 10), GLOW(0x76ff03, 1.0), [0.02, 0.9, 0.13], [PI / 2, 0, 0]); put(s, CG(0.04, 0.04, 0.22, 8), M(0x212121), [0, 1.18, 0]);
+      put(s, TG(0.24, 0.045, 6, 20), M(0xffca28, { m: 0.3 }), [0.05, -0.02, 0], [PI / 2 - 0.15, 0, -0.6]); put(s, CG(0.2, 0.2, 0.02, 18), M(0x37474f, { op: 0.6 }), [0.05, -0.02, 0], [-0.15, 0, -0.6]); return g; },
+    net() { const g = G(), s = sub(g, [0, 0, -0.7]); put(s, CG(0.03, 0.035, 1.1, 8), WOOD(), [0, 0.45, 0]); put(s, TG(0.26, 0.025, 6, 22), M(0x90a4ae, { m: 0.4 }), [0, 1.24, 0]);
+      put(s, SG(0.25, 10, 8, 0, PI * 2, 0, PI * 0.55), M(0xffffff, { wire: true }), [0, 1.24, 0.0], [PI / 2, 0, 0], [1, 1.4, 1]); return g; },
+    /* --- perfiles y manufacturas --- */
+    keyboard(c = 0x7c4dff) { const g = G(), s = sub(g, [0.35, 0, 0]); put(s, BG(1.1, 0.12, 0.5), M(0x37474f), [0, 0.06, 0]); for (let r = 0; r < 3; r++) for (let k = 0; k < 6; k++) put(s, BG(0.13, 0.06, 0.11), M(r === 1 && k === 3 ? c : 0xeceff1), [-0.42 + k * 0.17 + r * 0.03, 0.15, -0.13 + r * 0.14]);
+      put(s, BG(0.6, 0.06, 0.11), M(0xeceff1), [0.05, 0.15, 0.3]); put(g, XG(polyShape([[-0.08, 0.1], [-0.18, 0], [-0.08, -0.1], [-0.05, -0.07], [-0.12, 0], [-0.05, 0.07]]), 0.03, 0.008), GLOW(c, 0.8), [-0.14, 0.62, 0.1]);
+      put(g, XG(polyShape([[0.08, 0.1], [0.18, 0], [0.08, -0.1], [0.05, -0.07], [0.12, 0], [0.05, 0.07]]), 0.03, 0.008), GLOW(c, 0.8), [0.14, 0.62, 0.1]); return g; },
+    folder(c = 0x7c4dff) { const g = G(), s = sub(g, [-0.3, 0.2, 0], [0, 0.45, 0]); put(s, BG(0.9, 0.66, 0.04), M(c), [0, 0, -0.06]); put(s, BG(0.32, 0.1, 0.04), M(c), [-0.28, 0.37, -0.06]);
+      [0, 1].forEach(i => put(s, BG(0.78, 0.6, 0.02), WHITE(), [0.02 + i * 0.03, 0.04 - i * 0.03, -0.03 + i * 0.02])); put(s, BG(0.9, 0.5, 0.04), M(new THREE.Color(c).lerp(new THREE.Color(0xffffff), 0.35).getHex()), [0, -0.08, 0.04]);
+      [0, 1, 2].forEach(i => put(s, BG(0.5, 0.04, 0.02), M(0x9fa8da), [-0.1, -0.02 - i * 0.1, 0.07])); return g; },
+    notepad(c = 0x7c4dff) { const g = G(), s = sub(g, [-0.5, 0.15, 0], [0, 0.42, 0]); put(s, BG(0.66, 0.84, 0.05), WHITE(), [0, 0, 0]); put(s, BG(0.66, 0.1, 0.07), M(c), [0, 0.42, 0]);
+      [0, 1, 2, 3].forEach(i => put(s, BG(0.46, 0.03, 0.02), M(0xb0bec5), [-0.03, 0.2 - i * 0.14, 0.03])); const p = sub(g, [0, 0, -0.9], [0.32, 0.5, 0.25]); put(p, CG(0.05, 0.05, 0.62, 6), M(0xffca28), [0, 0, 0]); put(p, KG(0.05, 0.12, 6), M(0xf1d3a5), [0, -0.37, 0], [PI, 0, 0]); put(p, CG(0.05, 0.05, 0.08, 6), M(0xf48fb1), [0, 0.35, 0]); return g; },
+    brain(c = 0xf48fb1) { const g = G(); put(g, IG(0.32, 1), M(c), [-0.18, 0.45, 0], [0.2, 0.1, 0], [1, 0.85, 1.1]); put(g, IG(0.32, 1), M(c), [0.18, 0.45, 0], [0.4, 0.5, 0.2], [1, 0.85, 1.1]);
+      put(g, IG(0.18, 1), M(0xec7eaa), [0.0, 0.22, 0.15], [0, 0, 0], [1.3, 0.7, 1]); [[0, 0.62, 0.25], [-0.25, 0.55, 0.28], [0.26, 0.5, 0.28]].forEach(p => put(g, SG(0.04, 6, 5), GLOW(0x7c4dff, 1.4), p)); return g; },
+    chip(c = 0x7c4dff) { const g = G(), s = sub(g, [0.45, 0.6, 0], [0, 0.35, 0]); put(s, BG(0.72, 0.12, 0.72), M(0x263238), [0, 0, 0]); put(s, BG(0.34, 0.06, 0.34), GLOW(c, 1.3), [0, 0.08, 0]);
+      for (let i = 0; i < 4; i++) for (const k of [-1, 1]) { put(s, BG(0.06, 0.04, 0.16), GOLD(), [-0.24 + i * 0.16, 0, k * 0.43]); put(s, BG(0.16, 0.04, 0.06), GOLD(), [k * 0.43, 0, -0.24 + i * 0.16]); } return g; },
+    bolt(c = 0x26a69a) { const g = G(), s = sub(g, [0, 0, 0.5], [0, 0.48, 0]); put(s, CG(0.26, 0.26, 0.18, 6), SILVER(), [0, 0.38, 0]); put(s, CG(0.12, 0.12, 0.62, 10), SILVER(), [0, 0, 0]);
+      [-0.22, -0.11, 0, 0.11, 0.22].forEach(y => put(s, TG(0.125, 0.025, 4, 12), M(0x90a4ae, { m: 0.6 }), [0, y, 0], [PI / 2, 0, 0.15])); put(g, TG(0.4, 0.025, 6, 24), GLOW(c, 1.4), [0, 0.45, 0], [1.2, 0.3, 0]); return g; },
+    ruler(c = 0x26a69a) { const g = G(); put(g, BG(0.8, 0.62, 0.03), WHITE(), [0.05, 0.4, -0.05], [-0.15, 0.2, 0]); [0, 1, 2].forEach(i => put(g, BG(0.4 - i * 0.08, 0.03, 0.02), M(0x90a4ae), [-0.05, 0.55 - i * 0.12, -0.02], [-0.15, 0.2, 0.3 * (i - 1)]));
+      const tri = new THREE.Shape(); tri.moveTo(-0.45, -0.3); tri.lineTo(0.45, -0.3); tri.lineTo(-0.45, 0.45); tri.closePath(); const h = new THREE.Path(); h.moveTo(-0.3, -0.18); h.lineTo(0.08, -0.18); h.lineTo(-0.3, 0.14); h.closePath(); tri.holes.push(h);
+      put(g, XG(tri, 0.04, 0.01), M(c, { op: 0.85 }), [0.05, 0.4, 0.12], [-0.15, 0.2, 0]); return g; },
+    battery(c = 0x26a69a) { const g = G(), s = sub(g, [0, 0, 0.3], [0, 0.45, 0]); put(s, CG(0.24, 0.24, 0.72, 16), M(c), [0, 0, 0]); put(s, CG(0.245, 0.245, 0.14, 16), M(0x37474f), [0, -0.3, 0]); put(s, CG(0.1, 0.1, 0.08, 12), SILVER(), [0, 0.4, 0]);
+      put(g, XG(polyShape([[0.05, 0.3], [-0.15, 0], [0, 0], [-0.08, -0.3], [0.16, 0.06], [0.02, 0.06]]), 0.05, 0.015), GLOW(0xffeb3b, 1.4), [0.06, 0.5, 0.28], [0, 0, 0.3]); return g; },
+    scroll(c = 0x26a69a, paper = 0xfff3d6) { const g = G(), s = sub(g, [-0.3, 0.3, 0.1], [0, 0.45, 0]); put(s, BG(0.6, 0.72, 0.02), M(paper), [0, 0, 0]); [0.38, -0.38].forEach(y => put(s, CG(0.07, 0.07, 0.7, 10), M(0xe6d3a8), [0, y, 0.02], [0, 0, PI / 2]));
+      [0, 1, 2].forEach(i => put(s, BG(0.4, 0.03, 0.02), M(0xbcaaa4), [0, 0.18 - i * 0.12, 0.02])); put(s, CG(0.1, 0.1, 0.04, 14), M(c), [0.12, -0.24, 0.04], [PI / 2, 0, 0]); return g; },
+    gear(c = 0x26a69a) { const g = G(); put(g, XG(gearShape(0.42, 10, 0.12), 0.14, 0.02), SILVER(), [-0.12, 0.55, 0], [0, 0.3, 0]); put(g, XG(gearShape(0.26, 8, 0.07), 0.14, 0.02), M(c, { m: 0.4, r: 0.35 }), [0.4, 0.22, 0.1], [0, 0.3, 0.2]);
+      put(g, CG(0.07, 0.07, 0.2, 10), GLOW(c, 1.2), [-0.12, 0.55, 0.02], [PI / 2, 0, 0.3]); return g; },
+    can(c = 0xff7043) { const g = G(); put(g, CG(0.32, 0.32, 0.7, 20), SILVER(), [0, 0.35, 0]); put(g, CG(0.325, 0.325, 0.42, 20), M(c), [0, 0.35, 0]); put(g, TG(0.31, 0.025, 4, 20), SILVER(), [0, 0.7, 0], [PI / 2, 0, 0]);
+      put(g, SG(0.12, 10, 8), M(0xfff3e0), [0, 0.36, 0.28], [0, 0, 0], [1.2, 0.8, 0.3]); put(g, SG(0.06, 8, 6), M(0x2e7d32), [0.02, 0.4, 0.31]); return g; },
+    book(c = 0xff7043) { const g = G(), s = sub(g, [-0.2, 0.5, 0.15], [0, 0.4, 0]); put(s, BG(0.72, 0.9, 0.18), M(c), [0, 0, 0]); put(s, BG(0.66, 0.84, 0.16), WHITE(), [0.04, 0, 0]); put(s, BG(0.06, 0.9, 0.19), M(new THREE.Color(c).multiplyScalar(0.7).getHex()), [-0.35, 0, 0]);
+      put(s, XG(starShape(0.13, 0.06), 0.02, 0.006), GOLD(), [0.02, 0.12, 0.1]); put(s, BG(0.06, 0.3, 0.01), M(0xe53935), [0.2, -0.55, 0.06]); return g; },
+    mushroom(c = 0xff7043) { const g = G(); put(g, CG(0.14, 0.18, 0.46, 12), M(0xfff3e0, { smooth: true }), [0, 0.23, 0]); put(g, SG(0.42, 18, 10, 0, PI * 2, 0, PI / 2), M(c, { smooth: true }), [0, 0.42, 0], [0, 0, 0], [1, 0.85, 1]);
+      [[0.18, 0.66, 0.2], [-0.2, 0.62, 0.18], [0.0, 0.78, 0.0], [0.3, 0.5, -0.1], [-0.08, 0.6, 0.3]].forEach(p => put(g, SG(0.065, 8, 6), WHITE(), p, [0, 0, 0], [1, 0.5, 1])); put(g, SG(0.16, 10, 8), M(0xffffff, { op: 0.75, smooth: true }), [0.35, 0.95, 0], [0, 0, 0], [1.4, 0.8, 1]); return g; },
+    sneaker(c = 0x43a047) { const g = G(), s = sub(g, [0, -0.4, 0]); put(s, BG(0.82, 0.1, 0.42), WHITE(), [-0.04, 0.05, 0]); put(s, CG(0.21, 0.21, 0.1, 16), WHITE(), [0.37, 0.05, 0]);
+      put(s, BG(0.5, 0.3, 0.38), M(c), [-0.18, 0.25, 0]); put(s, SG(0.22, 14, 10), M(c), [0.22, 0.2, 0], [0, 0, 0], [1.45, 0.72, 0.86]); put(s, SG(0.21, 14, 10), M(c), [-0.3, 0.38, 0], [0, 0, 0], [1, 1.05, 0.9]);
+      put(s, CG(0.13, 0.14, 0.02, 14), M(0x263238), [-0.3, 0.6, 0], [0, 0, -0.15]); [0, 1, 2].forEach(i => put(s, BG(0.035, 0.025, 0.3), WHITE(), [-0.06 + i * 0.1, 0.42 - i * 0.05, 0], [0, 0, -0.35]));
+      put(s, XG(polyShape([[-0.32, 0.02], [0.16, 0.14], [0.2, 0.1], [-0.2, -0.06]]), 0.02, 0.005), WHITE(), [-0.08, 0.24, 0.2]); return g; },
+    juicebox(c = 0x43a047) { const g = G(), s = sub(g, [0, 0.4, 0]); put(s, BG(0.5, 0.78, 0.34), M(c), [0, 0.39, 0]); put(s, BG(0.51, 0.3, 0.35), WHITE(), [0, 0.36, 0]); put(s, SG(0.09, 10, 8), M(0xff7043), [0, 0.36, 0.18], [0, 0, 0], [1, 1, 0.3]);
+      put(s, CG(0.025, 0.025, 0.4, 6), M(0xfafafa), [0.12, 0.92, 0], [0, 0, -0.2]); put(s, CG(0.025, 0.025, 0.16, 6), M(0xfafafa), [0.02, 1.12, 0], [0, 0, 1.0]); return g; },
+    medal(c = 0xcfd8dc, rib = 0x43a047) { const g = G(); [-1, 1].forEach(k => { put(g, BG(0.18, 0.62, 0.03), M(rib), [k * 0.12, 0.76, -0.02], [0, 0, k * 0.35]); put(g, BG(0.05, 0.62, 0.035), WHITE(), [k * 0.12, 0.76, -0.02], [0, 0, k * 0.35]); });
+      put(g, CG(0.3, 0.3, 0.07, 24), M(c, { m: 0.65, r: 0.25 }), [0, 0.32, 0.02], [PI / 2, 0, 0]); put(g, XG(starShape(0.16, 0.07), 0.03, 0.008), M(c, { m: 0.65, r: 0.25 }), [0, 0.32, 0.07]); put(g, TG(0.27, 0.02, 4, 24), M(0x90a4ae, { m: 0.6 }), [0, 0.32, 0.06]); return g; },
+    trophy(c = 0xffc53d) { const g = G(), m = M(c, { m: 0.6, r: 0.28 }); put(g, BG(0.5, 0.14, 0.4), M(0x5d4037), [0, 0.07, 0]); put(g, CG(0.07, 0.1, 0.24, 10), m, [0, 0.26, 0]);
+      put(g, CG(0.36, 0.14, 0.42, 18), m, [0, 0.6, 0]); put(g, SG(0.36, 18, 8, 0, PI * 2, PI / 2, PI / 2), m, [0, 0.81, 0], [PI, 0, 0], [1, 0.12, 1]); [-1, 1].forEach(k => put(g, TG(0.13, 0.035, 6, 12, PI), m, [k * 0.36, 0.62, 0], [0, 0, k > 0 ? -PI / 2 : PI / 2]));
+      put(g, XG(starShape(0.1, 0.045), 0.02, 0.006), M(0xffffff), [0, 0.6, 0.29]); return g; },
+    sheets(c = 0xe53935) { const g = G(); [2, 1, 0].forEach(i => { const s = sub(g, [-0.55, 0.1 + i * 0.12, 0], [i * 0.05, 0.42 + i * 0.02, -i * 0.04]); put(s, BG(0.62, 0.82, 0.02), WHITE(), [0, 0, 0]); if (!i) [0, 1, 2, 3].forEach(j => put(s, BG(j ? 0.4 : 0.26, 0.03, 0.02), M(j ? 0xb0bec5 : c), [-0.04, 0.26 - j * 0.13, 0.015])); });
+      put(g, XG(polyShape([[0, 0], [0.14, 0], [0, 0.14]]), 0.02, 0.005), M(0xe0e0e0), [0.22, 0.12, 0.05], [-0.55, 0.1, 0]); return g; },
+    dress(c = 0xe53935) { const g = G(); put(g, KG(0.42, 0.62, 14), M(c), [0, 0.31, 0]); put(g, CG(0.16, 0.2, 0.3, 12), M(c), [0, 0.72, 0]); [-1, 1].forEach(k => put(g, CG(0.02, 0.02, 0.2, 4), M(c), [k * 0.1, 0.94, 0], [0, 0, -k * 0.3]));
+      put(g, TG(0.2, 0.03, 6, 20), M(0xffd54f), [0, 0.58, 0], [PI / 2, 0, 0]); put(g, TG(0.12, 0.02, 4, 12, PI), M(0x9e9e9e, { m: 0.5 }), [0, 1.12, 0]); put(g, BG(0.62, 0.03, 0.03), M(0x9e9e9e, { m: 0.5 }), [0, 1.04, 0]); return g; },
+    hands(c = 0xffcc80, cuff = 0xe53935) { const g = G(); [-1, 1].forEach(k => { const h = sub(g, [0, k * 0.55, k * 0.42], [k * 0.2, 0.42, k * -0.05]); put(h, SG(0.22, 14, 10), M(c, { smooth: true }), [0, 0.06, 0], [0, 0, 0], [0.95, 1.15, 0.42]);
+        [-0.12, -0.04, 0.04, 0.12].forEach((x, i) => put(h, SG(0.065, 10, 8), M(c, { smooth: true }), [x, 0.32 + (i === 1 || i === 2 ? 0.04 : 0), 0], [0, 0, 0], [0.9, 1.5, 0.8]));
+        put(h, SG(0.07, 10, 8), M(c, { smooth: true }), [k * -0.2, 0.0, 0.04], [0, 0, k * 0.6], [0.9, 1.5, 0.8]); put(h, CG(0.17, 0.17, 0.14, 14), M(cuff), [0, -0.24, 0], [0, 0, 0], [1, 1, 0.55]); });
+      [[-0.52, 0.95, 0.5], [0.52, 0.95, -0.5], [0, 1.08, 0]].forEach(([x, y, r]) => put(g, BG(0.05, 0.2, 0.03), M(0xffc107, { e: 0xffc107, ei: 0.4 }), [x, y, 0.1], [0, 0, r])); return g; },
+    statuette(c = 0xffc53d) { const g = G(), m = M(c, { m: 0.6, r: 0.25 }); put(g, CG(0.26, 0.3, 0.18, 14), M(0x37474f), [0, 0.09, 0]); put(g, CG(0.1, 0.14, 0.5, 12), m, [0, 0.43, 0]); put(g, SG(0.12, 14, 10), m, [0, 0.8, 0]);
+      [-1, 1].forEach(k => put(g, CG(0.035, 0.035, 0.36, 6), m, [k * 0.12, 0.62, 0.06], [0.3, 0, k * 0.2])); put(g, XG(starShape(0.12, 0.05), 0.03, 0.008), m, [0, 1.0, 0.1]); return g; },
+    note(c = 0xec407a) { const g = G(), m = M(c, { smooth: true }); put(g, SG(0.2, 14, 10), m, [-0.1, 0.25, 0], [0, 0, 0.4], [1.3, 0.9, 0.9]); put(g, CG(0.035, 0.035, 0.8, 8), m, [0.12, 0.62, 0]);
+      put(g, XG(polyShape([[0, 0], [0.26, -0.2], [0.24, -0.36], [0, -0.16]]), 0.05, 0.015), m, [0.22, 0.9, 0]); return g; },
+    notes(c = 0xec407a) { const g = G(), m = M(c, { smooth: true }); [[-0.32, 0.22], [0.28, 0.32]].forEach(([x, y]) => { put(g, SG(0.18, 14, 10), m, [x - 0.08, y, 0], [0, 0, 0.4], [1.3, 0.9, 0.9]); put(g, CG(0.035, 0.035, 0.7 - y * 0.3, 8), m, [x + 0.12, y + 0.33 - y * 0.15, 0]); });
+      put(g, BG(0.66, 0.1, 0.07), m, [0.12, 0.86, 0], [0, 0, 0.12]); return g; },
+    disc(c = 0xcfd8dc, label = 0xec407a) { const g = G(), s = sub(g, [1.1, 0, 0.25], [0, 0.45, 0]); put(s, CG(0.5, 0.5, 0.04, 32), M(c, { m: 0.75, r: 0.18 }), [0, 0, 0]); put(s, CG(0.18, 0.18, 0.045, 24), M(label), [0, 0, 0]);
+      put(s, CG(0.06, 0.06, 0.05, 16), INK(), [0, 0, 0]); put(s, TG(0.34, 0.006, 3, 32), M(0xffffff, { op: 0.6 }), [0, 0.025, 0], [PI / 2, 0, 0]); return g; },
+    mic(c = 0x80deea) { const g = G(); put(g, CG(0.07, 0.05, 0.62, 10), M(0x37474f), [0, 0.32, 0], [0.25, 0, 0]); put(g, IG(0.26, 1), M(c, { m: 0.3, r: 0.12, e: c, ei: 0.35 }), [0, 0.78, 0.1]);
+      put(g, TG(0.26, 0.03, 6, 20), SILVER(), [0, 0.7, 0.08], [PI / 2 - 0.25, 0, 0]); put(g, CG(0.2, 0.24, 0.05, 16), M(0x37474f), [0, 0.025, -0.08]); return g; },
+    screen(c = 0xff1744, img = 0x81d4fa) { const g = G(), s = sub(g, [0, 0.3, 0], [0, 0.45, 0]); put(s, BG(0.95, 0.64, 0.08), M(0x263238), [0, 0, 0]); put(s, BG(0.85, 0.54, 0.02), M(img), [0, 0, 0.045]);
+      put(s, SG(0.12, 10, 8), M(0xffffff), [-0.22, 0.1, 0.05], [0, 0, 0], [1, 1, 0.2]); put(s, SG(0.26, 10, 8), M(0x66bb6a), [0.15, -0.28, 0.05], [0, 0, 0], [1.6, 0.6, 0.15]);
+      put(s, CG(0.13, 0.13, 0.02, 20), M(c), [0.24, 0.1, 0.06], [PI / 2, 0, 0], [1.3, 1, 1]); play(s, [0.25, 0.1, 0.07], 0.6); return g; },
+    film(c = 0xff1744) { const g = G(), s = sub(g, [0, 0.4, 0.2], [0, 0.45, 0]); [-1, 0, 1].forEach(i => { const f = sub(s, [0, -i * 0.35, 0], [i * 0.36, Math.abs(i) * -0.06, -Math.abs(i) * 0.08]); put(f, BG(0.36, 0.5, 0.03), M(0x212121), [0, 0, 0]);
+        put(f, BG(0.26, 0.3, 0.035), M([0xffcc80, c, 0x81d4fa][i + 1]), [0, 0, 0]); [-0.21, 0.21].forEach(y => [-0.1, 0, 0.1].forEach(x => put(f, BG(0.05, 0.04, 0.035), WHITE(), [x, y, 0]))); }); return g; },
+    rings(c = 0xff1744) { const g = G(); put(g, TG(0.3, 0.075, 10, 24), M(c, { smooth: true }), [-0.18, 0.45, 0], [0, 0.6, 0]); put(g, TG(0.3, 0.075, 10, 24), M(0xffd54f, { smooth: true, m: 0.4 }), [0.18, 0.45, 0], [0, -0.6, PI / 2]); return g; },
+    flame(c = 0xff1744) { const g = G(); const tongue = (col, sc, p, ei) => { const n = sub(g, [0, 0, 0], p, sc); put(n, SG(0.32, 16, 12), GLOW(col, ei), [0, 0.32, 0]); put(n, KG(0.3, 0.7, 16), GLOW(col, ei), [0, 0.78, 0]); return n; };
+      tongue(0xff5722, 1, [0, 0, 0], 0.55); tongue(0xffa000, 0.72, [0.02, 0.0, 0.1], 0.7); tongue(0xffeb3b, 0.45, [0.03, 0.0, 0.2], 0.9); const l = tongue(0xff7043, 0.42, [-0.32, 0.05, -0.05], 0.55); l.rotation.z = 0.5;
+      put(g, CG(0.16, 0.16, 0.04, 20), M(c), [0.3, 0.22, 0.34], [PI / 2, 0, 0], [1.3, 1, 1]); play(g, [0.31, 0.22, 0.36], 0.7); return g; },
+    plaque(c = 0xff1744, gem = 0x80deea) { const g = G(), s = sub(g, [-0.2, 0.25, 0], [0, 0.48, 0]); put(s, BG(0.78, 0.92, 0.08), M(0x263238), [0, 0, 0]); put(s, BG(0.66, 0.8, 0.02), M(0xeceff1, { m: 0.5, r: 0.2 }), [0, 0, 0.045]);
+      put(s, OG(0.2), M(gem, { m: 0.3, r: 0.1, e: gem, ei: 0.4 }), [0, 0.08, 0.12], [0, 0, 0], [1, 1.2, 0.5]); put(s, CG(0.08, 0.08, 0.02, 16), M(c), [0, -0.27, 0.06], [PI / 2, 0, 0], [1.3, 1, 1]); play(s, [0.005, -0.27, 0.07], 0.4); return g; },
+    tube(c = 0xffb300) { const g = G(), s = sub(g, [0, 0, -1.0], [0, 0.42, 0]); put(s, CG(0.17, 0.17, 0.6, 14), SILVER(), [0, 0, 0]); put(s, CG(0.175, 0.175, 0.3, 14), M(c), [0, 0.02, 0]); put(s, BG(0.36, 0.06, 0.06), SILVER(), [0, -0.33, 0]);
+      put(s, CG(0.09, 0.11, 0.14, 10), M(0x212121), [0, 0.37, 0]); put(g, SG(0.16, 12, 8), M(c, { smooth: true }), [0.42, 0.1, 0.12], [0, 0, 0], [1.4, 0.5, 1.2]); return g; },
+    pencil(c = 0xffca28) { const g = G(), s = sub(g, [0, 0, -0.8], [0, 0.5, 0]); put(s, CG(0.09, 0.09, 0.8, 6), M(c), [0, 0, 0]); put(s, KG(0.09, 0.2, 6), M(0xf1d3a5), [0, -0.5, 0], [PI, 0, 0]); put(s, KG(0.035, 0.07, 6), INK(), [0, -0.58, 0], [PI, 0, 0]);
+      put(s, CG(0.095, 0.095, 0.08, 10), SILVER(), [0, 0.44, 0]); put(s, CG(0.09, 0.09, 0.12, 10), M(0xf48fb1), [0, 0.54, 0]); put(g, BG(0.5, 0.03, 0.02), INK(), [-0.2, 0.06, 0.2], [0, 0, 0.15]); return g; },
+    easel(c = 0xffb300) { const g = G(); [-1, 1].forEach(k => put(g, CG(0.03, 0.03, 1.1, 6), WOOD(), [k * 0.28, 0.52, 0], [0, 0, k * 0.18])); put(g, CG(0.03, 0.03, 1.0, 6), WOOD(), [0, 0.45, -0.2], [0.3, 0, 0]);
+      put(g, BG(0.7, 0.56, 0.04), WHITE(), [0, 0.68, 0.06], [-0.1, 0, 0]); [[-0.12, 0.72, 0xef5350], [0.12, 0.62, 0x42a5f5], [0.0, 0.8, c]].forEach(([x, y, col]) => put(g, SG(0.1, 10, 8), M(col), [x, y, 0.1], [-0.1, 0, 0], [1.2, 1, 0.15]));
+      put(g, BG(0.6, 0.04, 0.12), WOOD(), [0, 0.38, 0.06]); return g; },
+    painting(c = 0xffb300, pal = [0x5c6bc0, 0x26a69a, 0xffca28]) { const g = G(), s = sub(g, [-0.15, 0.3, 0], [0, 0.48, 0]); put(s, BG(0.95, 0.75, 0.08), M(c, { m: 0.55, r: 0.3 }), [0, 0, 0]); put(s, BG(0.8, 0.6, 0.02), M(pal[0]), [0, 0, 0.045]);
+      put(s, SG(0.14, 10, 8), M(0xfff59d), [0.22, 0.14, 0.05], [0, 0, 0], [1, 1, 0.15]); put(s, SG(0.3, 10, 8), M(pal[1]), [-0.12, -0.2, 0.05], [0, 0, 0], [1.4, 0.55, 0.15]); put(s, SG(0.2, 10, 8), M(pal[2]), [0.25, -0.22, 0.055], [0, 0, 0], [1.2, 0.45, 0.15]);
+      [[-0.47, 0.37], [0.47, 0.37], [-0.47, -0.37], [0.47, -0.37]].forEach(([x, y]) => put(s, SG(0.06, 8, 6), M(c, { m: 0.55, r: 0.3 }), [x, y, 0.04])); return g; },
+    genart(c = 0xffb300) { const g = G(), s = sub(g, [-0.15, 0.3, 0], [0, 0.48, 0]); put(s, BG(0.95, 0.75, 0.08), M(0x263238), [0, 0, 0]); const P = [0x7c4dff, 0x26a69a, 0xff7043, 0xffca28, 0xec407a, 0x42a5f5];
+      for (let i = 0; i < 4; i++) for (let j = 0; j < 3; j++) put(s, BG(0.19, 0.19, 0.02 + ((i * 3 + j) % 3) * 0.02), M(P[(i * 2 + j) % 6]), [-0.3 + i * 0.2, -0.2 + j * 0.2, 0.05]); return g; },
+    bottle(c = 0xffb300, glass = 0xb2ebf2) { const g = G(); put(g, SG(0.36, 18, 14), M(glass, { op: 0.4, r: 0.05, smooth: true }), [0, 0.38, 0]); put(g, CG(0.11, 0.14, 0.32, 14), M(glass, { op: 0.45, smooth: true }), [0, 0.82, 0]);
+      put(g, CG(0.1, 0.09, 0.14, 10), M(0xa1887f), [0, 1.02, 0]); put(g, SG(0.22, 14, 10), M(c, { smooth: true, e: c, ei: 0.3, r: 0.3 }), [0, 0.38, 0]); [[0.12, 0.5, 0.1], [-0.1, 0.3, 0.12], [0.05, 0.22, -0.1]].forEach(p => put(g, OG(0.05), GLOW(0xffffff, 1.5), p)); return g; },
+    pan() { const g = G(); put(g, CG(0.46, 0.4, 0.1, 22), M(0x37474f, { m: 0.4, r: 0.4 }), [0, 0.12, 0]); put(g, CG(0.42, 0.42, 0.02, 22), M(0x546e7a), [0, 0.17, 0]); put(g, BG(0.5, 0.06, 0.1), M(0x212121), [0.66, 0.16, 0], [0, 0, 0.15]);
+      put(g, SG(0.22, 14, 8), WHITE(), [-0.04, 0.17, 0.02], [0, 0, 0], [1.2, 0.18, 1]); put(g, SG(0.09, 12, 10), M(0xffb300, { smooth: true }), [0, 0.21, 0.05], [0, 0, 0], [1, 0.7, 1]); return g; },
+    tv(c = 0x43a047) { const g = G(); put(g, BG(0.95, 0.66, 0.36), M(0xbcaaa4), [0, 0.45, 0]); put(g, BG(0.72, 0.52, 0.02), M(c), [-0.07, 0.45, 0.185]); put(g, SG(0.06, 8, 6), WHITE(), [-0.1, 0.45, 0.2]);
+      put(g, BG(0.02, 0.4, 0.02), WHITE(), [-0.07, 0.45, 0.2]); [0.6, 0.38].forEach(y => put(g, CG(0.04, 0.04, 0.04, 10), M(0x5d4037), [0.37, y, 0.19], [PI / 2, 0, 0])); [-1, 1].forEach(k => put(g, CG(0.012, 0.012, 0.4, 4), M(0x424242), [k * 0.12, 0.92, 0], [0, 0, -k * 0.5])); [-0.35, 0.35].forEach(x => put(g, BG(0.06, 0.12, 0.3), M(0x5d4037), [x, 0.06, 0])); return g; },
+    synth(c = 0xec407a) { const g = G(), s = sub(g, [0.35, 0, 0]); put(s, BG(1.15, 0.16, 0.56), M(0x263238), [0, 0.08, 0]); for (let k = 0; k < 8; k++) put(s, BG(0.12, 0.06, 0.28), WHITE(), [-0.47 + k * 0.135, 0.17, 0.1]);
+      [0, 1, 3, 4, 5].forEach(k => put(s, BG(0.07, 0.06, 0.16), INK(), [-0.4 + k * 0.135, 0.21, 0.03])); [-0.4, -0.25, -0.1].forEach(x => put(s, CG(0.04, 0.04, 0.05, 10), M(c), [x, 0.18, -0.17])); put(s, BG(0.3, 0.02, 0.1), GLOW(0x76ff03, 1), [0.25, 0.17, -0.17]); return g; },
+    ramen() { const g = T.bowl(0xffcc80, 0xe53935); [0.0, 0.1, -0.12].forEach((x, i) => put(g, TG(0.12, 0.018, 4, 14), M(0xfff59d), [x, 0.44, i * 0.08 - 0.05], [PI / 2, 0, 0])); put(g, SG(0.11, 10, 8), WHITE(), [0.2, 0.45, 0.15], [0, 0, 0], [1, 0.6, 1]);
+      put(g, SG(0.06, 8, 6), M(0xffb300), [0.21, 0.47, 0.16], [0, 0, 0], [1, 0.6, 1]); [-1, 1].forEach(k => put(g, CG(0.018, 0.018, 1.0, 5), WOOD(), [0.05 + k * 0.05, 0.75, -0.1], [0, 0, -0.6])); return g; },
+    robot(c = 0x7c4dff) { const g = G(); put(g, BG(0.7, 0.56, 0.5), M(0xcfd8dc, { m: 0.3, r: 0.4 }), [0, 0.42, 0]); put(g, BG(0.56, 0.3, 0.02), M(0x263238), [0, 0.45, 0.26]); [-0.13, 0.13].forEach(x => put(g, SG(0.065, 10, 8), GLOW(c, 1.6), [x, 0.47, 0.27]));
+      put(g, BG(0.2, 0.04, 0.02), GLOW(c, 1.2), [0, 0.36, 0.27]); [-1, 1].forEach(k => put(g, CG(0.07, 0.07, 0.08, 12), M(c), [k * 0.38, 0.42, 0], [0, 0, PI / 2])); put(g, CG(0.02, 0.02, 0.22, 6), M(0x90a4ae), [0, 0.81, 0]); put(g, SG(0.06, 10, 8), GLOW(0xff5252, 1.4), [0, 0.94, 0]);
+      put(g, BG(0.4, 0.14, 0.3), M(0x90a4ae), [0, 0.07, 0]); return g; },
+    plate() { const g = G(); put(g, CG(0.55, 0.42, 0.06, 26), WHITE(), [0, 0.04, 0]); put(g, TG(0.5, 0.02, 4, 26), M(0xb0bec5), [0, 0.08, 0], [PI / 2, 0, 0]);
+      put(g, SG(0.16, 12, 10), M(0x8d6e63), [-0.05, 0.12, 0], [0, 0, 0], [1.2, 0.5, 1]); put(g, SG(0.08, 8, 6), M(0x66bb6a), [0.12, 0.16, 0.1]); put(g, SG(0.05, 8, 6), M(0xe53935), [0.0, 0.2, 0.0]);
+      [[0.18, -0.12, 0xffb300], [-0.2, 0.15, 0xffeb3b]].forEach(([x, z, col]) => put(g, SG(0.05, 6, 5), M(col), [x, 0.12, z])); put(g, BG(0.05, 0.02, 0.6), SILVER(), [-0.62, 0.03, 0.05]); put(g, BG(0.06, 0.02, 0.6), SILVER(), [0.62, 0.03, 0.05]); g.rotation.x = 0.45; return g; },
+    globe() { const g = G(); put(g, SG(0.42, 22, 16), M(0x42a5f5, { smooth: true, r: 0.35 }), [0, 0.6, 0]); [[0.3, 0.75, 0.2, 1.4], [-0.25, 0.5, 0.28, 1.1], [0.05, 0.38, 0.38, 0.9], [-0.1, 0.92, 0.12, 0.8]].forEach(([x, y, z, s]) => {
+        const p = put(g, SG(0.16 * s, 10, 8), M(0x66bb6a), [x, y, z], [0, 0, 0], [1, 0.8, 0.45]); p.lookAt(x * 3, 0.6 + (y - 0.6) * 3, z * 3); });
+      put(g, TG(0.5, 0.025, 6, 30, PI * 1.2), GOLD(), [0, 0.6, 0], [0, 0.4, PI * 0.9]); put(g, CG(0.04, 0.05, 0.16, 8), GOLD(), [0, 0.1, 0]); put(g, CG(0.22, 0.26, 0.06, 18), M(0x5d4037), [0, 0.03, 0]); return g; },
+    token(c = 0x8888aa) { const g = G(), s = sub(g, [1.1, 0, 0], [0, 0.45, 0]); put(s, CG(0.48, 0.48, 0.12, 28), M(c, { m: 0.3, r: 0.35 }), [0, 0, 0]); put(s, TG(0.42, 0.03, 6, 28), GOLD(), [0, 0.065, 0], [PI / 2, 0, 0]);
+      put(s, XG(starShape(0.22, 0.1), 0.05, 0.015), M(0xffffff), [0, 0.09, 0], [-PI / 2, 0, 0]); return g; },
+  };
+
+  /* ---- cada objeto: [plantilla, ...parámetros] ---- */
+  const ART = {
+    golden_fruit: ['fruit', 0xffd54f, 0x66bb6a, 0.25], seashell: ['scallop'], fish: ['fish', 0x90a4ae, 0x607d8b, 0xeceff1], tropical_fish: ['fish', 0xffa726, 0xef6c00, 0xfff3e0, 0xffffff], golden_fish: ['puffer'],
+    old_boot: ['boot'], dream_butterfly: ['butterfly', 0x81d4fa, 0xce93d8], firefly_jar: ['jar'],
+    wood_log: ['log'], stone: ['rock'], dream_sap: ['drop', 0xffb300], island_seed: ['sprout'], palm_fabric: ['roll', 0xc5e1a5, 0x7cb342], treated_wood: ['planks'], leather: ['pouch'], wing_dust: ['sparkles', 0xe1bee7],
+    pearl: ['pearl'], mystic_crystal: ['orb', 0xb39ddb], raw_gem: ['crystals', 0x4dd0e1], star_shard: ['star', 0xffca28, 0x81d4fa, 0.7], dream_spice: ['chili', 0xf4511e], sky_compass: ['compass'], timeless_clock: ['watch', 0xb39ddb, 0xede7f6, 0.35],
+    edge_map: ['map'], old_coin: ['coins'], fossil: ['bone'], rainbow_butterfly: ['butterfly', 0, 0, true], nacre_conch: ['oyster'], tiki_mask: ['tiki'],
+    croissant: ['croissant'], cupcake: ['cupcake'], strawberry_cake: ['cakeslice'], gasil_fuel: ['fuelcan'], dream_bread: ['loaf'], golden_jam: ['jamjar'], golden_cake: ['cake'], grilled_fish: ['skewer'], coffee: ['mug'],
+    coconut: ['coconut'], island_mango: ['mango'], golden_fish_grill: ['bento'], tropical_ceviche: ['bowl', 0xfff8e1, 0x26a69a, 0x66bb6a], spice_stew: ['bowl', 0xbf5a2a, 0x8d6e63, 0xff7043, true], spice_bun: ['donut', 0x8d4a1f],
+    gift_box: ['gift'], merchant_crate: ['crate'], poor_bread: ['baguette'], flower_bouquet: ['bouquet'], dream_ticket: ['ticket'], buried_chest: ['chest'], golden_gift_box: ['gift', 0xffc53d, 0xe53935], tide_charm: ['charm'], repair_kit: ['toolbox'],
+    dream_wheat: ['wheat'], flour: ['sack'],
+    fishing_rod: ['rod'], pickaxe: ['pickaxe'], axe: ['axe'], shovel: ['shovel'], detector: ['detector'], bug_net: ['net'],
+    hot_amber: ['keyboard'], sweet_obsidian: ['folder'], lava_pepper: ['notepad'], golden_ash: ['brain'], magma_heart: ['chip'],
+    moon_wood: ['bolt'], silver_moss: ['ruler'], night_mushroom: ['battery'], moon_resin: ['scroll'], moon_tear: ['gear'],
+    prism_coral: ['chili', 0xe53935], glass_sand: ['can'], neon_algae: ['book'], spiral_shell: ['mushroom'], black_pearl: ['star', 0xffa000, 0, 0.45],
+    slow_sand: ['sneaker'], fossil_gear: ['juicebox'], clock_cactus: ['medal'], second_dust: ['watch', 0xffc53d, 0xfffdf5, 0], eternal_minute: ['trophy'],
+    volt_ice: ['sheets'], static_feather: ['dress'], spark_moss: ['hands'], blue_quartz: ['star', 0xffca28, 0, 0.9], bottled_aurora: ['statuette'],
+    nimbus_cotton: ['note'], floating_drop: ['notes'], wind_feather: ['disc'], air_seed: ['disc', 0xffc53d, 0xec407a], sleeping_bolt: ['mic'],
+    echo_mud: ['screen'], whisper_reed: ['film'], purple_peat: ['rings'], slow_firefly: ['flame'], bottled_secret: ['plaque'],
+    living_papyrus: ['tube'], wandering_ink: ['pencil'], origami_card: ['easel'], ancient_seal: ['painting'], blank_page: ['bottle', 0xff8f00],
+    lunar_glass: ['pan'], volt_gear: ['tv'], nimbus_cloth: ['synth'], lava_ink: ['genart'], neon_bait: ['ramen'], ash_brick: ['robot'], prism_paper: ['plate'], edge_compass: ['globe'],
+  };
+  /** Color del oficio (objetos de perfil): sustituye el color por defecto de la plantilla */
+  const profColor = (it) => { try { const o = typeof NET_ORIGINS !== 'undefined' ? NET_ORIGINS.find(x => x.id === it.origin) : null; return o ? o.color : it.color ?? null; } catch (e) { return null; } };
+  const PROF_TINTED = new Set(['keyboard', 'folder', 'notepad', 'chip', 'bolt', 'ruler', 'battery', 'scroll', 'gear', 'can', 'book', 'mushroom', 'sneaker', 'juicebox', 'sheets', 'dress', 'note', 'notes', 'screen', 'film', 'rings', 'flame', 'plaque']);
+  function build(id) {
+    const it = (typeof ITEMS !== 'undefined' && ITEMS[id]) || { id }, a = ART[id];
+    let tpl, args;
+    if (a) { tpl = a[0]; args = a.slice(1); if (PROF_TINTED.has(tpl) && it.origin && !args.length) { const c = profColor(it); if (c != null) args = [c]; } }
+    else { tpl = 'token'; args = [profColor(it) ?? ({ special: 0xef5350, consumable: 0xffb74d, valuable: 0xba68c8, material: 0x8d6e63, resource: 0x4fc3f7, tool: 0x90a4ae })[it.cat] ?? 0x8888aa]; }
+    const f = T[tpl]; return f ? f(...args) : null;
+  }
+  function dispose() { geos.forEach(g => g.dispose()); geos.length = 0; mats.forEach(m => m.dispose()); mats.clear(); }
+  return { T, ART, build, dispose, has: (id) => !!ART[id] };
+})();
+
+/** Estudio de miniaturas: un renderer pequeño aparte (128 px, ×2), cámara ortográfica a 3/4 y luz cálida como la del juego */
+const IconStudio = (() => {
+  const SIZE = 128, urls = {}, faces = {}, listeners = [];
+  let R = null, scene = null, cam = null, pcam = null, A = null, B = null, C = null, out = null, failed = false, running = false, done = false;
+  function init() {
+    if (R || failed) return !failed;
+    try {
+      const cv = document.createElement('canvas'); R = new THREE.WebGLRenderer({ canvas: cv, alpha: true, antialias: true, preserveDrawingBuffer: true, powerPreference: 'low-power' });
+      R.setPixelRatio(2); R.setSize(SIZE, SIZE, false); R.setClearColor(0x000000, 0); R.outputColorSpace = THREE.SRGBColorSpace; R.toneMapping = THREE.ACESFilmicToneMapping; R.toneMappingExposure = 0.92;
+      scene = new THREE.Scene(); scene.add(new THREE.HemisphereLight(0xfff4e2, 0x8f86b8, 1.1), new THREE.AmbientLight(0xffffff, 0.2));
+      const key = new THREE.DirectionalLight(0xfff1d6, 2.0); key.position.set(2.2, 4, 3.2); scene.add(key); const rim = new THREE.DirectionalLight(0xc9dcff, 1.0); rim.position.set(-3, 1.5, -2.5); scene.add(rim);
+      try {   // reflejos suaves para metales y cristal (sin mapa de entorno, el oro sale marrón)
+        const env = new THREE.Scene(), eg = new THREE.SphereGeometry(10, 24, 12), col = [], P = eg.attributes.position;
+        for (let i = 0; i < P.count; i++) { const t = (P.getY(i) / 10 + 1) / 2; col.push(0.42 + 0.58 * t, 0.4 + 0.56 * t, 0.5 + 0.42 * t); } eg.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+        env.add(new THREE.Mesh(eg, new THREE.MeshBasicMaterial({ side: THREE.BackSide, vertexColors: true }))); const pn = new THREE.Mesh(new THREE.PlaneGeometry(9, 5), new THREE.MeshBasicMaterial({ color: 0xffffff })); pn.position.set(3, 6, 5); pn.lookAt(0, 0, 0); env.add(pn);
+        const pm = new THREE.PMREMGenerator(R); scene.environment = pm.fromScene(env, 0.03).texture; pm.dispose(); eg.dispose(); pn.geometry.dispose(); } catch (e) {}
+      cam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 60); cam.position.set(1.0, 0.85, 1.45).normalize().multiplyScalar(20); cam.lookAt(0, 0, 0); cam.updateMatrixWorld(true); pcam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 120);
+      const mk = () => { const c = document.createElement('canvas'); c.width = c.height = SIZE; const x = c.getContext('2d'); if (!x) throw new Error('2d'); return [c, x]; };
+      A = mk(); B = mk(); C = mk(); out = mk(); return true;
+    } catch (e) { failed = true; R = null; console.warn('[iconos] miniaturas 3D desactivadas:', e.message); return false; }
+  }
+  const _v = new THREE.Vector3(), _box = new THREE.Box3();
+  /** Encuadre ajustado: proyecta la caja del objeto sobre el plano de la cámara y centra */
+  function frame(g) {
+    g.updateMatrixWorld(true); _box.setFromObject(g); const right = new THREE.Vector3().setFromMatrixColumn(cam.matrixWorld, 0), up = new THREE.Vector3().setFromMatrixColumn(cam.matrixWorld, 1);
+    let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+    for (let i = 0; i < 8; i++) { _v.set(i & 1 ? _box.max.x : _box.min.x, i & 2 ? _box.max.y : _box.min.y, i & 4 ? _box.max.z : _box.min.z); const px = _v.dot(right), py = _v.dot(up); x0 = Math.min(x0, px); x1 = Math.max(x1, px); y0 = Math.min(y0, py); y1 = Math.max(y1, py); }
+    const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2, h = Math.max(x1 - x0, y1 - y0) / 2 * 1.1;
+    g.position.addScaledVector(right, -cx).addScaledVector(up, -cy); cam.left = -h; cam.right = h; cam.top = h; cam.bottom = -h; cam.updateProjectionMatrix();
+  }
+  function renderOne(id) {
+    const g = ItemArt.build(id); if (!g) return null;
+    frame(g); scene.add(g); R.render(scene, cam); scene.remove(g);
+    const [ca, xa] = A, [cb, xb] = B, [cc, xc] = C, [co, xo] = out;
+    xa.clearRect(0, 0, SIZE, SIZE); xa.drawImage(R.domElement, 0, 0, SIZE, SIZE);                 // el objeto (reducido de 256 a 128: bordes suaves)
+    xb.clearRect(0, 0, SIZE, SIZE); xb.drawImage(ca, 0, 0); xb.globalCompositeOperation = 'source-in'; xb.fillStyle = '#ffffff'; xb.fillRect(0, 0, SIZE, SIZE); xb.globalCompositeOperation = 'source-over';
+    xc.clearRect(0, 0, SIZE, SIZE); for (let k = 0; k < 12; k++) { const a = k / 12 * Math.PI * 2; xc.drawImage(cb, Math.cos(a) * 3.2, Math.sin(a) * 3.2); }   // borde blanco de pegatina
+    xo.clearRect(0, 0, SIZE, SIZE); xo.save(); xo.shadowColor = 'rgba(35,30,60,0.32)'; xo.shadowBlur = 6; xo.shadowOffsetY = 2.5; xo.drawImage(cc, 0, 0); xo.restore(); xo.drawImage(ca, 0, 0);
+    return co.toDataURL('image/png');
+  }
+  /** v2.9 · J2 · Retrato de busto: el modelo 3D del vecino (sin burbuja ni sombra), de frente, con fondo de su color en un cuadrado redondeado */
+  function renderPortrait(src, bg) {
+    // copia sin userData (algunos modelos guardan referencias circulares que clone() no sabe copiar) y sin burbujas, luces ni sombras
+    const lite = (o) => { const ud = o.userData; o.userData = {}; let c; try { c = o.clone(false); } finally { o.userData = ud; } for (const ch of o.children) { if (ch.isSprite || ch.isLight || ch.isPoints || ch.userData?.blob || ch.userData?.noPortrait) continue; c.add(lite(ch)); } return c; };
+    const m = lite(src);
+    m.position.set(0, 0, 0); m.quaternion.identity(); m.updateMatrixWorld(true);
+    const box = new THREE.Box3().setFromObject(m), H = box.max.y - box.min.y, top = box.max.y, y0 = top - H * 0.6, ctr = new THREE.Vector3((box.min.x + box.max.x) / 2, (y0 + top) / 2, (box.min.z + box.max.z) / 2);
+    pcam.position.copy(ctr).addScaledVector(new THREE.Vector3(0.34, 0.12, 1).normalize(), 40); pcam.lookAt(ctr); pcam.updateMatrixWorld(true);
+    const right = new THREE.Vector3().setFromMatrixColumn(pcam.matrixWorld, 0), up = new THREE.Vector3().setFromMatrixColumn(pcam.matrixWorld, 1); let x0 = Infinity, x1 = -Infinity, ya = Infinity, yb = -Infinity;
+    for (let i = 0; i < 8; i++) { _v.set(i & 1 ? box.max.x : box.min.x, i & 2 ? top : y0, i & 4 ? box.max.z : box.min.z).sub(ctr); const px = _v.dot(right), py = _v.dot(up); x0 = Math.min(x0, px); x1 = Math.max(x1, px); ya = Math.min(ya, py); yb = Math.max(yb, py); }
+    const h = Math.max(x1 - x0, yb - ya) / 2 * 1.06, cx = (x0 + x1) / 2, cy = (ya + yb) / 2; pcam.left = cx - h; pcam.right = cx + h; pcam.top = cy + h * 1.1; pcam.bottom = cy - h * 0.9; pcam.updateProjectionMatrix();
+    scene.add(m); R.render(scene, pcam); scene.remove(m);
+    const [co, xo] = out; xo.clearRect(0, 0, SIZE, SIZE); const rr = (x) => { x.beginPath(); if (x.roundRect) x.roundRect(4, 4, SIZE - 8, SIZE - 8, 30); else x.rect(4, 4, SIZE - 8, SIZE - 8); };
+    const gr = xo.createLinearGradient(0, 0, SIZE, SIZE); gr.addColorStop(0, '#ffffff'); gr.addColorStop(0.15, bg); gr.addColorStop(1, bg); xo.fillStyle = gr; rr(xo); xo.fill();
+    xo.save(); rr(xo); xo.clip(); xo.drawImage(R.domElement, 0, 0, SIZE, SIZE); xo.restore(); xo.lineWidth = 3; xo.strokeStyle = 'rgba(255,255,255,0.7)'; rr(xo); xo.stroke();
+    return co.toDataURL('image/png');
+  }
+  /** Genera por lotes (n por fotograma) en segundo plano; el emoji sirve mientras tanto · people: [{ id, obj, bg }] para los retratos */
+  function start(ids = Object.keys(ITEMS), perFrame = 6, people = []) {
+    if (running || done) return; if (!init()) return; running = true; const q = ids.filter(id => !urls[id]), pq = people.filter(p => p && p.obj && !faces[p.id]);
+    const step = () => {
+      try { for (let k = 0; k < perFrame && q.length; k++) { const id = q.shift(); try { const u = renderOne(id); if (u) urls[id] = u; } catch (e) { console.warn('[iconos]', id, e.message); } }
+        if (!q.length) for (let k = 0; k < 3 && pq.length; k++) { const p = pq.shift(); try { faces[p.id] = renderPortrait(p.obj, p.bg || '#ffe9b5'); } catch (e) { console.warn('[retratos]', p.id, e.message); } } }
+      catch (e) { console.warn('[iconos]', e.message); q.length = 0; }
+      if (q.length || pq.length) requestAnimationFrame(step); else finish();
+    };
+    requestAnimationFrame(step);
+  }
+  function finish() {
+    running = false; done = true; try { ItemArt.dispose(); R.dispose(); R.forceContextLoss && R.forceContextLoss(); } catch (e) {} R = null;
+    try { document.querySelectorAll('.item-ic[data-item]').forEach(el => { const u = urls[el.dataset.item]; if (u && !el.querySelector('img')) el.innerHTML = `<img src="${u}" alt="" draggable="false">`; });
+      document.querySelectorAll('[data-npc]').forEach(el => { const u = faces[el.dataset.npc]; if (u && !el.querySelector('img')) el.innerHTML = `<img src="${u}" alt="" draggable="false">`; }); } catch (e) {}
+    listeners.splice(0).forEach(f => { try { f(); } catch (e) {} });
+  }
+  return { SIZE, urls, faces, start, renderOne, renderPortrait, init, url: (id) => urls[id] || null, face: (id) => faces[id] || null, get ready() { return done; }, get failed() { return failed; }, onReady(f) { if (done) f(); else listeners.push(f); } };
+})();
+/** Icono de un objeto para HTML: la miniatura 3D si ya está, si no su emoji (se cambia sola cuando la miniatura termina) */
+function itemIcon(id, px = 28, cls = '') {
+  const it = ITEMS[id], emo = it ? it.icon : '❔'; let u = null; try { u = IconStudio.url(id); } catch (e) {}
+  return `<span class="item-ic ${cls}" data-item="${id}" style="--ic:${px}px" title="${it ? esc(it.name) : ''}">${u ? `<img src="${u}" alt="" draggable="false">` : `<span class="emo">${emo}</span>`}</span>`;
+}
+/* ===== v2.9 · J2 · retratos de los vecinos en diálogos, Relaciones, cartas y misiones ===== */
+const NPC_FACE_BG = { bear: '#ffd59a', mayor: '#ffe7a3', glover: '#d7ecb0', sombra: '#ddd1f5', dax: '#bfe8c4', sam: '#c7e9fb', hedgehogs: '#ffd6c9', rocco: '#cfe9d0', marea: '#dfeecf', ara: '#ffd3d8', tiko: '#ffe3c2', lula: '#c3ebe4' };
+/** Quién es por el nombre (las cartas y los textos usan nombres; el emoji 🦎 lo comparten Dax y Lula) */
+function npcIdFrom(str) { const s = String(str || ''); for (const [re, id] of [[/Oso|OsoExpress|Panader/, 'bear'], [/Mayor|Reginald|Ayuntamiento del Mayor/, 'mayor'], [/Glover/, 'glover'], [/Sombra|Oráculo/, 'sombra'], [/Dax|Climatizador/, 'dax'], [/Salty|\bSam\b/, 'sam'], [/Barnaby|Pip|erizos/i, 'hedgehogs'], [/Rocco/, 'rocco'], [/Marea/, 'marea'], [/\bAr[aá]\b/, 'ara'], [/Tiko/, 'tiko'], [/Lula/, 'lula']]) if (re.test(s)) return id; return null; }
+function npcByEmoji(e) { const k = String(e || '').replace(/\uFE0F/g, ''); const n = NPCS.find(x => x.emoji.replace(/\uFE0F/g, '') === k); if (n) return n.id; if (k === '🦝') return 'rocco'; const t = typeof TRIBE !== 'undefined' ? TRIBE.find(x => x.emoji === k) : null; return t ? t.id : null; }
+/** Cara de un vecino para HTML (retrato si ya está, si no su emoji; se cambia sola al terminar) */
+function npcFace(id, px = 24, emoji = '') { let u = null; try { u = id && IconStudio.face(id); } catch (e) {} return `<span class="npc-face" data-npc="${id || ''}" style="--ic:${px}px">${u ? `<img src="${u}" alt="" draggable="false">` : `<span class="emo">${esc(emoji || '🙂')}</span>`}</span>`; }
+/** Avatar del diálogo: retrato del vecino que habla */
+function setDialogAvatar(id, emoji) { const el = ui.dialogAvatar; let u = null; try { u = IconStudio.face(id); } catch (e) {} el.dataset.npc = id || ''; if (u) el.innerHTML = `<img src="${u}" alt="" draggable="false">`; else el.textContent = emoji; }
+/** Texto con los emojis del principio cambiados: de interfaz → icono, de vecino → retrato, de objeto → miniatura */
+function richLead(text, px = 18) {
+  let rest = String(text ?? ''), out = ''; const IS = (() => { try { return IconStudio; } catch (e) { return null; } })();
+  for (let k = 0; k < 2; k++) { const [e, t] = uiSplit(rest); if (!e) break; const key = e.replace(/\uFE0F/g, ''), npc = npcByEmoji(key);
+    if (UI_ICONS[key]) out += uiIco(e) + ' '; else if (npc && IS && IS.face(npc)) out += npcFace(npc, px + 2, e) + ' '; else { const iid = itemByEmoji(key); out += iid && IS && IS.url(iid) ? itemIcon(iid, px + 2) + ' ' : esc(e) + ' '; } rest = t; }
+  return out + esc(rest);
+}
+/** Remitente de una carta: cara del vecino por su nombre, o el icono de la institución */
+function senderHTML(from) { const [e, t] = uiSplit(from), id = npcIdFrom(t); return (id ? npcFace(id, 20, e) : e ? (UI_ICONS[e.replace(/\uFE0F/g, '')] ? uiIco(e) : esc(e)) : '') + ' ' + esc(t); }
+/** Texto del HUD con iconos (solo se repinta si cambia) */
+function setRich(el, text) { let rd = false; try { rd = IconStudio.ready; } catch (e) {} const t = String(text ?? ''), k = t + (rd ? '|1' : '|0'); if (!el || el.dataset.rk === k) return; el.dataset.rk = k; el.innerHTML = richLead(t); }
+let _itemByEmo = null; function itemByEmoji(k) { if (!_itemByEmo) { _itemByEmo = {}; Object.values(ITEMS).forEach(it => { const e = String(it.icon || '').replace(/\uFE0F/g, ''); if (e && !_itemByEmo[e]) _itemByEmo[e] = it.id; }); } return _itemByEmo[k] || null; }
+
 function openApp(title, html, onMount) { state.modalOpen = true; ui.dialog.classList.add('hidden'); clearInterval(typeTimer); setAppTitle(title); ui.appBody.innerHTML = html; ui.appModal.style.display = 'flex'; onMount && onMount(ui.appBody); }
 /** Sustituye el contenido del modal abierto sin cerrarlo (navegar entre app ↔ tienda ↔ inventario) */
 function swapApp(title, html, onMount) { if (ui.appModal.style.display !== 'flex') return openApp(title, html, onMount); ui.appBody._token = null; setAppTitle(title); ui.appBody.innerHTML = html; onMount && onMount(ui.appBody); }
@@ -4170,6 +4653,15 @@ function closeApp() { if (ui.appModal.style.display === 'none') return; state.mo
 function liveApp(b, render) { const my = Symbol(); b._token = my; render(); const timer = setInterval(() => { if (b._token !== my) clearInterval(timer); else render(); }, 1000); }
 ui_bind('btnCloseApp', closeApp);
 try { UIDecor.init(); } catch (e) { console.warn('[ui] iconos', e.message); }
+{ const el = document.getElementById('dialogName'); if (el && typeof MutationObserver !== 'undefined') {   // v2.9: el corazón de confianza del diálogo pasa a icono del juego
+    const RE = /(💟|💛|🧡|❤️?|💜)/u; new MutationObserver(() => { const t = el.textContent, m = t.match(RE); if (!m || el.querySelector('i')) return; const i = t.indexOf(m[0]); el.innerHTML = esc(t.slice(0, i)) + uiIco(m[0]) + esc(t.slice(i + m[0].length)); }).observe(el, { childList: true, characterData: true, subtree: true }); } }
+PhGlyph.onReady(() => { try { ['hudTop', 'appModal', 'dialogButtons'].forEach(id => { const el = document.getElementById(id); if (el) iconizeText(el); }); } catch (e) {} try {   // v2.9: los últimos emojis del HUD (saciedad y billete) pasan a iconos del juego
+  const ico = (n, c) => { const i = document.createElement('i'); i.className = `ph-duotone ph-${n} ui-ic`; i.setAttribute('style', `--t1:${c}`); i.setAttribute('aria-hidden', 'true'); return i; };
+  const sat = document.querySelector('#dayHud [title="Saciedad"]'); if (sat && sat.firstChild && sat.firstChild.nodeType === 3 && sat.firstChild.nodeValue.includes('🍗')) sat.firstChild.replaceWith(ico('bowl-food', '#c98a12'));
+  const gt = document.getElementById('goalText'), pv = gt && gt.previousSibling; if (pv && pv.nodeType === 3 && pv.nodeValue.includes('🎫')) { pv.nodeValue = ' '; gt.before(ico('ticket', '#ffd36b')); gt.before(document.createTextNode(' ')); }
+} catch (e) {} });
+IconStudio.onReady(() => { try { refreshMissionUI(); } catch (e) {} });   // v2.9: al terminar las miniaturas, el HUD de misiones pasa a retratos
+setTimeout(() => { try { if (!/[?&]noicons\b/.test(location.search)) IconStudio.start(Object.keys(ITEMS), 6, [...NPCS.map(n => ({ id: n.id, obj: npcObjs[n.id], bg: NPC_FACE_BG[n.id] })), { id: 'rocco', obj: vendor, bg: NPC_FACE_BG.rocco }, ...(typeof TRIBE !== 'undefined' ? TRIBE.map(t => ({ id: t.id, obj: Island.objs[t.id], bg: NPC_FACE_BG[t.id] })) : [])]); } catch (e) { console.warn('[iconos]', e.message); } }, 900);   // v2.9 · J1: miniaturas 3D en segundo plano
 setTimeout(() => document.getElementById('ctrlHint')?.classList.add('gone'), 150000);   // v2.1: la chuleta de controles se retira sola (sigue en ☰ → Guía y controles)
 const UPGRADES = [
   { id: 'house1', name: '🏪 Casa → Tienda', cost: 800, desc: 'Amplía tu casa con local comercial y toldo.', apply: () => buildHouse(1) },
@@ -4219,12 +4711,12 @@ function mountItemShop(body, shopId) {
       `<div class="flex gap-2 mb-3 items-center flex-wrap"><button data-tab="buy" class="btn-game px-4 py-1.5 text-sm ${tab === 'buy' ? 'active' : 'bg-white'}">🛒 Comprar</button><button data-tab="sell" class="btn-game px-4 py-1.5 text-sm ${tab === 'sell' ? 'active' : 'bg-white'}">💰 Vender</button>${trustTag}</div>`;
     if (tab === 'buy') {
       html += `<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">` + def.sells.map(e => { const it = ITEMS[e.id], price = shopBuyPrice(shopId, e.id), stock = s.stock[e.id] ?? 0, can = stock > 0 && Wallet.canAfford(price) && Inventory.canAdd(e.id, 1);
-        return `<div class="app-card p-3"><div class="flex items-start gap-3"><div class="text-4xl leading-none">${it.icon}</div><div class="flex-1 min-w-0"><div class="font-bold text-[#2b2b3d] flex items-center gap-2 flex-wrap">${it.name}${viralFlame(e.id)} ${rarityBadge(it.rarity)}</div><div class="text-xs text-slate-500 mt-0.5">${it.desc}</div><div class="text-[11px] text-slate-500 mt-1">${CATEGORIES[it.cat].icon} ${CATEGORIES[it.cat].name} · Stock: <b>${stock}</b> · Tienes: ${Inventory.count(e.id)}</div></div></div>
+        return `<div class="app-card p-3"><div class="flex items-start gap-3"><div class="text-4xl leading-none item-big">${itemIcon(it.id, 44)}</div><div class="flex-1 min-w-0"><div class="font-bold text-[#2b2b3d] flex items-center gap-2 flex-wrap">${it.name}${viralFlame(e.id)} ${rarityBadge(it.rarity)}</div><div class="text-xs text-slate-500 mt-0.5">${it.desc}</div><div class="text-[11px] text-slate-500 mt-1">${CATEGORIES[it.cat].icon} ${CATEGORIES[it.cat].name} · Stock: <b>${stock}</b> · Tienes: ${Inventory.count(e.id)}</div></div></div>
           <div class="flex items-center justify-between mt-2 gap-2"><span class="pixel text-[10px] text-amber-600">${price} $T</span><div class="flex gap-1"><button data-buy="${e.id}" data-q="1" class="btn-game px-3 py-1 text-xs bg-yellow-300" ${can ? '' : 'disabled'}>Comprar 1</button><button data-buy="${e.id}" data-q="5" class="btn-game px-2 py-1 text-xs bg-yellow-200" ${stock >= 5 && Wallet.canAfford(price * 5) && Inventory.canAdd(e.id, 5) ? '' : 'disabled'}>×5</button></div></div></div>`; }).join('') + `</div><p class="text-[11px] text-slate-500 mt-3">El stock se repone en ${restockIn} min.</p>`;
     } else {
       const sellable = Inventory.slots.map(sl => sl.id).filter((id, i, a) => a.indexOf(id) === i && shopBuysItem(shopId, id));
       html += sellable.length ? `<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">` + sellable.map(id => { const it = ITEMS[id], q = it.maxDur ? 1 : Inventory.count(id), p = it.maxDur ? toolSellPreview(shopId, id) : shopSellPrice(shopId, id), bonus = (def.buyMult[id] || 1) > 1;   // S2.2b: herramientas de 1 en 1 y precio × durabilidad
-        return `<div class="app-card p-3"><div class="flex items-start gap-3"><div class="text-4xl leading-none">${it.icon}</div><div class="flex-1 min-w-0"><div class="font-bold text-[#2b2b3d] flex items-center gap-2 flex-wrap">${it.name}${viralFlame(id)} <span class="text-slate-500">×${q}</span> ${rarityBadge(it.rarity)}</div><div class="text-xs text-slate-500 mt-0.5">${it.desc}</div></div></div>
+        return `<div class="app-card p-3"><div class="flex items-start gap-3"><div class="text-4xl leading-none item-big">${itemIcon(it.id, 44)}</div><div class="flex-1 min-w-0"><div class="font-bold text-[#2b2b3d] flex items-center gap-2 flex-wrap">${it.name}${viralFlame(id)} <span class="text-slate-500">×${q}</span> ${rarityBadge(it.rarity)}</div><div class="text-xs text-slate-500 mt-0.5">${it.desc}</div></div></div>
           <div class="flex items-center justify-between mt-2 gap-2"><span class="pixel text-[10px] text-emerald-600">${p} $T/u ${bonus ? '⭐' : ''}${viralFlame(id) ? '🔥×' + CFG.viralSellMult : ''}</span><div class="flex gap-1"><button data-sell="${id}" data-q="1" class="btn-game px-3 py-1 text-xs bg-emerald-300">Vender 1</button><button data-sell="${id}" data-q="${q}" class="btn-game px-2 py-1 text-xs bg-emerald-200">Todo (+${fmt(p * q)})</button></div></div></div>`; }).join('') + '</div>'
         : `<div class="app-card p-4 text-sm text-slate-600">No llevas nada que ${def.name} compre.<br><span class="text-xs">Compra aquí: ${def.buys === 'all' ? 'cualquier objeto vendible' : def.buys.map(i => ITEMS[i].icon + ' ' + ITEMS[i].name).join(', ')}${Object.keys(def.buyMult).length ? ' · ⭐ paga extra por ' + Object.keys(def.buyMult).filter(k => def.buyMult[k] > 1).map(k => ITEMS[k].name).join(', ') : ''}</span></div>`;
     }
@@ -4244,7 +4736,7 @@ function buildCatalogHTML() {
   return `<div class="app-card p-3 mb-3 text-xs text-slate-600">Construye en la <b>zona de la aldea</b> (alrededor de tu casa). Cada construcción cuesta $TOKEN y, a veces, materiales de la mochila. Construcciones actuales: <b>${built.length}</b>${built.length ? ' · ' + BUILDABLES.filter(b => built.some(x => x.type === b.id)).map(b => `${b.icon}×${built.filter(x => x.type === b.id).length}`).join(' ') : ''}</div>
     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">` + BUILDABLES.map(b => { const locked = b.unlock && !b.unlock(); const missing = buildMissing(b); const ok = !locked && Wallet.canAfford(buildCost(b)) && !missing.length;
       return `<div class="app-card p-3 ${locked ? 'opacity-70' : ''}"><div class="flex items-start gap-3"><div class="text-4xl leading-none">${b.icon}</div><div class="flex-1 min-w-0"><div class="font-bold text-[#2b2b3d]">${b.name}</div><div class="text-xs text-slate-500">${b.desc}</div>
-        <div class="text-[11px] mt-1 ${Wallet.canAfford(buildCost(b)) ? 'text-slate-600' : 'text-red-600'}">Coste: <b>${buildCost(b)} $TOKEN</b>${buildCost(b) < b.cost ? ` <s class="text-slate-400">${b.cost}</s> 🌉` : ''}${Object.keys(b.mats).length ? ' + ' + Object.entries(b.mats).map(([id, q]) => `${ITEMS[id].icon} ${ITEMS[id].name} ×${q}`).join(', ') : ''}</div>
+        <div class="text-[11px] mt-1 ${Wallet.canAfford(buildCost(b)) ? 'text-slate-600' : 'text-red-600'}">Coste: <b>${buildCost(b)} $TOKEN</b>${buildCost(b) < b.cost ? ` <s class="text-slate-400">${b.cost}</s> 🌉` : ''}${Object.keys(b.mats).length ? ' + ' + Object.entries(b.mats).map(([id, q]) => `${itemIcon(id, 18)} ${ITEMS[id].name} ×${q}`).join(', ') : ''}</div>
         ${missing.length && !locked ? `<div class="text-[11px] text-red-600">Te falta: ${missing.join(' · ')}</div>` : ''}${locked ? `<div class="text-[11px] text-amber-700">🔒 Requiere ${b.unlockText}</div>` : ''}</div></div>
         <div class="flex justify-end mt-2"><button data-build="${b.id}" class="btn-game px-4 py-1.5 text-sm bg-emerald-300" ${ok ? '' : 'disabled'}>🏗️ Construir</button></div></div>`; }).join('') + '</div>';
 }
@@ -4259,22 +4751,22 @@ function relationsHTML() {
     const liked = Object.keys(social.giftPrefs || {}).filter(iid => ITEMS[iid]).sort((a, b) => (social.giftPrefs[b] || 0) - (social.giftPrefs[a] || 0)).slice(0, 3);
     const mission = id !== 'rocco' && !tribe ? (state.missions[id]?.status ?? 0) : null;
     const enc = tribe ? Island.req(id) : (typeof currentEncargo === 'function') ? currentEncargo(id) : null;
-    const hints = [];
-    if (hasShop) hints.push(tribe ? '💰 Comercia en monedas antiguas' : '🛒 Comercia en su tienda');
-    if (social.giftNone) hints.push('🦝 No acepta regalos: solo comercio');
-    else if (liked.length) hints.push(`🎁 Le encanta: ${liked.map(iid => ITEMS[iid].icon).join(' ')}`);
-    { const seen = (GS.util?.hatesSeen?.[id] || []).filter(iid => ITEMS[iid]); if (seen.length) hints.push(`🙅 No le gusta: ${seen.map(iid => ITEMS[iid].icon).join(' ')}`); }   // v2.8: los regalos detestados que ya descubriste (Guía 1, 3.3)
-    if (mission === 2) hints.push('✅ Misión completada');
-    else if (mission === 1) hints.push('⏳ Misión en curso');
-    else if (mission === 0) hints.push(lv >= (social.trustRequired ?? 0) ? '❗ Misión disponible' : `🔒 Misión: requiere ${TRUST_LEVELS[social.trustRequired ?? 0].name}`);
-    if (enc && !enc.done) hints.push('📋 Encargo disponible hoy');
-    else if (enc?.done) hints.push('📋 Encargo de hoy ✓');
+    const hints = [], H = (emo, html) => hints.push(`${uiIco(emo)} ${html}`), its = (l) => l.map(iid => itemIcon(iid, 18)).join(' ');   // v2.9: iconos del juego y miniaturas
+    if (hasShop) H(tribe ? '💰' : '🛒', tribe ? 'Comercia en monedas antiguas' : 'Comercia en su tienda');
+    if (social.giftNone) H('🚫', 'No acepta regalos: solo comercio');
+    else if (liked.length) H('🎁', `Le encanta: ${its(liked)}`);
+    { const seen = (GS.util?.hatesSeen?.[id] || []).filter(iid => ITEMS[iid]); if (seen.length) H('🙅', `No le gusta: ${its(seen)}`); }   // v2.8: los regalos detestados que ya descubriste (Guía 1, 3.3)
+    if (mission === 2) H('✅', 'Misión completada');
+    else if (mission === 1) H('⏳', 'Misión en curso');
+    else if (mission === 0) H(lv >= (social.trustRequired ?? 0) ? '❗' : '🔒', lv >= (social.trustRequired ?? 0) ? 'Misión disponible' : `Misión: requiere ${TRUST_LEVELS[social.trustRequired ?? 0].name}`);
+    if (enc && !enc.done) H('📋', 'Encargo disponible hoy');
+    else if (enc?.done) H('📋', 'Encargo de hoy ✓');
     return `<div class="app-card p-3">
       <div class="flex items-center gap-2">
-        <div class="text-3xl leading-none">${emoji}</div>
+        ${npcFace(id, 44, emoji)}
         <div class="flex-1 min-w-0">
           <div class="font-bold text-[#2b2b3d] text-sm truncate">${name}</div>
-          <div class="text-[11px] font-semibold">${TRUST_LEVELS[lv].heart} ${TRUST_LEVELS[lv].name}${lv < 4 ? ` · ${prog.cur}/${prog.next} pts` : ' · MÁX'}</div>
+          <div class="text-[11px] font-semibold">${uiIco(TRUST_LEVELS[lv].heart)} ${TRUST_LEVELS[lv].name}${lv < 4 ? ` · ${prog.cur}/${prog.next} pts` : ' · MÁX'}</div>
         </div>
       </div>
       <div class="h-2 rounded-full bg-slate-200 border border-[#2b2b3d] overflow-hidden mt-2"><div class="h-full" style="width:${Math.round(prog.pct * 100)}%;background:${lv >= 4 ? '#a855f7' : 'linear-gradient(90deg,#f59e0b,#ec4899)'}"></div></div>
@@ -4319,13 +4811,13 @@ function mountInventory(body, backFn, initialPage = 'items') {
     } else {
       const slots = Inventory.slots.map((s, i) => ({ ...s, i })).filter(s => cat === 'all' || ITEMS[s.id].cat === cat);
       const empty = cat === 'all' ? Inventory.freeSlots() : 0;
-      html += `<div class="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-2">` + slots.map(s => { const it = ITEMS[s.id]; return `<button data-slot="${s.i}" class="app-card inv-slot p-1.5 aspect-square flex flex-col items-center justify-center relative ${sel === s.i ? 'sel' : ''}" style="--rc:${RARITY[it.rarity].color}"><div class="text-2xl md:text-3xl leading-none" style="${it.maxDur && Tools.dur(s) <= 0 ? 'filter:grayscale(1);opacity:.5' : ''}">${it.icon}</div><div class="text-[10px] font-bold text-[#2b2b3d] truncate w-full text-center mt-1">${it.name}${viralFlame(s.id)}</div>${it.maxDur ? toolBarHTML(s) : `<span class="qty">×${s.qty}</span>`}</button>`; }).join('') +
+      html += `<div class="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-2">` + slots.map(s => { const it = ITEMS[s.id]; return `<button data-slot="${s.i}" class="app-card inv-slot p-1.5 aspect-square flex flex-col items-center justify-center relative ${sel === s.i ? 'sel' : ''}" style="--rc:${RARITY[it.rarity].color}"><div class="text-2xl md:text-3xl leading-none item-big" style="${it.maxDur && Tools.dur(s) <= 0 ? 'filter:grayscale(1);opacity:.5' : ''}">${itemIcon(it.id, 46)}</div><div class="text-[10px] font-bold text-[#2b2b3d] truncate w-full text-center mt-1">${it.name}${viralFlame(s.id)}</div>${it.maxDur ? toolBarHTML(s) : `<span class="qty">×${s.qty}</span>`}</button>`; }).join('') +
         Array.from({ length: empty }, () => `<div class="rounded-xl border-2 border-dashed border-slate-300 aspect-square"></div>`).join('') + '</div>';
       if (!slots.length && !empty) html += `<div class="text-sm text-slate-500 mt-2">No tienes objetos de esta categoría.</div>`;
       if (!Inventory.slots.length) html += `<div class="app-card p-3 mt-3 text-xs text-slate-600">💡 Explora el planeta: recoge 🐚 conchas en las playas, 🌲 troncos en los bosques, ⛰️ piedras en las montañas y 🔮 cristales junto a la carpa de Madame Sombra. Las 🍋 Frutas Doradas crecen junto al laboratorio de Dax.</div>`;
       const s = Inventory.slots[sel];
       if (s) { const it = ITEMS[s.id]; const buyers = Object.entries(SHOPS).filter(([sid]) => shopBuysItem(sid, s.id)).map(([sid, d]) => `${d.icon} ${d.name} (${shopSellPrice(sid, s.id)} $T)`);
-        html += `<div class="app-card p-4 mt-3 fade-in"><div class="flex items-start gap-3"><div class="text-5xl leading-none">${it.icon}</div><div class="flex-1"><div class="font-bold text-lg text-[#2b2b3d] flex items-center gap-2 flex-wrap">${it.name} <span class="text-slate-500 text-base">×${s.qty}</span> ${rarityBadge(it.rarity)}</div><div class="text-xs text-slate-500">${CATEGORIES[it.cat].icon} ${CATEGORIES[it.cat].name}</div><p class="text-sm text-[#2b2b3d] mt-1">${it.desc}</p>${(() => { const u = typeof Util !== 'undefined' ? Util.usesOf(it.id) : []; return u.length ? `<p class="text-xs text-slate-500 mt-1"><b>Sirve para:</b> ${u.slice(0, 5).join(' · ')}</p>` : ''; })()}${it.maxDur ? `<div class="text-xs mt-1 flex items-center gap-2 flex-wrap">🛠️ Durabilidad: <b>${Tools.dur(s)}/${it.maxDur}</b>${Tools.dur(s) <= 0 ? ' · <b class="text-red-600">ROTA</b>' : ''} · al venderla pagan sell × durabilidad <button data-tools class="btn-game px-2 py-0.5 text-[11px] bg-orange-200">🔧 Reparar</button></div>` : ''}
+        html += `<div class="app-card p-4 mt-3 fade-in"><div class="flex items-start gap-3"><div class="text-5xl leading-none item-big">${itemIcon(it.id, 56)}</div><div class="flex-1"><div class="font-bold text-lg text-[#2b2b3d] flex items-center gap-2 flex-wrap">${it.name} <span class="text-slate-500 text-base">×${s.qty}</span> ${rarityBadge(it.rarity)}</div><div class="text-xs text-slate-500">${CATEGORIES[it.cat].icon} ${CATEGORIES[it.cat].name}</div><p class="text-sm text-[#2b2b3d] mt-1">${it.desc}</p>${(() => { const u = typeof Util !== 'undefined' ? Util.usesOf(it.id) : []; return u.length ? `<p class="text-xs text-slate-500 mt-1"><b>Sirve para:</b> ${u.slice(0, 5).join(' · ')}</p>` : ''; })()}${it.maxDur ? `<div class="text-xs mt-1 flex items-center gap-2 flex-wrap">🛠️ Durabilidad: <b>${Tools.dur(s)}/${it.maxDur}</b>${Tools.dur(s) <= 0 ? ' · <b class="text-red-600">ROTA</b>' : ''} · al venderla pagan sell × durabilidad <button data-tools class="btn-game px-2 py-0.5 text-[11px] bg-orange-200">🔧 Reparar</button></div>` : ''}
           <div class="text-xs text-slate-600 mt-2">${it.sellable ? `Valor de venta: <b>${it.sell} $T</b> · Se vende en: ${buyers.join(' · ') || '—'}` : 'No se puede vender'}${it.buy ? ` · Precio de compra: ${it.buy} $T` : ''}</div></div></div>
           <div class="flex gap-2 mt-3">${it.usable ? `<button data-use="${s.id}" class="btn-game px-4 py-1.5 text-sm bg-emerald-300">✨ Usar 1</button>` : ''}<button data-close-sel class="btn-game px-3 py-1.5 text-sm bg-slate-200">Cerrar</button></div></div>`; }
     }
@@ -4702,7 +5194,7 @@ function openHousePanel(tab) {
       if (_houseTab === 'mail') {
         html += `<div class="app-card p-3 mb-3"><div class="flex items-center justify-between mb-1"><div class="font-bold text-[#2b2b3d]">📮 Buzón ${unread ? `<span class="text-xs text-red-600">(${unread} sin leer)</span>` : ''}</div>${unread ? `<button data-readall class="btn-game px-2 py-1 text-[11px] bg-slate-200">Marcar todo leído</button>` : ''}</div>`;
         html += letters.length
-          ? `<div class="max-h-[45vh] overflow-auto divide-y divide-slate-100">` + letters.map((l, i) => `<button data-letter="${i}" class="block w-full text-left py-2 ${l.read ? 'opacity-60' : ''}"><div class="text-xs font-bold ${l.read ? 'text-slate-500' : 'text-[#2b2b3d]'}">${l.read ? '' : '🔴 '}${esc(l.from)} · día ${l.day}</div><div class="text-xs text-slate-600 leading-snug mt-0.5 whitespace-pre-line">${esc(l.text)}</div></button>`).join('') + '</div>'
+          ? `<div class="max-h-[45vh] overflow-auto divide-y divide-slate-100">` + letters.map((l, i) => `<button data-letter="${i}" class="block w-full text-left py-2 ${l.read ? 'opacity-60' : ''}"><div class="text-xs font-bold ${l.read ? 'text-slate-500' : 'text-[#2b2b3d]'}">${l.read ? '' : '<span class="unread-dot"></span>'}${senderHTML(l.from)} · día ${l.day}</div><div class="text-xs text-slate-600 leading-snug mt-0.5 whitespace-pre-line">${esc(l.text)}</div></button>`).join('') + '</div>'
           : `<div class="text-sm text-slate-500">Sin cartas. El cartero onírico descansa.</div>`;
         html += `<div class="text-[11px] text-slate-500 mt-2">Llegan facturas, resultados de la lotería, ventas del escaparate, rumores (confianza ❤️ 3) y cartas de tus vecinos más cercanos (confianza 4).</div></div>`;
       } else if (_houseTab === 'rent') {
@@ -4737,7 +5229,7 @@ function openHousePanel(tab) {
         const tk = Trend.knownToday();
         html += `<div class="app-card p-3 mb-3"><div class="font-bold text-[#2b2b3d] mb-1">🏷️ Escaparate</div>
           <div class="text-sm text-slate-600">${Showcase.slots() ? `${Showcase.list.length}/${Showcase.slots()} huecos · 🐷 hucha: <b>${fmt(GS.housing.showcaseRevenue | 0)} $T</b>` : 'Llega con la mejora a Tienda (nivel 1).'}</div>
-          ${tk ? `<div class="mt-2 p-2 rounded-lg bg-fuchsia-50 text-xs font-semibold text-fuchsia-700">🔥 Tendencia de hoy (según los erizos): ${ITEMS[tk].icon} ${esc(ITEMS[tk].name)} · se vende el doble de fácil esta noche</div>` : ''}
+          ${tk ? `<div class="mt-2 p-2 rounded-lg bg-fuchsia-50 text-xs font-semibold text-fuchsia-700">🔥 Tendencia de hoy (según los erizos): ${itemIcon(tk, 20)} ${esc(ITEMS[tk].name)} · se vende el doble de fácil esta noche</div>` : ''}
           <button data-showcase class="btn-game px-3 py-1.5 text-xs mt-2 bg-amber-200">🏷️ Abrir escaparate</button></div>`;
       } else if (_houseTab === 'furniture') {
         const canBuy = GS.missions?.glover?.status === 2;
@@ -5565,11 +6057,11 @@ function openToolsPanel(npcId = null) {
       list.forEach(({ s, i }) => {
         const it = ITEMS[s.id], max = Tools.max(s.id), d = Tools.dur(s), pct = Math.round(d / max * 100), rep = CFG.toolRepair[s.id];
         const broken = d <= 0, full = d >= max;
-        const diyTxt = rep.diy.map(([id, q]) => `${q} ${ITEMS[id].icon}`).join(' + ');
+        const diyTxt = rep.diy.map(([id, q]) => `${q} ${itemIcon(id, 18)}`).join(' + ');
         const diyOk = rep.diy.every(([id, q]) => Inventory.has(id, q));
         const npcOk = npcId && rep.npc === npcId;
         html += `<div class="app-card p-3 mb-2 flex items-center gap-3">
-          <div class="text-3xl" style="${broken ? 'filter:grayscale(1);opacity:.5' : ''}">${it.icon}</div>
+          <div class="text-3xl item-big" style="${broken ? 'filter:grayscale(1);opacity:.5' : ''}">${itemIcon(it.id, 38)}</div>
           <div class="flex-1 min-w-0">
             <div class="font-bold text-sm text-[#2b2b3d]">${esc(it.name)} ${broken ? '<span class="text-red-600 text-xs">· ROTA</span>' : ''}</div>
             <div class="h-2 rounded-full bg-slate-200 overflow-hidden mt-1"><div class="h-full ${pct > 50 ? 'bg-emerald-400' : pct > 20 ? 'bg-amber-400' : 'bg-red-500'}" style="width:${pct}%"></div></div>
@@ -5580,7 +6072,7 @@ function openToolsPanel(npcId = null) {
             <button data-diy="${i}" class="btn-game px-2 py-1 text-[11px] ${diyOk ? 'bg-sky-200' : 'bg-slate-200 opacity-60'}" ${full ? 'disabled' : ''}>Tú mismo (${diyTxt})</button>
           </div></div>`;
       });
-      if (missing.length) html += `<div class="text-xs font-bold text-slate-500 mt-3 mb-1">TE FALTAN</div>` + missing.map(t => `<div class="app-card p-2 mb-1.5 flex items-center gap-3 text-xs"><span class="text-2xl" style="filter:grayscale(.6);opacity:.7">${ITEMS[t.id].icon}</span><div class="flex-1"><b>${ITEMS[t.id].name}</b> · ${t.what}<div class="text-slate-500">Se compra en ${t.where} · ${fmt(ITEMS[t.id].buy)} $T</div></div></div>`).join('');
+      if (missing.length) html += `<div class="text-xs font-bold text-slate-500 mt-3 mb-1">TE FALTAN</div>` + missing.map(t => `<div class="app-card p-2 mb-1.5 flex items-center gap-3 text-xs"><span class="text-2xl item-big" style="filter:grayscale(.6);opacity:.7">${itemIcon(t.id, 30)}</span><div class="flex-1"><b>${ITEMS[t.id].name}</b> · ${t.what}<div class="text-slate-500">Se compra en ${t.where} · ${fmt(ITEMS[t.id].buy)} $T</div></div></div>`).join('');
       if (npcId) html += `<div class="text-[11px] text-slate-500 mt-2">${npcById[npcId]?.emoji || '🔧'} Aquí reparan: ${Object.entries(CFG.toolRepair).filter(([, r]) => r.npc === npcId).map(([id]) => ITEMS[id].icon + ' ' + ITEMS[id].name).join(', ')}. Hacerlo tú mismo cuesta materiales.</div>`;
       body.innerHTML = html;
       body.querySelectorAll('[data-diy]').forEach(b => b.onclick = () => { Tools.repairDIY(+b.dataset.diy); render(); });
@@ -5828,12 +6320,12 @@ function openKitchenPanel() {
       const b = Kitchen.blocked();
       if (b) { body.innerHTML = html + `<div class="app-card p-3 text-sm text-slate-700 font-bold">${b}</div>`; return; }
       const now = Date.now();
-      html += `<div class="app-card p-3 mb-3"><div class="font-bold text-sm mb-1">Lotes (${Kitchen.q.length}/${Kitchen.slots()})</div>` + (Kitchen.q.length ? Kitchen.q.map((k, i) => { const r = Kitchen.recipe(k.recipe), it = ITEMS[r.out], ready = now >= k.readyAt; return `<div class="flex items-center gap-2 py-1 text-xs"><span class="text-lg">${it.icon}</span><div class="flex-1">${k.qty}× ${esc(it.name)} · ${ready ? '<b class="text-emerald-600">¡Listo!</b>' : `listo en <b>${kitchenFmt(k.readyAt - now)}</b>`}</div>${ready ? `<button data-collect="${i}" class="btn-game px-2 py-0.5 text-[11px] bg-emerald-300">🧺 Recoger</button>` : ''}</div>`; }).join('') : `<div class="text-xs text-slate-500">Ningún lote en marcha.</div>`) + `</div>`;
+      html += `<div class="app-card p-3 mb-3"><div class="font-bold text-sm mb-1">Lotes (${Kitchen.q.length}/${Kitchen.slots()})</div>` + (Kitchen.q.length ? Kitchen.q.map((k, i) => { const r = Kitchen.recipe(k.recipe), it = ITEMS[r.out], ready = now >= k.readyAt; return `<div class="flex items-center gap-2 py-1 text-xs"><span class="text-lg">${itemIcon(it.id, 22)}</span><div class="flex-1">${k.qty}× ${esc(it.name)} · ${ready ? '<b class="text-emerald-600">¡Listo!</b>' : `listo en <b>${kitchenFmt(k.readyAt - now)}</b>`}</div>${ready ? `<button data-collect="${i}" class="btn-game px-2 py-0.5 text-[11px] bg-emerald-300">🧺 Recoger</button>` : ''}</div>`; }).join('') : `<div class="text-xs text-slate-500">Ningún lote en marcha.</div>`) + `</div>`;
       const full = Kitchen.q.length >= Kitchen.slots();
       RECIPES.filter(r => !r.net || Net.on()).forEach(r => {   // v1.3: el Cebo Neón aparece cuando tienes origen
         const it = ITEMS[r.out], max = Kitchen.maxQty(r), lock = Kitchen.locked(r), on = max > 0 && !full && !lock;
-        const ing = r.in.map(([id, q]) => `${q}× ${ITEMS[id].icon} ${esc(ITEMS[id].name)} <span class="${Inventory.count(id) >= q ? 'text-emerald-600' : 'text-red-500'}">(${Inventory.count(id)})</span>`).join(' + ');
-        html += `<div class="app-card p-3 mb-2 ${lock ? 'opacity-60' : ''}"><div class="flex items-center gap-2"><span class="text-2xl">${it.icon}</span><div class="flex-1 min-w-0"><div class="font-bold text-sm">${esc(it.name)} ${r.gourmet ? '<span class="text-[10px] text-amber-600">GOURMET</span>' : ''}</div><div class="text-[11px] text-slate-500">${ing}</div><div class="text-[11px] text-slate-400">${lock ? lock : `${CFG.cookSecs[r.id]} s · cada unidad extra del lote +${Math.round(CFG.cookBatchExtra * 100)}% · máx. ${CFG.cookMaxBatch}`}</div></div></div>
+        const ing = r.in.map(([id, q]) => `${q}× ${itemIcon(id, 18)} ${esc(ITEMS[id].name)} <span class="${Inventory.count(id) >= q ? 'text-emerald-600' : 'text-red-500'}">(${Inventory.count(id)})</span>`).join(' + ');
+        html += `<div class="app-card p-3 mb-2 ${lock ? 'opacity-60' : ''}"><div class="flex items-center gap-2"><span class="text-2xl item-big">${itemIcon(it.id, 30)}</span><div class="flex-1 min-w-0"><div class="font-bold text-sm">${esc(it.name)} ${r.gourmet ? '<span class="text-[10px] text-amber-600">GOURMET</span>' : ''}</div><div class="text-[11px] text-slate-500">${ing}</div><div class="text-[11px] text-slate-400">${lock ? lock : `${CFG.cookSecs[r.id]} s · cada unidad extra del lote +${Math.round(CFG.cookBatchExtra * 100)}% · máx. ${CFG.cookMaxBatch}`}</div></div></div>
           ${lock ? '' : `<div class="flex flex-wrap gap-2 mt-2 items-center">
             <input data-qty="${r.id}" type="number" min="1" max="${Math.max(1, max)}" value="1" class="game w-16 text-xs">
             <button data-cook="${r.id}" class="btn-game px-3 py-1.5 text-xs ${on ? 'bg-orange-200' : 'bg-slate-200 opacity-60'}">Cocinar</button>
@@ -5905,7 +6397,7 @@ function openShowcasePanel() {
       if (houseSealed()) html += `<div class="app-card p-3 mb-3 text-sm text-purple-700 font-bold">🔒 Casa sellada: las ventas están en pausa (no pierdes nada).</div>`;
       const rev = GS.housing.showcaseRevenue | 0;
       html += `<div class="app-card p-3 mb-3 flex items-center justify-between gap-2"><div class="text-sm">🐷 Hucha: <b>${fmt(rev)} $T</b><div class="text-[11px] text-slate-500">Las ventas ocurren en la liquidación de medianoche. Comisión: 0%.</div></div><button data-collect class="btn-game px-3 py-1.5 text-xs ${rev ? 'bg-emerald-300' : 'bg-slate-200 opacity-60'}">Recoger</button></div>`;
-      html += `<div class="app-card p-3 mb-3"><div class="font-bold text-sm mb-2">En venta (${Showcase.list.length}/${max})</div>` + (Showcase.list.length ? Showcase.list.map((s, i) => { const it = ITEMS[s.id], p = Math.round(Showcase.odds(s.price, s.id) * 100); return `<div class="flex items-center gap-2 py-1 text-xs"><span class="text-lg">${it.icon}</span><div class="flex-1">${esc(it.name)} ×${s.qty} · <b>${fmt(s.price)} $T</b>/u <span class="text-slate-500">(ref. ${fmt(it.sell)} · ${p}%/día)</span></div><button data-withdraw="${i}" class="btn-game px-2 py-0.5 text-[11px] bg-slate-200">Retirar</button></div>`; }).join('') : `<div class="text-xs text-slate-500">Vacío.</div>`) + `</div>`;
+      html += `<div class="app-card p-3 mb-3"><div class="font-bold text-sm mb-2">En venta (${Showcase.list.length}/${max})</div>` + (Showcase.list.length ? Showcase.list.map((s, i) => { const it = ITEMS[s.id], p = Math.round(Showcase.odds(s.price, s.id) * 100); return `<div class="flex items-center gap-2 py-1 text-xs"><span class="text-lg">${itemIcon(it.id, 22)}</span><div class="flex-1">${esc(it.name)} ×${s.qty} · <b>${fmt(s.price)} $T</b>/u <span class="text-slate-500">(ref. ${fmt(it.sell)} · ${p}%/día)</span></div><button data-withdraw="${i}" class="btn-game px-2 py-0.5 text-[11px] bg-slate-200">Retirar</button></div>`; }).join('') : `<div class="text-xs text-slate-500">Vacío.</div>`) + `</div>`;
       const ids = [...new Set(GS.inventory.slots.map(s => s.id))].filter(id => Showcase.canShow(id));
       if (Showcase.list.length < max && ids.length && !houseSealed()) {
         html += `<div class="app-card p-3"><div class="font-bold text-sm mb-2">Poner a la venta</div><div class="flex flex-wrap gap-2 items-center">
@@ -6162,8 +6654,8 @@ function updateClockHUD() {
   const el = document.getElementById('clockText'); if (!el) return;
   const h = (GS.daily.clockMs / 3600000) % 24, mins = Math.floor(h * 60);
   const icon = h < 6 || h >= 20.5 ? '🌙' : h < 8 ? '🌅' : h < 18.5 ? '☀️' : '🌆';
-  const txt = `${icon} Día ${GS.daily.dayCount} · ${String(Math.floor(mins / 60)).padStart(2, '0')}:${String(mins % 60).padStart(2, '0')}`;
-  if (txt !== _clockLast) { _clockLast = txt; el.textContent = txt; }
+  const txt = `${icon} Día ${GS.daily.dayCount} · ${String(Math.floor(mins / 60)).padStart(2, '0')}:${String(mins % 60).padStart(2, '0')}`, ph = icon === '🌙' ? ['moon-stars', '#6a59e6'] : icon === '☀️' ? ['sun', '#c98a12'] : ['sun-horizon', icon === '🌅' ? '#e07a2e' : '#c2477a'];
+  const key = txt + (PhGlyph.ready ? '|i' : ''); if (key !== _clockLast) { _clockLast = key; if (PhGlyph.ready) el.innerHTML = `<i class="ph-duotone ph-${ph[0]} ui-ic" style="--t1:${ph[1]}" aria-hidden="true"></i> ${txt.slice(icon.length + 1)}`; else el.textContent = txt; }   // v2.9: iconos del juego en vez de emojis
 }
 function updateHungerHUD() {
   const bar = document.getElementById('hungerBar'), val = document.getElementById('hungerVal'); if (!bar) return;
@@ -6825,7 +7317,7 @@ const BakeryOrders = {
       const render = () => {
         const o = this.today(), ok = !this.missing(o).length;
         body.innerHTML = balanceBar() + `<div class="app-card p-4 mb-3"><div class="text-sm text-slate-600 mb-2"><b class="text-[#2b2b3d]">🐻 Oso:</b> “${o.done ? '¡Pedido de hoy servido! Mañana la web traerá otro. ¡Eres mi proveedor oficial!' : '¡Socio! La web ha traído este pedido. ¿Me lo preparas en tu cocina?'}”</div>
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">${o.items.map(([id, q]) => { const have = Inventory.count(id); return `<div class="flex items-center gap-2 p-2 rounded-lg ${have >= q ? 'bg-emerald-50' : 'bg-slate-100'}"><span class="text-2xl">${ITEMS[id].icon}</span><div class="text-xs flex-1"><b>${q}× ${esc(ITEMS[id].name)}</b><div class="${have >= q ? 'text-emerald-600' : 'text-red-500'}">tienes ${have}/${q}</div></div></div>`; }).join('')}</div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">${o.items.map(([id, q]) => { const have = Inventory.count(id); return `<div class="flex items-center gap-2 p-2 rounded-lg ${have >= q ? 'bg-emerald-50' : 'bg-slate-100'}"><span class="text-2xl item-big">${itemIcon(id, 30)}</span><div class="text-xs flex-1"><b>${q}× ${esc(ITEMS[id].name)}</b><div class="${have >= q ? 'text-emerald-600' : 'text-red-500'}">tienes ${have}/${q}</div></div></div>`; }).join('')}</div>
           <div class="text-sm mt-3">Pago: <b class="text-amber-600">${COIN} ${fmt(o.pay)} $T</b> <span class="text-xs text-slate-500">(valor de tienda ${fmt(o.base)} × ${String(CFG.bakeryOrderMult).replace('.', ',')}) · +${CFG.bakeryOrderTrust} confianza</span></div>
           <div class="flex justify-end mt-3">${o.done ? '<span class="text-emerald-600 font-bold text-sm">✅ Servido</span>' : `<button data-deliver class="btn-game px-4 py-2 text-sm ${ok ? 'bg-emerald-300' : 'bg-slate-200 opacity-60'}" ${ok ? '' : 'disabled'}>📦 Entregar pedido</button>`}</div></div>
           <div class="text-[11px] text-slate-500">Un pedido al día, fijo para hoy (no cambia al recargar) · caduca a medianoche onírica · pedidos servidos: ${act2State().orders.served | 0}. Se cocina en 🍳 Mi Casa: Mermelada (2 🍋), Pastel Dorado (Villa), Pan, Pescado a la brasa.</div>`;
@@ -6888,7 +7380,7 @@ const Bridge = {
         const p = this.phase(), N = this.phases(), done = this.done(), need = this.need();
         let html = `<div class="app-card p-4 mb-3"><div class="text-sm text-slate-600"><b class="text-[#2b2b3d]">🐿️ Glover:</b> “${done ? 'Ahí lo tienes. Mira al horizonte. Yo ya no pregunto.' : this.canToday() ? 'Trae los materiales de esta fase. Ni un milímetro de más, ni uno de menos.' : 'Hoy ya hemos avanzado. El cemento necesita su noche: vuelve mañana.'}”</div>
           <div class="h-3 rounded-full bg-slate-200 border border-[#2b2b3d] overflow-hidden mt-3"><div class="h-full" style="width:${p / N * 100}%;background:linear-gradient(90deg,#ffb74d,#ffd54f)"></div></div><div class="text-xs text-slate-500 mt-1">Fase ${p}/${N} · 1 fase por día onírico${done ? ` · terminado el día ${this.st().doneDay}` : ''}</div></div>`;
-        html += `<div class="app-card p-3 mb-3"><div class="font-bold text-sm mb-1">Fases de obra</div>` + CFG.bridgePhases.map((ph, i) => `<div class="flex items-center gap-2 text-xs py-1 ${i < p ? 'text-emerald-600' : i === p ? 'text-[#2b2b3d] font-bold' : 'text-slate-400'}"><span>${i < p ? '✅' : i === p ? '🏗️' : '▫️'}</span><span>Fase ${i + 1}: ${Object.entries(ph).map(([id, q]) => `${q}× ${ITEMS[id].icon} ${esc(ITEMS[id].name)}${i === p ? ` <span class="${Inventory.count(id) >= q ? 'text-emerald-600' : 'text-red-500'}">(${Inventory.count(id)})</span>` : ''}`).join(' + ')}</span></div>`).join('') + `</div>`;
+        html += `<div class="app-card p-3 mb-3"><div class="font-bold text-sm mb-1">Fases de obra</div>` + CFG.bridgePhases.map((ph, i) => `<div class="flex items-center gap-2 text-xs py-1 ${i < p ? 'text-emerald-600' : i === p ? 'text-[#2b2b3d] font-bold' : 'text-slate-400'}"><span>${i < p ? '✅' : i === p ? '🏗️' : '▫️'}</span><span>Fase ${i + 1}: ${Object.entries(ph).map(([id, q]) => `${q}× ${itemIcon(id, 18)} ${esc(ITEMS[id].name)}${i === p ? ` <span class="${Inventory.count(id) >= q ? 'text-emerald-600' : 'text-red-500'}">(${Inventory.count(id)})</span>` : ''}`).join(' + ')}</span></div>`).join('') + `</div>`;
         if (!done && need) { const ok = this.canToday() && Object.entries(need).every(([id, q]) => Inventory.has(id, q)); html += `<div class="flex justify-end"><button data-donate class="btn-game px-4 py-2 text-sm ${ok ? 'bg-amber-300' : 'bg-slate-200 opacity-60'}" ${ok ? '' : 'disabled'}>🧱 Donar materiales de la fase ${p + 1}</button></div>`; }
         html += `<div class="text-[11px] text-slate-500 mt-2">Al terminar: puente-mirador permanente en la costa del puerto (con placa), y <b>−${Math.round(CFG.bridgeBuildDiscount * 100)}% en el coste de las construcciones</b> para siempre${done ? ' (✅ activo)' : ''}. Las gemas (💎) salen al minar con el pico.</div>`;
         body.innerHTML = html; const b = body.querySelector('[data-donate]'); if (b) b.onclick = () => { this.donate(); render(); };
@@ -7114,7 +7606,7 @@ const Imports = {
         const im = act2State().imports, today = im.day === GS.daily.dayCount ? im.count : 0, o = this.offer();
         body.innerHTML = balanceBar() + `<div class="app-card p-3 mb-3 text-sm text-slate-600"><b class="text-[#2b2b3d]">🐦 Sam:</b> “Arrr… las nuevas rutas traen cosas que no existen en ningún mapa, grumete. Porque el mapa… bueno. Tú ya sabes del mapa.”</div>
           <div class="app-card p-3 mb-3"><div class="font-bold text-sm mb-1">📦 Importaciones en la caja del muelle</div><div class="text-xs text-slate-600">Cada atraque, la caja trae 1 objeto exclusivo de Ultramar. Hoy: <b>${today}/${CFG.importsPerDayCap}</b> · total: ${im.total | 0}. Barco: <b>${state.shipDocked ? '⚓ atracado: ¡recoge la caja!' : 'en ruta'}</b></div>
-            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-2">${(() => { const tot = CFG.importLoot.reduce((a, e) => a + e[1], 0); return CFG.importLoot.map(([id, w]) => `<div class="p-2 rounded-lg bg-slate-50 text-center text-[11px]"><div class="text-2xl">${ITEMS[id].icon}</div><b>${esc(ITEMS[id].name)}</b><div>${fmt(ITEMS[id].sell)} $T · ${Math.round(w / tot * 100)}%</div></div>`).join(''); })()}</div></div>
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-2">${(() => { const tot = CFG.importLoot.reduce((a, e) => a + e[1], 0); return CFG.importLoot.map(([id, w]) => `<div class="p-2 rounded-lg bg-slate-50 text-center text-[11px]"><div class="text-2xl item-big">${itemIcon(id, 30)}</div><b>${esc(ITEMS[id].name)}</b><div>${fmt(ITEMS[id].sell)} $T · ${Math.round(w / tot * 100)}%</div></div>`).join(''); })()}</div></div>
           <div class="app-card p-3"><div class="font-bold text-sm mb-1">🧵 Tela imposible del atraque</div>${!state.shipDocked ? '<div class="text-xs text-slate-500">Llega con el próximo atraque (1 tela por barco).</div>' : o?.sold ? '<div class="text-xs text-emerald-600 font-bold">✓ Ya compraste la tela de este barco.</div>' : o?.all ? '<div class="text-xs text-emerald-600 font-bold">✓ Tienes las 12 telas imposibles. Arrr, coleccionista.</div>' : o?.part ? `<div class="flex items-center gap-3"><span class="text-3xl">🧵</span><div class="flex-1 text-xs"><b>${esc(o.part.name)}</b> · <span style="color:${RARITY[o.part.rarity]?.color}">${RARITY[o.part.rarity]?.name || ''}</span><div class="text-slate-500">Cosmético para tu armario (la ropa nunca da ventaja).</div></div><button data-fabric class="btn-game px-3 py-1.5 text-xs ${Wallet.canAfford(o.price) ? 'bg-amber-300' : 'bg-slate-200 opacity-60'}">${fmt(o.price)} $T</button></div>` : ''}</div>`;
         const f = body.querySelector('[data-fabric]'); if (f) f.onclick = () => this.buyFabric();
       });
@@ -7139,7 +7631,7 @@ const Viral = {
   open() {
     openApp('🔥 Agencia Viral · Tendencia del Día', '', (body) => {
       const id = Trend.forDay(GS.daily.dayCount), it = ITEMS[id], best = Object.keys(SHOPS).filter(s => shopBuysItem(s, id)).map(s => [s, shopSellPrice(s, id)]).sort((a, b) => b[1] - a[1])[0];
-      body.innerHTML = balanceBar() + `<div class="app-card p-4 mb-3 text-center"><div class="text-5xl">${it.icon}</div><div class="font-bold text-[#2b2b3d] mt-1">🔥 ${esc(it.name)} está en tendencia hoy</div><div class="text-xs text-slate-500 mt-1">Precio de venta a los vecinos <b>×${CFG.viralSellMult}</b> durante todo el día onírico ${GS.daily.dayCount}${best ? ` · ahora mismo: <b>${fmt(best[1])} $T</b> en ${SHOPS[best[0]].icon} ${SHOPS[best[0]].name}` : ''} · en el escaparate se vende el doble de fácil esta noche · llevas ${Inventory.count(id)}.</div></div>
+      body.innerHTML = balanceBar() + `<div class="app-card p-4 mb-3 text-center"><div class="text-5xl item-big">${itemIcon(it.id, 56)}</div><div class="font-bold text-[#2b2b3d] mt-1">🔥 ${esc(it.name)} está en tendencia hoy</div><div class="text-xs text-slate-500 mt-1">Precio de venta a los vecinos <b>×${CFG.viralSellMult}</b> durante todo el día onírico ${GS.daily.dayCount}${best ? ` · ahora mismo: <b>${fmt(best[1])} $T</b> en ${SHOPS[best[0]].icon} ${SHOPS[best[0]].name}` : ''} · en el escaparate se vende el doble de fácil esta noche · llevas ${Inventory.count(id)}.</div></div>
         <div class="app-card p-3 text-sm text-slate-600"><b class="text-[#2b2b3d]">🦔 Barnaby Jr.:</b> “¡BRO! ¡Hemos hackeado el algoritmo!” <b class="text-[#2b2b3d]">Pip:</b> “(Era solo una ruleta.)” <b class="text-[#2b2b3d]">Barnaby:</b> “¡NO DIGAS ESO, PIP!”<div class="text-[11px] text-slate-500 mt-1">Honestidad (P5): la tendencia es un sorteo diario determinista entre ${CFG.trendPool.length} objetos. Cambia cada medianoche onírica. La de mañana se la cuentan a los Socios ❤️ (rumor).</div></div>`;
     });
   },
@@ -7828,9 +8320,9 @@ function act3MissionHUD(lbl) {
   const a = GS.awakening, s = GS.story || {};
   if (s.ending === 'B') {
     const p = GS.postgame || {}; if (lbl) lbl.textContent = 'POST-JUEGO · SOÑADOR ETERNO'; ui.missionCount.textContent = `${(p.mansion ? 1 : 0) + (p.club100M ? 1 : 0)}/2`;
-    ui.missionText.textContent = !p.mansion ? '🏰 Mansión Onírica: encárgasela a Glover' : !p.club100M ? `💯 Club de los 100M: ${fmtDots(GS.economy.money)} / ${fmtDots(CFG.club100M)}` : '🌟 Eres leyenda del sueño';
+    setRich(ui.missionText, !p.mansion ? '🏰 Mansión Onírica: encárgasela a Glover' : !p.club100M ? `💯 Club de los 100M: ${fmtDots(GS.economy.money)} / ${fmtDots(CFG.club100M)}` : '🌟 Eres leyenda del sueño');
   } else if ((a?.step | 0) >= 1 && !s.ending) {
-    if (lbl) lbl.textContent = 'ACTO 3 · EL DESPERTAR'; ui.missionCount.textContent = `${Awakening.doneSteps()}/3`; ui.missionText.textContent = Awakening.nextText();
+    if (lbl) lbl.textContent = 'ACTO 3 · EL DESPERTAR'; ui.missionCount.textContent = `${Awakening.doneSteps()}/3`; setRich(ui.missionText, Awakening.nextText());
   }
 }
 /** Lista de la cadena dentro del panel del billete */
@@ -7853,7 +8345,7 @@ function awakeningChainHTML() {
    Nota: la 🎪 Feria del Sábado (puestos de los vecinos, ofertas de tienda) NO es la
    📈 Feria del Tablón de la v0.8 (especulación por categorías): conviven sin tocarse.
    ========================================================= */
-const GAME_VERSION = '2.8', GAME_TAG = 'La isla de la tribu';
+const GAME_VERSION = '2.9', GAME_TAG = 'Iconos y retratos';
 /* ---------- 🗓️ EVENTOS: calendario REAL → flags que leen los sistemas existentes (Sec. 10.10) ---------- */
 const Events = {
   _force: null,   // DBG.weekday(n): simula el día de la semana real (0 = domingo … 6 = sábado)
@@ -7905,7 +8397,7 @@ const Fair = {
         offers.forEach(o => (by[o.npc] ||= []).push(o));
         let html = balanceBar() + `<div class="app-card p-3 mb-3 text-sm text-slate-600">Los vecinos han montado puestos en la aldea: ofertas que solo existen hoy, stock limitado y algo raro de Ultramar. <b>Precio de feria fijo</b> (cuenta como comercio para la confianza).</div>`;
         html += Object.entries(by).map(([npc, list]) => { const v = FAIR_NPC[npc]; return `<div class="app-card p-3 mb-2"><div class="font-bold text-sm text-[#2b2b3d]">${v.emoji} ${v.name}</div><div class="text-xs text-slate-500 italic mb-2">“${v.line}”</div>` +
-          list.map(o => { const it = ITEMS[o.id], p = this.price(o), left = this.left(o), base = this.base(o); return `<div class="flex items-center gap-2 py-1"><span class="text-2xl">${it.icon}</span><div class="flex-1 min-w-0"><div class="text-sm font-semibold">${esc(it.name)} ${o.rare ? '<span class="text-[10px] text-purple-600 font-bold">✦ STOCK RARO</span>' : ''}</div><div class="text-[11px] text-slate-500">${o.disc && base ? `<s>${fmt(base)}</s> → ` : ''}<b class="text-emerald-700">${fmt(p)} $T</b>${o.disc ? ` (−${Math.round(o.disc * 100)}%)` : ''} · quedan ${left}</div></div><button data-fair="${o.key}" class="btn-game px-3 py-1.5 text-xs ${left > 0 && Wallet.canAfford(p) ? 'bg-emerald-300' : 'bg-slate-200 opacity-60'}" ${left > 0 ? '' : 'disabled'}>Comprar</button></div>`; }).join('') + `</div>`; }).join('');
+          list.map(o => { const it = ITEMS[o.id], p = this.price(o), left = this.left(o), base = this.base(o); return `<div class="flex items-center gap-2 py-1"><span class="text-2xl item-big">${itemIcon(it.id, 30)}</span><div class="flex-1 min-w-0"><div class="text-sm font-semibold">${esc(it.name)} ${o.rare ? '<span class="text-[10px] text-purple-600 font-bold">✦ STOCK RARO</span>' : ''}</div><div class="text-[11px] text-slate-500">${o.disc && base ? `<s>${fmt(base)}</s> → ` : ''}<b class="text-emerald-700">${fmt(p)} $T</b>${o.disc ? ` (−${Math.round(o.disc * 100)}%)` : ''} · quedan ${left}</div></div><button data-fair="${o.key}" class="btn-game px-3 py-1.5 text-xs ${left > 0 && Wallet.canAfford(p) ? 'bg-emerald-300' : 'bg-slate-200 opacity-60'}" ${left > 0 ? '' : 'disabled'}>Comprar</button></div>`; }).join('') + `</div>`; }).join('');
         body.innerHTML = html;
         body.querySelectorAll('[data-fair]').forEach(b => b.onclick = () => { if (this.buy(b.dataset.fair)) render(); });
       };
@@ -8167,7 +8659,7 @@ function achievementsHTML() {
     <div class="flex flex-wrap gap-1 mt-2">${a.titles.length ? [null, ...a.titles].map(t => `<button data-title="${t === null ? '' : esc(t)}" class="btn-game px-2 py-0.5 text-[10px] ${a.equippedTitle === t || (!a.equippedTitle && t === null) ? 'active' : 'bg-white'} ${t && gold.includes(t) ? 'text-amber-600' : ''}">${t === null ? 'Sin título' : (gold.includes(t) ? '✨ ' : '') + esc(t)}</button>`).join('') : '<span class="text-[11px] text-slate-400">Aún no tienes títulos.</span>'}</div></div>`;
   html += Object.entries(ACH_CATS).map(([cat, label]) => `<div class="pixel text-[9px] text-slate-500 mt-3 mb-1">${label}</div><div class="grid grid-cols-1 sm:grid-cols-2 gap-2">` + ACHIEVEMENTS.filter(d => d.cat === cat).map(d => {
     const u = a.unlocked[d.id], hidden = d.secret && !u, p = !hidden && d.prog ? (() => { try { return d.prog(); } catch (e) { return null; } })() : null;
-    const reward = (d.r || []).map(([id, q]) => `${ITEMS[id].icon}×${q}`).join(' ') + (d.fashion ? ' + 👗' : '') + (d.legendAura ? ' + ✨ aura' : '');
+    const reward = (d.r || []).map(([id, q]) => `${itemIcon(id, 18)}×${q}`).join(' ') + (d.fashion ? ' + 👗' : '') + (d.legendAura ? ' + ✨ aura' : '');
     return `<div class="app-card p-2.5 flex items-center gap-2 ${u ? 'owned' : ''}"><div class="text-2xl ${u ? '' : 'opacity-40 grayscale'}">${hidden ? '❔' : d.icon}</div><div class="flex-1 min-w-0"><div class="text-sm font-bold ${d.gold && u ? 'text-amber-600' : 'text-[#2b2b3d]'}">${hidden ? 'Logro secreto' : esc(d.name)}</div><div class="text-[11px] text-slate-500 leading-snug">${hidden ? 'Hay cosas que solo se descubren haciéndolas… o dejando de hacerlas.' : esc(d.desc)}</div>${!u && p ? `<div class="h-1.5 mt-1 rounded-full bg-slate-200 overflow-hidden"><div class="h-full bg-amber-400" style="width:${Math.min(100, p[0] / p[1] * 100).toFixed(1)}%"></div></div><div class="text-[10px] text-slate-400">${fmt(Math.min(Math.floor(p[0]), p[1]))}/${fmt(p[1])}</div>` : ''}${hidden ? '' : `<div class="text-[10px] text-slate-500">Premio: ${reward}</div>`}</div>${u ? (a.claimed[d.id] ? '<span class="text-emerald-600 text-[11px] font-bold">✓</span>' : `<button data-achclaim="${d.id}" class="btn-game px-2 py-1 text-[11px] bg-emerald-300">Recoger</button>`) : ''}</div>`;
   }).join('') + `</div>`).join('');
   return html;
@@ -8531,7 +9023,7 @@ function toggleLavaLamp() {
 function openInteriorShopPanel() {
   const def = Interiors.active?.def; if (!def || !def.shopItems) return;
   openApp(def.title, '', (body) => {
-    body.innerHTML = `<div class="app-card p-3 mb-3 text-sm text-slate-700">🦊 ${esc(def.keeperLine)}</div>` + def.shopItems.map(s => `<div class="app-card p-2 mb-1.5 flex items-center gap-2 text-sm"><span class="text-xl">${ITEMS[s.id].icon}</span><span class="flex-1">${esc(ITEMS[s.id].name)}</span><b>${fmt(s.price)} $T</b></div>`).join('') +
+    body.innerHTML = `<div class="app-card p-3 mb-3 text-sm text-slate-700">🦊 ${esc(def.keeperLine)}</div>` + def.shopItems.map(s => `<div class="app-card p-2 mb-1.5 flex items-center gap-2 text-sm"><span class="text-xl item-big">${itemIcon(s.id, 24)}</span><span class="flex-1">${esc(ITEMS[s.id].name)}</span><b>${fmt(s.price)} $T</b></div>`).join('') +
       `<div class="text-[11px] text-slate-500 mt-2">🧪 Simulación: así serán los puestos, locales y boutiques de otros soñadores en el online. Todavía no se vende nada.</div>`;
   });
 }
@@ -9513,7 +10005,7 @@ const Island = (() => {
     const clear = (p) => { let m = 99; for (const c of colliders) if (c && c.island) { const d = p.clone().sub(c.pos); d.addScaledVector(up, -d.dot(up)); m = Math.min(m, d.length() - (c.wide || c.r)); } return m; };
     const [pa, pb] = [1, -1].map(s => mid.clone().addScaledVector(side, 4.2 * s)), ca = clear(pa), cb = clear(pb);
     state.dialogPose = { pos: (ca >= cb ? pa : pb).addScaledVector(up, Math.max(ca, cb) > 0.6 ? 1.2 : 2.8), target: mid, up: up.clone() }; tweenCamera(state.dialogPose, 0.9);
-    ui.hint.classList.add('hidden'); ui.dialog.classList.remove('hidden'); ui.dialogButtons.innerHTML = ''; ui.dialogAvatar.textContent = t.emoji;
+    ui.hint.classList.add('hidden'); ui.dialog.classList.remove('hidden'); ui.dialogButtons.innerHTML = ''; setDialogAvatar(t.id, t.emoji);
     ui.dialogName.textContent = `${t.name.toUpperCase()} · ${t.role.toUpperCase()} · ${trustLvIcon(id)} ${trustLvName(id)}`;
     const line = t.lines[Math.floor(Math.random() * t.lines.length)];
     typeText(ui.dialogText, line, 16, () => {
@@ -9534,9 +10026,9 @@ const Island = (() => {
       const render = () => {
         let html = `<div class="app-card p-3 mb-2 text-xs text-slate-600">En la isla se paga con <b>💰 Monedas Antiguas</b> (tienes <b>${coins()}</b>). Las encuentras excavando en el desierto${id === 'lula' ? ', y Lula te las da por tu pescado' : ''}. Lo de la isla vale mucho en el pueblo.</div>`;
         if (id === 'lula') html += `<div class="sec-h">Lula compra tu pescado</div>` + LULA_BUYS.map(([it, n, c]) => { const have = Inventory.count(it), lots = Math.floor(have / n);
-          return `<div class="app-card p-2.5 mb-1.5 flex items-center gap-3"><div class="text-2xl w-9 text-center">${ITEMS[it].icon}</div><div class="flex-1 text-sm"><b class="text-[#2b2b3d]">${ITEMS[it].name}</b><div class="text-xs text-slate-500">${n} = ${c} 💰 · tienes ${have}</div></div><button data-sell="${it}" class="btn-game px-3 py-1.5 text-xs ${lots ? 'bg-emerald-300' : 'bg-slate-200 opacity-60'}">Vender ${lots ? lots * n : ''}</button></div>`; }).join('');
+          return `<div class="app-card p-2.5 mb-1.5 flex items-center gap-3"><div class="text-2xl w-9 text-center item-big">${itemIcon(it, 30)}</div><div class="flex-1 text-sm"><b class="text-[#2b2b3d]">${ITEMS[it].name}</b><div class="text-xs text-slate-500">${n} = ${c} 💰 · tienes ${have}</div></div><button data-sell="${it}" class="btn-game px-3 py-1.5 text-xs ${lots ? 'bg-emerald-300' : 'bg-slate-200 opacity-60'}">Vender ${lots ? lots * n : ''}</button></div>`; }).join('');
         const shop = ISLAND_SHOPS[id] || [];
-        if (shop.length) html += `<div class="sec-h">A la venta</div>` + shop.map(([it, p]) => `<div class="app-card p-2.5 mb-1.5 flex items-center gap-3"><div class="text-2xl w-9 text-center">${ITEMS[it].icon}</div><div class="flex-1 min-w-0 text-xs"><b class="text-sm text-[#2b2b3d]">${ITEMS[it].name}</b><div class="text-slate-500">${ITEMS[it].desc}</div><div class="text-amber-700 font-bold mt-0.5">${p} 💰 · en el pueblo vale ${fmt(ITEMS[it].sell)} $T</div></div>
+        if (shop.length) html += `<div class="sec-h">A la venta</div>` + shop.map(([it, p]) => `<div class="app-card p-2.5 mb-1.5 flex items-center gap-3"><div class="text-2xl w-9 text-center item-big">${itemIcon(it, 30)}</div><div class="flex-1 min-w-0 text-xs"><b class="text-sm text-[#2b2b3d]">${ITEMS[it].name}</b><div class="text-slate-500">${ITEMS[it].desc}</div><div class="text-amber-700 font-bold mt-0.5">${p} 💰 · en el pueblo vale ${fmt(ITEMS[it].sell)} $T</div></div>
             <button data-buy="${it}" data-p="${p}" class="btn-game px-3 py-1.5 text-xs ${coins() >= p ? 'bg-amber-300' : 'bg-slate-200 opacity-60'}">Comprar</button></div>`).join('');
         body.innerHTML = html;
         body.querySelectorAll('[data-buy]').forEach(b => b.onclick = () => { buy(id, b.dataset.buy, +b.dataset.p); render(); });
@@ -9572,8 +10064,8 @@ const Island = (() => {
     const t = TRIBE_BY_ID[id];
     openApp(`📜 Encargo de ${t.name}`, '', (body) => { const render = () => { const q = req(id), it = ITEMS[q.item], have = Inventory.count(q.item), ok = have >= q.qty;
       body.innerHTML = q.done ? `<div class="app-card p-5 text-center"><div class="text-4xl mb-2">✅</div><b class="text-[#2b2b3d]">¡Hecho por hoy!</b><div class="text-sm text-slate-600 mt-1">Vuelve mañana: ${t.name} siempre necesita algo.</div></div>`
-        : `<div class="app-card p-4"><div class="flex items-start gap-3"><div class="text-4xl">${it.icon}</div><div class="flex-1"><b class="text-[#2b2b3d]">${t.emoji} ${t.name} pide:</b><p class="text-sm text-slate-600 mt-1">“${q.text}”</p>
-          <div class="text-sm font-bold mt-2 ${ok ? 'text-emerald-600' : 'text-red-600'}">${it.icon} ${it.name}: ${have}/${q.qty}</div><div class="text-xs text-slate-500 mt-1">Recompensa: <b class="text-amber-700">${q.coins} 💰 Monedas Antiguas</b> + 🤝 ${q.trust}</div></div></div>
+        : `<div class="app-card p-4"><div class="flex items-start gap-3"><div class="text-4xl item-big">${itemIcon(it.id, 44)}</div><div class="flex-1"><b class="text-[#2b2b3d]">${t.emoji} ${t.name} pide:</b><p class="text-sm text-slate-600 mt-1">“${q.text}”</p>
+          <div class="text-sm font-bold mt-2 ${ok ? 'text-emerald-600' : 'text-red-600'}">${itemIcon(it.id, 20)} ${it.name}: ${have}/${q.qty}</div><div class="text-xs text-slate-500 mt-1">Recompensa: <b class="text-amber-700">${q.coins} 💰 Monedas Antiguas</b> + 🤝 ${q.trust}</div></div></div>
           <div class="flex justify-end mt-3"><button data-go class="btn-game px-4 py-2 text-sm bg-emerald-300" ${ok ? '' : 'disabled'}>📦 Entregar</button></div></div>`;
       const b = body.querySelector('[data-go]'); if (b) b.onclick = () => { deliver(id); render(); }; }; render(); });
   }
@@ -9616,7 +10108,7 @@ const Voyage = (() => {
     openApp('⛵ La travesía', '', (body) => { const render = () => {
       const row = (ok, icon, label, extra = '') => `<div class="app-card p-2.5 mb-1.5 flex items-center gap-3 ${ok ? 'opacity-80' : ''}"><div class="text-2xl w-9 text-center">${ok ? '✅' : icon}</div><div class="flex-1 text-sm text-[#2b2b3d]">${label}</div>${extra}</div>`;
       let html = `<div class="app-card p-3 mb-2 text-sm text-slate-600">🐦 <i>"Arrr… Mi barco no aguanta el Mar del Borde: allí la corriente parte cascos como galletas. Si lo arreglamos y me consigues las tres piezas de navegación, te llevo a la isla del otro lado. Y quiero fiarme de ti: Socio, nada menos."</i></div>`;
-      html += row(v.repaired, '🔧', `Reparar el barco: ${C.repair.map(([id, q]) => `${q}× ${ITEMS[id].icon} ${ITEMS[id].name} (${Inventory.count(id)})`).join(' · ')}`, v.repaired ? '' : '<button data-rep class="btn-game px-3 py-1.5 text-xs bg-amber-300">Reparar</button>');
+      html += row(v.repaired, '🔧', `Reparar el barco: ${C.repair.map(([id, q]) => `${q}× ${itemIcon(id, 18)} ${ITEMS[id].name} (${Inventory.count(id)})`).join(' · ')}`, v.repaired ? '' : '<button data-rep class="btn-game px-3 py-1.5 text-xs bg-amber-300">Reparar</button>');
       VOYAGE_PARTS.forEach(id => { const ok = partOk(id), mus = !st().parts[id] && ok; html += row(ok, ITEMS[id].icon, `${ITEMS[id].name}${mus ? ' <span class="text-xs text-slate-500">(Sam la estudia en el museo)</span>' : ''}`, ok ? '' : `<button data-part="${id}" class="btn-game px-3 py-1.5 text-xs ${Inventory.has(id) ? 'bg-amber-300' : 'bg-slate-200 opacity-60'}">Entregar</button>`); });
       const lv = Trust.level('sam'); html += row(lv >= C.trust, '🤝', `Confianza con Sam: ${TRUST_LEVELS[C.trust].heart} ${TRUST_LEVELS[C.trust].name} (ahora ${trustLvIcon('sam')} ${trustLvName('sam')})`);
       html += `<div class="flex justify-end mt-2"><button data-sail class="btn-game px-4 py-2 text-sm ${ready() ? 'bg-sky-300' : 'bg-slate-200 opacity-60'}" ${ready() ? '' : 'disabled'}>⛵ ¡Zarpar!</button></div>`;
@@ -9700,8 +10192,8 @@ const Util = {
       const render = () => {
         body.innerHTML = `<div class="app-card p-3 mb-2 text-xs text-slate-600">Fabrica herramientas y materiales con lo que encuentras por el mundo. Las tiendas siguen vendiéndolas, pero aquí te salen por materiales.</div>` +
           WORKBENCH.map(r => { const it = ITEMS[r.id], miss = this.missing(r);
-            return `<div class="app-card p-2.5 mb-1.5 flex items-center gap-3"><div class="text-3xl w-10 text-center">${it.icon}</div><div class="flex-1 min-w-0 text-xs"><div class="font-bold text-sm text-[#2b2b3d]">${it.name}</div><div class="text-slate-500">${r.note}</div>
-              <div class="mt-0.5">${r.in.map(([id, q]) => `<span class="${Inventory.has(id, q) ? 'text-emerald-700' : 'text-red-600'}">${q}× ${ITEMS[id].icon} ${ITEMS[id].name}</span>`).join(' · ')}</div></div>
+            return `<div class="app-card p-2.5 mb-1.5 flex items-center gap-3"><div class="text-3xl w-10 text-center item-big">${itemIcon(it.id, 38)}</div><div class="flex-1 min-w-0 text-xs"><div class="font-bold text-sm text-[#2b2b3d]">${it.name}</div><div class="text-slate-500">${r.note}</div>
+              <div class="mt-0.5">${r.in.map(([id, q]) => `<span class="${Inventory.has(id, q) ? 'text-emerald-700' : 'text-red-600'}">${q}× ${itemIcon(id, 18)} ${ITEMS[id].name}</span>`).join(' · ')}</div></div>
               <button data-craft="${r.id}" class="btn-game px-3 py-1.5 text-xs ${miss.length ? 'bg-slate-200 opacity-60' : 'bg-emerald-300'}">Fabricar</button></div>`; }).join('');
         body.querySelectorAll('[data-craft]').forEach(b => b.onclick = () => { this.craft(b.dataset.craft); render(); });
       };
@@ -10650,7 +11142,7 @@ const NetUI = {
       if (on) {
         const reqs = Net.genRequests(), sh = st.shop, T = Net.shopDef(), open = Net.myOrders();
         html += `<div class="app-card p-3 mb-2 flex items-center gap-2"><span class="text-3xl">${o.icon}</span><div class="flex-1 text-xs"><b>Tu perfil: ${o.name}</b><br>${o.mats.map(m => ITEMS[m[0]].icon).join(' ')} + ${ITEMS[o.jewel[0]].icon} · afinidades ${st.aff.map(m => netItem(m).icon).join(' ')}</div><button data-origin class="btn-game px-2 py-1 text-xs bg-violet-200">Ficha</button></div>`;
-        html += `<div class="app-card p-3 mb-2"><div class="font-bold text-sm mb-1">📦 Pedidos de Ultramar (${reqs.length})</div>${reqs.map(q => `<div class="text-[11px] py-0.5">${npcById[q.npc]?.emoji || '📦'} ${q.k === 'diario' ? 'Diario' : q.k === 'raro' ? '⭐ Raro' : '🏆 Gran Pedido'} · ${Object.entries(q.need).map(([id, n]) => `${n}× ${ITEMS[id].icon}`).join(' ')} → <b>${fmt(q.r)} $T</b></div>`).join('') || '<div class="text-[11px] text-slate-500">Hoy nadie pide nada.</div>'}<button data-reqs class="btn-game px-2 py-1 text-xs mt-1 bg-orange-200">Ver y entregar</button></div>`;
+        html += `<div class="app-card p-3 mb-2"><div class="font-bold text-sm mb-1">📦 Pedidos de Ultramar (${reqs.length})</div>${reqs.map(q => `<div class="text-[11px] py-0.5">${npcById[q.npc]?.emoji || '📦'} ${q.k === 'diario' ? 'Diario' : q.k === 'raro' ? '⭐ Raro' : '🏆 Gran Pedido'} · ${Object.entries(q.need).map(([id, n]) => `${n}× ${itemIcon(id, 18)}`).join(' ')} → <b>${fmt(q.r)} $T</b></div>`).join('') || '<div class="text-[11px] text-slate-500">Hoy nadie pide nada.</div>'}<button data-reqs class="btn-game px-2 py-1 text-xs mt-1 bg-orange-200">Ver y entregar</button></div>`;
         html += `<div class="app-card p-3 mb-2 text-xs"><div class="font-bold text-sm mb-1">📋 Tus órdenes y tu tienda</div>Órdenes abiertas: <b>${open.length}</b>/${CFG.net.maxOrders}${open.length ? ' · ' + open.map(x => `${x.side === 'b' ? 'compra' : 'venta'} ${x.q}× ${netItem(x.m).icon} a ${fmt(x.p)}`).join(' · ') : ''}<br>Consigna de la Aduana: <b>${st.stash.reduce((a, e) => a + e.q, 0)}</b> objeto(s)<br>${T ? `${T.icon} Tu ${T.name}: ${sh.sealed ? '<b class="text-purple-700">🔮 sellada</b>' : 'abierta'} · caja <b>${fmt(Math.floor(sh.box))} $T</b> <button data-box class="btn-game px-2 py-0.5 text-[11px] bg-emerald-200">Recoger</button>` : 'Sin tienda (licencias en el Mercadillo).'}</div>`;
         html += NetUp.has('net_antenna') ? `<div class="app-card p-3 mb-2"><div class="font-bold text-sm mb-1">📡 Índice de la Red (Antena)</div>${this.indexTable(8)}</div>` : `<div class="app-card p-2 mb-2 text-[11px] text-slate-500">📡 Con la <b>Antena de la Red</b> (laboratorio de Dax) verías aquí el índice de precios sin entrar.</div>`;
         html += st.log.length ? `<div class="app-card p-3 text-[11px] text-slate-600"><div class="font-bold text-sm mb-1">📰 Novedades</div>${st.log.slice(0, 8).map(l => `<div>· ${esc(l.t)}</div>`).join('')}</div>` : '';
@@ -10676,7 +11168,7 @@ const NetUI = {
     const o = NET_ORIGINS[st.origin], C = CFG.net, W = NetEco.W;
     openApp(`${o.icon} Tu perfil: ${o.name}`, '', (body) => {
       body.innerHTML = `<div class="app-card p-4 mb-2 text-center" style="background:linear-gradient(180deg,#${o.color.toString(16).padStart(6, '0')}55,#fff)"><div class="text-5xl">${o.icon}</div><div class="font-bold text-lg text-[#2b2b3d]">${o.name}</div><div class="text-xs text-slate-600">${old ? 'Novedad: los orígenes del sueño ahora son perfiles. El tuyo se queda así en esta partida.' : o.tag}</div></div>
-        <div class="app-card p-3 mb-2"><div class="font-bold text-sm mb-1">🌱 Tus objetos (niveles 1–4, abundantes para ti)</div>${o.mats.map(([id], j) => `<div class="flex justify-between text-xs py-0.5"><span>${ITEMS[id].icon} ${ITEMS[id].name}</span><span>~${C.spawn[j]}/día · base ${C.base[j]} $T · tu NPC paga ${netRound(C.base[j] * C.nativeMult, 1)}${W ? ` · Red <b>${fmt(Math.round(W.price[NET_M[id]]))}</b>` : ''}</span></div>`).join('')}</div>
+        <div class="app-card p-3 mb-2"><div class="font-bold text-sm mb-1">🌱 Tus objetos (niveles 1–4, abundantes para ti)</div>${o.mats.map(([id], j) => `<div class="flex justify-between text-xs py-0.5"><span>${itemIcon(id, 18)} ${ITEMS[id].name}</span><span>~${C.spawn[j]}/día · base ${C.base[j]} $T · tu NPC paga ${netRound(C.base[j] * C.nativeMult, 1)}${W ? ` · Red <b>${fmt(Math.round(W.price[NET_M[id]]))}</b>` : ''}</span></div>`).join('')}</div>
         <div class="app-card p-3 mb-2 text-xs"><b>💎 Nivel 5 (legendario):</b> ${ITEMS[o.jewel[0]].icon} ${ITEMS[o.jewel[0]].name} (muy rara: ${Math.round(C.jewelP * 100)} % al día; no caduca)<br><b>🧭 Afinidades:</b> ${st.aff.map(m => `${netLabel(m)} (${NET_ORIGINS[netOrig(m)].icon})`).join(' · ')} (de vez en cuando, en las cajas de Sam)</div>
         <div class="app-card p-3 mb-2 text-[11px] text-slate-600">Salen en tu estudio ${o.station} (${o.act.toLowerCase()}), al minar, pescar, talar, excavar y cazar, en el jardín y en las cajas de Sam. Para ti valen poco; para otros perfiles, de ×3 a ×12 (cuanto más distinto el oficio, más). Si un mundo recibe mucho de un material, su NPC paga menos ese día (saturación). Tus objetos de perfil <b>caducan a los ${C.decayDays} días</b> (la joya no).</div>
         ${this.demoTag()}<button data-go class="btn-game px-3 py-2 text-sm w-full bg-violet-300">${after ? '🌙 Dormirme delante de la pantalla' : 'Entendido'}</button>`;
@@ -10691,10 +11183,10 @@ const NetUI = {
       const dc = W.decree;
       let html = balanceBar() + this.demoTag() + `<div class="app-card p-2 mb-2 text-[11px] text-slate-700">📜 <b>Decreto de la Semana</b>${dc ? ` (día ${dc.d}: la masa ${dc.g >= 0 ? 'creció' : 'bajó'} ${Math.abs(dc.g * 100).toFixed(1)} %)` : ' (el primero, el 2.º domingo)'}: comisión de venta <b>${pctTxt(W.fee.sale)}</b> (2–6 %) · publicar <b>1 %</b> · tasa de los bots ${pctTxt(W.fee.tax, 2)} · recompensas ×${String(W.fee.rew).replace('.', ',')}</div>`;
       if (m === null || m === undefined) {
-        html += NET_ORIGINS.map((o, oi) => `<div class="app-card p-2 mb-1.5"><div class="text-xs font-bold mb-1">${o.icon} ${o.name}${oi === st.origin ? ' <span class="text-[10px] text-violet-700">(tu perfil)</span>' : ''}</div>${o.mats.map(([id]) => { const mm = NET_M[id], h = this.hist(mm), g = h.length > 1 ? W.price[mm] / Math.max(0.01, h[0]) - 1 : 0, bb = NetEco.best(mm); return `<button data-m="${mm}" class="w-full flex items-center justify-between text-[11px] py-0.5 hover:bg-slate-50"><span>${ITEMS[id].icon} ${ITEMS[id].name}${st.aff.includes(mm) ? ' 🧭' : ''} <span class="text-slate-400">(${Inventory.count(id)})</span></span><span><b>${fmt(Math.round(W.price[mm]))}</b> <span class="${g >= 0 ? 'text-emerald-600' : 'text-red-500'}">${g >= 0 ? '▲' : '▼'}${Math.abs(g * 100).toFixed(0)}%</span> · ${bb.bid ? fmt(Math.round(bb.bid)) : '—'}/${bb.ask ? fmt(Math.round(bb.ask)) : '—'}</span></button>`; }).join('')}</div>`).join('');
+        html += NET_ORIGINS.map((o, oi) => `<div class="app-card p-2 mb-1.5"><div class="text-xs font-bold mb-1">${o.icon} ${o.name}${oi === st.origin ? ' <span class="text-[10px] text-violet-700">(tu perfil)</span>' : ''}</div>${o.mats.map(([id]) => { const mm = NET_M[id], h = this.hist(mm), g = h.length > 1 ? W.price[mm] / Math.max(0.01, h[0]) - 1 : 0, bb = NetEco.best(mm); return `<button data-m="${mm}" class="w-full flex items-center justify-between text-[11px] py-0.5 hover:bg-slate-50"><span>${itemIcon(id, 18)} ${ITEMS[id].name}${st.aff.includes(mm) ? ' 🧭' : ''} <span class="text-slate-400">(${Inventory.count(id)})</span></span><span><b>${fmt(Math.round(W.price[mm]))}</b> <span class="${g >= 0 ? 'text-emerald-600' : 'text-red-500'}">${g >= 0 ? '▲' : '▼'}${Math.abs(g * 100).toFixed(0)}%</span> · ${bb.bid ? fmt(Math.round(bb.bid)) : '—'}/${bb.ask ? fmt(Math.round(bb.ask)) : '—'}</span></button>`; }).join('')}</div>`).join('');
       } else {
         const id = NET_MATS[m], it = ITEMS[id], bb = NetEco.best(m), dp = NetEco.depth(m, 5), npcP = Net.npcUnitPrice(id), mine = Net.myOrders().filter(o => o.m === m);
-        html += `<div class="app-card p-3 mb-2"><div class="flex items-center gap-2"><span class="text-3xl">${it.icon}</span><div class="flex-1"><div class="font-bold">${it.name}</div><div class="text-[11px] text-slate-500">${NET_ORIGINS[netOrig(m)].icon} ${NET_ORIGINS[netOrig(m)].name} · base ${netBase(m)} $T · tienes ${Inventory.count(id)}</div></div><button data-back class="btn-game px-2 py-1 text-xs bg-slate-200">← Lista</button></div>
+        html += `<div class="app-card p-3 mb-2"><div class="flex items-center gap-2"><span class="text-3xl item-big">${itemIcon(it.id, 38)}</span><div class="flex-1"><div class="font-bold">${it.name}</div><div class="text-[11px] text-slate-500">${NET_ORIGINS[netOrig(m)].icon} ${NET_ORIGINS[netOrig(m)].name} · base ${netBase(m)} $T · tienes ${Inventory.count(id)}</div></div><button data-back class="btn-game px-2 py-1 text-xs bg-slate-200">← Lista</button></div>
           <div class="flex items-end gap-3 mt-2"><div>${this.spark(this.hist(m))}<div class="text-[10px] text-slate-500">Índice de la Red · 14 días</div></div><div class="text-xs">Índice <b>${fmt(Math.round(W.price[m]))} $T</b><br>NPC de tu origen: ${npcP ? `<b>${fmt(npcP)} $T</b>/u (hoy)` : 'cupo lleno'}</div></div></div>
           <div class="grid grid-cols-2 gap-2 mb-2 text-[11px]"><div class="app-card p-2"><div class="font-bold text-emerald-700 mb-0.5">Compran</div>${dp.b.map(x => `<div class="flex justify-between"><span>${fmt(netRound(x.p))}${x.mine ? ' ⭐' : ''}</span><span>${x.q}</span></div>`).join('') || '—'}</div><div class="app-card p-2"><div class="font-bold text-red-600 mb-0.5">Venden</div>${dp.a.map(x => `<div class="flex justify-between"><span>${fmt(netRound(x.p))}${x.mine ? ' ⭐' : ''}</span><span>${x.q}</span></div>`).join('') || '—'}</div></div>
           <div class="app-card p-3 mb-2"><div class="font-bold text-sm mb-1">Nueva orden</div><div class="flex flex-wrap gap-2 items-center text-xs">
@@ -10719,7 +11211,7 @@ const NetUI = {
     this._wrap('🛃 Aduana de la Red', (body, re) => {
       const st = Net.st();
       body.innerHTML = balanceBar() + this.demoTag() + `<div class="app-card p-3 mb-2 text-xs text-slate-600">Lo que compras en la Red espera aquí. Traerlo a tu sueño cuesta el <b>${pctTxt(CFG.net.aduanaFee)}</b> de su valor (índice). Tus propias cosas devueltas no pagan. Al despertar se intenta pasar todo.</div>` +
-        (st.stash.length ? st.stash.map((e, k) => `<div class="app-card p-2 mb-1.5 flex items-center gap-2 text-xs"><span class="text-xl">${ITEMS[e.id].icon}</span><span class="flex-1">${ITEMS[e.id].name} ×${e.q} <span class="text-slate-400">(día ${e.day})</span></span><span>${e.fee ? fmt(Net.aduanaFee(e)) + ' $T' : 'gratis'}</span><button data-imp="${k}" class="btn-game px-2 py-1 text-[11px] bg-sky-200">Traer</button></div>`).join('') + `<button data-all class="btn-game px-3 py-2 text-sm w-full bg-sky-300 mt-1">🛃 Traer todo a mi sueño</button>` : '<div class="app-card p-3 text-xs text-slate-500">La consigna está vacía.</div>');
+        (st.stash.length ? st.stash.map((e, k) => `<div class="app-card p-2 mb-1.5 flex items-center gap-2 text-xs"><span class="text-xl item-big">${itemIcon(e.id, 24)}</span><span class="flex-1">${ITEMS[e.id].name} ×${e.q} <span class="text-slate-400">(día ${e.day})</span></span><span>${e.fee ? fmt(Net.aduanaFee(e)) + ' $T' : 'gratis'}</span><button data-imp="${k}" class="btn-game px-2 py-1 text-[11px] bg-sky-200">Traer</button></div>`).join('') + `<button data-all class="btn-game px-3 py-2 text-sm w-full bg-sky-300 mt-1">🛃 Traer todo a mi sueño</button>` : '<div class="app-card p-3 text-xs text-slate-500">La consigna está vacía.</div>');
       this.on(body, '[data-imp]', (el) => { Net.importStash(+el.dataset.imp); re(); });
       this.on(body, '[data-all]', () => { Net.importStash(); re(); });
     });
@@ -10757,7 +11249,7 @@ const NetUI = {
     this._wrap('📦 Pedidos de Ultramar', (body, re) => {
       const reqs = Net.genRequests(), sam = Net.samState();
       body.innerHTML = balanceBar() + `<div class="app-card p-2 mb-2 text-[11px] text-slate-600">Tus vecinos piden cosas que en tu mundo no existen. Cómpralas en la Red (pasan por la Aduana) o pide a Sam una importación cara (×${CFG.net.samMult} del valor, ${NetUp.samMax()} unidades al día · hoy llevas ${sam.n}).</div>` +
-        (reqs.map(q => { const short = Net.reqShort(q), sc = Net.samCost(q); return `<div class="app-card p-3 mb-2 text-xs"><div class="font-bold">${npcById[q.npc]?.emoji || '📦'} ${npcById[q.npc]?.name || q.npc} · ${q.k === 'diario' ? 'Pedido diario' : q.k === 'raro' ? '⭐ Pedido raro' : '🏆 Gran Pedido semanal'}</div><div class="text-[11px] text-slate-600 italic my-1">"${esc(Net.reqText(q))}"</div>${Object.entries(q.need).map(([id, n]) => `<span class="mr-2 ${Inventory.count(id) >= n ? 'text-emerald-600' : 'text-red-500'}">${ITEMS[id].icon} ${Inventory.count(id)}/${n}</span>`).join('')}<div class="mt-1">Pago <b>${fmt(q.r)} $T</b>${q.k === 'diario' ? ` + ${CFG.net.daily.trust} confianza` : ''} · vence ${q.e === Net.today() ? 'hoy' : `el día ${q.e}`}</div>
+        (reqs.map(q => { const short = Net.reqShort(q), sc = Net.samCost(q); return `<div class="app-card p-3 mb-2 text-xs"><div class="font-bold">${npcById[q.npc]?.emoji || '📦'} ${npcById[q.npc]?.name || q.npc} · ${q.k === 'diario' ? 'Pedido diario' : q.k === 'raro' ? '⭐ Pedido raro' : '🏆 Gran Pedido semanal'}</div><div class="text-[11px] text-slate-600 italic my-1">"${esc(Net.reqText(q))}"</div>${Object.entries(q.need).map(([id, n]) => `<span class="mr-2 ${Inventory.count(id) >= n ? 'text-emerald-600' : 'text-red-500'}">${itemIcon(id, 18)} ${Inventory.count(id)}/${n}</span>`).join('')}<div class="mt-1">Pago <b>${fmt(q.r)} $T</b>${q.k === 'diario' ? ` + ${CFG.net.daily.trust} confianza` : ''} · vence ${q.e === Net.today() ? 'hoy' : `el día ${q.e}`}</div>
           <div class="flex gap-2 mt-1"><button data-dl="${q.id}" class="btn-game px-2 py-1 text-[11px] ${short.length ? 'bg-slate-200 opacity-60' : 'bg-orange-300'}">Entregar</button>${short.length && sc ? `<button data-sam="${q.id}" class="btn-game px-2 py-1 text-[11px] bg-sky-200">Con Sam (${sc.units} u · ${fmt(sc.cost)} $T)</button>` : ''}</div></div>`; }).join('') || '<div class="app-card p-3 text-xs text-slate-500">Hoy nadie pide nada. Vuelve mañana.</div>');
       this.on(body, '[data-dl]', (el) => { if (this.res(Net.deliver(el.dataset.dl))) re(); });
       this.on(body, '[data-sam]', (el) => { if (this.res(Net.deliver(el.dataset.sam, { sam: true }))) re(); });
@@ -10786,7 +11278,7 @@ const NetUI = {
     this._wrap('🏪 Tienda', (body, re) => {
       const W = NetEco.W, s = NetEco.S[o.bot], b = W.bots[o.bot], T = NetEco._tier(b.sh) || CFG.net.shops.puesto, shelf = NetEco.botShelf(o.bot);
       body.innerHTML = balanceBar() + this.demoTag() + `<div class="app-card p-2 mb-2 text-xs">${NET_ORIGINS[s.origin].icon} <b>${s.name}</b> (bot ${s.cls === 'casual' ? 'ocasional' : s.cls === 'trader' ? 'comerciante' : s.cls === 'shopkeeper' ? 'tendero' : 'acaparador'}): "${['¡Género fresco de mi sueño!', 'Precio justo… para mí.', 'Si te llevas tres, te sonrío.', 'Aquí no regateo: para eso está la Plaza.'][o.bot % 4]}"</div>` +
-        (shelf.map(e => `<div class="app-card p-2 mb-1.5 flex items-center gap-2 text-xs"><span class="text-xl">${ITEMS[e.id].icon}</span><span class="flex-1">${ITEMS[e.id].name} <span class="text-slate-400">(${e.qty})</span><br><span class="text-[10px] text-slate-500">índice ${fmt(Math.round(W.price[e.m]))}</span></span><b>${fmt(e.price)} $T</b><input data-q="${e.m}" type="number" min="1" max="${e.qty}" value="1" class="game w-12 text-xs"><button data-b="${e.m}" class="btn-game px-2 py-1 text-[11px] bg-emerald-200">Comprar</button></div>`).join('') || '<div class="app-card p-3 text-xs text-slate-500">Estanterías vacías: vuelve mañana.</div>') + `<div class="text-[10px] text-slate-500">Lo que compres va a la Aduana (2 % al traerlo) · comisión de licencia ${Math.round(T.fee * 100)} % (la paga el tendero).</div>`;
+        (shelf.map(e => `<div class="app-card p-2 mb-1.5 flex items-center gap-2 text-xs"><span class="text-xl item-big">${itemIcon(e.id, 24)}</span><span class="flex-1">${ITEMS[e.id].name} <span class="text-slate-400">(${e.qty})</span><br><span class="text-[10px] text-slate-500">índice ${fmt(Math.round(W.price[e.m]))}</span></span><b>${fmt(e.price)} $T</b><input data-q="${e.m}" type="number" min="1" max="${e.qty}" value="1" class="game w-12 text-xs"><button data-b="${e.m}" class="btn-game px-2 py-1 text-[11px] bg-emerald-200">Comprar</button></div>`).join('') || '<div class="app-card p-3 text-xs text-slate-500">Estanterías vacías: vuelve mañana.</div>') + `<div class="text-[10px] text-slate-500">Lo que compres va a la Aduana (2 % al traerlo) · comisión de licencia ${Math.round(T.fee * 100)} % (la paga el tendero).</div>`;
       this.on(body, '[data-b]', (el) => { const m = +el.dataset.b; const r = Net.buyFromBotShop(o.bot, m, +this.val(body, `[data-q="${m}"]`, 1)); if (this.res(r, r.ok ? `🛒 ${r.q}× ${netLabel(m)} (en la Aduana)` : null)) { re(); Interiors.rebuild(); } });
     });
   },
@@ -10797,7 +11289,7 @@ const NetUI = {
       const refP = (id) => { const m = NET_M[id]; return m !== undefined ? Math.round(W.price[m] * 1.2) : Math.max(1, Math.round((ITEMS[id].sell || 1) * 1.5)); };
       body.innerHTML = balanceBar() + this.demoTag() + `<div class="app-card p-3 mb-2 text-xs"><div class="font-bold text-sm">${T.icon} Tu ${T.name} · ${NET_ZONES[sh.zone].name}</div>${sh.sealed ? `<b class="text-purple-700">🔮 Sellada por Sombra: debes ${fmt(sh.debt)} $T (${sh.sealedDays}/${CFG.net.sealDays} días)</b> <button data-pay class="btn-game px-2 py-0.5 text-[11px] bg-purple-200">Pagar</button><br>` : ''}Cuota ${fmt(T.rent)} $T/día (en la liquidación) · huecos ${sh.stock.length}/${T.slots} · ganado ${fmt(Math.round(sh.cum))} de ${fmt(sh.cost)} invertidos<br>Caja: <b>${fmt(Math.floor(sh.box))} $T</b> <button data-box class="btn-game px-2 py-0.5 text-[11px] bg-emerald-200">Recoger</button></div>
         <div class="app-card p-3 mb-2 text-xs"><div class="font-bold mb-1">Condiciones de compra</div><label>Aura mínima <select data-aura class="game text-xs">${[0, 1, 2, 3, 4].map(a => `<option value="${a}" ${sh.cond.aura === a ? 'selected' : ''}>${a === 0 ? 'cualquiera' : AURA_TIERS[a].name + '+'}</option>`).join('')}</select></label> <label>Límite por cliente/día <input data-lim type="number" min="0" max="99" value="${sh.cond.limit | 0}" class="game w-12 text-xs"></label> <button data-cond class="btn-game px-2 py-0.5 text-[11px] bg-sky-200">Guardar</button><div class="text-[10px] text-slate-500">0 = sin límite. Más aura exigida = menos clientes, pero pagan más (+10 % por nivel).</div></div>
-        <div class="app-card p-3 mb-2 text-xs"><div class="font-bold mb-1">Estanterías</div>${sh.stock.map(e => `<div class="flex items-center gap-2 py-0.5"><span>${ITEMS[e.id].icon} ${ITEMS[e.id].name} ×${e.qty}</span><input data-p="${e.id}" type="number" min="1" value="${e.price}" class="game w-16 text-xs"><button data-sp="${e.id}" class="btn-game px-2 py-0.5 text-[10px] bg-sky-200">Precio</button><button data-rm="${e.id}" class="btn-game px-2 py-0.5 text-[10px] bg-rose-200">Retirar</button></div>`).join('') || '<div class="text-slate-500">Vacías.</div>'}
+        <div class="app-card p-3 mb-2 text-xs"><div class="font-bold mb-1">Estanterías</div>${sh.stock.map(e => `<div class="flex items-center gap-2 py-0.5"><span>${itemIcon(e.id, 18)} ${ITEMS[e.id].name} ×${e.qty}</span><input data-p="${e.id}" type="number" min="1" value="${e.price}" class="game w-16 text-xs"><button data-sp="${e.id}" class="btn-game px-2 py-0.5 text-[10px] bg-sky-200">Precio</button><button data-rm="${e.id}" class="btn-game px-2 py-0.5 text-[10px] bg-rose-200">Retirar</button></div>`).join('') || '<div class="text-slate-500">Vacías.</div>'}
           ${sellable.length ? `<div class="flex flex-wrap gap-2 mt-2 items-center"><select data-add class="game text-xs">${sellable.map(id => `<option value="${id}">${ITEMS[id].icon} ${ITEMS[id].name} (${Inventory.count(id)}) · ${fmt(refP(id))}</option>`).join('')}</select><input data-aq type="number" min="1" value="5" class="game w-12 text-xs"><input data-ap type="number" min="1" value="${refP(sellable[0])}" class="game w-16 text-xs"><button data-stock class="btn-game px-2 py-1 text-[11px] bg-emerald-300">Poner a la venta</button></div>` : ''}</div>
         <div class="app-card p-2 text-[11px]"><div class="font-bold mb-1">Últimas ventas</div>${sh.log.slice(0, 8).map(l => `<div>· día ${l.d}: ${l.q}× ${ITEMS[l.id]?.icon || ''} a ${fmt(l.p)} → ${esc(l.who)}</div>`).join('') || '<div class="text-slate-500">Aún ninguna.</div>'}</div>`;
       this.on(body, '[data-box]', () => { const n = Net.collectBox(); showToast(n ? `💰 +${fmt(n)} $T` : 'Caja vacía', 'text-white'); re(); });
@@ -10845,7 +11337,7 @@ const NetUI = {
       const need = (b.rq || []).flatMap(q => Object.keys(q.need).map(Number)).filter((v, k, a) => a.indexOf(v) === k);
       body.innerHTML = balanceBar() + this.demoTag() + this.chatHTML(i) + `<div class="app-card p-3 mb-2 text-xs"><b>${NET_ORIGINS[s.origin].icon} ${s.name}</b> · bot ${s.cls === 'casual' ? 'ocasional' : s.cls === 'trader' ? 'comerciante' : s.cls === 'shopkeeper' ? 'tendero' : 'acaparador'} · aura ${AURA_TIERS[s.aura].name}${need.length ? `<br>Busca: ${need.slice(0, 5).map(m => netItem(m).icon).join(' ')}` : ''}</div>
         <div class="grid grid-cols-2 gap-2 text-[11px]"><div class="app-card p-2"><div class="font-bold mb-1">Recibes</div>${theirs.map(([m, q]) => `<div class="flex items-center justify-between py-0.5"><span>${netItem(m).icon} ${netItem(m).name} (${q})</span><input data-get="${NET_MATS[m]}" type="number" min="0" max="${q}" value="${bt.get[NET_MATS[m]] || 0}" class="game w-12 text-xs"></div>`).join('') || '—'}</div>
-        <div class="app-card p-2"><div class="font-bold mb-1">Das</div>${mine.map(id => `<div class="flex items-center justify-between py-0.5"><span>${ITEMS[id].icon} ${ITEMS[id].name} (${Inventory.count(id)})</span><input data-give="${id}" type="number" min="0" max="${Inventory.count(id)}" value="${bt.give[id] || 0}" class="game w-12 text-xs"></div>`).join('') || '—'}<label class="block mt-1">+ $T <input data-money type="number" min="0" value="${bt.money}" class="game w-20 text-xs"></label></div></div>
+        <div class="app-card p-2"><div class="font-bold mb-1">Das</div>${mine.map(id => `<div class="flex items-center justify-between py-0.5"><span>${itemIcon(id, 18)} ${ITEMS[id].name} (${Inventory.count(id)})</span><input data-give="${id}" type="number" min="0" max="${Inventory.count(id)}" value="${bt.give[id] || 0}" class="game w-12 text-xs"></div>`).join('') || '—'}<label class="block mt-1">+ $T <input data-money type="number" min="0" value="${bt.money}" class="game w-20 text-xs"></label></div></div>
         ${bt.counter ? `<div class="app-card p-2 mt-2 text-xs bg-amber-50">${s.name}: "Me falta un poco… añade <b>${fmt(bt.counter)} $T</b> y trato hecho."<button data-acc class="btn-game px-2 py-1 text-[11px] bg-amber-300 ml-2">Aceptar contraoferta</button></div>` : ''}
         <button data-prop class="btn-game px-3 py-2 text-sm w-full bg-emerald-300 mt-2">Proponer trueque (1 % del valor)</button><div class="text-[10px] text-slate-500 mt-1">Lo que recibes va a la Aduana. El bot valora con el índice: sus nativos le importan menos y lo que necesita, más.</div>`;
       const read = () => { bt.give = {}; bt.get = {}; body.querySelectorAll('[data-give]').forEach(el => { const q = Math.floor(+el.value || 0); if (q > 0) bt.give[el.dataset.give] = q; }); body.querySelectorAll('[data-get]').forEach(el => { const q = Math.floor(+el.value || 0); if (q > 0) bt.get[el.dataset.get] = q; }); bt.money = Math.max(0, Math.floor(+this.val(body, '[data-money]', 0) || 0)); };
@@ -10865,7 +11357,7 @@ const NetUI = {
       const list = Crafting.recipes(station);
       body.innerHTML = balanceBar() + `<div class="app-card p-2 mb-2 text-[11px] text-slate-600">Recetas multiorigen de la Red del Sueño: nadie las hace solo con lo suyo. Coste fijo: ${fmt(CFG.net.craftFee.manufactura)} $T por manufactura · ${fmt(CFG.net.craftFee.mejora)} $T por mejora (se instala una vez y es para siempre).</div>` + list.map(r => {
         const up = Crafting.isUpgrade(r), have = up && NetUp.has(r.id), it = up ? null : ITEMS[r.id], miss = Crafting.missing(r);
-        return `<div class="app-card p-3 mb-2 text-xs ${have ? 'opacity-70' : ''}"><div class="flex items-center gap-2"><span class="text-2xl">${up ? r.icon : it.icon}</span><div class="flex-1"><b>${up ? r.name : it.name}</b> ${up ? '<span class="text-[10px] text-amber-600">MEJORA</span>' : '<span class="text-[10px] text-sky-600">MANUFACTURA</span>'}<div class="text-[11px] text-slate-500">${up ? r.fx : esc(it.desc)}</div><div class="text-[11px]">${r.in.map(([id, q]) => `<span class="${Inventory.count(id) >= q ? 'text-emerald-600' : 'text-red-500'}">${q}× ${ITEMS[id].icon} ${ITEMS[id].name} (${Inventory.count(id)})</span>`).join(' + ')}</div></div>
+        return `<div class="app-card p-3 mb-2 text-xs ${have ? 'opacity-70' : ''}"><div class="flex items-center gap-2"><span class="text-2xl">${up ? r.icon : it.icon}</span><div class="flex-1"><b>${up ? r.name : it.name}</b> ${up ? '<span class="text-[10px] text-amber-600">MEJORA</span>' : '<span class="text-[10px] text-sky-600">MANUFACTURA</span>'}<div class="text-[11px] text-slate-500">${up ? r.fx : esc(it.desc)}</div><div class="text-[11px]">${r.in.map(([id, q]) => `<span class="${Inventory.count(id) >= q ? 'text-emerald-600' : 'text-red-500'}">${q}× ${itemIcon(id, 18)} ${ITEMS[id].name} (${Inventory.count(id)})</span>`).join(' + ')}</div></div>
           <button data-c="${r.id}" class="btn-game px-2 py-1 text-[11px] ${!have && !miss.length ? 'bg-emerald-300' : 'bg-slate-200 opacity-60'}">${have ? 'Instalada ✓' : up ? 'Instalar' : 'Fabricar'}</button></div></div>`;
       }).join('');
       this.on(body, '[data-c]', (el) => { Crafting.craft(el.dataset.c); re(); });
@@ -10944,7 +11436,7 @@ const Profiles = {
   LV: [['NV1', '#94a3b8'], ['NV2', '#22c55e'], ['NV3', '#3b82f6'], ['NV4', '#a855f7'], ['NV5', '#f59e0b']],
   itemsOf(i) { const o = NET_ORIGINS[i]; return [...o.mats.map(m => m[0]), o.jewel[0]]; },
   levelRow(id, j) { const C = CFG.net, it = ITEMS[id], [lv, col] = this.LV[j];
-    return `<div class="cx-row"><span class="cx-lv" style="background:${col}">${lv}</span><span style="font-size:20px">${it.icon}</span><b style="flex:1">${it.name}</b><span class="text-[11px] text-slate-500">${j < 4 ? `~${C.spawn[j]}/día · base ${C.base[j]} $T` : `${Math.round(C.jewelP * 100)} %/día · ${C.jewelBase} $T`}</span></div>`; },
+    return `<div class="cx-row"><span class="cx-lv" style="background:${col}">${lv}</span><span style="font-size:20px">${itemIcon(it.id, 24)}</span><b style="flex:1">${it.name}</b><span class="text-[11px] text-slate-500">${j < 4 ? `~${C.spawn[j]}/día · base ${C.base[j]} $T` : `${Math.round(C.jewelP * 100)} %/día · ${C.jewelBase} $T`}</span></div>`; },
   /** Pantalla de elección (8 tarjetas → detalle → confirmar) */
   pick(onPick) {
     this.css(); state.modalOpen = true;
@@ -12094,7 +12586,7 @@ DBG.refs = DBG_REFS;
 if (/[?&]debug=1\b/.test(location.search)) window._dbg = DBG_REFS;   // v1.0: ya no es global por defecto
 /* v1.1 · Interior caminable de la casa (Sec. 6.9 Fase 2) */
 /** v1.5 · capturas: DBG.tp(x, z) lleva al jugador a (x, z) del pueblo · DBG.view(dist, pitch, yaw) fija la cámara · DBG.shot('B'|'C'|'D'|'G'|'H') prepara la escena del protocolo */
-DBG.g = { World, WGEO, WorldFX, TRAVEL_POSTS, Island, Voyage, TRIBE, ship, state, Gather, Mining, npcObjs, interactables, colliders, SITES, NPCS, CFG, get house() { return house; }, scene, renderer, camera, cam, sky, water, atmo, clouds, PostFX, SkyEnv, PlanetAO, WATER_U, POST_U, Gather, Studio, ToolAnim, Profiles, Hub, Decor, Fitting, player, Interiors };   // v1.5: referencias gráficas para depurar
+DBG.g = { World, WGEO, WorldFX, TRAVEL_POSTS, Island, Voyage, TRIBE, ship, state, IconStudio, ItemArt, itemIcon, PhGlyph, startDialog, openInventory, openHousePanel, addLetter, endDialog, openShop, openGiftPicker, Gather, Mining, npcObjs, interactables, colliders, SITES, NPCS, CFG, get house() { return house; }, scene, renderer, camera, cam, sky, water, atmo, clouds, PostFX, SkyEnv, PlanetAO, WATER_U, POST_U, Gather, Studio, ToolAnim, Profiles, Hub, Decor, Fitting, player, Interiors };   // v1.5: referencias gráficas para depurar
 DBG.post = (v = !PostFX.active) => { PostFX.active = !!v; POST_U.uPost.value = v ? 1 : 0; return PostFX.active; };
 DBG.env = (v = !SkyEnv.enabled) => SkyEnv.setEnabled(v);
 DBG.ao = (v = true) => { if (!PlanetAO.on) return false; if (v) PlanetAO.bake(); else { const c = planet.geometry.attributes.color; PlanetAO.reset(); c.needsUpdate = true; } return v; };
