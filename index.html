@@ -123,6 +123,7 @@
   @keyframes marquee { to { transform: translateX(-100%); } }
   .app-card { background: #fff; border: 3px solid #2b2b3d; border-radius: 14px; box-shadow: 0 4px 0 #2b2b3d; }
   /* v1.6 · menús: carcasa común más limpia (cabecera crema, cuerpo con fondo papel, tarjetas suaves, títulos de sección) */
+  #appModal { z-index: 30; }   /* por encima de la columna de botones (que en pantallas estrechas tiene z-index 5) */
   #appModal > .panel { background: #fffdf5; border-radius: 22px; }
   #appModal #appTitle { font-size: 18px; letter-spacing: .01em; }
   #appBody { background: linear-gradient(#fffdf5, #fff8e7); scrollbar-width: thin; scrollbar-color: #c9b98f transparent; }
