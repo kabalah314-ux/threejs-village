@@ -164,7 +164,7 @@
       <div class="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-3 mt-4 text-left">
       <div class="step p-3"><div class="text-2xl">🗺️</div><div class="font-bold text-sm text-[#2b2b3d] mt-1">1. Explora</div><div class="text-xs text-slate-600">Camina, nada y da la vuelta al planeta. Haz zoom hasta verlo entero.</div></div>
       <div class="step p-3"><div class="text-2xl">❗</div><div class="font-bold text-sm text-[#2b2b3d] mt-1">2. Habla</div><div class="text-xs text-slate-600">Busca a los vecinos con un “!” y acepta sus misiones.</div></div>
-      <div class="step p-3"><div class="text-2xl">💻</div><div class="font-bold text-sm text-[#2b2b3d] mt-1">3. Genera con IA</div><div class="text-xs text-slate-600">Abre la laptop, escribe el prompt y crea su web app.</div></div>
+      <div class="step p-3"><div class="text-2xl">💻</div><div class="font-bold text-sm text-[#2b2b3d] mt-1">3. Genera con IA</div><div class="text-xs text-slate-600">Abre la laptop del escritorio de tu casa, escribe el prompt y crea su web app.</div></div>
       <div class="step p-3"><div class="text-2xl"><i class="ico-coin"></i></div><div class="font-bold text-sm text-[#2b2b3d] mt-1">4. Gana $TOKEN</div><div class="text-xs text-slate-600">Desbloquea tiendas, skins, el barco mercante, memes y frutas doradas.</div></div>
     </div>
       <div class="mt-3 text-left text-xs md:text-sm text-[#2b2b3d]">
@@ -660,6 +660,7 @@ const CFG = {
   boutiquePrices: { common: 50, uncommon: 150, rare: 400, epic: 900, legendary: 2000 },   // Sec. 8.4: 50–2.000 $T por rareza
   importPrices: { uncommon: 300, rare: 600, epic: 1000, legendary: 1500 },                // Sec. 8.4: telas del muelle 300–1.500 $T (se venden desde v0.8)
   fittingRotateSpeed: 0.012,      // probador: radianes por píxel arrastrado
+  fitting: { bodySpan: 2.5, bodyWidth: 1.5, bodyY: 1.1, faceSpan: 1.2, faceY: 1.68, fill: 0.8, pitch: 0.12, minDist: 1.6 },   // v2.2 · encuadre de cuerpo entero en el probador (Guía Maestra 2, A1): alto a encuadrar, centro y % del hueco libre
   /* ===== v0.9 · EL DESPERTAR (Sec. 1.6, 2.10, 5.10, 7.5, 10.7) ===== */
   ticketTrustLevel: 4,            // Sec. 5.10: confianza ❤️ Aliada con Sombra para comprar el billete
   planeFuelNeeded: 5,             // Sec. 5.10 / Anexo A.2: el avión de Sam necesita 5× Gasolina Gasil
@@ -2094,14 +2095,8 @@ function buildHouse(level) {
   if (house) { const i = interactables.indexOf(house); if (i >= 0) interactables.splice(i, 1); }
   registerInteractable(g, { type: 'house', get label() { return houseSealed() ? '🔒 Casa sellada (runas)' : '🚪 Entrar en casa'; } });   // v1.1: la puerta lleva al interior
   { const mb = new THREE.Object3D(); mb.position.set(1.9, 1.1, 1.9); g.add(mb); if (mailboxObj) { const k = interactables.indexOf(mailboxObj); if (k >= 0) interactables.splice(k, 1); } registerInteractable(mb, { type: 'mailbox', label: 'Abrir el buzón 📮' }); mailboxObj = mb; }   // v0.5: buzón independiente (Sec. 6.10)
-  { // v0.7 · Armario 👗 (Sec. 8.2 y 8.9): box + espejo, en los 3 niveles de casa. Abre el probador (cambiarse es gratis)
-    const wd = new THREE.Group(); wd.position.set(-[2.45, 2.95, 3.35, 3.35][level], 0, level >= 3 ? 1.6 : 0.9);
-    wd.add(box(0.9, 1.7, 0.45, mat(0x8d6e63), 0, 0.85, 0)); wd.add(box(1.0, 0.1, 0.52, mat(0x6d4c41), 0, 1.74, 0));
-    wd.add(box(0.6, 1.1, 0.03, new THREE.MeshStandardMaterial({ color: 0xdff3ff, metalness: 0.9, roughness: 0.08, emissive: 0x9fd8ff, emissiveIntensity: 0.18 }), 0, 0.95, 0.24));
-    wd.add(sphere(0.04, mat(0xffd54f), 0.37, 0.9, 0.24, 6)); g.add(wd);
-    if (wardrobeObj) { const k = interactables.indexOf(wardrobeObj); if (k >= 0) interactables.splice(k, 1); }
-    registerInteractable(wd, { type: 'wardrobe', label: 'Armario 👗 (probador)' }); wardrobeObj = wd;
-  }
+  // v2.2 · el armario ya no está fuera: se usa dentro de casa (Guía Maestra 2, Bloque B)
+  if (wardrobeObj) { const k = interactables.indexOf(wardrobeObj); if (k >= 0) interactables.splice(k, 1); wardrobeObj = null; }
   refreshMerchantSign(g);   // v1.2: cartel de las Licencias de Comerciante (si tienes alguna)
   placeAtSite(g, S_V, -6.5, -3.5, 0.5, -0.1); scene.add(g); house = g;
   houseCollider.pos.copy(g.position); houseCollider.r = [2.8, 3.3, 4.2, 5.0][level];
@@ -2110,15 +2105,7 @@ function buildHouse(level) {
 buildHouse(0);
 
 const laptopMats = { body: mat(0xcfd8dc), disp: glow(0x1de9b6, 0x00e5a0, 1.2), light: new THREE.PointLight(0x1de9b6, 1.2, 3, 2) };
-const laptop = (() => {
-  const g = new THREE.Group(); g.add(box(1.4, 0.1, 0.9, mat(0xb07d4f), 0, 0.75, 0));
-  [[-0.6, -0.35], [0.6, -0.35], [-0.6, 0.35], [0.6, 0.35]].forEach(([x, z]) => g.add(box(0.1, 0.75, 0.1, mat(0x8d6e63), x, 0.37, z)));
-  g.add(box(0.7, 0.05, 0.5, laptopMats.body, 0, 0.83, 0.05)); const sc = box(0.7, 0.45, 0.04, laptopMats.body, 0, 1.05, -0.2); sc.rotation.x = -0.25; g.add(sc);
-  const disp = box(0.6, 0.36, 0.01, laptopMats.disp, 0, 1.06, -0.17); disp.rotation.x = -0.25; g.add(disp);
-  laptopMats.light.position.set(0, 1.2, 0.3); g.add(laptopMats.light);
-  g.userData.interact = { type: 'laptop' }; g.traverse(o => { if (o.isMesh) o.userData.root = g; }); return g;
-})();
-placeAtSite(laptop, S_V, -4.2, -0.6, 0.3); scene.add(laptop); colliders.push({ pos: laptop.position.clone(), r: 0.9 });
+// v2.2 · la Laptop de IA ya no está fuera: se abre desde el escritorio de casa (💻 PC de casa → Laptop de IA) o desde el diálogo de cada vecino
 const stoneMat = mat(0xd9cfc1, { flatShading: true });
 for (let i = 0; i <= 10; i++) { const t = i / 10; const s = cyl(0.45 + Math.random() * 0.15, 0.5, 0.12, stoneMat, 0, 0, 0, 7); placeAtSite(s, S_V, lerp(-4, 4.5, t), lerp(1.2, 0.2, t) + Math.sin(t * Math.PI) * 1.2, Math.random() * 3, 0.04); scene.add(s); }
 
@@ -2587,7 +2574,6 @@ const buildings = {};
 function addProp(obj, site, x, z, yaw = 0, lift = 0, r = 0) { placeAtSite(obj, site, x, z, yaw, lift); scene.add(obj); if (r) colliders.push({ pos: obj.position.clone(), r }); return obj; }
 
 registerInteractable(bakery, { type: 'building', label: 'Entrar a la Panadería' }, 'bear'); buildings.bear = bakery;
-registerInteractable(laptop, { type: 'laptop', label: 'Usar Laptop de IA' });
 
 // Ayuntamiento
 { const s = SITES.townhall; const b = makeBuilding({ w: 6, h: 3.8, d: 4, wall: 0xf5f5f5, roof: 0x4f7dd8, roofType: 'dome', sign: 'AYUNTAMIENTO', signColor: '#1e3a8a', door: 0x5d4037, windowGlow: 0.3 });
@@ -3777,7 +3763,7 @@ const UI_ICONS = {
   '🔍': ['magnifying-glass', 'ink'], '📍': ['map-pin', 'coral'], '🔔': ['bell', 'gold'], '❓': ['question', 'sky'], '🗺': ['map-trifold', 'sky'], '🧾': ['receipt', 'ink'], '💳': ['credit-card', 'ink'], '🪪': ['identification-card', 'ink'],
   '🎯': ['target', 'coral'], '🧠': ['brain', 'rose'], '👁': ['eye', 'ink'], '📄': ['file-code', 'sky'], '🔨': ['hammer', 'coral'], '🏅': ['medal', 'gold'], '📣': ['megaphone', 'rose'], '🎟': ['ticket', 'gold'], '🛍': ['shopping-bag', 'rose'],
   '📸': ['camera', 'sky'], '📷': ['camera', 'sky'], '🏦': ['bank', 'gold'], '⚖': ['scales', 'ink'], '🧪': ['flask', 'lilac'], '🌱': ['plant', 'mint'], '🌾': ['grains', 'mint'], '⛏': ['pick', 'coral'], '🎣': ['fish-simple', 'sky'], '🪓': ['axe', 'coral'],
-  '🦋': ['butterfly', 'rose'], '🧲': ['magnet', 'coral'], '📨': ['envelope-open', 'rose'], '🚀': ['rocket-launch', 'lilac'], '🔑': ['key', 'gold'], '🏁': ['flag-checkered', 'ink'], '▶': ['play', 'mint'], '⏸': ['pause', 'ink'], '💡': ['lightbulb', 'gold'], '🥣': ['bowl-food', 'mint'], '💎': ['diamond', 'sky'], '🍹': ['cookie', 'rose'], '🏭': ['factory', 'coral'], '🌾': ['grains', 'mint'], '🥖': ['bread', 'gold'], '🎉': ['confetti', 'rose'], '📮': ['mailbox', 'rose'], '🪑': ['chair', 'mint'], '🎵': ['music-notes', 'lilac'], '🧳': ['suitcase', 'gold'], '🗓': ['calendar', 'rose'], '🧑‍🍳': ['chef-hat', 'mint'], '🎓': ['graduation-cap', 'sky'], '🔭': ['binoculars', 'lilac'], '🛡': ['shield-check', 'mint'], '🚫': ['prohibit', 'coral'], '➕': ['plus', 'mint'], '➖': ['minus', 'coral'], '🔁': ['repeat', 'sky'], '♻': ['recycle', 'mint'], '🪄': ['magic-wand', 'lilac'], '🌈': ['rainbow', 'rose'], '❤': ['heart', 'rose'], '💖': ['heart', 'rose'], '🗳': ['archive-box', 'ink'],
+  '🦋': ['butterfly', 'rose'], '🧲': ['magnet', 'coral'], '📨': ['envelope-open', 'rose'], '🚀': ['rocket-launch', 'lilac'], '🔑': ['key', 'gold'], '🏁': ['flag-checkered', 'ink'], '▶': ['play', 'mint'], '⏸': ['pause', 'ink'], '💡': ['lightbulb', 'gold'], '💺': ['armchair', 'mint'], '🪞': ['user-focus', 'rose'], '👕': ['t-shirt', 'rose'], '🥣': ['bowl-food', 'mint'], '💎': ['diamond', 'sky'], '🍹': ['cookie', 'rose'], '🏭': ['factory', 'coral'], '🌾': ['grains', 'mint'], '🥖': ['bread', 'gold'], '🎉': ['confetti', 'rose'], '📮': ['mailbox', 'rose'], '🪑': ['chair', 'mint'], '🎵': ['music-notes', 'lilac'], '🧳': ['suitcase', 'gold'], '🗓': ['calendar', 'rose'], '🧑‍🍳': ['chef-hat', 'mint'], '🎓': ['graduation-cap', 'sky'], '🔭': ['binoculars', 'lilac'], '🛡': ['shield-check', 'mint'], '🚫': ['prohibit', 'coral'], '➕': ['plus', 'mint'], '➖': ['minus', 'coral'], '🔁': ['repeat', 'sky'], '♻': ['recycle', 'mint'], '🪄': ['magic-wand', 'lilac'], '🌈': ['rainbow', 'rose'], '❤': ['heart', 'rose'], '💖': ['heart', 'rose'], '🗳': ['archive-box', 'ink'],
 };
 const UI_EMO_RE = new RegExp('^\\s*(' + Object.keys(UI_ICONS).sort((a, b) => b.length - a.length).map(k => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|') + ')\\uFE0F?\\s*');
 /** Icono suelto (en línea con el texto) */
@@ -6063,40 +6049,65 @@ function avHowToGet(p) {
 
 /* ---------- 👗 PROBADOR (creador inicial + armario) · Sec. 8.2 y 8.7 ---------- */
 const Fitting = (() => {
-  let open = false, mode = 'wardrobe', draft = null, slotId = 'top', panel = null, onClose = null, drag = null;
+  let open = false, mode = 'wardrobe', draft = null, slotId = 'top', panel = null, onClose = null, drag = null, face = false, collapsed = false, preview = null;
+  const FACE_SLOTS = ['hair', 'eyes', 'hat', 'glasses'];
   function css() {
     if (document.getElementById('fitCSS')) return;
     const st = document.createElement('style'); st.id = 'fitCSS';
     st.textContent = `
     #fitPanel { position: fixed; z-index: 60; background: #fffdf5; border:1px solid rgba(35,36,74,.12); box-shadow:0 2px 8px rgba(23,22,60,.12); display: flex; flex-direction: column; font-family: Fredoka, sans-serif; color: #2b2b3d; }
-    @media (min-width: 768px) { #fitPanel { right: 16px; top: 84px; bottom: 16px; width: 400px; border-radius: 18px; } }
-    @media (max-width: 767px) { #fitPanel { left: 0; right: 0; bottom: 0; height: 54vh; border-radius: 18px 18px 0 0; border-bottom: 0; box-shadow: 0 -4px 0 #2b2b3d; } }
+    #fitPanel { background: var(--paper, #f7f5fc); font-family: var(--f-ui, Nunito), sans-serif; color: var(--ink, #23244a); box-shadow: 0 2px 6px rgba(23,22,60,.14), 0 24px 60px rgba(16,14,48,.32); }
+    @media (min-width: 768px), (orientation: landscape) and (max-height: 520px) { #fitPanel { right: 12px; top: 12px; bottom: 12px; width: min(380px, 44vw); border-radius: 20px; } #fitPanel .fit-handle { display: none; } }
+    @media (max-width: 767px) and (orientation: portrait), (max-width: 767px) and (min-height: 521px) { #fitPanel { left: 0; right: 0; bottom: 0; max-height: 42vh; border-radius: 20px 20px 0 0; border-bottom: 0; } }
+    #fitPanel .fit-handle { display: block; width: 100%; padding: 6px 0 2px; background: none; border: 0; cursor: pointer; }
+    #fitPanel .fit-handle i { display: block; width: 44px; height: 5px; border-radius: 99px; background: rgba(35,36,74,.22); margin: 0 auto; }
+    #fitPanel.collapsed .fit-body, #fitPanel.collapsed .fit-intro { display: none; }
+    #fitPanel > * { flex-shrink: 0; } #fitPanel .fit-body { flex: 1 1 auto; min-height: 0; }
+    @media (max-width: 767px) and (orientation: portrait) { #fitPanel .fit-intro { display: none; } }
+    body.fitting #hudTop, body.fitting #ctrlHint, body.fitting #netChat, body.fitting #actionBtn, body.fitting #joystick, body.fitting #hint { opacity: 0 !important; pointer-events: none !important; transition: opacity .3s; }
+    #fitPanel .fit-face.on { background: var(--ink, #23244a) !important; color: #fff !important; }
     #fitPanel .fit-body { flex: 1; overflow: auto; padding: 8px 12px; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
     #fitPanel .fit-cats { display: flex; gap: 4px; overflow-x: auto; padding: 4px 10px 6px; border-bottom:1px solid rgba(35,36,74,.12)22; scrollbar-width: thin; }
     #fitPanel .fit-cat { flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; min-width: 54px; padding: 4px 6px; border-radius: 12px; border: 2px solid transparent; background: #fff; font-size: 20px; line-height: 1.1; cursor: pointer; }
     #fitPanel .fit-cat small { font-size: 10px; font-weight: 700; }
-    #fitPanel .fit-cat.on { border-color: #2b2b3d; background: #fde68a; }
-    #fitPanel .fit-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 6px; }
-    #fitPanel .fit-opt { border: 2px solid #cbd5e1; border-radius: 12px; background: #fff; padding: 6px 4px; text-align: center; cursor: pointer; }
-    #fitPanel .fit-opt.on { border-color: #2b2b3d; background: #e0f7fa; box-shadow:0 2px 8px rgba(23,22,60,.12); }
+    #fitPanel .fit-cat.on { border-color: var(--lilac, #7c6cf0); background: var(--lilac-2, #e3defe); }
+    #fitPanel .fit-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(76px, 1fr)); gap: 6px; }
+    #fitPanel .fit-opt { border: 1px solid rgba(35,36,74,.14); border-radius: 12px; background: #fff; padding: 8px 4px; text-align: center; cursor: pointer; min-height: 64px; }
+    #fitPanel .fit-opt.on { border-color: var(--lilac, #7c6cf0); background: var(--lilac-2, #e3defe); box-shadow: 0 0 0 2px var(--lilac, #7c6cf0); }
     #fitPanel .fit-opt.locked { opacity: .45; filter: grayscale(.6); }
     #fitPanel .fit-sw { width: 32px; height: 32px; border-radius: 999px; border: 3px solid #fff; box-shadow: 0 0 0 2px #2b2b3d33; cursor: pointer; position: relative; font-size: 13px; }
-    #fitPanel .fit-sw.on { box-shadow: 0 0 0 3px #2b2b3d; }
+    #fitPanel .fit-sw { width: 36px; height: 36px; }
+    #fitPanel .fit-sw.on { box-shadow: 0 0 0 3px var(--lilac, #7c6cf0); }
     #fitPanel .fit-foot { display: flex; gap: 6px; padding: 8px 10px calc(8px + env(safe-area-inset-bottom)); border-top:1px solid rgba(35,36,74,.12)22; }
     #fitPanel .fit-foot button { flex: 1; padding: 9px 6px; font-size: 13px; }`;
     document.head.appendChild(st);
   }
-  /** Pose de cámara del probador (patrón dialogPose): de frente, con el personaje a un lado del panel */
-  function pose() {
-    const pd = player.userData, inside = Interiors.active, up = (inside ? UP_Y : pd.dir).clone().normalize(), fwd = (inside ? Interiors.fwdVec() : pd.fwd).clone().normalize(), base = player.position.clone();   // v1.1: también dentro de casa
-    const sheet = innerWidth < 768;
-    const pos = base.clone().addScaledVector(fwd, sheet ? 5.6 : 4.4).addScaledVector(up, sheet ? 2.1 : 1.55);
-    const hp = heightAt(pos.clone().normalize()) + 0.6; if (pos.length() < hp) pos.setLength(hp);
-    const target = base.clone().addScaledVector(up, 1.15);
-    const right = new THREE.Vector3().crossVectors(target.clone().sub(pos), up).normalize();
-    if (sheet) target.addScaledVector(up, -1.05); else target.addScaledVector(right, 1.05);
-    return { pos, target, up };
+  /** v2.2 · Hueco de pantalla que NO tapa el panel (Guía Maestra 2, A1): a la izquierda de la columna, o encima de la hoja en móvil */
+  function freeRect() {
+    const W = innerWidth, H = innerHeight, r = panel && panel.getBoundingClientRect ? panel.getBoundingClientRect() : null;
+    if (!r || !r.width) return { x: 0, y: 0, w: W, h: H };
+    const sheet = r.top > H * 0.25 && r.width > W * 0.7;
+    return sheet ? { x: 0, y: 8, w: W, h: Math.max(160, r.top - 16) } : { x: 0, y: 8, w: Math.max(160, r.left - 8), h: H - 16 };
   }
+  /** v2.2 · Encuadre de cuerpo entero (o de cara): distancia para que el personaje ocupe ~80 % del alto libre y centro óptico en el hueco libre */
+  function frameCharacter(rect) {
+    const pd = player.userData, inside = Interiors.active, up = (inside ? UP_Y : pd.dir).clone().normalize(), fwd = (inside ? Interiors.fwdVec() : pd.fwd).clone().normalize(), base = player.position.clone();
+    const W = innerWidth, H = innerHeight, t = Math.tan((camera.fov || 50) * Math.PI / 360), fh = rect.h / H, fw = rect.w / W;
+    const span = face ? CFG.fitting.faceSpan : CFG.fitting.bodySpan, wide = face ? 0.8 : CFG.fitting.bodyWidth;
+    const d = Math.max(span / (CFG.fitting.fill * fh * 2 * t), wide / (CFG.fitting.fill * fw * 2 * t * camera.aspect), CFG.fitting.minDist);
+    const target = base.clone().addScaledVector(up, face ? CFG.fitting.faceY : CFG.fitting.bodyY);
+    const pos = target.clone().addScaledVector(fwd, d).addScaledVector(up, d * CFG.fitting.pitch);
+    if (!inside) { const hp = heightAt(pos.clone().normalize()) + 0.6; if (pos.length() < hp) pos.setLength(hp); }
+    return { pos, target, up, center: [rect.x + rect.w / 2, rect.y + rect.h / 2] };
+  }
+  /** Desplaza el centro óptico al centro del hueco libre sin mover el mundo (setViewOffset) */
+  function applyOffset(c) {
+    const W = innerWidth, H = innerHeight; if (!c || !camera.setViewOffset) return;
+    camera.setViewOffset(W, H, W / 2 - c[0], H / 2 - c[1], W, H); camera.updateProjectionMatrix();
+  }
+  function clearOffset() { if (camera.clearViewOffset) { camera.clearViewOffset(); camera.updateProjectionMatrix(); } }
+  function pose() { return frameCharacter(freeRect()); }
+  function reframe(dur = 0.45) { if (!open) return; const p = pose(); state.dialogPose = p; applyOffset(p.center); tweenCamera(p, dur); }
   const slotDef = () => AVATAR_SLOTS.find(s => s.id === slotId);
   const colorChoices = (s) => s.colors.map((_, i) => i).concat(s.fabrics ? AV_FABRICS.map((f, i) => avOwns(`fabric:${f.id}`) ? s.colors.length + i : -1).filter(i => i >= 0) : []);
   const ownedStyles = (s) => { const list = AV_STYLES[s.style].map((st, i) => i).filter(i => avOwns(`${s.style}:${AV_STYLES[s.style][i].id}`)); return s.nullable ? [null, ...list] : list; };
@@ -6117,11 +6128,12 @@ const Fitting = (() => {
   function render() {
     if (!panel) return;
     const s = slotDef(), creator = mode === 'creator';
-    let html = `<div style="padding:10px 12px 4px" class="flex items-start justify-between gap-2"><div class="min-w-0">
-      <div class="font-bold text-base">${creator ? '✨ ¿Quién eres en el sueño?' : '👗 Armario · Probador'}</div>
-      <div class="text-[11px] text-slate-500 leading-snug">${creator ? 'El sueño se forma a tu alrededor… ¿y tú? ¿Cómo te sueñas? Todo se puede cambiar después gratis en el Armario 👗 de tu casa.' : 'Cambiarte es siempre gratis: solo se paga por desbloquear piezas.'} <span class="whitespace-nowrap">↔️ Arrastra para girar.</span></div></div>
-      <button data-fx class="btn-game px-2.5 py-1 text-xs bg-slate-200 shrink-0" title="Salir sin guardar">✕</button></div>`;
-    html += `<div class="fit-cats">` + AVATAR_SLOTS.map(c => `<button data-slot="${c.id}" class="fit-cat ${c.id === slotId ? 'on' : ''}">${c.icon}<small>${c.name}</small></button>`).join('') + `</div><div class="fit-body">`;
+    const pv = preview ? AV_PART_BY_KEY[preview] : null;
+    let html = `<button class="fit-handle" data-handle aria-label="${collapsed ? 'Abrir opciones' : 'Plegar opciones'}"><i></i></button><div style="padding:6px 12px 4px" class="flex items-start justify-between gap-2"><div class="min-w-0">
+      <div class="font-bold text-base" style="font-family:var(--f-disp)">${creator ? '¿Quién eres en el sueño?' : pv ? `Probador · ${esc(pv.name)}` : 'Armario'}</div>
+      <div class="fit-intro text-[11px] text-slate-500 leading-snug">${creator ? 'Todo se puede cambiar después gratis en el armario de tu casa.' : pv ? 'Así te queda. Si te gusta, cómprala aquí mismo.' : 'Cambiarte es gratis: solo se paga por desbloquear piezas.'} Arrastra sobre el personaje para girarlo.</div></div>
+      <div class="flex gap-1 shrink-0"><button data-face class="fit-face btn-game px-2.5 py-1 text-xs bg-white ${face ? 'on' : ''}" title="Acercar a la cara">${face ? 'Cuerpo' : 'Cara'}</button><button data-fx class="btn-game px-2.5 py-1 text-xs bg-slate-200" title="Salir sin guardar">✕</button></div></div>`;
+    html += `<div class="fit-cats no-ico">` + AVATAR_SLOTS.map(c => `<button data-slot="${c.id}" class="fit-cat ${c.id === slotId ? 'on' : ''}">${c.icon}<small>${c.name}</small></button>`).join('') + `</div><div class="fit-body">`;
     const curName = !s.style ? s.colors[draft[s.color]]?.name : draft[s.style] === null ? 'Ninguno' : AV_STYLES[s.style][draft[s.style]].name;
     html += `<div class="flex items-center justify-between gap-2 mb-2"><button data-cyc="-1" class="btn-game px-3 py-1 text-sm bg-white">‹</button><div class="text-sm font-bold text-center truncate">${s.icon} ${esc(curName || '')}</div><button data-cyc="1" class="btn-game px-3 py-1 text-sm bg-white">›</button></div>`;
     if (s.style) {
@@ -6139,11 +6151,14 @@ const Fitting = (() => {
       if (s.fabrics) { const n = AV_FABRICS.filter(f => avOwns(`fabric:${f.id}`)).length; html += `<div class="text-[10px] text-slate-500 mt-1">🚢 Telas imposibles: ${n}/${AV_FABRICS.length} · llegan por barco con las Rutas del Horizonte de Sam.</div>`; }
     } else if (st) html += `<div class="text-[11px] text-slate-500 mt-3">${st.origin === 'insignia' ? '🏆 Prenda insignia: sus colores son los de su dueño original.' : 'Esta pieza tiene sus propios colores.'}</div>`;
     html += `<div class="text-[10px] text-slate-400 mt-3">🧬 ${fmt(avatarCombinations())} combinaciones posibles · la ropa nunca da ventajas: es pura expresión.</div></div>`;
-    html += `<div class="fit-foot"><button data-rand class="btn-game bg-fuchsia-200">🎲 Aleatorio</button><button data-save class="btn-game bg-emerald-300">${creator ? '✨ Así estoy bien' : '💾 Guardar'}</button><button data-exit class="btn-game bg-slate-200">✕ Salir sin guardar</button></div>`;
+    const pvBuy = pv && !avOwns(preview);
+    html += `<div class="fit-foot">${pvBuy ? `<button data-pvbuy class="btn-game bg-amber-300">Comprar · ${fmt(Boutique.price(pv))} $T</button>` : `<button data-rand class="btn-game bg-fuchsia-200">🎲 Aleatorio</button><button data-save class="btn-game bg-emerald-300">${creator ? '✨ Así estoy bien' : '💾 Guardar'}</button>`}<button data-exit class="btn-game bg-slate-200">${pvBuy ? 'Volver' : '✕ Salir sin guardar'}</button></div>`;
     const scroll = panel.querySelector('.fit-body')?.scrollTop || 0, cs = panel.querySelector('.fit-cats')?.scrollLeft || 0;
     panel.innerHTML = html;
     const fb = panel.querySelector('.fit-body'); if (fb) fb.scrollTop = scroll; const fc = panel.querySelector('.fit-cats'); if (fc) fc.scrollLeft = cs;
-    panel.querySelectorAll('[data-slot]').forEach(b => b.onclick = () => { slotId = b.dataset.slot; render(); const f = panel.querySelector('.fit-body'); if (f) f.scrollTop = 0; });
+    panel.querySelectorAll('[data-slot]').forEach(b => b.onclick = () => { slotId = b.dataset.slot; const wantFace = FACE_SLOTS.includes(slotId); if (wantFace !== face) { face = wantFace; reframe(); } if (collapsed) { collapsed = false; panel.classList.remove('collapsed'); reframe(); } render(); const f = panel.querySelector('.fit-body'); if (f) f.scrollTop = 0; });
+    panel.querySelector('[data-face]').onclick = () => { face = !face; render(); reframe(); };
+    panel.querySelector('[data-handle]').onclick = () => { collapsed = !collapsed; panel.classList.toggle('collapsed', collapsed); render(); requestAnimationFrame(() => reframe()); };
     panel.querySelectorAll('[data-cyc]').forEach(b => b.onclick = () => cycle(+b.dataset.cyc));
     panel.querySelectorAll('[data-style]').forEach(b => b.onclick = () => {
       const v = b.dataset.style === 'none' ? null : +b.dataset.style;
@@ -6151,23 +6166,27 @@ const Fitting = (() => {
       draft[s.style] = v; live(); render();
     });
     panel.querySelectorAll('[data-col]').forEach(b => b.onclick = () => { draft[s.color] = +b.dataset.col; live(); render(); });
-    panel.querySelector('[data-rand]').onclick = randomize;
-    panel.querySelector('[data-save]').onclick = () => close(true);
+    if (panel.querySelector('[data-rand]')) panel.querySelector('[data-rand]').onclick = randomize;
+    if (panel.querySelector('[data-save]')) panel.querySelector('[data-save]').onclick = () => close(true);
+    if (panel.querySelector('[data-pvbuy]')) panel.querySelector('[data-pvbuy]').onclick = () => { if (Boutique.buy(preview)) { const p = AV_PART_BY_KEY[preview]; draft[p.slot] = p.idx; render(); } };
     panel.querySelector('[data-exit]').onclick = () => close(false);
     panel.querySelector('[data-fx]').onclick = () => close(false);
   }
-  function openRoom(m = 'wardrobe', cb) {
+  function openRoom(m = 'wardrobe', cb, opts = {}) {
     if (open) return false; css();
-    open = true; mode = m; onClose = cb || null; drag = null;
+    open = true; mode = m; onClose = cb || null; drag = null; collapsed = false; preview = opts.preview || null;
     draft = avSanitize(GS.avatar); slotId = m === 'creator' ? 'skin' : 'top';
+    if (preview && AV_PART_BY_KEY[preview]) { const p = AV_PART_BY_KEY[preview]; draft[p.slot] = p.idx; slotId = p.slot; }
+    face = FACE_SLOTS.includes(slotId); document.body.classList.add('fitting');
     // de espaldas a la casa, para que la cámara no acabe dentro de un edificio
     if (house && player.position.distanceTo(house.position) < 9) { const away = tangent(player.position.clone().sub(house.position), player.userData.dir); if (away.lengthSq() > 1e-6) player.userData.fwd.copy(away.normalize()); }
     state.moveTarget = null; state.pendingInteract = null; ui.dialog.classList.add('hidden'); ui.hint.classList.add('hidden');
     state.modalOpen = true; state.mode = 'dialog';
-    state.dialogPose = pose(); tweenCamera(state.dialogPose, 0.9);
     panel = document.createElement('div'); panel.id = 'fitPanel'; document.body.appendChild(panel);
     ['pointerdown', 'wheel', 'touchstart'].forEach(ev => panel.addEventListener(ev, e => e.stopPropagation(), { passive: true }));
-    render(); return true;
+    render(); if (preview) live();
+    const p0 = pose(); state.dialogPose = p0; applyOffset(p0.center); tweenCamera(p0, 0.9);   // v2.2: el encuadre se calcula con el panel ya puesto
+    return true;
   }
   function close(saveIt) {
     if (!open) return;
@@ -6177,7 +6196,7 @@ const Fitting = (() => {
       showToast(mode === 'creator' ? '✨ ¡Así te sueñas! (cámbialo gratis en el Armario 👗 de casa)' : '💾 Look guardado', 'text-white');
     }
     applyAvatar(GS.avatar); if (player.userData.body) player.userData.body.rotation.y = 0;
-    open = false; drag = null; if (panel) panel.remove(); panel = null;
+    open = false; drag = null; preview = null; if (panel) panel.remove(); panel = null; clearOffset(); document.body.classList.remove('fitting');
     state.modalOpen = anyModalOpen(); tweenCamera(camPose(), 0.7, () => { if (!open) state.mode = 'player'; });
     const cb = onClose; onClose = null; cb && cb(!!saveIt);
   }
@@ -6186,8 +6205,8 @@ const Fitting = (() => {
   window.addEventListener('pointermove', (e) => { if (!open || !drag) return; const b = player.userData.body; if (b) b.rotation.y += (e.clientX - drag.x) * CFG.fittingRotateSpeed; drag.x = e.clientX; });
   window.addEventListener('pointerup', () => { drag = null; }); window.addEventListener('pointercancel', () => { drag = null; });
   window.addEventListener('keydown', (e) => { if (!open || (e.target && e.target.tagName === 'INPUT')) return; if (e.code === 'Escape') close(false); else if (e.code === 'ArrowLeft' || e.code === 'ArrowRight') cycle(e.code === 'ArrowLeft' ? -1 : 1); });
-  window.addEventListener('resize', () => { if (open && state.mode === 'dialog') state.dialogPose = pose(); });
-  return { open: openRoom, close, randomize, get isOpen() { return open; }, get mode() { return mode; }, get draft() { return draft; } };
+  window.addEventListener('resize', () => { if (open && state.mode === 'dialog') { const p = pose(); state.dialogPose = p; applyOffset(p.center); } });
+  return { open: openRoom, close, randomize, freeRect, frameCharacter, get isOpen() { return open; }, get mode() { return mode; }, get draft() { return draft; }, get face() { return face; } };
 })();
 /** Creador inicial (Sec. 8.2): solo partidas NUEVAS, una vez, justo después del prólogo. Sobrevive a recargas (GS.story.creatorPending). */
 function maybeOpenCreator(after) {
@@ -6229,10 +6248,11 @@ const Boutique = {
           `<div class="grid grid-cols-2 md:grid-cols-4 gap-2">` + cat.map(p => { const own = avOwns(p.key), price = this.price(p), rar = RARITY[p.rarity] || RARITY.common;
             return `<div class="app-card p-3 flex flex-col items-center text-center" style="border-color:${rar.color}"><div class="text-4xl leading-none">${p.icon}</div><div class="text-sm font-bold text-[#2b2b3d] mt-1 leading-tight">${esc(p.name)}</div><div class="text-[11px] text-slate-500">${slotName(p)} · <span style="color:${rar.color}" class="font-bold">${rar.name}</span></div>
               ${own ? `<div class="text-emerald-600 font-bold text-xs mt-2">✓ Es tuya</div><button data-wear="${p.key}" class="btn-game px-3 py-1 text-xs bg-cyan-200 mt-1">👗 Ponérmela</button>`
-                : `<button data-buy="${p.key}" class="btn-game px-3 py-1.5 text-xs mt-2 ${Wallet.canAfford(price) ? 'bg-amber-300' : 'bg-slate-200 opacity-60'}">${fmt(price)} $T</button>`}</div>`; }).join('') + `</div>` +
+                : `<button data-buy="${p.key}" class="btn-game px-3 py-1.5 text-xs mt-2 ${Wallet.canAfford(price) ? 'bg-amber-300' : 'bg-slate-200 opacity-60'}">${fmt(price)} $T</button>`}<button data-try="${p.key}" class="btn-game px-3 py-1 text-xs bg-white mt-1">Probármela</button></div>`; }).join('') + `</div>` +
           `<div class="text-[11px] text-slate-500 mt-3">👗 Tu colección de la Boutique: ${this.pool().filter(p => avOwns(p.key)).length}/${this.pool().length} · 🏆 Insignias: ${insigniasOwned()}/7 (esas no se venden, bro).</div>`;
         body.querySelectorAll('[data-buy]').forEach(b => b.onclick = () => { this.buy(b.dataset.buy); render(); });
         body.querySelectorAll('[data-wear]').forEach(b => b.onclick = () => { this.wear(b.dataset.wear); render(); });
+        body.querySelectorAll('[data-try]').forEach(b => b.onclick = () => { const key = b.dataset.try; closeApp(); setTimeout(() => Fitting.open('wardrobe', () => setTimeout(() => this.open(), 400), { preview: key }), 60); });   // v2.2: probador de cuerpo entero
       };
       render();
     });
@@ -7461,7 +7481,7 @@ function awakeningChainHTML() {
    Nota: la 🎪 Feria del Sábado (puestos de los vecinos, ofertas de tienda) NO es la
    📈 Feria del Tablón de la v0.8 (especulación por categorías): conviven sin tocarse.
    ========================================================= */
-const GAME_VERSION = '2.1';
+const GAME_VERSION = '2.2';
 /* ---------- 🗓️ EVENTOS: calendario REAL → flags que leen los sistemas existentes (Sec. 10.10) ---------- */
 const Events = {
   _force: null,   // DBG.weekday(n): simula el día de la semana real (0 = domingo … 6 = sábado)
@@ -8025,8 +8045,7 @@ const INTERIOR_LAYOUTS = {
       { type: 'painting', x: -hw + 1.05, z: -hd + 0.06, y: 2.1, solid: false },
       { type: 'kitchen', x: hw - 1.3, z: -hd + 0.5, o: { iron: hasFurniture('iron_stove') }, act: 'kitchen', label: hasFurniture('iron_stove') ? '🍳 Cocina de Hierro' : '🍳 Cocina' },
       { type: 'wardrobe', x: -hw + 0.33, z: hd - 2.2, rot: Math.PI / 2, act: 'wardrobe', label: '👗 Armario (probador)' },
-      { type: 'desk_pc', x: hw - 0.42, z: 0.4, rot: -Math.PI / 2, act: 'pc', label: '💻 PC de casa' },
-      { type: 'mailbox', x: -1.6, z: hd - 0.45, rot: Math.PI, act: 'mail', label: '📮 Cartas del buzón' },
+      { type: 'desk_pc', x: hw - 0.42, z: 0.4, rot: -Math.PI / 2, act: 'pc', label: '💻 Escritorio: Laptop de IA y Red del Sueño' },
       { type: lvl >= 3 ? 'chandelier' : 'pendant', x: 0, z: 0, o: { h: H }, solid: false },
       { type: 'plant', x: lvl ? 1.3 : hw - 0.45, z: hd - 0.42 },
     ];
@@ -10658,7 +10677,7 @@ $('btnNewGame').onclick = async () => {
   const ok = await confirmDialog({ title: '¿Seguro que quieres comenzar una nueva partida?', text: 'Se perderá el progreso guardado en este navegador:\n◎ ' + GS.economy.money.toLocaleString('es-ES') + ' $TOKEN · ' + missionsDone() + '/' + NPCS.length + ' misiones · casa nivel ' + GS.house.level, okLabel: 'NUEVA PARTIDA' });
   if (!ok) return; SaveSystem.reset(); location.reload();
 };
-{ const v = document.createElement('div'); v.className = 'text-[10px] text-slate-400 text-center mt-3'; v.textContent = `CrossIA · Micro World: AI Village · v${GAME_VERSION} «Interfaz» · guardado v${SAVE_VERSION}`; document.querySelector('#settingsModal .menu-card')?.append(v); }   // v1.0: etiqueta de versión
+{ const v = document.createElement('div'); v.className = 'text-[10px] text-slate-400 text-center mt-3'; v.textContent = `CrossIA · Micro World: AI Village · v${GAME_VERSION} «Casa y probador» · guardado v${SAVE_VERSION}`; document.querySelector('#settingsModal .menu-card')?.append(v); }   // v1.0: etiqueta de versión
 // =====================================================================
 // DEBUG (B0.2b) - Herramientas de prueba. Uso: consola -> DBG.help()
 // Panel en pantalla: añadir ?debug=1 a la URL
@@ -11012,7 +11031,7 @@ DBG.refs = DBG_REFS;
 if (/[?&]debug=1\b/.test(location.search)) window._dbg = DBG_REFS;   // v1.0: ya no es global por defecto
 /* v1.1 · Interior caminable de la casa (Sec. 6.9 Fase 2) */
 /** v1.5 · capturas: DBG.tp(x, z) lleva al jugador a (x, z) del pueblo · DBG.view(dist, pitch, yaw) fija la cámara · DBG.shot('B'|'C'|'D'|'G'|'H') prepara la escena del protocolo */
-DBG.g = { scene, renderer, camera, cam, sky, water, atmo, clouds, PostFX, SkyEnv, PlanetAO, WATER_U, POST_U, Gather, Studio, ToolAnim, Profiles, Hub, Decor };   // v1.5: referencias gráficas para depurar
+DBG.g = { scene, renderer, camera, cam, sky, water, atmo, clouds, PostFX, SkyEnv, PlanetAO, WATER_U, POST_U, Gather, Studio, ToolAnim, Profiles, Hub, Decor, Fitting, player, Interiors };   // v1.5: referencias gráficas para depurar
 DBG.post = (v = !PostFX.active) => { PostFX.active = !!v; POST_U.uPost.value = v ? 1 : 0; return PostFX.active; };
 DBG.env = (v = !SkyEnv.enabled) => SkyEnv.setEnabled(v);
 DBG.ao = (v = true) => { if (!PlanetAO.on) return false; if (v) PlanetAO.bake(); else { const c = planet.geometry.attributes.color; PlanetAO.reset(); c.needsUpdate = true; } return v; };
