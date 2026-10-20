@@ -2996,7 +2996,7 @@ function updateCamera(dt) {
   }
   if (state.mode === 'dialog') { const p = state.dialogPose; applyLook(p.pos, p.target, p.up); return; }
   if (state.menuOpen) cam.tYaw += dt * 0.12; // el planeta gira lentamente detrás del menú
-  menuViewOffset(state.menuOpen && !document.getElementById('menu')?.classList.contains('hide'));   // v1.5 · Etapa 7
+  { const mEl = document.getElementById('menu'); menuViewOffset(state.menuOpen && !!mEl && !mEl.classList.contains('hide')); }   // v1.5 · Etapa 7
   const p = camPose(); applyLook(p.pos, p.target, p.up);
   ui.btnPlanet.classList.toggle('active', cam.dist > 30); ui.btnPlayer.classList.toggle('active', cam.dist <= 30);
 }
