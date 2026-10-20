@@ -607,6 +607,7 @@ const CFG = {
       desert:   { brg: 139, m: 38, rIn: 9,   rOut: 14, name: 'Desierto',              icon: '🏜️' },
       mountain: { brg: 333, m: 39, rIn: 8.6, rOut: 12, name: 'Montaña',               icon: '⛰️' },
       sea:      { port: 22,          rIn: 12,  rOut: 19, name: 'Mar del Borde',         icon: '🌊' },   // a 22 m del muelle de Sam, mar adentro
+      island:   { port: 22,          rIn: 4.5, rOut: 7.5, name: 'Isla de la Tribu',     icon: '🏝️' },   // v2.8: en el centro del Mar del Borde
     },
     sites: { workshop: [47, 15], lab: [14, 21], sombra: [100, 32] },   // [rumbo, metros] desde el pueblo
     /* v2.7 · Bloque D · EL PUEBLO (metros reales sobre la esfera): plaza en el centro, la Calle Mayor hacia el sur y tu casa al final */
@@ -623,6 +624,9 @@ const CFG = {
     },
     pondFish: { fish: 80, tropical_fish: 6, golden_fish: 2, old_boot: 12 },   // la charca: peces de río y alguna bota
     forestBugs: 3, forestRare: 2.5, mountainGem: 1.6,   // más bichos (y más arcoíris) en el bosque · más gemas en la montaña
+    island: { r0: 6.5, r1: 9, h: 0.7 },   // v2.8 · la isla (meseta baja de 6,5 m) y el anillo de mar profundo que la rodea
+    voyage: { fare: 60, repair: [['treated_wood', 4], ['seashell', 6], ['stone', 6]], trust: 3, secs: 8, current: 3.6 },   // la travesía con Sam · corriente (m/s)
+    shipFar: 12,   // hasta dónde se aleja el barco mercante (m): ya no atraviesa la isla
     slopeMax: 0.84,      // tan 40°: las laderas más empinadas no se suben
     travelFee: 30,       // $T por viaje entre postes
     planetDist: 96, seed: 2026,
@@ -1243,6 +1247,16 @@ const ITEMS = {
   buried_chest:   defItem({ id: 'buried_chest',   name: 'Cofre Enterrado',     icon: '🧰', cat: 'special', rarity: 'rare', sell: 60, usable: true, desc: 'Lo encuentra el detector. Ábrelo: monedas, perlas, gemas, fósiles…' }),
   golden_gift_box: defItem({ id: 'golden_gift_box', name: 'Caja Regalo Dorada', icon: '🎁', cat: 'special', rarity: 'epic', sell: 0, usable: true, desc: 'Premio del Sello Semanal. Botín mejorado: perlas, gemas, estrellas, mermelada…' }),
 };
+/* ===== v2.8 · OBJETOS DE LA ISLA (lote 1, Bloque F5): se compran con Monedas Antiguas y valen mucho en el pueblo ===== */
+Object.assign(ITEMS, {
+  coconut:      defItem({ id: 'coconut',      name: 'Coco',               icon: '🥥', cat: 'consumable', rarity: 'common',   sell: 35,  usable: true, desc: 'De las palmeras de la isla. Úsalo: saciedad +25 y un poco de energía.' }),
+  island_mango: defItem({ id: 'island_mango', name: 'Mango de la Isla',   icon: '🥭', cat: 'consumable', rarity: 'uncommon', sell: 70,  usable: true, desc: 'Dulce como una mañana sin despertador. Úsalo: saciedad +20 y velocidad +30 % un rato. A Tiko le encanta.' }),
+  island_seed:  defItem({ id: 'island_seed',  name: 'Semilla de Palmera', icon: '🌱', cat: 'material',   rarity: 'uncommon', sell: 110, desc: 'Ará la vende. Con una puedes plantar una Palmera Tropical en tu jardín (Construir).' }),
+  palm_fabric:  defItem({ id: 'palm_fabric',  name: 'Tejido de Palma',    icon: '🧶', cat: 'material',   rarity: 'rare',     sell: 160, desc: 'Lo teje Tiko. Con dos te hace una tela nueva para tu armario.' }),
+  nacre_conch:  defItem({ id: 'nacre_conch',  name: 'Ostra de Nácar',     icon: '🦪', cat: 'valuable',   rarity: 'rare',     sell: 260, desc: 'Solo en las playas de la isla. A Sombra, a Sam y a la Abuela Marea les encanta como regalo.' }),
+  tide_charm:   defItem({ id: 'tide_charm',   name: 'Amuleto de Mareas',  icon: '📿', cat: 'special',    rarity: 'rare',     sell: 300, usable: true, desc: 'Lo hace Ará. Úsalo: suerte con la pesca y el detector durante 15 minutos.' }),
+  tiki_mask:    defItem({ id: 'tiki_mask',    name: 'Máscara Tiki',       icon: '🗿', cat: 'valuable',   rarity: 'epic',     sell: 420, desc: 'Tallada por Tiko. No asusta… mucho. A los erizos les vuelve locos (y a Sombra le intriga).' }),
+});
 /* ===== v2.5 · NINGÚN OBJETO INÚTIL (Guía Maestra 2, Bloque G): materiales intermedios, platos nuevos y kit de reparación ===== */
 Object.assign(ITEMS, {
   treated_wood:     defItem({ id: 'treated_wood',     name: 'Madera Tratada',        icon: '🪵', cat: 'material',   rarity: 'uncommon', sell: 30, desc: 'Tronco barnizado con savia onírica. La pide el banco de trabajo (detector, kit de reparación) y el barco de Sam.' }),
@@ -1418,6 +1432,7 @@ const SHOPS = {
    Añadir una construcción = una entrada aquí + un caso en makeBuildable().
    ========================================================= */
 const BUILDABLES = [
+  { id: 'palm',     name: 'Palmera Tropical', icon: '🌴', cost: 60,   mats: { island_seed: 1 }, r: 0.6, desc: 'Una palmera de la isla para tu jardín (se planta con una Semilla de Palmera de Ará).' },   // v2.8
   { id: 'lamp',     name: 'Farola',           icon: '🏮', cost: 100,  mats: { stone: 1 },    r: 0.35, desc: 'Luz cálida para los caminos de la aldea.' },
   { id: 'tree',     name: 'Árbol',            icon: '🌳', cost: 50,   mats: {},              r: 0.6,  desc: 'Un árbol low‑poly. Da sombra y estilo.' },
   { id: 'bench',    name: 'Banco',            icon: '💺', cost: 150,  mats: { wood_log: 2 }, r: 0.7,  desc: 'Para sentarse a mirar el planeta girar.' },
@@ -1590,13 +1605,14 @@ const SITES = {
   garden:   streetSite(TOWN.garden, 0, 'north', R + 1.0, TOWN.gardenR),   // el jardín de obras, detrás
   port:     makeSite(n3(-0.8, -0.1, -0.55), SEA + 0.4, 0.18, 0.34),
 };
+SITES.island = makeSite(WGEO.v3(WGEO.offset(SITES.port.dir, 0, CFG.world.zones.sea.port)), SEA + CFG.world.island.h, CFG.world.island.r0 / 16, CFG.world.island.r1 / 16);   // v2.8: la isla, en medio del Mar del Borde
 const V = SITES.village.dir, V_N = SITES.village.N, V_S = SITES.village.S;
 const CHANNELS = [];   // v2.6: el Mar del Borde ya abre el paso del barco frente al muelle
 /** v2.7 · La meseta del pueblo: una cápsula a lo largo de la Calle Mayor (de la plaza al jardín) */
 const TOWN_SEG = (() => { const [a0, a1, r0, r1] = TOWN.capsule, g = WGEO.street(0); return { seg: true, a: g.p, t: g.F, aMin: a0 / R, aMax: a1 / R, h: R + 1.0, r0: r0 / R, r1: r1 / R, dir: WGEO.v3(g.p) }; })();
 const segAngle = (d, s) => { const th = Math.max(s.aMin, Math.min(s.aMax, Math.atan2(d.x * s.t.x + d.y * s.t.y + d.z * s.t.z, d.x * s.a.x + d.y * s.a.y + d.z * s.a.z))), c = Math.cos(th), k = Math.sin(th);
   return Math.acos(Math.max(-1, Math.min(1, d.x * (s.a.x * c + s.t.x * k) + d.y * (s.a.y * c + s.t.y * k) + d.z * (s.a.z * c + s.t.z * k)))); };
-const TERRAIN_SITES = [SITES.village, TOWN_SEG, SITES.workshop, SITES.sombra, SITES.lab, SITES.port];
+const TERRAIN_SITES = [SITES.village, TOWN_SEG, SITES.workshop, SITES.sombra, SITES.lab, SITES.port, SITES.island];
 
 function terrainNoise(x, y, z) {
   let n = Math.sin(x * 3.1 + y * 1.7) * Math.cos(z * 2.3 - x * 1.1);
@@ -1652,7 +1668,7 @@ const World = (() => {
     const wh = w('hill', d); if (wh > 0) h += wh * C.hillH;
     h += mountain(d).h;
     const ms = meters('sea', d), S = Z.sea;
-    if (ms < S.rOut) { const a = 1 - sst(S.rIn, S.rOut, ms), tgt = SEA - 0.25 - (C.seaDepth - 0.25) * (1 - sst(S.rIn * 0.35, S.rIn, ms)); h += (tgt - h) * a; }
+    if (ms < S.rOut) { const a = 1 - sst(S.rIn, S.rOut, ms), tgt = SEA - 0.25 - (C.seaDepth - 0.25) * (1 - sst(S.rIn * 0.9, S.rIn + 1.5, ms)); h += (tgt - h) * a; }   // v2.8: hondo hasta el anillo (la isla sube en medio)
     const mp = meters('pond', d), P = Z.pond;
     if (mp < P.rOut) { const a = 1 - sst(P.rIn, P.rOut, mp); h += (SEA - C.pondDepth - h) * a; }
     return h;
@@ -1661,6 +1677,7 @@ const World = (() => {
   function zoneAt(d, h = null) {
     if (h == null) h = heightAt(d);
     if (h <= SEA + 0.12) return meters('pond', d) < Z.pond.rOut + 1 ? 'pond' : 'sea';
+    if (meters('sea', d) < Z.island.rOut + 1.5) return 'island';   // v2.8
     if (meters('mountain', d) < MZ.rIn + 1) return 'mountain';
     const ws = { desert: w('desert', d), forest: Math.max(w('forest', d), w('pond', d)), hill: w('hill', d), fields: w('fields', d), town: Math.max(w('town', d), w('south', d), w('home', d)) };
     let best = 'wild', bw = 0.5; for (const k in ws) if (ws[k] > bw) { bw = ws[k]; best = k; }
@@ -1673,7 +1690,8 @@ const World = (() => {
   function tint(h, d, slope, base) {
     const rel = h - SEA; if (rel < 0.12) return base;
     const n = Math.sin(d.x * 9 + d.z * 4) * Math.sin(d.y * 7 - d.x * 5);   // variación suave
-    const ms = meters('sea', d); if (ms < Z.sea.rOut + 1.5 && rel < 1.0) return mixHex(n > 0 ? P8.sand : P8.sand2, base, sst(Z.sea.rOut - 0.5, Z.sea.rOut + 1.5, ms));
+    const ms = meters('sea', d); if (ms < Z.island.rOut + 1) return mixHex(n > 0 ? P8.sand : P8.sand2, n > 0 ? P8.forest : P8.forest2, sst(0.25, 0.8, w('island', d)) * 0.9);   // v2.8: isla (playa y selva)
+    if (ms < Z.sea.rOut + 1.5 && rel < 1.0) return mixHex(n > 0 ? P8.sand : P8.sand2, base, sst(Z.sea.rOut - 0.5, Z.sea.rOut + 1.5, ms));
     const mt = mountain(d);
     if (mt.r < MZ.rIn + 0.8) {
       const hr = mt.h; let c = slope > 0.55 || hr > 1.4 ? mixHex(P8.rock, P8.rock2, 0.5 + 0.5 * n) : mixHex(base, P8.foot, 0.6);
@@ -2362,6 +2380,7 @@ const AV_FABRICS = [
   { id: 'coral',     name: 'Lino de Coral',      hex: 0xff7f6e, fx: { emissive: 0xff5252, emissiveIntensity: 0.12 }, rarity: 'uncommon' },
   { id: 'star_ink',  name: 'Tinta Estelar',      hex: 0x111122, fx: { emissive: 0x3949ab, emissiveIntensity: 0.3 }, rarity: 'legendary' },
   { id: 'mint_neon', name: 'Neón de Menta',      hex: 0x69f0ae, fx: { emissive: 0x00e676, emissiveIntensity: 0.4 }, rarity: 'uncommon' },
+  { id: 'palm',      name: 'Palma Trenzada',     hex: 0xc9a86a, fx: { roughness: 0.95 }, rarity: 'rare', origin: 'special' },   // v2.8: la teje Tiko con 2 Tejidos de Palma
   { id: 'rainbow',   name: 'Seda Arcoíris',      hex: 0xf48fb1, fx: { emissive: 0xb388ff, emissiveIntensity: 0.32, metalness: 0.2, roughness: 0.35 }, rarity: 'epic', origin: 'special' },   // v2.5: tinte de la Boutique (mariposa arcoíris + polvo de ala)
 ];
 const AV_ORIGINS = {
@@ -2939,6 +2958,7 @@ const Decor = (() => {
         if (hit) S.meshes.forEach(im => { im.instanceMatrix.needsUpdate = true; }); }
     },
     stats() { const o = {}; for (const [k, S] of sets) o[k] = { n: S.items.length, calls: S.meshes.length }; return o; },
+    setVisible(key, v) { const S = sets.get(key); if (S) S.meshes.forEach(m => { m.visible = v; }); },   // v2.8: la isla no se dibuja hasta descubrirla
   };
   return api;
 })();
@@ -3210,6 +3230,7 @@ drawBoard(); setInterval(tickMarket, 1000);
 const animatedBuilds = [];   // grupos con partes animadas (gotas, aspas, moneda)
 function makeBuildable(type) {
   const g = new THREE.Group();
+  if (type === 'palm') { g.add(makePalm()); return g; }   // v2.8
   if (type === 'fountain') {
     g.add(cyl(1.6, 1.7, 0.4, mat(0xd7ccc8), 0, 0.2, 0, 16)); g.add(cyl(1.35, 1.35, 0.1, glow(0x4dd0e1, 0x26c6da, 0.4, { transparent: true, opacity: 0.85 }), 0, 0.42, 0, 16));
     g.add(cyl(0.2, 0.3, 1.2, mat(0xd7ccc8), 0, 0.9, 0, 10)); g.add(cyl(0.5, 0.5, 0.1, mat(0xd7ccc8), 0, 1.5, 0, 12));
@@ -3439,10 +3460,10 @@ function genTicker() {
 }
 const SHIP_CYCLE = { approach: 18, dock: 20, depart: 18, wait: 6 };
 function updateShip(dt) {
-  if (!GS.unlocks.ship) return;
+  if (!GS.unlocks.ship || Voyage.holdsShip()) return;   // v2.8: durante la travesía (o con el barco en la isla) manda la travesía
   const s = SITES.port; const C = SHIP_CYCLE; const T = C.approach + C.dock + C.depart + C.wait;
   state.shipTime = (state.shipTime + dt) % T; const t = state.shipTime;
-  const far = 1.15 / R16, near = 0.33 / R16; let th, moving = 0;   // v2.6: los mismos metros de antes
+  const far = CFG.world.shipFar / R, near = 0.33 / R16; let th, moving = 0;   // v2.8: ya no atraviesa la isla
   if (t < C.approach) { th = lerp(far, near, smoothstep(0, 1, t / C.approach)); moving = -1; }
   else if (t < C.approach + C.dock) th = near;
   else if (t < C.approach + C.dock + C.depart) { th = lerp(near, far, smoothstep(0, 1, (t - C.approach - C.dock) / C.depart)); moving = 1; }
@@ -3488,6 +3509,14 @@ function menuViewOffset(on) {
   else camera.setViewOffset(innerWidth, innerHeight, 0, innerHeight * M.offsetY, innerWidth, innerHeight);   // móvil: el planeta sube por encima de la hoja inferior
   if (state.menuOpen) cam.tDist = wide ? M.dist : M.distNarrow;
 }
+/* v2.8 · Burbujas y placas flotantes (depthTest:false) tapadas por el planeta: desde la isla, las del pueblo se veían a través del mundo.
+   Si la línea cámara → burbuja cruza el planeta, la burbuja pasa a la capa 31 (no se dibuja) sin tocar su .visible */
+const Overlays = (() => {
+  let list = [], tRefresh = 0; const _p = new THREE.Vector3(), _d = new THREE.Vector3(), _c = new THREE.Vector3();
+  const refresh = () => { list = []; scene.traverse(o => { if (o.isSprite && o.material && o.material.depthTest === false) list.push(o); }); };
+  const behind = (p) => { _c.copy(camera.position); _d.copy(p).sub(_c); const dd = _d.lengthSq(); if (dd < 1e-6) return false; const k = -_c.dot(_d) / dd; if (k <= 0 || k >= 1) return false; return _c.addScaledVector(_d, k).length() < R - 0.4; };
+  return { get count() { return list.length; }, behind, update(dt) { if (Interiors.active) return; if ((tRefresh -= dt) <= 0) { tRefresh = 1; refresh(); } for (const s of list) { s.getWorldPosition(_p); const L = behind(_p) ? 31 : 0; if (s.layers.mask !== (1 << L) >>> 0) s.layers.set(L); } } };
+})();
 function updateCamera(dt) {
   cam.refF = tangent(cam.refF, player.userData.dir); if (cam.refF.lengthSq() < 1e-6) cam.refF = frameAt(player.userData.dir, V_N).fwd;
   const k = 1 - Math.exp(-dt * (cam.rate || 10)); cam.yaw += (cam.tYaw - cam.yaw) * k; cam.pitch += (cam.tPitch - cam.pitch) * k; cam.dist += (cam.tDist - cam.dist) * k;
@@ -3498,6 +3527,7 @@ function updateCamera(dt) {
     if (tw.t >= tw.duration) { state.camTween = null; tw.onDone && tw.onDone(); }
     return;
   }
+  if (state.mode === 'voyage' && state.voyagePose) { const p = state.voyagePose; applyLook(p.pos, p.target, p.up); return; }   // v2.8: la cámara sigue la estela del barco
   if (state.mode === 'dialog') { const p = state.dialogPose; applyLook(p.pos, p.target, p.up); return; }
   if (state.menuOpen) cam.tYaw += dt * 0.12; // el planeta gira lentamente detrás del menú
   { const mEl = document.getElementById('menu'); menuViewOffset(state.menuOpen && !!mEl && !mEl.classList.contains('hide')); }   // v1.5 · Etapa 7
@@ -3631,7 +3661,7 @@ const giftBase = (id, itemId) => (NPC_SOCIAL[id]?.giftHates || []).includes(item
 const encBtns = (npcId) => (typeof encargoBtns === 'function') ? encargoBtns(npcId) : [];   // el motor de encargos llega en el Bloque 4
 /** 🎰 Servicios especiales por NPC: ruleta, dados, lotería, empleo… (cada bloque añade los suyos) */
 function serviceBtns(npcId) {
-  const btns = typeof Util !== 'undefined' ? Util.btns(npcId) : [];
+  const btns = [...(typeof Util !== 'undefined' ? Util.btns(npcId) : []), ...(typeof Voyage !== 'undefined' ? Voyage.btns(npcId) : [])];   // v2.8: ⛵ la travesía con Sam
   if (npcId === 'sombra' && typeof openRoulette === 'function') btns.push(dialogButton('🎰 Ruleta de Runas', 'bg-purple-300 text-[#2b2b3d]', () => openRoulette()));
   if (npcId === 'sam' && typeof openDiceGame === 'function') btns.push(dialogButton('🎲 Dados con Sam', 'bg-sky-300 text-[#2b2b3d]', () => openDiceGame()));
   if (npcId === 'mayor' && typeof openLottery === 'function') btns.push(dialogButton('🎫 Lotería Municipal', 'bg-yellow-200 text-[#2b2b3d]', () => openLottery()));
@@ -3805,7 +3835,7 @@ function startDialog(npcId) {
 function endDialog() { clearInterval(typeTimer); ui.dialog.classList.add('hidden'); tweenCamera(camPose(), 0.7, () => { state.mode = 'player'; }); }
 /** 🎁 Selector de regalos: inventario con los puntos que daría cada objeto (preferencias + decaimiento del día) */
 function openGiftPicker(npcId) {
-  const n = npcById[npcId];
+  const n = npcById[npcId] || TRIBE_BY_ID[npcId];   // v2.8: también la tribu
   openApp(`🎁 Regalar a ${n.name}`, '', (body) => {
     const render = () => {
       const gs = giftState(npcId);
@@ -4224,15 +4254,16 @@ function relationsHTML() {
   const auraName = (typeof AURA_TIERS !== 'undefined' ? AURA_TIERS[tier]?.name : null) || ['Sin aura', 'Chispa', 'Llama', 'Radiante', 'Legendaria'][tier];
   const styleName = AURA_STYLES[GS.cosmetics.auraV3?.style || 'none']?.name || 'Esencia';
   const card = (id, name, emoji) => {
-    const lv = Trust.level(id), prog = Trust.progress(id), social = NPC_SOCIAL[id] || {};
-    const hasShop = Object.values(SHOP_OWNER).includes(id);
+    const lv = Trust.level(id), prog = Trust.progress(id), social = NPC_SOCIAL[id] || {}, tribe = typeof TRIBE_BY_ID !== 'undefined' && !!TRIBE_BY_ID[id];   // v2.8: la tribu de la isla
+    const hasShop = tribe ? (ISLAND_SHOPS[id] || []).length > 0 || id === 'lula' : Object.values(SHOP_OWNER).includes(id);
     const liked = Object.keys(social.giftPrefs || {}).filter(iid => ITEMS[iid]).sort((a, b) => (social.giftPrefs[b] || 0) - (social.giftPrefs[a] || 0)).slice(0, 3);
-    const mission = id !== 'rocco' ? (state.missions[id]?.status ?? 0) : null;
-    const enc = (typeof currentEncargo === 'function') ? currentEncargo(id) : null;
+    const mission = id !== 'rocco' && !tribe ? (state.missions[id]?.status ?? 0) : null;
+    const enc = tribe ? Island.req(id) : (typeof currentEncargo === 'function') ? currentEncargo(id) : null;
     const hints = [];
-    if (hasShop) hints.push('🛒 Comercia en su tienda');
+    if (hasShop) hints.push(tribe ? '💰 Comercia en monedas antiguas' : '🛒 Comercia en su tienda');
     if (social.giftNone) hints.push('🦝 No acepta regalos: solo comercio');
     else if (liked.length) hints.push(`🎁 Le encanta: ${liked.map(iid => ITEMS[iid].icon).join(' ')}`);
+    { const seen = (GS.util?.hatesSeen?.[id] || []).filter(iid => ITEMS[iid]); if (seen.length) hints.push(`🙅 No le gusta: ${seen.map(iid => ITEMS[iid].icon).join(' ')}`); }   // v2.8: los regalos detestados que ya descubriste (Guía 1, 3.3)
     if (mission === 2) hints.push('✅ Misión completada');
     else if (mission === 1) hints.push('⏳ Misión en curso');
     else if (mission === 0) hints.push(lv >= (social.trustRequired ?? 0) ? '❗ Misión disponible' : `🔒 Misión: requiere ${TRUST_LEVELS[social.trustRequired ?? 0].name}`);
@@ -4261,7 +4292,7 @@ function relationsHTML() {
     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
       ${TRUST_NPCS.map(id => card(id, npcById[id].name, npcById[id].emoji)).join('')}
       ${card('rocco', 'Rocco', '🦝')}
-    </div>`;
+    </div>${typeof TRIBE !== 'undefined' && GS.voyage?.discovered ? `<div class="sec-h mt-3">🏝️ La tribu de la isla</div><div class="grid grid-cols-1 sm:grid-cols-2 gap-3">${TRIBE.map(t => card(t.id, `${t.name} · ${t.role}`, t.emoji)).join('')}</div>` : ''}`;
 }
 function mountInventory(body, backFn, initialPage = 'items') {
   let page = initialPage, cat = 'all', sel = null;
@@ -5245,6 +5276,7 @@ function updatePlayer(dt) {
   }
   state.moving = moving;   // v0.1: Needs drena más saciedad en movimiento
   const wasSwimming = state.swimming; state.swimming = !isLand(pd.dir);
+  if (state.swimming && state.mode !== 'voyage') Island.current(dt);   // v2.8 · F1: la corriente del Mar del Borde no deja cruzar a nado
   // v0.1 · Sec. 4.3: si te entra el hambre nadando, "el mar te devuelve a la orilla"
   if (state.swimming && Needs.hungry() && state.lastLandDir && !Needs._fainting) { pd.dir.copy(state.lastLandDir); state.swimming = false; weakSwimToast(true); }
   if (!state.swimming) (state.lastLandDir ||= new THREE.Vector3()).copy(pd.dir);
@@ -6334,7 +6366,7 @@ let _chatIn = -1;
 function animate() {
   requestAnimationFrame(animate);
   const rawDt = clock.getDelta(), dt = Math.min(rawDt, 0.05), t = clock.elapsedTime; GFX.update(dt, rawDt);   // v1.4: gobernador de FPS + viñeta
-  updatePlayer(dt); ToolAnim.update(dt); Gather.update(dt, t); WorldFX.update(dt, t); Studio.update(t); Online.update(dt); if ((NetWorld.inside() ? 1 : 0) !== _chatIn) { _chatIn = NetWorld.inside() ? 1 : 0; NetChat.render(); } if (!state.cinematic) Needs.update(dt); updateNPCs(dt, t); Awakening.update(dt, t); /* v0.9: el sueño se detiene durante la escena del puerto */ updateCamera(dt); updateSun(); updateNeon(dt, t); updateUnlocks(dt, t); updateShip(dt); updateConfetti(dt); updateWater(t); V10.update(dt, t); ShootingStars.update(dt, 1 - (state.dayAmt ?? 1)); WIND_U.uTime.value = t; { const w = Weather.id(), tw = (w === 'storm' ? 2.8 : w === 'rain' ? 2 : 1) * lerp(0.5, 1, state.dayAmt ?? 1); WIND_U.uWind.value += (tw - WIND_U.uWind.value) * Math.min(1, dt * 0.8); }
+  updatePlayer(dt); ToolAnim.update(dt); Gather.update(dt, t); WorldFX.update(dt, t); Voyage.update(dt); Studio.update(t); Online.update(dt); if ((NetWorld.inside() ? 1 : 0) !== _chatIn) { _chatIn = NetWorld.inside() ? 1 : 0; NetChat.render(); } if (!state.cinematic) Needs.update(dt); updateNPCs(dt, t); Awakening.update(dt, t); /* v0.9: el sueño se detiene durante la escena del puerto */ updateCamera(dt); Overlays.update(dt); updateSun(); updateNeon(dt, t); updateUnlocks(dt, t); updateShip(dt); updateConfetti(dt); updateWater(t); V10.update(dt, t); ShootingStars.update(dt, 1 - (state.dayAmt ?? 1)); WIND_U.uTime.value = t; { const w = Weather.id(), tw = (w === 'storm' ? 2.8 : w === 'rain' ? 2 : 1) * lerp(0.5, 1, state.dayAmt ?? 1); WIND_U.uWind.value += (tw - WIND_U.uWind.value) * Math.min(1, dt * 0.8); }
   clouds.children.forEach(p => { p.rotateY(p.userData.speed * dt); const c = p.userData.bob; if (c) c.position.z = c.userData.z0 + Math.sin(t * 0.3 + c.userData.ph) * 0.25; });   // v1.5: las nubes «respiran» arriba y abajo
   updateTokens(); updateGoalHUD(); updateClockHUD(); Weather.update(dt); Fishing.update(dt); Mining.update(dt); StarFall.update(dt); Net.update(dt);
   if (SaveSystem.started && !state.menuOpen && !state.cinematic) {
@@ -7821,7 +7853,7 @@ function awakeningChainHTML() {
    Nota: la 🎪 Feria del Sábado (puestos de los vecinos, ofertas de tienda) NO es la
    📈 Feria del Tablón de la v0.8 (especulación por categorías): conviven sin tocarse.
    ========================================================= */
-const GAME_VERSION = '2.4';
+const GAME_VERSION = '2.8', GAME_TAG = 'La isla de la tribu';
 /* ---------- 🗓️ EVENTOS: calendario REAL → flags que leen los sistemas existentes (Sec. 10.10) ---------- */
 const Events = {
   _force: null,   // DBG.weekday(n): simula el día de la semana real (0 = domingo … 6 = sábado)
@@ -9388,6 +9420,252 @@ const WorldFX = (() => {
     tp(id) { const p = TRAVEL_POSTS.find(x => x.id === id); if (p) return teleport(arriveOf(p)); const z = World.Z[id]; if (z) teleport(WGEO.v3(id === 'sea' ? WGEO.offset(SITES.port.dir, 0, -2) : z.c)); },
   };
 })();
+/* ===== v2.8 · 🏝️ LA ISLA DE LA TRIBU Y LA TRAVESÍA CON SAM (Guía Maestra 2, Bloque F) =====
+   La isla está en el centro del Mar del Borde, al otro lado del planeta. La corriente no deja cruzar a nado y la niebla la tapa
+   hasta que Sam te lleva por primera vez. Allí se paga con Monedas Antiguas: Lula compra tu pescado y los cuatro venden cosas de la isla. */
+const TRIBE = [
+  { id: 'marea', name: 'Abuela Marea', emoji: '🐢', role: 'Jefa de la tribu', spot: [1.4, 0.55], hut: [2.2, Math.PI], hutCol: 0xa1887f,
+    lines: ['…Hace muchas mareas que no llegaba un viajero del sueño. Siéntate, que los de tu pueblo siempre tenéis prisa.', 'La isla no tiene prisa. Tú tampoco deberías: el sueño dura lo que dura.', 'Antes venían muchos como tú. Construían, comerciaban… y un día despertaban. Todos despiertan.'],
+    story: ['Hace mucho, esta isla y tu pueblo eran una sola orilla. Luego el sueño se estiró y el mar se metió en medio.', 'Los viajeros antiguos dejaron monedas por todo el desierto. Aquí aún valen: el que guarda memoria guarda valor.', 'Ará dice que tu Madame Sombra y él leen el mismo cielo. Yo digo que los dos hablan demasiado.'] },
+  { id: 'ara', name: 'Ará', emoji: '🦜', role: 'Chamán de las mareas', spot: [3.0, 2.0], hut: [4.1, 2.25], hutCol: 0x7e57c2,
+    lines: ['Las mareas me dijeron que vendrías. Las estrellas, que tardarías. Tenían razón las dos.', 'Shhh… escucha. El Mar del Borde canta cuando alguien está a punto de despertar.', 'Madame Sombra y yo nos escribimos con conchas. Ella mira las cartas; yo, la espuma.'],
+    story: ['El Despertar no es un final: es la marea que baja. Lo que construiste se queda en la arena.', 'Si llevas un Amuleto de Mareas, el mar te devuelve lo que le pides. Un rato.'] },
+  { id: 'tiko', name: 'Tiko', emoji: '🐒', role: 'Artesano', spot: [3.0, -2.0], hut: [4.1, -2.25], hutCol: 0x8d6e63,
+    lines: ['¡Uh-uh! ¿Vienes del pueblo? Allí tenéis madera recta. Aquí todo es curvo, como debe ser.', 'Tejo, tallo, ato y desato. Si me traes buena madera, te hago cosas que en tu pueblo no han visto.', 'Mis máscaras no asustan. Bueno, un poco. A los erizos les encantan.'] },
+  { id: 'lula', name: 'Lula', emoji: '🦎', role: 'Pescadora', spot: [4.6, 0.75], hut: null, hutCol: 0x26a69a,
+    lines: ['¡Pescado del pueblo! Aquí pagamos bien por él. En monedas de las de verdad.', 'Las conchas de nácar no salen en cualquier playa. Las mías, sí. Si las pagas.', 'Tres peces normales, una moneda. Un Pez Dorado… cuatro. Lula no regatea.'] },
+];
+const TRIBE_BY_ID = Object.fromEntries(TRIBE.map(t => [t.id, t]));
+/** Tiendas de la isla: [objeto, precio en Monedas Antiguas] · lo que compra Lula: [objeto, unidades por moneda o monedas por unidad] */
+const ISLAND_SHOPS = { marea: [], ara: [['tide_charm', 6], ['island_seed', 3]], tiko: [['palm_fabric', 4], ['tiki_mask', 8], ['island_mango', 2]], lula: [['coconut', 1], ['nacre_conch', 5]] };
+const LULA_BUYS = [['fish', 3, 1], ['tropical_fish', 1, 1], ['golden_fish', 1, 4]];   // [objeto, cuántos, monedas]
+const ISLAND_REQS = {
+  marea: [{ item: 'golden_fruit', qty: 3, coins: 4, trust: 4, text: 'Tres Frutas Doradas para la ofrenda de la marea alta. En la isla no crecen.' }, { item: 'dream_bread', qty: 2, coins: 3, trust: 3, text: 'Pan de tu pueblo. Dos. Los mayores tenemos derecho a caprichos.' }, { item: 'flower_bouquet', qty: 1, coins: 2, trust: 3, text: 'Un ramo de flores del pueblo. Hace mucho que no huelo uno.' }],
+  ara: [{ item: 'firefly_jar', qty: 1, coins: 3, trust: 3, text: 'Un bote de luciérnagas. Leo mejor las mareas con su luz.' }, { item: 'mystic_crystal', qty: 1, coins: 4, trust: 4, text: 'Un Cristal Místico de Sombra. Ella sabrá que es para mí.' }, { item: 'star_shard', qty: 1, coins: 6, trust: 5, text: 'Un Fragmento de Estrella. Caen en la cima de vuestra montaña, de noche.' }],
+  tiko: [{ item: 'wood_log', qty: 5, coins: 2, trust: 3, text: 'Cinco troncos. Aquí solo hay palmeras y no se dejan tallar.' }, { item: 'treated_wood', qty: 2, coins: 3, trust: 3, text: 'Dos Maderas Tratadas. Con savia aguantan el salitre.' }, { item: 'leather', qty: 1, coins: 3, trust: 3, text: 'Un Cuero Reciclado de Glover. Para las correas de las máscaras.' }],
+  lula: [{ item: 'tropical_fish', qty: 2, coins: 3, trust: 3, text: 'Dos Peces Tropicales de vuestras orillas. Aquí se escapan.' }, { item: 'seashell', qty: 6, coins: 2, trust: 2, text: 'Seis conchas del pueblo para los anzuelos.' }, { item: 'golden_fish_grill', qty: 1, coins: 7, trust: 5, text: 'Un Pez Dorado a la Brasa. Me han hablado de él… y quiero probarlo.' }],
+};
+const Island = (() => {
+  const C = CFG.world, I = C.island, V8 = C.voyage, objs = {};
+  const st = () => { const v = (GS.voyage ||= {}); v.step ??= 0; v.repaired ??= false; v.parts ||= {}; v.unlocked ??= false; v.discovered ??= false; v.where ??= 'home'; v.req ||= {}; return v; };
+  const IC = SITES.island.dir, PORT = SITES.port.dir;
+  const TH = (() => { const f = WGEO.frame(IC), t = WGEO.mix(PORT, 1, IC, -WGEO.dot(PORT, IC)); return Math.atan2(WGEO.dot(t, f.E), WGEO.dot(t, f.N)); })();   // rumbo hacia el muelle de Sam
+  const at = (r, a) => WGEO.v3(WGEO.polar(IC, r, TH + a));
+  const coins = () => Inventory.count('old_coin');
+  const group = new THREE.Group(); group.visible = false; scene.add(group);
+  const detail = new THREE.Group(); group.add(detail);   // la tribu, el puesto, las antorchas y la campana: solo de cerca (ahorra ~150 llamadas de dibujo)
+  /* --- 🏝️ la aldea: cabañas, muelle, puesto de pescado, tótem y antorchas --- */
+  const STRAW = matC(0xd8b45a, true), BAMBOO = matC(0xb08850, true), DARK = matC(0x4e342e, true), PLANK = matC(0xa1704a, true);
+  function hut(col, big) { const g = new THREE.Group(), s = big ? 1.35 : 1; g.add(cyl(1.0 * s, 1.1 * s, 1.5 * s, matC(col, true), 0, 0.75 * s, 0, 10)); const roof = cone(1.55 * s, 1.3 * s, STRAW, 0, 2.1 * s, 0, 10); g.add(roof); g.add(box(0.5 * s, 0.9 * s, 0.12, DARK, 0, 0.45 * s, 1.02 * s)); return g; }
+  function place(obj, dir, faceDock = true, r = 0, wide = 0, parent = group) { placeOnPlanet(obj, dir, 0, 0, WGEO.v3(WGEO.mix(PORT, 1, dir, -WGEO.dot(PORT, dir)))); if (!faceDock) obj.rotateY(Math.PI); parent.add(obj); if (r) colliders.push({ pos: obj.position.clone(), r, wide: wide || r, island: true }); return obj; }
+  function buildVillage() {
+    TRIBE.forEach(t => { if (t.hut) place(hut(t.hutCol, t.id === 'marea'), at(...t.hut), true, t.id === 'marea' ? 1.7 : 1.25, t.id === 'marea' ? 2.1 : 1.55); });
+    for (let k = 0; k < 6; k++) { const p = new THREE.Group(), r = 6.0 + k * 0.6; p.add(box(1.5, 0.12, 0.62, PLANK, 0, 0, 0)); if (k % 2 === 0) [-0.65, 0.65].forEach(x => p.add(cyl(0.07, 0.07, 1.4, DARK, x, -0.55, 0, 5))); placeOnPlanet(p, at(r, 0), 0, 0, WGEO.v3(WGEO.mix(PORT, 1, at(r, 0), -WGEO.dot(PORT, at(r, 0)))), Math.max(heightAt(at(r, 0)) + 0.12, SEA + 0.3)); group.add(p); }
+    { const s = new THREE.Group(); s.add(box(1.4, 0.1, 0.7, PLANK, 0, 0.8, 0)); [[-0.6, -0.28], [0.6, -0.28], [-0.6, 0.28], [0.6, 0.28]].forEach(([x, z]) => s.add(cyl(0.05, 0.05, 1.6, BAMBOO, x, 0.8, z, 5))); const aw = box(1.6, 0.08, 0.9, matC(0x29b6f6, true), 0, 1.65, 0); aw.rotation.x = 0.12; s.add(aw); s.add(box(0.5, 0.3, 0.4, matC(0x8d6e63, true), 0.3, 0.98, 0)); place(s, at(4.9, 1.3), true, 0.8, 0, detail); }
+    { const t = new THREE.Group(); [0xe53935, 0xfdd835, 0x43a047, 0x1e88e5].forEach((c, i) => t.add(cyl(0.32, 0.36, 0.5, matC(c, true), 0, 0.25 + i * 0.5, 0, 8))); t.add(cone(0.45, 0.5, STRAW, 0, 2.25, 0, 8)); place(t, at(2.6, 0.9), true, 0.45); }
+    [[5.4, 0.35], [5.4, -0.35], [2.0, 2.9], [2.0, -2.9]].forEach(([r, a]) => { const t = new THREE.Group(); t.add(cyl(0.05, 0.06, 1.5, BAMBOO, 0, 0.75, 0, 5)); t.add(mesh(new THREE.SphereGeometry(0.12, 6, 5), glow(0xffcc80, 0xff9100, 1.6), 0, 1.6, 0)); place(t, at(r, a), true, 0.15, 0, detail); });
+    // la isla: palmeras (selva pequeña) que solo se ven cuando la descubres
+    [[5.6, 1.9], [6.0, 2.6], [5.2, -1.4], [5.9, -2.3], [4.8, 3.1], [5.3, -3.0], [6.2, 1.5], [3.4, 3.6], [6.3, -1.0]].forEach(([r, a], i) => { const d = at(r, a); if (heightAt(d) - SEA > 0.2) { Decor.add('islandPalm', makePalm, { amp: 0.08, H: 2.6, shadow: true }, d, i * 1.3, 0.9 + (i % 3) * 0.1); colliders.push({ pos: d.clone().multiplyScalar(heightAt(d)), r: 0.45, wide: 1.7, island: true }); } });
+    Decor.build();
+    // campana del muelle: para volver al pueblo en el barco de Sam
+    { const b = new THREE.Group(); b.add(cyl(0.06, 0.07, 1.7, DARK, 0, 0.85, 0, 6)); b.add(box(0.5, 0.06, 0.06, DARK, 0.2, 1.68, 0)); b.add(mesh(new THREE.CylinderGeometry(0.1, 0.18, 0.24, 10, 1, true), glow(0xffd54f, 0x6d4c00, 0.3, { metalness: 0.7, roughness: 0.3, side: THREE.DoubleSide }), 0.4, 1.5, 0));
+      place(b, at(6.2, -0.35), true, 0.15, 0, detail); registerInteractable(b, { type: 'gather', label: `⛵ Volver al pueblo con Sam · ${C.voyage.fare} $T`, fn: () => Voyage.sail('home') }); }
+  }
+  /* --- 🐢🦜🐒🦎 la tribu --- */
+  const SPEC = {
+    marea: () => makeCritter({ fur: 0x7cb342, belly: 0xdce775, ears: 'none', decorate: (g) => { const sh = sphere(0.72, matC(0x6d4c41, true), 0, 0.85, -0.32, 12); sh.scale.set(1.05, 0.95, 0.75); g.add(sh);
+      [[-0.3, 1.15], [0.3, 1.15], [0, 0.75], [-0.35, 0.6], [0.35, 0.6]].forEach(([x, y]) => g.add(sphere(0.13, matC(0x8d6e63, true), x, y, -0.86, 6)));
+      [0xe53935, 0xfdd835, 0x1e88e5, 0x43a047, 0xff7043].forEach((c, i) => { const f = cone(0.07, 0.42, matC(c, true), -0.36 + i * 0.18, 2.2, -0.1, 4); f.rotation.z = (i - 2) * 0.18; g.add(f); }); g.add(cyl(0.4, 0.4, 0.08, matC(0xf9a825, true), 0, 2.02, 0, 14));
+      const cane = cyl(0.04, 0.04, 1.6, matC(0x8d6e63), 0.72, 0.8, 0.2, 6); g.add(cane); } }),
+    ara: () => makeCritter({ fur: 0xe53935, belly: 0xffeb3b, ears: 'none', decorate: (g) => { const beak = cone(0.16, 0.42, matC(0xfff59d, true), 0, 1.55, 0.6, 6); beak.rotation.x = Math.PI / 2 + 0.4; g.add(beak);
+      [0x43a047, 0x1e88e5, 0xfdd835].forEach((c, i) => { const f = cone(0.09, 0.5, matC(c, true), -0.15 + i * 0.15, 2.25, -0.05, 4); f.rotation.x = -0.4; g.add(f); });
+      [-1, 1].forEach(s => { const w = sphere(0.3, matC(0x1e88e5, true), s * 0.62, 0.95, -0.05, 8); w.scale.set(0.45, 1.1, 0.9); g.add(w); });
+      for (let i = 0; i < 7; i++) { const a = -0.9 + i * 0.3; g.add(sphere(0.06, matC(i % 2 ? 0xffffff : 0x8e24aa), Math.sin(a) * 0.42, 1.2 - Math.cos(a) * 0.12, 0.38 + Math.cos(a) * 0.08, 5)); } } }),
+    tiko: () => makeCritter({ fur: 0x8d6e63, belly: 0xffe0b2, ears: 'none', decorate: (g) => { const face = sphere(0.36, matC(0xffe0b2), 0, 1.58, 0.28, 12); face.scale.set(1, 0.85, 0.6); g.add(face);
+      [-1, 1].forEach(s => g.add(sphere(0.16, matC(0xffccbc), s * 0.55, 1.68, 0, 8)));
+      const tail = new THREE.Mesh(new THREE.TorusGeometry(0.42, 0.06, 6, 14, Math.PI * 1.4), matC(0x8d6e63)); tail.position.set(0, 0.55, -0.65); tail.rotation.y = Math.PI / 2; g.add(tail);
+      g.add(box(0.8, 0.12, 0.12, matC(0x5d4037, true), 0, 0.62, 0.48)); g.add(box(0.1, 0.42, 0.06, matC(0x90a4ae), 0.32, 0.45, 0.55)); } }),
+    lula: () => makeCritter({ fur: 0x26a69a, belly: 0xb2dfdb, ears: 'none', decorate: (g) => { for (let i = 0; i < 6; i++) g.add(cone(0.07, 0.2, matC(0x00796b, true), 0, 2.1 - i * 0.24, -0.45 - (i > 2 ? (i - 2) * 0.05 : 0), 4));
+      const tail = cone(0.16, 1.2, matC(0x26a69a), 0, 0.35, -0.95, 6); tail.rotation.x = -1.35; g.add(tail); g.add(sphere(0.12, matC(0xff8a65), 0, 1.3, 0.48, 6));
+      g.add(cyl(0.62, 0.62, 0.05, STRAW, 0, 2.12, 0, 14)); g.add(cyl(0.3, 0.34, 0.26, STRAW, 0, 2.27, 0, 14));
+      const rod = cyl(0.025, 0.03, 2.0, matC(0x8d6e63), 0.62, 1.4, 0.3, 4); rod.rotation.z = -0.35; g.add(rod); } }),
+  };
+  function buildTribe() {
+    TRIBE.forEach(t => { const g = SPEC[t.id](); addBlob(g); place(g, at(...t.spot), true, 0, 0, detail); g.userData.up = g.userData.dir; objs[t.id] = g;
+      registerInteractable(g, { type: 'gather', label: `Hablar con ${t.name}`, fn: () => talk(t.id) }); colliders.push({ pos: g.position.clone(), r: 0.6, island: true, noAO: true }); });
+  }
+  /* --- 🌫️ niebla hasta descubrirla --- */
+  const fog = new THREE.Group(), fogMat = new THREE.MeshStandardMaterial({ color: 0xf4f6ff, roughness: 1, emissive: 0xdfe6ff, emissiveIntensity: 0.25, transparent: true, opacity: 0.94, depthWrite: false });
+  function buildFog() {   // 17 bolas de niebla en una sola llamada de dibujo
+    const r = mulberry32(808), im = new THREE.InstancedMesh(new THREE.SphereGeometry(1, 12, 9), fogMat, 17), m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), p = new THREE.Vector3(), sc = new THREE.Vector3();
+    for (let i = 0; i < 16; i++) { const a = i / 16 * 6.283, rr = 3 + r() * 4.5, s = 2.6 + r() * 1.8; im.setMatrixAt(i, m4.compose(p.set(Math.cos(a) * rr, 1.2 + r() * 1.6, Math.sin(a) * rr), q, sc.set(s, s, s))); }
+    im.setMatrixAt(16, m4.compose(p.set(0, 2.2, 0), q, sc.set(5.2, 5.2, 5.2))); im.instanceMatrix.needsUpdate = true; if (im.computeBoundingSphere) im.computeBoundingSphere(); fog.add(im);
+    placeOnPlanet(fog, IC, 0, 0, V_S, SEA); scene.add(fog); }
+  let fogFade = 0;
+  function reveal(animated = true) { const v = st(); v.discovered = true; group.visible = true; Decor.setVisible('islandPalm', true); if (animated) fogFade = 2.2; else fog.visible = false; }
+  /* --- 💬 hablar --- */
+  function talk(id) {
+    const t = TRIBE_BY_ID[id], o = objs[id]; if (!t || !o) return;
+    state.mode = 'dialog'; state.dialogNpc = id; Trust.entry(id).met = true;
+    const up = o.userData.up, toNpc = tangent(o.position.clone().sub(player.position), player.userData.dir); player.userData.fwd.copy(toNpc);
+    const mid = player.position.clone().lerp(o.position, 0.55).addScaledVector(up, 1.35), side = new THREE.Vector3().crossVectors(toNpc, up).normalize();
+    // la aldea es pequeña: la cámara va al lado con más hueco (copas de palmera y tejados) y, si los dos están tapados, más alta
+    const clear = (p) => { let m = 99; for (const c of colliders) if (c && c.island) { const d = p.clone().sub(c.pos); d.addScaledVector(up, -d.dot(up)); m = Math.min(m, d.length() - (c.wide || c.r)); } return m; };
+    const [pa, pb] = [1, -1].map(s => mid.clone().addScaledVector(side, 4.2 * s)), ca = clear(pa), cb = clear(pb);
+    state.dialogPose = { pos: (ca >= cb ? pa : pb).addScaledVector(up, Math.max(ca, cb) > 0.6 ? 1.2 : 2.8), target: mid, up: up.clone() }; tweenCamera(state.dialogPose, 0.9);
+    ui.hint.classList.add('hidden'); ui.dialog.classList.remove('hidden'); ui.dialogButtons.innerHTML = ''; ui.dialogAvatar.textContent = t.emoji;
+    ui.dialogName.textContent = `${t.name.toUpperCase()} · ${t.role.toUpperCase()} · ${trustLvIcon(id)} ${trustLvName(id)}`;
+    const line = t.lines[Math.floor(Math.random() * t.lines.length)];
+    typeText(ui.dialogText, line, 16, () => {
+      const b = [];
+      if ((ISLAND_SHOPS[id] || []).length || id === 'lula') b.push(dialogButton(id === 'lula' ? '🐟 Comerciar' : '🛍️ Tienda', 'bg-amber-200 text-[#2b2b3d]', () => openShop(id)));
+      b.push(dialogButton('📜 Encargo de la isla', 'bg-emerald-200 text-[#2b2b3d]', () => openReq(id)));
+      if (t.story) b.push(dialogButton(id === 'marea' ? '📖 Historia de la isla' : '🌊 Leer las mareas', 'bg-sky-200 text-[#2b2b3d]', () => { typeText(ui.dialogText, t.story[Math.floor(Math.random() * t.story.length)], 16); }));
+      if (id === 'tiko') b.push(dialogButton('🧵 Tejer tela (2 tejidos)', 'bg-fuchsia-200 text-[#2b2b3d]', () => weave()));
+      b.push(dialogButton('🎁 Regalar', 'bg-pink-200 text-[#2b2b3d]', () => openGiftPicker(id)));
+      b.push(dialogButton('👋 Adiós', 'bg-slate-200 text-[#2b2b3d]', () => endDialog()));
+      ui.dialogButtons.append(...b);
+    });
+  }
+  /* --- 🛍️ tiendas en monedas --- */
+  function openShop(id) {
+    const t = TRIBE_BY_ID[id];
+    openApp(`${t.emoji} ${t.name}`, '', (body) => {
+      const render = () => {
+        let html = `<div class="app-card p-3 mb-2 text-xs text-slate-600">En la isla se paga con <b>💰 Monedas Antiguas</b> (tienes <b>${coins()}</b>). Las encuentras excavando en el desierto${id === 'lula' ? ', y Lula te las da por tu pescado' : ''}. Lo de la isla vale mucho en el pueblo.</div>`;
+        if (id === 'lula') html += `<div class="sec-h">Lula compra tu pescado</div>` + LULA_BUYS.map(([it, n, c]) => { const have = Inventory.count(it), lots = Math.floor(have / n);
+          return `<div class="app-card p-2.5 mb-1.5 flex items-center gap-3"><div class="text-2xl w-9 text-center">${ITEMS[it].icon}</div><div class="flex-1 text-sm"><b class="text-[#2b2b3d]">${ITEMS[it].name}</b><div class="text-xs text-slate-500">${n} = ${c} 💰 · tienes ${have}</div></div><button data-sell="${it}" class="btn-game px-3 py-1.5 text-xs ${lots ? 'bg-emerald-300' : 'bg-slate-200 opacity-60'}">Vender ${lots ? lots * n : ''}</button></div>`; }).join('');
+        const shop = ISLAND_SHOPS[id] || [];
+        if (shop.length) html += `<div class="sec-h">A la venta</div>` + shop.map(([it, p]) => `<div class="app-card p-2.5 mb-1.5 flex items-center gap-3"><div class="text-2xl w-9 text-center">${ITEMS[it].icon}</div><div class="flex-1 min-w-0 text-xs"><b class="text-sm text-[#2b2b3d]">${ITEMS[it].name}</b><div class="text-slate-500">${ITEMS[it].desc}</div><div class="text-amber-700 font-bold mt-0.5">${p} 💰 · en el pueblo vale ${fmt(ITEMS[it].sell)} $T</div></div>
+            <button data-buy="${it}" data-p="${p}" class="btn-game px-3 py-1.5 text-xs ${coins() >= p ? 'bg-amber-300' : 'bg-slate-200 opacity-60'}">Comprar</button></div>`).join('');
+        body.innerHTML = html;
+        body.querySelectorAll('[data-buy]').forEach(b => b.onclick = () => { buy(id, b.dataset.buy, +b.dataset.p); render(); });
+        body.querySelectorAll('[data-sell]').forEach(b => b.onclick = () => { sellFish(b.dataset.sell); render(); });
+      };
+      render();
+    });
+  }
+  function buy(id, it, p) {
+    if (!(ISLAND_SHOPS[id] || []).some(([x, q]) => x === it && q === p)) return false;
+    if (coins() < p) { showToast(`❌ Necesitas ${p} 💰 Monedas Antiguas (tienes ${coins()})`, 'text-red-200'); return false; }
+    if (!Inventory.canAdd(it, 1)) { showToast('🎒 Inventario lleno', 'text-red-200'); return false; }
+    Inventory.remove('old_coin', p); Inventory.add(it, 1, { silent: true }); Trust.add(id, 1, 'isla:compra'); playChime(); showToast(`${ITEMS[it].icon} ${ITEMS[it].name} por ${p} 💰`, 'text-white'); SaveSystem.save('island-buy'); return true;
+  }
+  function sellFish(it) {
+    const row = LULA_BUYS.find(r => r[0] === it); if (!row) return 0; const [, n, c] = row, lots = Math.floor(Inventory.count(it) / n); if (!lots) { showToast(`🦎 Lula: "Para ${c} 💰 necesito ${n} × ${ITEMS[it].name}."`, 'text-white'); return 0; }
+    if (!Inventory.canAdd('old_coin', lots * c)) { showToast('🎒 Inventario lleno', 'text-red-200'); return 0; }
+    Inventory.remove(it, lots * n); Inventory.add('old_coin', lots * c, { silent: true }); Trust.add('lula', Math.min(3, lots), 'isla:pescado'); playChime(); showToast(`🦎 Lula te paga ${lots * c} 💰 por ${lots * n} × ${ITEMS[it].name}`, 'text-white'); SaveSystem.save('island-fish'); return lots * c;
+  }
+  function weave() {
+    const key = 'fabric:palm'; if (avOwns(key)) { showToast('🐒 Tiko: "Ya tienes mi tela. ¡Póntela!"', 'text-white'); return false; }
+    if (!Inventory.has('palm_fabric', 2)) { showToast('🐒 Tiko: "Con 2 Tejidos de Palma te hago una tela para tu armario."', 'text-white'); return false; }
+    Inventory.remove('palm_fabric', 2); (GS.avatar.wardrobe ||= []).push(key); playChime(); showToast('🧵 Tela de Palma Trenzada desbloqueada (en el Armario)', 'text-white'); SaveSystem.save('palm-fabric'); return true;
+  }
+  /* --- 📜 encargos de la isla (pagan en monedas) --- */
+  function req(id) { const v = st(), d = GS.daily.dayCount | 0; let r = v.req[id]; if (!r || r.day !== d) { const pool = ISLAND_REQS[id]; r = v.req[id] = { day: d, i: Math.floor(mulberry32(_hashStr(GS.meta.saveId + ':isla:' + id + ':' + d))() * pool.length), done: false }; } return { ...ISLAND_REQS[id][r.i], done: r.done }; }
+  function deliver(id) {
+    const q = req(id); if (q.done) return false; if (!Inventory.has(q.item, q.qty)) { showToast(`❌ Te faltan ${q.qty - Inventory.count(q.item)} × ${ITEMS[q.item].name}`, 'text-red-200'); return false; }
+    if (!Inventory.canAdd('old_coin', q.coins)) { showToast('🎒 Inventario lleno', 'text-red-200'); return false; }
+    Inventory.remove(q.item, q.qty); Inventory.add('old_coin', q.coins, { silent: true }); Trust.add(id, q.trust, 'isla:encargo'); st().req[id].done = true; playChime(); showToast(`${TRIBE_BY_ID[id].emoji} ${TRIBE_BY_ID[id].name}: +${q.coins} 💰 y +${q.trust} confianza`, 'text-white'); SaveSystem.saveNow('island-req'); return true;
+  }
+  function openReq(id) {
+    const t = TRIBE_BY_ID[id];
+    openApp(`📜 Encargo de ${t.name}`, '', (body) => { const render = () => { const q = req(id), it = ITEMS[q.item], have = Inventory.count(q.item), ok = have >= q.qty;
+      body.innerHTML = q.done ? `<div class="app-card p-5 text-center"><div class="text-4xl mb-2">✅</div><b class="text-[#2b2b3d]">¡Hecho por hoy!</b><div class="text-sm text-slate-600 mt-1">Vuelve mañana: ${t.name} siempre necesita algo.</div></div>`
+        : `<div class="app-card p-4"><div class="flex items-start gap-3"><div class="text-4xl">${it.icon}</div><div class="flex-1"><b class="text-[#2b2b3d]">${t.emoji} ${t.name} pide:</b><p class="text-sm text-slate-600 mt-1">“${q.text}”</p>
+          <div class="text-sm font-bold mt-2 ${ok ? 'text-emerald-600' : 'text-red-600'}">${it.icon} ${it.name}: ${have}/${q.qty}</div><div class="text-xs text-slate-500 mt-1">Recompensa: <b class="text-amber-700">${q.coins} 💰 Monedas Antiguas</b> + 🤝 ${q.trust}</div></div></div>
+          <div class="flex justify-end mt-3"><button data-go class="btn-game px-4 py-2 text-sm bg-emerald-300" ${ok ? '' : 'disabled'}>📦 Entregar</button></div></div>`;
+      const b = body.querySelector('[data-go]'); if (b) b.onclick = () => { deliver(id); render(); }; }; render(); });
+  }
+  /* --- 🌊 corriente del Mar del Borde: a nado no se cruza --- */
+  let currentT = 0;
+  /** Siempre más fuerte que el nadador más rápido (tarta, botas, cama mullida…): a nado no se cruza nunca */
+  const currentSpeed = () => { const buff = Date.now() < state.buff.until ? state.buff.mult : 1; return Math.max(C.voyage.current, CFG.playerSpeed * CFG.swimFactor * buff * Rested.speedMult() * NetUp.speedMult() * 1.25); };
+  function current(dt) {
+    const pd = player.userData, ms = World.meters('sea', pd.dir), S = World.Z.sea; if (ms < I.r1 - 1.6 || ms > S.rIn + 2.5) return;
+    const t = tangent(WGEO.v3(IC).sub(pd.dir.clone().multiplyScalar(WGEO.dot(IC, pd.dir))), pd.dir), toIsland = ms < (I.r1 + S.rIn) / 2;
+    pd.dir.addScaledVector(t, (toIsland ? 1 : -1) * currentSpeed() * dt / R).normalize(); state.moveTarget = null;
+    if ((currentT -= dt) <= 0) { currentT = 6; showToast('🌊 La corriente del Mar del Borde es demasiado fuerte: solo se cruza en el barco de Sam', 'text-white'); }
+  }
+  let built = false; const TOP = WGEO.v3(IC).multiplyScalar(R + 15);   // un punto alto sobre la isla: si el planeta lo tapa, tapa la isla entera
+  const api = { TRIBE, objs, group, detail, st, IC, TH, at, talk, openShop, buy, sellFish, weave, req, deliver, current, currentSpeed, reveal,
+    get fogFade() { return fogFade; }, set fogFade(v) { fogFade = v; }, fog, fogMat,
+    build() { if (built) return; built = true; buildVillage(); buildTribe(); buildFog(); Decor.setVisible('islandPalm', false); },
+    /** Al cargar la partida: isla visible si ya la descubriste */
+    restore() { const v = st(); if (v.discovered) reveal(false); else { group.visible = false; fog.visible = true; fogMat.opacity = 0.94; Decor.setVisible('islandPalm', false); } },
+    /** Niebla que se disipa y, si el planeta tapa la isla entera (desde el pueblo o la vista de planeta), la isla no se dibuja */
+    update(dt) { if (fogFade > 0) { fogFade -= dt; fogMat.opacity = Math.max(0, 0.94 * fogFade / 2.2); }
+      const v = st(), far = Overlays.behind(TOP), showI = v.discovered && !far, showF = (!v.discovered || fogFade > 0) && !far;
+      if (group.visible !== showI) { group.visible = showI; Decor.setVisible('islandPalm', showI); }
+      const near = showI && cam.dist < 32 && (Voyage.busy || Math.acos(Math.min(1, WGEO.dot(player.userData.dir, IC))) * R < 16); if (detail.visible !== near) detail.visible = near;
+      if (fog.visible !== showF) fog.visible = showF; },
+  };
+  return api;
+})();
+/* ===== ⛵ La travesía: la cadena de Sam (reparar el barco, las 3 piezas de navegación y confianza 3) y los viajes ===== */
+const Voyage = (() => {
+  const C = CFG.world.voyage, st = Island.st;
+  const partOk = (id) => !!st().parts[id] || (typeof Museum !== 'undefined' && Museum.has(id));
+  const ready = () => { const v = st(); return v.repaired && VOYAGE_PARTS.every(partOk) && Trust.level('sam') >= C.trust; };
+  let trip = null;
+  function repair() { const v = st(); if (v.repaired) return true; const miss = C.repair.filter(([id, q]) => !Inventory.has(id, q)); if (miss.length) { showToast('❌ Para reparar el barco te falta: ' + miss.map(([id, q]) => `${q - Inventory.count(id)}× ${ITEMS[id].icon} ${ITEMS[id].name}`).join(' · '), 'text-red-200'); return false; }
+    C.repair.forEach(([id, q]) => Inventory.remove(id, q)); v.repaired = true; v.step = Math.max(v.step, 2); playChime(); showToast('🔧 ¡Barco reparado! Sam silba de alegría.', 'text-white'); SaveSystem.saveNow('voyage-repair'); return true; }
+  function givePart(id) { const v = st(); if (partOk(id)) return true; if (!Inventory.has(id, 1)) { showToast(`❌ No tienes ${ITEMS[id].icon} ${ITEMS[id].name}`, 'text-red-200'); return false; } Inventory.remove(id, 1); v.parts[id] = true; playChime(); showToast(`${ITEMS[id].icon} Sam instala ${ITEMS[id].name} en el barco`, 'text-white'); SaveSystem.save('voyage-part'); return true; }
+  function panel() {
+    const v = st(); v.step = Math.max(v.step, 1);
+    openApp('⛵ La travesía', '', (body) => { const render = () => {
+      const row = (ok, icon, label, extra = '') => `<div class="app-card p-2.5 mb-1.5 flex items-center gap-3 ${ok ? 'opacity-80' : ''}"><div class="text-2xl w-9 text-center">${ok ? '✅' : icon}</div><div class="flex-1 text-sm text-[#2b2b3d]">${label}</div>${extra}</div>`;
+      let html = `<div class="app-card p-3 mb-2 text-sm text-slate-600">🐦 <i>"Arrr… Mi barco no aguanta el Mar del Borde: allí la corriente parte cascos como galletas. Si lo arreglamos y me consigues las tres piezas de navegación, te llevo a la isla del otro lado. Y quiero fiarme de ti: Socio, nada menos."</i></div>`;
+      html += row(v.repaired, '🔧', `Reparar el barco: ${C.repair.map(([id, q]) => `${q}× ${ITEMS[id].icon} ${ITEMS[id].name} (${Inventory.count(id)})`).join(' · ')}`, v.repaired ? '' : '<button data-rep class="btn-game px-3 py-1.5 text-xs bg-amber-300">Reparar</button>');
+      VOYAGE_PARTS.forEach(id => { const ok = partOk(id), mus = !st().parts[id] && ok; html += row(ok, ITEMS[id].icon, `${ITEMS[id].name}${mus ? ' <span class="text-xs text-slate-500">(Sam la estudia en el museo)</span>' : ''}`, ok ? '' : `<button data-part="${id}" class="btn-game px-3 py-1.5 text-xs ${Inventory.has(id) ? 'bg-amber-300' : 'bg-slate-200 opacity-60'}">Entregar</button>`); });
+      const lv = Trust.level('sam'); html += row(lv >= C.trust, '🤝', `Confianza con Sam: ${TRUST_LEVELS[C.trust].heart} ${TRUST_LEVELS[C.trust].name} (ahora ${trustLvIcon('sam')} ${trustLvName('sam')})`);
+      html += `<div class="flex justify-end mt-2"><button data-sail class="btn-game px-4 py-2 text-sm ${ready() ? 'bg-sky-300' : 'bg-slate-200 opacity-60'}" ${ready() ? '' : 'disabled'}>⛵ ¡Zarpar!</button></div>`;
+      body.innerHTML = html;
+      const rb = body.querySelector('[data-rep]'); if (rb) rb.onclick = () => { repair(); render(); };
+      body.querySelectorAll('[data-part]').forEach(b => b.onclick = () => { givePart(b.dataset.part); render(); });
+      const sb = body.querySelector('[data-sail]'); if (sb) sb.onclick = () => { if (ready()) { closeApp(); sail('island'); } };
+    }; render(); });
+  }
+  /** Viaje en barco: la cámara sigue la estela unos segundos y desembarcas al otro lado */
+  function sail(dest) {
+    const v = st(); if (trip || Interiors.active) return false;
+    if (!v.unlocked) { if (dest !== 'island' || !ready()) return false; }
+    else if (!Wallet.spend(C.fare, 'Travesía con Sam')) return false;
+    if (state.mode === 'dialog') { clearInterval(typeTimer); ui.dialog.classList.add('hidden'); }
+    const P = SITES.port, A = siteDir(P, 2.2, 5.3), B = Island.at(CFG.world.island.r1 + 0.6, 0), from = dest === 'island' ? A : B, to = dest === 'island' ? B : A;
+    trip = { dest, t: 0, T: C.secs, from: from.clone(), to: to.clone(), first: !v.unlocked };
+    state.modalOpen = true; state.mode = 'voyage'; state.moveTarget = null; player.visible = false; document.body.classList.add('cinematic');
+    if (dest === 'island' && !v.discovered) Island.reveal(true);
+    showToast(dest === 'island' ? '⛵ ¡Zarpamos! Rumbo a la isla del otro lado…' : '⛵ Volvemos al pueblo…', 'text-white'); return true;
+  }
+  const _q = new THREE.Quaternion(), _p = new THREE.Vector3(), _f = new THREE.Vector3();
+  /** Dónde estás de verdad: un desmayo (Sombra te rescata en el pueblo) te puede sacar de la isla sin barco */
+  const loc = { onIsland: () => Math.acos(Math.min(1, WGEO.dot(player.userData.dir, Island.IC))) * R < CFG.world.zones.sea.rIn };
+  function syncWhere() { if (Interiors.active || !SaveSystem.started) return; const v = st(), w = loc.onIsland() ? 'island' : 'home'; if (w === v.where) return;
+    v.where = w; if (w === 'island') placeShip(); else if (!GS.unlocks.ship) ship.visible = false; }
+  function update(dt) {
+    Island.update(dt);
+    if (!trip) return syncWhere(); trip.t += dt; const k = Math.min(1, trip.t / trip.T), e = k * k * (3 - 2 * k);
+    const ang = trip.from.angleTo(trip.to), dir = trip.from.clone().multiplyScalar(Math.sin((1 - e) * ang)).addScaledVector(trip.to, Math.sin(e * ang)).divideScalar(Math.sin(ang) || 1).normalize();
+    _f.copy(tangent(trip.to.clone().sub(dir), dir)); quatFromFrame(frameAt(dir, _f), ship.quaternion); ship.quaternion.multiply(_q.setFromAxisAngle(new THREE.Vector3(0, 0, 1), Math.sin(performance.now() * 0.002) * 0.04));
+    ship.position.copy(dir).multiplyScalar(SEA + 0.05 + Math.sin(performance.now() * 0.0025) * 0.06); ship.visible = true;
+    _p.copy(ship.position).addScaledVector(_f, -7.5).addScaledVector(dir, 3.6); state.voyagePose = { pos: _p.clone(), target: ship.position.clone().addScaledVector(dir, 1.0), up: dir.clone() };
+    if (k >= 1) arrive();
+  }
+  function arrive() {
+    const v = st(), d = trip.dest; state.voyagePose = null; trip = null; player.visible = true; document.body.classList.remove('cinematic'); state.modalOpen = false; state.mode = 'player';
+    const land = d === 'island' ? Island.at(CFG.world.island.r0 - 0.6, 0.12) : siteDir(SITES.port, 1.0, 0.6); WorldFX.teleport(land);
+    v.where = d; if (d === 'island' && !v.unlocked) { v.unlocked = true; v.step = 9; addLetter('🐦 Salty Sam', '¡Arrr! Primera travesía al otro lado del Mar del Borde. Desde hoy te llevo cuando quieras desde el muelle (y te traigo de vuelta), por un precio de amigo. Ten cuidado con la Abuela Marea: lo sabe todo.'); }
+    placeShip(); if (d !== 'island' && !GS.unlocks.ship) ship.visible = false; tweenCamera(camPose(), 0.6); showToast(d === 'island' ? '🏝️ Isla de la Tribu' : '⚓ De vuelta en el muelle de Sam', 'text-white'); SaveSystem.saveNow('voyage:' + d);
+  }
+  /** Con el jugador en la isla, el barco espera atracado en su muelle */
+  function placeShip() { if (st().where !== 'island') return; const d = Island.at(CFG.world.island.r1 + 0.6, 0); quatFromFrame(frameAt(d, tangent(WGEO.v3(SITES.port.dir).sub(d), d)), ship.quaternion); ship.position.copy(d).multiplyScalar(SEA + 0.05); ship.visible = true; }
+  return { st, ready, partOk, repair, givePart, panel, sail, update, placeShip, loc, get busy() { return !!trip; }, holdsShip: () => !!trip || st().where === 'island',
+    btns(npcId) { if (npcId !== 'sam' || state.missions?.sam?.status !== 2) return []; const v = st();
+      if (!v.unlocked) return [dialogButton('⛵ La travesía', 'bg-sky-200 text-[#2b2b3d]', () => panel())];
+      return v.where === 'island' ? [] : [dialogButton(`⛵ Viajar a la isla · ${C.fare} $T`, 'bg-sky-200 text-[#2b2b3d]', () => sail('island'))]; },
+  };
+})();
 /* ===== v2.5 · 🔨 UTILIDAD DE LOS OBJETOS (Guía Maestra 2, Bloque G e I-regalos): banco de trabajo, recetas nuevas, servicios de vecinos,
    sala del museo «Excavación y naturaleza», suerte de las luciérnagas, regalos detestados y la regla «todo objeto sirve para algo». ===== */
 const WORKBENCH = [
@@ -9485,7 +9763,7 @@ const Util = {
     VOYAGE_PARTS.forEach(id => add(id, 'travesía con Sam'));
     ISLAND_CURRENCY.forEach(id => add(id, 'moneda de la isla'));
     add('old_boot', 'Glover: cuero'); add('dream_butterfly', 'Dax: polvo de ala'); add('fossil', 'Dax: estudio'); add('old_coin', 'Rocco: colección'); add('rainbow_butterfly', 'Boutique: tinte'); add('wing_dust', 'Boutique: tinte');
-    add('dream_wheat', 'molino: harina'); add('gasil_fuel', 'avión de Sam'); add('dream_ticket', 'final del juego'); add('poor_bread', 'se come'); add('lottery_ticket', 'lotería');
+    add('dream_wheat', 'molino: harina'); add('palm_fabric', 'Tiko: tela para el armario'); Object.keys(ISLAND_SHOPS).forEach(k => ISLAND_SHOPS[k].forEach(([id]) => add(id, 'tienda de la isla'))); add('gasil_fuel', 'avión de Sam'); add('dream_ticket', 'final del juego'); add('poor_bread', 'se come'); add('lottery_ticket', 'lotería');
     return U;
   },
   usesOf(id) { return [...(this.uses()[id] || [])]; },
@@ -9503,6 +9781,9 @@ Object.assign(ITEM_EFFECTS, {
   tropical_ceviche:  () => { Needs.eat(40); applyBuff(1.25, 40, '🥗 Ceviche Tropical: velocidad +25% · saciedad +40'); },
   spice_stew:        () => { Needs.eat(60); applyBuff(1.3, 60, '🍲 Guiso Especiado: velocidad +30% · saciedad +60'); },
   spice_bun:         () => { Needs.eat(30); applyBuff(1.3, 30, '🍩 Bollo de Especias: velocidad +30% · saciedad +30'); },
+  coconut:           () => { Needs.eat(25); applyBuff(1.15, 20, '🥥 Coco: saciedad +25 y un poco de energía'); },
+  island_mango:      () => { Needs.eat(20); applyBuff(1.3, 40, '🥭 Mango de la Isla: velocidad +30 % · saciedad +20'); },
+  tide_charm:        () => { Util.luckUntil = Math.max(Util.luckUntil, Date.now()) + 15 * 60000; showToast('📿 El mar te devuelve lo que le pides: más suerte con la pesca y el detector durante 15 min', 'text-white'); playChime(); },
   firefly_jar:       () => { Util.luckUntil = Date.now() + CFG.util.luckMs; showToast('🏮 Las luciérnagas te acompañan: más suerte con el detector y la pesca durante 10 min', 'text-white'); playChime(); },
   repair_kit:        () => { let n = 0; GS.inventory.slots.forEach(s => { if (Tools.isTool(s.id) && Tools.dur(s) < Tools.max(s.id)) { s.dur = Tools.max(s.id); n++; } }); if (!n) { showToast('🧰 Tus herramientas ya están perfectas', 'text-white'); return false; } showToast(`🧰 ${n} herramienta(s) como nuevas`, 'text-white'); refreshInvBadge(); },
 });
@@ -9519,6 +9800,14 @@ NPC_SOCIAL.bear.encargos.push({ id: 'b_cr', item: 'spice_bun', qty: 1, tokens: 2
 NPC_SOCIAL.sam.encargos.push({ id: 's_tf', item: 'tropical_fish', qty: 2, tokens: 110, trust: 3, text: 'Arrr… un cliente pide 2 Peces Tropicales. ¿Me los pescas, grumete?' });
 NPC_SOCIAL.sam.encargos.push({ id: 's_gf', item: 'golden_fish_grill', qty: 1, tokens: 420, trust: 4, text: 'Hoy me apetece algo de lujo: un Pez Dorado a la Brasa. Pago bien.' });
 Object.entries(GIFT_HATES).forEach(([npc, list]) => { if (NPC_SOCIAL[npc]) NPC_SOCIAL[npc].giftHates = list; });
+// v2.8: la tribu (gustos, detestados y encargos) y lo que opinan los del pueblo de las cosas de la isla
+Object.assign(NPC_SOCIAL, {
+  marea: { giftPrefs: { golden_cake: 10, nacre_conch: 8, coconut: 5, dream_bread: 4, flower_bouquet: 4 }, giftHates: ['gasil_fuel', 'old_boot'], encargos: ISLAND_REQS.marea },
+  ara:   { giftPrefs: { star_shard: 10, mystic_crystal: 8, firefly_jar: 6, tide_charm: 4 }, giftHates: ['coffee', 'stone'], encargos: ISLAND_REQS.ara },
+  tiko:  { giftPrefs: { island_mango: 8, golden_fruit: 6, treated_wood: 5, cupcake: 4 }, giftHates: ['flower_bouquet', 'seashell'], encargos: ISLAND_REQS.tiko },
+  lula:  { giftPrefs: { golden_fish: 10, tropical_fish: 6, coconut: 4, fish: 3 }, giftHates: ['cupcake', 'old_coin'], encargos: ISLAND_REQS.lula },
+});
+Object.assign(NPC_SOCIAL.sombra.giftPrefs, { nacre_conch: 8, tiki_mask: 6 }); Object.assign(NPC_SOCIAL.sam.giftPrefs, { nacre_conch: 6, coconut: 4 }); Object.assign(NPC_SOCIAL.hedgehogs.giftPrefs, { tiki_mask: 10 });
 /* museo: sala nueva */
 MUSEUM_SETS.push({ id: 'nature', icon: '🦴', name: 'Excavación y Naturaleza', color: 0x8d6e63, pieces: ['fossil', 'old_coin', 'dream_butterfly', 'firefly_jar'], title: 'Naturalista del Sueño', trophy: { icon: '🦴', name: 'Trofeo Naturalista' },
   letter: ['🦎 Professor Dax', '¡Una sala entera de naturaleza onírica! El fósil, la moneda, la mariposa y el bote de luciérnagas. Te he preparado el Trofeo Naturalista. Científicamente, es precioso.'] });
@@ -11346,6 +11635,7 @@ function applyGameStateToWorld() {
   Net.apply();         // v1.3
   Util.placeBench();   // v2.5: banco de trabajo junto a casa
   WorldFX.build();     // v2.6: postes de viaje, telescopio y estrella de la cima
+  Island.build(); Island.restore(); Voyage.placeShip();   // v2.8: la isla (con niebla hasta descubrirla) y el barco si te quedaste allí
   Studio.place();      // v1.6: estudio del perfil junto a casa (si ya tienes perfil): Red del Sueño (re-engancha el mundo de bots; si recargaste dentro, despiertas en casa)
   state.tokensShown = GS.economy.money; ui.tokenValue.textContent = state.tokensShown.toLocaleString('es-ES');
   refreshMissionUI();
@@ -11450,7 +11740,7 @@ $('btnNewGame').onclick = async () => {
   const ok = await confirmDialog({ title: '¿Seguro que quieres comenzar una nueva partida?', text: 'Se perderá el progreso guardado en este navegador:\n◎ ' + GS.economy.money.toLocaleString('es-ES') + ' $TOKEN · ' + missionsDone() + '/' + NPCS.length + ' misiones · casa nivel ' + GS.house.level, okLabel: 'NUEVA PARTIDA' });
   if (!ok) return; SaveSystem.reset(); location.reload();
 };
-{ const v = document.createElement('div'); v.className = 'text-[10px] text-slate-400 text-center mt-3'; v.textContent = `CrossIA · Micro World: AI Village · v${GAME_VERSION} «Red en 3D» · guardado v${SAVE_VERSION}`; document.querySelector('#settingsModal .menu-card')?.append(v); }   // v1.0: etiqueta de versión
+{ const v = document.createElement('div'); v.className = 'text-[10px] text-slate-400 text-center mt-3'; v.textContent = `CrossIA · Micro World: AI Village · v${GAME_VERSION} «${GAME_TAG}» · guardado v${SAVE_VERSION}`; document.querySelector('#settingsModal .menu-card')?.append(v); }   // v1.0: etiqueta de versión
 // =====================================================================
 // DEBUG (B0.2b) - Herramientas de prueba. Uso: consola -> DBG.help()
 // Panel en pantalla: añadir ?debug=1 a la URL
@@ -11804,12 +12094,14 @@ DBG.refs = DBG_REFS;
 if (/[?&]debug=1\b/.test(location.search)) window._dbg = DBG_REFS;   // v1.0: ya no es global por defecto
 /* v1.1 · Interior caminable de la casa (Sec. 6.9 Fase 2) */
 /** v1.5 · capturas: DBG.tp(x, z) lleva al jugador a (x, z) del pueblo · DBG.view(dist, pitch, yaw) fija la cámara · DBG.shot('B'|'C'|'D'|'G'|'H') prepara la escena del protocolo */
-DBG.g = { World, WGEO, WorldFX, TRAVEL_POSTS, state, Gather, Mining, npcObjs, interactables, colliders, SITES, NPCS, CFG, get house() { return house; }, scene, renderer, camera, cam, sky, water, atmo, clouds, PostFX, SkyEnv, PlanetAO, WATER_U, POST_U, Gather, Studio, ToolAnim, Profiles, Hub, Decor, Fitting, player, Interiors };   // v1.5: referencias gráficas para depurar
+DBG.g = { World, WGEO, WorldFX, TRAVEL_POSTS, Island, Voyage, TRIBE, ship, state, Gather, Mining, npcObjs, interactables, colliders, SITES, NPCS, CFG, get house() { return house; }, scene, renderer, camera, cam, sky, water, atmo, clouds, PostFX, SkyEnv, PlanetAO, WATER_U, POST_U, Gather, Studio, ToolAnim, Profiles, Hub, Decor, Fitting, player, Interiors };   // v1.5: referencias gráficas para depurar
 DBG.post = (v = !PostFX.active) => { PostFX.active = !!v; POST_U.uPost.value = v ? 1 : 0; return PostFX.active; };
 DBG.env = (v = !SkyEnv.enabled) => SkyEnv.setEnabled(v);
 DBG.ao = (v = true) => { if (!PlanetAO.on) return false; if (v) PlanetAO.bake(); else { const c = planet.geometry.attributes.color; PlanetAO.reset(); c.needsUpdate = true; } return v; };
 DBG.tp = (a = 0, b = 0) => { if (typeof a === 'string') { if (SITES[a] && !TRAVEL_POSTS.some(p => p.id === a) && !World.Z[a]) WorldFX.teleport(siteDir(SITES[a], 0, 2)); else WorldFX.tp(a); console.log('[DBG] tp →', a, '· zona', World.zoneAt(player.userData.dir)); return true; }
   const d = siteDir(S_V, a, b); player.userData.dir.copy(d); player.position.copy(d).multiplyScalar(surfaceR(d)); state.moveTarget = null; return true; };   // v2.7: DBG.tp('forest' | 'bakery' | x, z de la plaza)
+DBG.overlays = () => ({ total: Overlays.count, hidden: (() => { let n = 0; scene.traverse(o => { if (o.isSprite && o.layers.mask === (1 << 31) >>> 0) n++; }); return n; })() });   // v2.8
+DBG.voyage = (go = false) => { const v = Voyage.st(); v.repaired = true; VOYAGE_PARTS.forEach(p => { v.parts[p] = true; }); Trust.entry('sam').points = Math.max(Trust.points('sam'), CFG.trustThresholds[2]); GS.missions.sam.status = 2; if (go) Voyage.sail('island'); return { ready: Voyage.ready(), ...v }; };   // v2.8
 DBG.zone = () => ({ zone: World.zoneAt(player.userData.dir), h: +(heightAt(player.userData.dir) - SEA).toFixed(2), slope: +World.slopeAt(player.userData.dir).toFixed(2), posts: GS.world.posts });
 DBG.view = (dist, pitch, yaw) => { if (dist != null) cam.dist = cam.tDist = dist; if (pitch != null) cam.pitch = cam.tPitch = pitch; if (yaw != null) cam.yaw = cam.tYaw = yaw; return { dist: cam.tDist, pitch: cam.tPitch, yaw: cam.tYaw }; };
 DBG.shot = (id = 'B') => { const S = { B: [() => DBG.tp(-1, 2), 12, 'clear', 9, 0.42], C: [() => DBG.tp(-9.5, 9.5), 18.5, 'clear', 9, 0.32], D: [() => DBG.tp(3.5, -2.5), 23, 'clear', 10, 0.45], G: [() => {}, 0, 'clear', 60, 0.3], H: [() => DBG.tp(-1, 2), 12, 'storm', 9, 0.42] }[id]; if (!S) return false; S[0](); DBG.time(S[1]); DBG.weather(S[2]); DBG.view(S[3], S[4]); return id; };
