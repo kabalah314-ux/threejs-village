@@ -218,6 +218,8 @@
     <div class="flex flex-col gap-2">
       <button id="btnPlanet" class="btn-game clickable px-3 md:px-4 py-2 bg-sky-300 text-[#2b2b3d] text-sm">🌍<span class="hidden md:inline"> Modo Planeta</span></button>
       <button id="btnPlayer" class="btn-game clickable px-3 md:px-4 py-2 bg-emerald-300 text-[#2b2b3d] text-sm active">🎮<span class="hidden md:inline"> Modo Jugador</span></button>
+      <button id="btnInteriorExit" class="btn-game clickable px-3 md:px-4 py-2 bg-rose-200 text-[#2b2b3d] text-sm hidden" title="Salir por la puerta">🚪<span class="hidden md:inline"> Salir</span></button>
+      <button id="btnInteriorPanel" class="btn-game clickable px-3 md:px-4 py-2 bg-teal-200 text-[#2b2b3d] text-sm hidden" title="Panel Mi Casa">📋<span class="hidden md:inline"> Mi Casa</span></button>
       <button id="btnSettingsGame" class="btn-game clickable px-3 md:px-4 py-2 bg-slate-200 text-[#2b2b3d] text-sm" title="Ajustes y guardado">⚙️<span class="hidden md:inline"> Ajustes</span></button>
       <button id="btnBackpack" class="btn-game clickable px-3 md:px-4 py-2 bg-amber-300 text-[#2b2b3d] text-sm" title="Mochila (B)">🎒<span class="hidden md:inline"> Mochila</span> <span id="invBadge" class="pixel text-[8px] bg-[#2b2b3d] text-yellow-300 px-1.5 py-0.5 rounded ml-1">0/20</span></button>
       <button id="btnTools" class="btn-game clickable px-3 md:px-4 py-2 bg-orange-200 text-[#2b2b3d] text-sm" title="Herramientas">🛠️<span class="hidden md:inline"> Herramientas</span></button>
@@ -498,6 +500,17 @@ const CFG = {
   museumSignSpot: [-1.5, 2.2],
   maxPixelRatioMobile: 1.25,      // v1.0 · rendimiento: 1.5 → 1.25 en táctil (la mayor parte del coste es de relleno de píxeles)
   starLightOnMobile: false,       // v1.0 · rendimiento: las estrellas caídas no crean PointLight en móvil (cada luz nueva recompila shaders)
+  /* ===== v1.1 · INTERIOR CAMINABLE DE LA CASA (Sec. 6.9 Fase 2) · geometría/cámara, no balance ===== */
+  interior: {
+    originY: 400,                 // «y=400: las casas son más grandes por dentro» (además se dibuja en una escena propia)
+    fadeMs: 420, fadeColor: '#140f24',
+    roomByLevel: [[8, 7], [10, 8], [13, 10], [16, 12]],   // ancho × fondo de la habitación: Casa · Tienda · Villa · Mansión
+    shopSize: [11, 8],            // layout 'shop' (tiendas de jugadores del online, Anexo D)
+    wallH: 3.0, speedMult: 0.8, reach: 1.0, playerR: 0.35,   // reach: distancia al borde del mueble para interactuar
+    camDist: 7.2, camMin: 4, camMax: 11, camPitch: 0.8, camPitchMin: 0.35, camPitchMax: 1.3,
+    lampNight: 1.6, lampDay: 0.45, windowLightDay: 1.25, windowLightNight: 0.12,
+    counterSlots: 8, shelfSlots: 6,   // objetos visibles en el mostrador / por balda
+  },
   /* ===== v1.0 · PASE DE BALANCE (Sec. 4.9 · 5.12 · 11.4) =====
      Objetivo de la Guía: 10K → 40M en ~8 h (h2→h10) con gastos diarios. Un día onírico dura 20 min si no duermes y
      ~10 min si duermes cada noche (18:00 → 06:00); jugador de referencia: duerme la mitad de las noches → ~15 min/día
@@ -561,8 +574,9 @@ function defaultGameState() {
     farm: { fruits: {} },                            // { [índice]: timestamp en que vuelve a madurar }
     player: { dir: null, fwd: null },                // última posición sobre el planeta
     stats: { missionsCompleted: 0, fruitsHarvested: 0, itemsBought: 0, itemsSold: 0, itemsCollected: 0, itemsUsed: 0, memesCreated: 0 },
-    achievements: { titles: [], equippedTitle: null, unlocked: {}, claimed: {}, track: {}, goldTitles: [], legendAura: false }, vehicles: {}, interiors: {}, zones: {},   // v1.0: logros (Sec. 10.4) · unlocked { id: { at, day } } · claimed { id: ts } · track: contadores internos
+    achievements: { titles: [], equippedTitle: null, unlocked: {}, claimed: {}, track: {}, goldTitles: [], legendAura: false }, vehicles: {}, interiors: { house: { lavaOn: true } }, zones: {},   // v1.0: logros (Sec. 10.4) · unlocked { id: { at, day } } · claimed { id: ts } · track: contadores internos
     furniture: { owned: [] },                        // v3: muebles comprados (Sec. 6.8) · antes reservado vacío
+    // v1.1 · interiors: datos de los interiores caminables (Sec. 6.9 Fase 2). Estar DENTRO no se guarda (state); aquí solo preferencias (lámpara de lava…)
     /* ===== v3 · DÍA ONÍRICO Y NECESIDADES (Guía Maestra Sec. 4 y 6) =====
        Convención de tiempos: el DÍA ONÍRICO solo avanza JUGANDO (daily.clockMs suma ms reales de partida).
        Los cooldowns de recursos/tiendas/frutas siguen siendo tiempo REAL (Date.now), como en v2. */
@@ -1286,7 +1300,7 @@ function buildHouse(level) {
   const mailBadge = new THREE.Sprite(new THREE.SpriteMaterial({ map: bubbleTexture('📮', '#ffde59'), depthTest: false }));   // v0.3: aviso de cartas sin leer
   mailBadge.position.set(1.9, 2.1, 1.9); mailBadge.scale.setScalar(0.9); mailBadge.renderOrder = 10; mailBadge.visible = false; g.add(mailBadge); g.userData.mailBadge = mailBadge;
   if (house) { const i = interactables.indexOf(house); if (i >= 0) interactables.splice(i, 1); }
-  registerInteractable(g, { type: 'house', label: 'Tu casa' });
+  registerInteractable(g, { type: 'house', get label() { return houseSealed() ? '🔒 Casa sellada (runas)' : '🚪 Entrar en casa'; } });   // v1.1: la puerta lleva al interior
   { const mb = new THREE.Object3D(); mb.position.set(1.9, 1.1, 1.9); g.add(mb); if (mailboxObj) { const k = interactables.indexOf(mailboxObj); if (k >= 0) interactables.splice(k, 1); } registerInteractable(mb, { type: 'mailbox', label: 'Abrir el buzón 📮' }); mailboxObj = mb; }   // v0.5: buzón independiente (Sec. 6.10)
   { // v0.7 · Armario 🪞 (Sec. 8.2 y 8.9): box + espejo, en los 3 niveles de casa. Abre el probador (cambiarse es gratis)
     const wd = new THREE.Group(); wd.position.set(-[2.45, 2.95, 3.35, 3.35][level], 0, level >= 3 ? 1.6 : 0.9);
@@ -2079,6 +2093,7 @@ const buildAffordable = (def) => Wallet.canAfford(buildCost(def)) && buildMissin
 let buildRing = null;
 function enterBuildMode(type) {
   const def = buildableById[type]; if (!def || state.build) return;
+  if (Interiors.active) { showToast('🏗️ Sal de casa para construir', 'text-white'); return; }   // v1.1
   if (embargoActive()) { showToast(`🔮 Embargo activo: salda tu deuda por debajo de ${fmt(CFG.debtEmbargoAt)} $T para volver a construir`, 'text-red-200'); return; }
   if (!buildAffordable(def)) { showToast('❌ No cumples los requisitos para construir esto', 'text-red-200'); return; }
   closeApp(); if (state.mode === 'dialog') endDialog();
@@ -2232,6 +2247,7 @@ const cam = { yaw: 0, pitch: 0.42, dist: 9, tYaw: 0, tPitch: 0.42, tDist: 9, min
 const currentLook = new THREE.Vector3(); const _q = new THREE.Quaternion();
 /** Pose deseada: al alejar el zoom, el objetivo se desliza del jugador al centro del planeta */
 function camPose() {
+  if (Interiors.active) return Interiors.camPose();   // v1.1: cámara de interior (mismos controles de giro y zoom)
   const up = player.userData.dir; const blend = smoothstep(13, 40, cam.dist);
   const target = player.position.clone().addScaledVector(up, 1.4).lerp(new THREE.Vector3(), blend);
   const f = frameAt(up, cam.refF);
@@ -2285,7 +2301,9 @@ canvas.addEventListener('pointermove', (e) => {
 const endPointer = (e) => { pointers.delete(e.pointerId); if (pointers.size === 0 && downPos) { if (Math.hypot(e.clientX - downPos.x, e.clientY - downPos.y) < 6) handleClick(e); downPos = null; } };
 canvas.addEventListener('pointerup', endPointer); canvas.addEventListener('pointercancel', endPointer);
 canvas.addEventListener('wheel', (e) => { e.preventDefault(); if (!canControl()) return; cam.tDist = clamp(cam.tDist * Math.exp(e.deltaY * 0.0012), cam.min, cam.max); }, { passive: false });
-ui_bind('btnPlanet', () => { if (canControl()) cam.tDist = 70; });
+ui_bind('btnPlanet', () => { if (canControl() && !Interiors.active) cam.tDist = 70; });
+ui_bind('btnInteriorExit', () => { if (canControl()) Interiors.exit(); });   // v1.1 · HUD del interior
+ui_bind('btnInteriorPanel', () => { if (canControl()) { if (houseSealed()) openSealedHousePanel(); else openHousePanel(); } });
 ui_bind('btnPlayer', () => { if (canControl()) cam.tDist = 9; });
 function ui_bind(id, fn) { document.getElementById(id).onclick = fn; }
 
@@ -2314,6 +2332,7 @@ function handleClick(e) {
   if (state.build) { setBuildCursorFromPointer(e.clientX, e.clientY); if (!IS_MOBILE && state.build.valid) confirmBuild(); return; } // construcción: tap = mover · clic PC = construir
   if (!canControl()) return;
   pointer.set((e.clientX / innerWidth) * 2 - 1, -(e.clientY / innerHeight) * 2 + 1); raycaster.setFromCamera(pointer, camera);
+  if (Interiors.active) { Interiors.click(raycaster); return; }   // v1.1: clic/tap dentro de casa
   const hits = raycaster.intersectObjects(interactables.filter(isAvailable), true);
   if (hits.length && hits[0].object.userData.root) {
     const root = hits[0].object.userData.root; const wp = new THREE.Vector3(); root.getWorldPosition(wp);
@@ -2327,6 +2346,7 @@ function handleClick(e) {
 function setMoveTarget(dir) { state.moveTarget = dir.clone(); marker.position.copy(dir).multiplyScalar(surfaceR(dir) + 0.08); marker.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), dir); marker.material.opacity = 1; marker.scale.setScalar(1); }
 const _wp = new THREE.Vector3();
 function getNearbyInteractable() {
+  if (Interiors.active) return Interiors.nearby();   // v1.1: dentro solo cuentan los muebles
   let best = null;
   for (const obj of interactables) { if (!isAvailable(obj)) continue; obj.getWorldPosition(_wp); const d = player.position.distanceTo(_wp) - (rangeFor(obj) - CFG.interactDist); if (d <= CFG.interactDist && (!best || d < best.d)) best = { obj, d }; }
   return best;
@@ -2337,7 +2357,8 @@ function interactWith(obj) {
   if (it.type === 'npc') startDialog(npcId);
   else if (it.type === 'building') { if (state.missions[npcId].status === 2) openUnlockedApp(npcById[npcId].app); else startDialog(npcId); }
   else if (it.type === 'laptop') { if (!Object.values(state.missions).some(m => m.status >= 1)) showToast('Primero acepta una misión hablando con un NPC', 'text-white'); else openLaptop(); }
-  else if (it.type === 'house') { if (GS.housing.sealed) openSealedHousePanel(); else openHousePanel(); }   // v0.3 panel Mi Casa · S1.2 casa sellada (Sec. 6.4)
+  else if (it.type === 'house') { if (GS.housing.sealed) openSealedHousePanel(); else Interiors.enter('house'); }   // v1.1: entrar al interior (el panel Mi Casa sigue en el PC y en el HUD) · S1.2 casa sellada (Sec. 6.4)
+  else if (it.type === 'interior') Interiors.act(obj);   // v1.1 · muebles del interior
   else if (it.type === 'fruit') harvest(obj);
   else if (it.type === 'pickup') collectPickup(obj);
   else if (it.type === 'fishing') Fishing.cast();   // S2.3
@@ -3088,6 +3109,7 @@ const Needs = {
     document.body.append(ov); requestAnimationFrame(() => ov.style.opacity = '1');
     playBeep(196, 0.5, 'sine');
     setTimeout(() => {
+      if (Interiors.active) Interiors.exit({ instant: true, toDoor: false });   // v1.1: desmayarse dentro → primero fuera, luego el rescate de siempre
       player.userData.dir.copy(siteDir(SITES.sombra, 2.5, 3)); player.userData.fwd.copy(frameAt(player.userData.dir, V_N).fwd);
       GS.needs.hunger = CFG.rescueHunger; state.swimming = false; updateHungerHUD(); showToast(msg, 'text-white'); SaveSystem.saveNow('faint-rescue');
       ov.style.opacity = '0'; setTimeout(() => { ov.remove(); this._fainting = false; }, 700);
@@ -3403,7 +3425,7 @@ function openHousePanel(tab) {
       } else if (_houseTab === 'furniture') {
         const canBuy = GS.missions?.glover?.status === 2;
         html += FURNITURE.map(f => { const own = hasFurniture(f.id); return `<div class="app-card p-3 mb-2 flex items-center gap-3"><div class="text-3xl">${f.icon}</div><div class="flex-1 min-w-0"><div class="font-bold text-sm">${esc(f.name)}</div><div class="text-[11px] text-slate-500">${esc(f.desc)}</div></div>${own ? '<span class="text-emerald-600 font-bold text-xs whitespace-nowrap">✓ En casa</span>' : canBuy ? `<button data-buyfurn="${f.id}" class="btn-game px-3 py-1.5 text-xs ${Wallet.canAfford(f.price) ? 'bg-emerald-300' : 'bg-slate-200 opacity-60'}">${fmt(f.price)} $T</button>` : `<span class="text-[11px] text-slate-400 whitespace-nowrap">${fmt(f.price)} $T</span>`}</div>`; }).join('');
-        html += `<div class="text-[11px] text-slate-500">${canBuy ? 'Los fabrica Glover; te los trae a casa al momento.' : '🦫 Glover te venderá muebles cuando completes su misión.'} Sin interior 3D todavía: actúan desde este panel (Sec. 6.9).</div>`;
+        html += `<div class="text-[11px] text-slate-500">${canBuy ? 'Los fabrica Glover; te los trae a casa al momento.' : '🦫 Glover te venderá muebles cuando completes su misión.'} Entra en casa para verlos colocados: cada mueble se usa ahí mismo (o desde este panel).</div>`;
       } else if (_houseTab === 'wardrobe') {
         html += wardrobeSummaryHTML();   // v0.7 · Sec. 8.2: el Armario, mismo probador, coste 0
       }
@@ -3883,6 +3905,7 @@ function openMunicipalJob() {
    ========================================================= */
 const _fwd = new THREE.Vector3(), _right = new THREE.Vector3(), _move = new THREE.Vector3();
 function updatePlayer(dt) {
+  if (Interiors.active) { Interiors.tick(dt); return; }   // v1.1: movimiento plano dentro de un interior
   const pd = player.userData, parts = pd.parts, up = pd.dir; let moving = false;
   if (canControl()) {
     _fwd.copy(tangent(currentLook.clone().sub(camera.position), up)); _right.crossVectors(_fwd, up).normalize();
@@ -4781,7 +4804,7 @@ function animate() {
     GS.daily.clockMs += dt * 1000 * DAY_SCALE;                 // v0.1: el reloj onírico solo avanza jugando
     if (GS.daily.clockMs >= DAY_MS) { GS.daily.clockMs -= DAY_MS; GS.daily.dayCount++; if (typeof settleDay === 'function') settleDay(); SaveSystem.save('new-day'); }
   }
-  sky.position.copy(camera.position); renderer.render(scene, camera);
+  sky.position.copy(camera.position); renderer.render(Interiors.active ? Interiors.scene : scene, camera);   // v1.1: dentro no se dibuja el planeta
 }
 window.addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
 /* =========================================================
@@ -4853,7 +4876,7 @@ const Fitting = (() => {
   }
   /** Pose de cámara del probador (patrón dialogPose): de frente, con el personaje a un lado del panel */
   function pose() {
-    const pd = player.userData, up = pd.dir.clone().normalize(), fwd = pd.fwd.clone().normalize(), base = player.position.clone();
+    const pd = player.userData, inside = Interiors.active, up = (inside ? UP_Y : pd.dir).clone().normalize(), fwd = (inside ? Interiors.fwdVec() : pd.fwd).clone().normalize(), base = player.position.clone();   // v1.1: también dentro de casa
     const sheet = innerWidth < 768;
     const pos = base.clone().addScaledVector(fwd, sheet ? 5.6 : 4.4).addScaledVector(up, sheet ? 2.1 : 1.55);
     const hp = heightAt(pos.clone().normalize()) + 0.6; if (pos.length() < hp) pos.setLength(hp);
@@ -5752,7 +5775,7 @@ const Awakening = {
     @keyframes awCredits { from { transform: translateY(100%) } to { transform: translateY(-100%) } }`;
     document.head.appendChild(st);
   },
-  enterCinematic() { this.css(); state.cinematic = true; state.modalOpen = true; clearInterval(typeTimer); ui.dialog.classList.add('hidden'); ui.hint.classList.add('hidden'); document.body.classList.add('cinematic'); state.moveTarget = null; state.pendingInteract = null; },
+  enterCinematic() { if (Interiors.active) Interiors.exit({ instant: true }); this.css(); state.cinematic = true; state.modalOpen = true; clearInterval(typeTimer); ui.dialog.classList.add('hidden'); ui.hint.classList.add('hidden'); document.body.classList.add('cinematic'); state.moveTarget = null; state.pendingInteract = null; },
   exitCinematic() { state.cinematic = false; state.modalOpen = false; document.body.classList.remove('cinematic'); state.mode = 'player'; tweenCamera(camPose(), 0.9); },
   at(x, z) { return siteDir(SITES.port, x, z); },
   gather() {   // los 7 vecinos + Rocco se reúnen en el puerto; tú en el muelle, frente al avión
@@ -6432,7 +6455,483 @@ function timeAgo(ts) { if (!ts) return 'nunca'; const s = Math.max(0, (Date.now(
 const missionsDone = () => NPCS.filter(n => GS.missions[n.id].status === 2).length;
 
 /** Reconstruye el mundo 3D a partir de GS (una sola vez al arrancar). Todo lo que llama debe ser idempotente. */
+/* =========================================================
+   v1.1 · INTERIOR CAMINABLE DE LA CASA (Guía Maestra Sec. 6.9 · Fase 2)
+   «Las casas son más grandes por dentro: es un sueño.»
+   ---------------------------------------------------------
+   - Interiors: módulo GENÉRICO. Interiors.enter(kind, opts) / Interiors.exit(opts).
+     Cada `kind` es un LAYOUT (INTERIOR_LAYOUTS[kind](opts) → datos: tamaño, paleta, ventanas, piezas).
+     La habitación se construye en una ESCENA PROPIA (el planeta, el cielo y el océano no se dibujan),
+     una vez por entrada, y se libera al salir. Coordenadas locales planas (x, z) en y = CFG.interior.originY.
+   - makeFurniture(type, o): fábrica única de mallas de muebles (patrón makeBuildable).
+   - Las piezas con `act` son interactuables (type 'interior') y abren los sistemas de siempre
+     (Sleep, Kitchen, Fitting, panel Mi Casa, laptop, Showcase…): aquí no vive ningún dato de juego.
+   - Estado: estar dentro es solo EJECUCIÓN (Interiors.active). player.userData.dir no se toca al entrar,
+     así que GS.player.dir sigue siendo la puerta de fuera → recargar dentro = empezar fuera, a salvo.
+   - Reutilizable: el layout 'shop' (estanterías + mostrador + tendero) es la base de los puestos,
+     locales y boutiques de jugadores del online (Anexo D · F4): mismos datos ({ id, price }), otro origen.
+   ========================================================= */
+function plankTexture(c1, c2) {
+  const c = document.createElement('canvas'); c.width = c.height = 256; const x = c.getContext('2d');
+  for (let i = 0; i < 8; i++) { x.fillStyle = i % 2 ? c1 : c2; x.fillRect(0, i * 32, 256, 32); x.fillStyle = 'rgba(0,0,0,.13)'; x.fillRect(0, i * 32, 256, 2); x.fillRect((i * 97) % 256, i * 32, 2, 32); x.fillRect((i * 97 + 128) % 256, i * 32, 2, 32); }
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; return t;
+}
+/** Sprites de objetos (icono + precio opcional) repartidos sobre una balda: el escaparate y las tiendas los usan igual */
+function interiorItemSprites(g, list, x0, x1, y, z, { tags = false, scale = 0.42 } = {}) {
+  const n = list.length; if (!n) return;
+  list.forEach((s, i) => {
+    const it = ITEMS[s.id]; if (!it) return;
+    const spr = new THREE.Sprite(new THREE.SpriteMaterial({ map: iconTexture(it.icon), depthWrite: false })); spr.scale.setScalar(scale);
+    const x = n === 1 ? (x0 + x1) / 2 : x0 + (x1 - x0) * i / (n - 1); spr.position.set(x, y + scale / 2, z); g.add(spr);
+    if (tags) { const tg = new THREE.Sprite(new THREE.SpriteMaterial({ map: textTexture(`${fmt(s.price ?? it.sell)} $T`, { w: 256, h: 96, font: 'bold 46px Fredoka, Arial', radius: 30 }), depthWrite: false })); tg.scale.set(0.42, 0.16, 1); tg.position.set(x, y - 0.04, z + 0.12); g.add(tg); }
+  });
+}
+/** Fábrica única de muebles de interior (frente = +Z, base en y = 0). userData.foot = [ancho, fondo] para colisiones. */
+function makeFurniture(type, o = {}) {
+  const g = new THREE.Group(), wood = mat(o.wood ?? 0xb08968), dark = mat(0x6d4c41), white = mat(0xfafafa); let foot = [1, 1];
+  const lights = [];
+  const lamp = (color, intensity, dist, x, y, z) => { const l = new THREE.PointLight(color, intensity, dist, 2); l.position.set(x, y, z); g.add(l); lights.push({ light: l, base: intensity }); return l; };
+  switch (type) {
+    case 'bed': {   // 🛏️ cama · con la Cama Mullida: edredón rosa, cojines extra y cabecero acolchado
+      const comfy = !!o.comfy;
+      g.add(box(1.5, 0.32, 2.3, wood, 0, 0.2, 0)); g.add(box(1.42, 0.22, 2.16, white, 0, 0.47, 0.02));
+      g.add(box(1.46, 0.12, 1.45, mat(comfy ? 0xf48fb1 : 0x64b5f6), 0, 0.6, 0.38)); g.add(box(1.0, 0.16, 0.42, white, 0, 0.64, -0.82));
+      g.add(box(1.6, comfy ? 1.25 : 0.95, 0.14, comfy ? mat(0xf8bbd0) : wood, 0, comfy ? 0.62 : 0.5, -1.13));
+      if (comfy) { g.add(box(0.5, 0.2, 0.36, mat(0xfce4ec), -0.36, 0.78, -0.62)); g.add(box(0.5, 0.2, 0.36, mat(0xfff9c4), 0.36, 0.78, -0.62)); [-0.62, 0.62].forEach(x => g.add(sphere(0.12, mat(0xf06292), x, 1.3, -1.13, 8))); }
+      foot = [1.6, 2.5]; break;
+    }
+    case 'kitchen': {   // 🍳 encimera + fogones · Cocina de Hierro: cuerpo de hierro, chimenea y brasa encendida
+      const iron = !!o.iron;
+      g.add(box(1.4, 0.9, 0.8, mat(0xeeeeee), -0.45, 0.45, 0)); g.add(box(1.45, 0.06, 0.85, wood, -0.45, 0.93, 0));
+      g.add(box(0.5, 0.06, 0.4, mat(0xb0bec5), -0.75, 0.97, 0)); g.add(cyl(0.03, 0.03, 0.3, mat(0x90a4ae), -0.75, 1.15, -0.22, 6));
+      g.add(box(0.85, 0.92, 0.8, mat(iron ? 0x37474f : 0xffffff), 0.68, 0.46, 0)); g.add(box(0.6, 0.4, 0.04, mat(0x263238), 0.68, 0.4, 0.41));
+      [[-0.18, -0.15], [0.18, -0.15], [-0.18, 0.15], [0.18, 0.15]].forEach(([x, z]) => g.add(cyl(0.12, 0.12, 0.03, mat(0x212121), 0.68 + x, 0.94, z, 10)));
+      g.add(cyl(0.16, 0.14, 0.14, mat(0x90a4ae), 0.5, 1.03, -0.15, 10));   // olla
+      if (iron) { g.add(cyl(0.1, 0.1, 1.8, mat(0x455a64), 0.9, 1.85, -0.3, 8)); g.add(box(0.5, 0.12, 0.04, glow(0xff7043, 0xff3d00, 1.6), 0.68, 0.18, 0.41)); lamp(0xff7043, 2, 3, 0.68, 0.4, 0.6); }
+      foot = [2.3, 0.9]; break;
+    }
+    case 'wardrobe': {   // 🪞 armario con espejo (mismo diseño que el de fuera, a escala de interior)
+      g.add(box(1.0, 1.95, 0.5, mat(0x8d6e63), 0, 0.98, 0)); g.add(box(1.1, 0.1, 0.56, dark, 0, 1.98, 0));
+      g.add(box(0.66, 1.25, 0.03, new THREE.MeshStandardMaterial({ color: 0xdff3ff, metalness: 0.9, roughness: 0.08, emissive: 0x9fd8ff, emissiveIntensity: 0.22 }), 0, 1.08, 0.26));
+      g.add(sphere(0.04, mat(0xffd54f), 0.42, 1.0, 0.27, 6)); foot = [1.05, 0.55]; break;
+    }
+    case 'desk_pc': {   // 💻 escritorio + la laptop de IA de casa + silla
+      g.add(box(1.4, 0.07, 0.7, wood, 0, 0.78, 0)); [[-0.62, -0.28], [0.62, -0.28], [-0.62, 0.28], [0.62, 0.28]].forEach(([x, z]) => g.add(box(0.07, 0.76, 0.07, dark, x, 0.38, z)));
+      g.add(box(0.55, 0.03, 0.38, mat(0xcfd8dc), 0, 0.83, 0.05)); const sc = box(0.55, 0.36, 0.03, mat(0xcfd8dc), 0, 1.0, -0.15); sc.rotation.x = -0.22; g.add(sc);
+      const disp = box(0.47, 0.28, 0.01, glow(0x1de9b6, 0x00e5a0, 1.1), 0, 1.0, -0.13); disp.rotation.x = -0.22; g.add(disp);
+      g.add(box(0.5, 0.06, 0.5, mat(0x5c6bc0), 0, 0.48, 0.62)); g.add(box(0.5, 0.55, 0.06, mat(0x5c6bc0), 0, 0.78, 0.86)); g.add(cyl(0.04, 0.04, 0.45, dark, 0, 0.23, 0.62, 6));
+      g.add(box(0.18, 0.22, 0.14, mat(0xffcc80), 0.5, 0.92, -0.12));   // taza de lápices
+      foot = [1.4, 0.75]; break;
+    }
+    case 'mailbox': {   // 📮 mesita de la entrada con el buzón interior y las cartas
+      g.add(box(0.62, 0.72, 0.46, wood, 0, 0.36, 0)); g.add(box(0.36, 0.3, 0.42, mat(0xe53935), 0, 0.88, 0));
+      g.add(box(0.26, 0.02, 0.18, white, 0.12, 1.04, 0.1)); g.add(box(0.24, 0.02, 0.17, mat(0xfff59d), 0.1, 1.06, 0.08));
+      const badge = new THREE.Sprite(new THREE.SpriteMaterial({ map: bubbleTexture('📮', '#ffde59'), depthTest: false })); badge.position.set(0, 1.65, 0); badge.scale.setScalar(0.55); badge.renderOrder = 10; badge.visible = false; g.add(badge); g.userData.badge = badge;
+      foot = [0.62, 0.5]; break;
+    }
+    case 'counter': {   // 🏷️ mostrador con vitrina: enseña lo que tienes a la venta (Showcase.list o los datos de una tienda)
+      g.add(box(2.4, 0.95, 0.8, mat(o.body ?? 0xfff3e0), 0, 0.48, 0)); g.add(box(2.5, 0.07, 0.9, wood, 0, 0.98, 0));
+      g.add(box(2.42, 0.12, 0.06, mat(o.trim ?? 0x26a69a), 0, 0.8, 0.41));
+      g.add(box(2.2, 0.42, 0.6, new THREE.MeshStandardMaterial({ color: 0xe1f5fe, transparent: true, opacity: 0.28, roughness: 0.05 }), 0, 1.23, 0));
+      interiorItemSprites(g, (o.items || []).slice(0, CFG.interior.counterSlots), -0.95, 0.95, 1.02, 0, { tags: !!o.tags, scale: 0.34 });
+      foot = [2.5, 0.9]; break;
+    }
+    case 'shelf': {   // estantería genérica de 3 baldas con objetos expuestos (tiendas)
+      const w = o.w ?? 2.2; [-w / 2 + 0.04, w / 2 - 0.04].forEach(x => g.add(box(0.08, 2.0, 0.45, dark, x, 1.0, 0))); g.add(box(w, 2.0, 0.04, mat(0xd7ccc8), 0, 1.0, -0.2));
+      const rows = [0.45, 1.05, 1.65]; rows.forEach(y => g.add(box(w, 0.05, 0.45, wood, 0, y, 0)));
+      const items = (o.items || []).slice(0, CFG.interior.shelfSlots * rows.length);
+      rows.forEach((y, r) => interiorItemSprites(g, items.slice(r * CFG.interior.shelfSlots, (r + 1) * CFG.interior.shelfSlots), -w / 2 + 0.3, w / 2 - 0.3, y + 0.03, 0.05, { tags: !!o.tags, scale: 0.3 }));
+      foot = [w, 0.45]; break;
+    }
+    case 'trophies': {   // 🏆 Estantería de Trofeos (mueble) o, sin ella, una vitrina baja con los trofeos del museo
+      const shelf = !!o.shelf, list = o.trophies || [];
+      if (shelf) { [-0.6, 0.6].forEach(x => g.add(box(0.08, 1.8, 0.4, dark, x, 0.9, 0))); [0.5, 1.1, 1.7].forEach(y => g.add(box(1.3, 0.05, 0.4, mat(0x795548), 0, y, 0))); [-0.35, 0, 0.35].forEach((x, i) => { g.add(cyl(0.05, 0.08, 0.06, mat(0xffd54f, { metalness: 0.6, roughness: 0.3 }), x, 1.16, 0, 8)); g.add(cone(0.1, 0.22, glow(0xffd54f, 0xffab00, 0.4 + i * 0.1), x, 1.3, 0, 8)); }); }
+      else { g.add(box(1.1, 0.6, 0.4, mat(0xd7ccc8), 0, 0.3, 0)); g.add(box(1.15, 0.05, 0.45, wood, 0, 0.62, 0)); }
+      list.forEach((t, i) => { const spr = new THREE.Sprite(new THREE.SpriteMaterial({ map: iconTexture(t.icon), depthWrite: false })); spr.scale.setScalar(0.34); const n = list.length; spr.position.set(n === 1 ? 0 : -0.45 + 0.9 * i / (n - 1), shelf ? 0.7 : 0.82, 0.05); g.add(spr); });
+      foot = shelf ? [1.3, 0.45] : [1.15, 0.45]; break;
+    }
+    case 'muni_safe': {   // 🔐 Caja Fuerte Municipal™
+      const metal = mat(0x546e7a, { metalness: 0.55, roughness: 0.4 });
+      g.add(box(0.8, 0.9, 0.7, metal, 0, 0.45, 0)); g.add(box(0.66, 0.74, 0.03, mat(0x607d8b, { metalness: 0.6, roughness: 0.35 }), 0, 0.47, 0.36));
+      const dial = cyl(0.12, 0.12, 0.05, mat(0xffd54f, { metalness: 0.7, roughness: 0.3 }), 0.12, 0.55, 0.39, 14); dial.rotation.x = Math.PI / 2; g.add(dial);
+      g.add(box(0.06, 0.24, 0.05, mat(0xb0bec5), -0.2, 0.47, 0.4)); g.add(box(0.3, 0.08, 0.02, mat(0xfff8e1), 0, 0.82, 0.38));
+      foot = [0.85, 0.75]; break;
+    }
+    case 'piggy_xl': {   // 🐷 Hucha XL (la hucha del escaparate)
+      const pink = mat(0xf8a5c2); const b = sphere(0.5, pink, 0, 0.62, 0, 16); b.scale.set(1, 0.9, 1.15); g.add(b);
+      const sn = cyl(0.17, 0.17, 0.12, mat(0xf48fb1), 0, 0.62, 0.58, 12); sn.rotation.x = Math.PI / 2; g.add(sn);
+      [-0.22, 0.22].forEach(x => { g.add(cone(0.12, 0.2, pink, x, 1.08, 0.18, 6)); g.add(sphere(0.045, mat(0x2b2b3d), x * 0.8, 0.8, 0.5, 6)); });
+      [[-0.25, -0.3], [0.25, -0.3], [-0.25, 0.3], [0.25, 0.3]].forEach(([x, z]) => g.add(cyl(0.09, 0.09, 0.24, pink, x, 0.12, z, 8)));
+      g.add(box(0.26, 0.03, 0.06, mat(0x2b2b3d), 0, 1.07, -0.05)); foot = [1.05, 1.15]; break;
+    }
+    case 'lava_lamp': {   // 🪔 Lámpara de Lava en su mesita (bonita, solo bonita)
+      g.add(box(0.5, 0.6, 0.5, wood, 0, 0.3, 0)); g.add(cone(0.14, 0.22, mat(0x37474f), 0, 0.71, 0, 10));
+      const glass = cyl(0.1, 0.13, 0.5, glow(0xffccbc, 0xff7043, 0.35, { transparent: true, opacity: 0.7 }), 0, 1.07, 0, 12); g.add(glass);
+      const blobs = [0, 1, 2].map(i => { const s = sphere(0.055 + i * 0.012, glow(0xff8a65, 0xff5722, 1.4), 0, 0.95 + i * 0.1, 0, 8); g.add(s); return s; });
+      g.add(cone(0.08, 0.1, mat(0x37474f), 0, 1.37, 0, 10)); const l = lamp(0xff7043, 2.5, 4, 0, 1.1, 0.2);
+      g.userData.lava = { blobs, glass, light: l, base: 2.5 }; foot = [0.55, 0.55]; break;
+    }
+    case 'rug': { const r = o.r ?? 2; const m = cyl(r, r, 0.03, mat(o.color ?? 0xffccbc), 0, 0.015, 0, 24); m.scale.z = o.oval ?? 0.75; m.castShadow = false; g.add(m); const r2 = cyl(r * 0.72, r * 0.72, 0.035, mat(o.color2 ?? 0xffffff), 0, 0.02, 0, 24); r2.scale.z = o.oval ?? 0.75; r2.castShadow = false; g.add(r2); foot = [0, 0]; break; }
+    case 'plant': { g.add(cyl(0.22, 0.17, 0.4, mat(o.pot ?? 0xd84315), 0, 0.2, 0, 8)); const lf = mat(0x43a047, { flatShading: true }); g.add(sphere(0.32, lf, 0, 0.72, 0, 7)); g.add(sphere(0.22, lf, 0.16, 0.98, 0.05, 6)); g.add(sphere(0.2, lf, -0.15, 0.92, -0.08, 6)); foot = [0.5, 0.5]; break; }
+    case 'sofa': { const c = mat(o.color ?? 0x7986cb); g.add(box(2.1, 0.42, 0.85, c, 0, 0.3, 0)); g.add(box(2.1, 0.6, 0.22, c, 0, 0.7, -0.33)); [-1.0, 1.0].forEach(x => g.add(box(0.2, 0.55, 0.85, c, x, 0.45, 0))); [-0.5, 0.5].forEach(x => g.add(box(0.85, 0.12, 0.6, mat(0xe8eaf6), x, 0.56, 0.08))); foot = [2.2, 0.9]; break; }
+    case 'table': { g.add(box(1.2, 0.06, 0.7, wood, 0, 0.45, 0)); [[-0.52, -0.28], [0.52, -0.28], [-0.52, 0.28], [0.52, 0.28]].forEach(([x, z]) => g.add(box(0.06, 0.44, 0.06, dark, x, 0.22, z))); g.add(cyl(0.12, 0.1, 0.12, mat(0xfff8e1), 0.25, 0.54, 0, 10)); g.add(box(0.3, 0.03, 0.22, mat(0x81d4fa), -0.25, 0.49, 0.05)); foot = [1.2, 0.7]; break; }
+    case 'floor_lamp': { g.add(cyl(0.18, 0.2, 0.05, dark, 0, 0.03, 0, 10)); g.add(cyl(0.03, 0.03, 1.6, dark, 0, 0.82, 0, 6)); g.add(cone(0.3, 0.36, glow(0xfff3e0, 0xffcc80, 0.8), 0, 1.75, 0, 10)); lamp(0xffd8a8, 3.5, 7, 0, 1.55, 0); foot = [0.4, 0.4]; break; }
+    case 'pendant': { const H = o.h ?? 3; g.add(cyl(0.015, 0.015, 0.9, dark, 0, H - 0.45, 0, 4)); g.add(cone(0.32, 0.26, glow(0xfff8e1, 0xffd180, 0.9), 0, H - 1.0, 0, 10)); lamp(0xffe0b2, 5, 14, 0, H - 1.15, 0); foot = [0, 0]; break; }
+    case 'chandelier': { const H = o.h ?? 3; g.add(cyl(0.02, 0.02, 0.7, mat(0xffd54f), 0, H - 0.35, 0, 4)); const ring = cyl(0.7, 0.7, 0.06, mat(0xffd54f, { metalness: 0.6, roughness: 0.3 }), 0, H - 0.75, 0, 16); g.add(ring); for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2; g.add(sphere(0.08, glow(0xfff8e1, 0xffe082, 1.6), Math.cos(a) * 0.7, H - 0.65, Math.sin(a) * 0.7, 6)); } lamp(0xffe0b2, 9, 20, 0, H - 0.9, 0); foot = [0, 0]; break; }
+    case 'fireplace': { const st = mat(0xbcaaa4, { flatShading: true }); g.add(box(1.8, 1.3, 0.6, st, 0, 0.65, 0)); g.add(box(2.0, 0.12, 0.7, mat(0x8d6e63), 0, 1.36, 0)); g.add(box(0.9, 0.7, 0.08, mat(0x1b1b1b), 0, 0.45, 0.27)); const fire = cone(0.24, 0.45, glow(0xffab40, 0xff6d00, 2.0), 0, 0.35, 0.18, 6); g.add(fire); lamp(0xff9e40, 4, 7, 0, 0.6, 0.6); g.userData.fire = fire; foot = [1.8, 0.6]; break; }
+    case 'painting': { g.add(box(1.0, 0.75, 0.05, mat(0x8d6e63), 0, 0, 0)); g.add(box(0.86, 0.6, 0.02, new THREE.MeshStandardMaterial({ map: textTexture(o.text ?? '🌙 ✨ 🪐', { w: 256, h: 192, bg: o.bg ?? '#1a2450', color: '#ffe082', font: '64px serif', radius: 6 }), roughness: 0.8 }), 0, 0, 0.035)); foot = [0, 0]; break; }
+    case 'sign': { g.add(box(o.w ?? 3, 0.6, 0.05, new THREE.MeshStandardMaterial({ map: textTexture(o.text ?? 'TIENDA', { bg: o.bg ?? '#fff7e6', color: o.color ?? '#00695c', font: 'bold 44px Fredoka, Arial' }), roughness: 0.6 }), 0, 0, 0)); foot = [0, 0]; break; }
+    case 'door': {   // 🚪 la puerta por la que se sale (frente = hacia dentro de la habitación)
+      g.add(box(1.3, 2.2, 0.1, mat(0xffffff), 0, 1.1, -0.02)); g.add(box(1.0, 2.0, 0.08, mat(o.color ?? 0x8b5a2b), 0, 1.0, 0.04)); g.add(sphere(0.06, mat(0xffd54f), 0.36, 1.0, 0.1, 8));
+      const dm = box(1.2, 0.03, 0.7, mat(0xa1887f), 0, 0.015, 0.5); dm.castShadow = false; g.add(dm); foot = [0, 0]; break;
+    }
+    case 'keeper': {   // tendero (NPC de prueba de la tienda; en el online sería el avatar del dueño o su dependiente)
+      const k = makeCritter({ fur: o.fur ?? 0xffb74d, belly: 0xfff3e0, ears: 'pointy', decorate: (c) => { c.add(box(0.75, 0.7, 0.1, mat(o.apron ?? 0x26a69a), 0, 0.7, 0.53)); c.add(box(0.8, 0.12, 0.12, mat(0xffffff), 0, 1.05, 0.52)); } });
+      k.scale.setScalar(0.85); g.add(k); const bub = new THREE.Sprite(new THREE.SpriteMaterial({ map: bubbleTexture('🏷️', '#c8f7c5'), depthTest: false })); bub.position.set(0, 2.55, 0); bub.scale.setScalar(0.6); bub.renderOrder = 10; g.add(bub); g.userData.bubble = bub;
+      foot = [0.9, 0.9]; break;
+    }
+    default: console.warn('[Interiors] mueble desconocido: ' + type);
+  }
+  g.userData.foot = foot; g.userData.ftype = type; g.userData.lights = lights; return g;
+}
+/* ---------- LAYOUTS: datos puros. Cada pieza: { type, x, z, rot?, o?, act?, label?, range?, solid? } ---------- */
+const DEMO_SHOP_ITEMS = [['dream_bread', 0], ['golden_jam', 0], ['grilled_fish', 0], ['fish', 0], ['pearl', 0], ['seashell', 0], ['mystic_crystal', 0], ['raw_gem', 0], ['star_shard', 0], ['flour', 0], ['golden_fruit', 0], ['coffee', 0]];
+const INTERIOR_LAYOUTS = {
+  /** 🏠 Tu casa: crece con el nivel (0 Casa · 1 Tienda + mostrador · 2 Villa · 3 Mansión). Muebles comprados y trofeos del museo, físicos. */
+  house(o = {}) {
+    const lvl = clamp(o.level ?? (GS.house.level | 0), 0, CFG.houseMaxLevel), [w, d] = CFG.interior.roomByLevel[lvl], hw = w / 2, hd = d / 2, H = CFG.interior.wallH + (lvl >= 2 ? 0.6 : 0);
+    const names = ['🏠 Casa', '🏪 Tienda', '🏡 Villa $TOKEN', '🏰 Mansión Onírica'];
+    const trophies = MUSEUM_SETS.filter(s => s.trophy && (Museum.st().trophies || []).includes(s.id)).map(s => s.trophy);
+    const P = [
+      { type: 'door', x: 0, z: hd, rot: Math.PI, act: 'exit', label: '🚪 Salir de casa', solid: false, range: 1.4 },
+      { type: 'rug', x: 0, z: 0.3, o: { r: Math.min(hw, hd) * 0.62, color: [0xffccbc, 0xb2dfdb, 0xffe082, 0xd1c4e9][lvl], color2: [0xfff3e0, 0xe0f2f1, 0xfff8e1, 0xede7f6][lvl] }, solid: false },
+      { type: 'bed', x: -hw + 1.05, z: -hd + 1.3, o: { comfy: hasFurniture('comfy_bed') }, act: 'sleep', label: hasFurniture('comfy_bed') ? '🛏️ Cama Mullida (dormir)' : '🛏️ Cama (dormir)' },
+      { type: 'painting', x: -hw + 1.05, z: -hd + 0.06, y: 2.1, solid: false },
+      { type: 'kitchen', x: hw - 1.3, z: -hd + 0.5, o: { iron: hasFurniture('iron_stove') }, act: 'kitchen', label: hasFurniture('iron_stove') ? '🍳 Cocina de Hierro' : '🍳 Cocina' },
+      { type: 'wardrobe', x: -hw + 0.33, z: hd - 2.2, rot: Math.PI / 2, act: 'wardrobe', label: '🪞 Armario (probador)' },
+      { type: 'desk_pc', x: hw - 0.42, z: 0.4, rot: -Math.PI / 2, act: 'pc', label: '💻 PC de casa' },
+      { type: 'mailbox', x: -1.6, z: hd - 0.45, rot: Math.PI, act: 'mail', label: '📮 Cartas del buzón' },
+      { type: lvl >= 3 ? 'chandelier' : 'pendant', x: 0, z: 0, o: { h: H }, solid: false },
+      { type: 'plant', x: lvl ? 1.3 : hw - 0.45, z: hd - 0.42 },
+    ];
+    if (hasFurniture('trophy_shelf') || trophies.length) P.push({ type: 'trophies', x: -hw + 2.75, z: -hd + 0.3, o: { shelf: hasFurniture('trophy_shelf'), trophies }, act: 'trophies', label: hasFurniture('trophy_shelf') ? '🏆 Estantería de Trofeos' : '🏛️ Trofeos del museo' });
+    if (hasFurniture('muni_safe')) P.push({ type: 'muni_safe', x: -hw + 0.5, z: hd - 1.0, rot: Math.PI / 2, act: 'safe', label: '🔐 Caja Fuerte Municipal™' });
+    if (hasFurniture('lava_lamp')) P.push({ type: 'lava_lamp', x: hw - 0.4, z: -0.9, rot: -Math.PI / 2, act: 'lava', label: '🪔 Lámpara de Lava' });
+    if (hasFurniture('piggy_xl')) P.push({ type: 'piggy_xl', x: lvl ? -hw + 2.0 : 1.6, z: hd - 0.68, rot: Math.PI, act: 'piggy', label: '🐷 Hucha XL (escaparate)' });
+    if (lvl >= 1) P.push({ type: 'counter', x: hw - 2.1, z: hd - 1.9, o: { items: Showcase.list }, act: 'showcase', label: '🏷️ Mostrador (escaparate)' });
+    if (lvl >= 2) {
+      P.push({ type: 'sofa', x: -hw + 3.3, z: hd - 2.4, rot: Math.PI, o: { color: lvl >= 3 ? 0x9575cd : 0x7986cb } }, { type: 'table', x: -hw + 3.3, z: hd - 3.6 },
+        { type: 'floor_lamp', x: -hw + 4.8, z: hd - 2.4 }, { type: 'plant', x: hw - 2.9, z: -hd + 0.4, o: { pot: 0x5d4037 } });
+    }
+    if (lvl >= 3) P.push({ type: 'fireplace', x: -hw + 0.3, z: -hd + 3.6, rot: Math.PI / 2 }, { type: 'plant', x: 2.6, z: hd - 0.42, o: { pot: 0x7e57c2 } }, { type: 'floor_lamp', x: hw - 0.45, z: hd - 2.9 });
+    const back = [[0.4], [0.4], [-1.2, 1.4], [-2.4, 0, 2.4]][lvl];
+    return {
+      title: names[lvl] + ' · por dentro', size: [w, d], wallH: H, spawn: [0, hd - 1.5], exitZone: true,
+      palette: { wall: [0xfff1d6, 0xe0f7fa, 0xfff8e1, 0xf3e5f5][lvl], trim: [0xffab91, 0x4db6ac, 0xffca28, 0xb388ff][lvl], floor: [['#c8a27a', '#b88f66'], ['#d7b98e', '#c9a676'], ['#e6c89c', '#d9b884'], ['#d1b3e0', '#c29fd6']][lvl], void: 0x150f26 },
+      windows: { back, left: lvl === 2 ? [-hd + 3.4] : lvl === 3 ? [0.8] : [], right: lvl >= 1 ? [-hd + 2.4] : [] },
+      pieces: P, welcome: lvl === 3 ? '🏰 Bienvenido a la Mansión Onírica. El eco aplaude tus pasos.' : '🏠 Estás en casa. Más grande por dentro: es un sueño.',
+    };
+  },
+  /** 🏪 Tienda de prueba (no accesible en el juego normal: DBG.enterShop). Base de los puestos/locales/boutiques del online.
+      opts.items = [{ id, price }] · opts.title · opts.keeperLine — solo datos, nunca geometría (Anexo A.1). */
+  shop(o = {}) {
+    const [w, d] = CFG.interior.shopSize, hw = w / 2, hd = d / 2;
+    const items = (o.items || DEMO_SHOP_ITEMS.map(([id]) => ({ id }))).filter(s => ITEMS[s.id]).map(s => ({ id: s.id, price: Math.max(1, Math.floor(s.price || ITEMS[s.id].sell)) }));
+    const sh = (i) => items.filter((_, k) => k % 3 === i);   // reparto entre las 3 estanterías
+    const title = o.title || 'Local de prueba';
+    return {
+      title: '🏪 ' + title, size: [w, d], wallH: CFG.interior.wallH, spawn: [0, hd - 1.4], exitZone: true, shopItems: items,
+      keeperLine: o.keeperLine || '¡Bienvenido! Esto es un local de prueba: en el Sueño Compartido, aquí venderán otros soñadores.',
+      palette: { wall: 0xfffde7, trim: 0x26a69a, floor: ['#cfd8dc', '#b0bec5'], void: 0x150f26 },
+      windows: { back: [], left: [-1.2], right: [-1.2] },
+      pieces: [
+        { type: 'door', x: 0, z: hd, rot: Math.PI, act: 'exit', label: '🚪 Salir de la tienda', solid: false, range: 1.4 },
+        { type: 'rug', x: 0, z: 1.2, o: { r: 2.2, color: 0xb2dfdb, color2: 0xe0f2f1 }, solid: false },
+        { type: 'sign', x: 0, z: -hd + 0.06, y: 2.4, o: { text: title.toUpperCase().slice(0, 22), w: 3.6 }, solid: false },
+        { type: 'shelf', x: -3.0, z: -hd + 0.3, o: { items: sh(0), tags: true }, act: 'shelf', label: '🏷️ Estantería' },
+        { type: 'shelf', x: 3.0, z: -hd + 0.3, o: { items: sh(1), tags: true }, act: 'shelf', label: '🏷️ Estantería' },
+        { type: 'shelf', x: -hw + 0.3, z: 1.4, rot: Math.PI / 2, o: { items: sh(2), tags: true, w: 2.0 }, act: 'shelf', label: '🏷️ Estantería' },
+        { type: 'counter', x: 0, z: -0.7, o: { items: items.slice(0, 4), tags: true, body: 0xe0f2f1 }, act: 'shelf', label: '🏷️ Mostrador' },
+        { type: 'keeper', x: 0, z: -1.7, act: 'keeper', label: '🦊 Hablar con el tendero', range: 1.7 },
+        { type: 'plant', x: hw - 0.45, z: hd - 0.45 }, { type: 'plant', x: -hw + 0.45, z: hd - 0.45 },
+        { type: 'pendant', x: -2, z: 0.5, o: { h: CFG.interior.wallH }, solid: false }, { type: 'pendant', x: 2, z: 0.5, o: { h: CFG.interior.wallH }, solid: false },
+      ],
+      welcome: '🏪 ' + title + ' · vista previa de las tiendas de jugadores (simulación)',
+    };
+  },
+};
+/* ---------- ACCIONES de las piezas: abren los sistemas existentes (nada de lógica de juego aquí) ---------- */
+const INTERIOR_ACTIONS = {
+  exit: () => Interiors.exit(),
+  sleep: () => openBedPanel(),
+  kitchen: () => openKitchenPanel(),
+  wardrobe: () => { Interiors.faceRoom(); Fitting.open('wardrobe'); },
+  mail: () => { if (houseSealed()) openSealedHousePanel(); else openHousePanel('mail'); },
+  pc: () => openHomePC(),
+  showcase: () => openShowcasePanel(),
+  piggy: () => openShowcasePanel(),
+  trophies: () => openTrophyPanel(),
+  safe: () => openSafePanel(),
+  lava: () => toggleLavaLamp(),
+  shelf: () => openInteriorShopPanel(),
+  keeper: () => openInteriorShopPanel(),
+};
+/** 💻 Apps del PC de casa. Gancho del online: Interiors.hooks.dreamNet = () => {…} activa la «Red del Sueño» (Anexo C/D) */
+const HOME_PC_APPS = [
+  { id: 'laptop', icon: '💻', name: 'Laptop de IA', desc: 'Tus proyectos: las webs de las misiones y los Trabajos Mayores.', ready: () => true,
+    open: () => { if (!Object.values(state.missions).some(m => m.status >= 1)) showToast('Primero acepta una misión hablando con un NPC', 'text-white'); else openLaptop(); } },
+  { id: 'house', icon: '🏠', name: 'Mi Casa', desc: 'Buzón, alquiler, dormir, cocina, escaparate, muebles y armario.', ready: () => true, open: () => houseSealed() ? openSealedHousePanel() : openHousePanel() },
+  { id: 'dreamnet', icon: '🌐', name: 'Red del Sueño', desc: 'Comprar, vender y truecar con otros soñadores, y tu propia tienda en el barrio online. Llega con el modo online.', ready: () => typeof Interiors.hooks.dreamNet === 'function', open: () => Interiors.hooks.dreamNet() },
+];
+function openHomePC() {
+  openApp('💻 PC de casa', '', (body) => {
+    body.innerHTML = balanceBar() + HOME_PC_APPS.map(a => { const on = a.ready(); return `<button data-pcapp="${a.id}" class="app-card p-3 mb-2 w-full text-left flex items-center gap-3 ${on ? '' : 'opacity-60'}"><span class="text-3xl">${a.icon}</span><span class="flex-1 min-w-0"><span class="block font-bold text-sm">${esc(a.name)}${on ? '' : ' <span class="text-[10px] text-slate-500">· próximamente</span>'}</span><span class="block text-[11px] text-slate-500">${esc(a.desc)}</span></span></button>`; }).join('');
+    body.querySelectorAll('[data-pcapp]').forEach(b => b.onclick = () => { const a = HOME_PC_APPS.find(x => x.id === b.dataset.pcapp); if (!a) return; if (!a.ready()) { showToast(`${a.icon} ${a.name}: llegará con el modo online`, 'text-white'); return; } closeApp(); a.open(); });
+  });
+}
+/** 🛏️ La cama: dormir (Sleep) + el portal futuro «Caminar entre sueños» (Anexo A.1 · Interiors.hooks.walkBetweenDreams) */
+function openBedPanel() {
+  openApp(hasFurniture('comfy_bed') ? '🛏️ Cama Mullida' : '🛏️ Tu cama', '', (body) => {
+    const can = Sleep.canSleep(), r = Rested.active(), portal = typeof Interiors.hooks.walkBetweenDreams === 'function';
+    body.innerHTML = balanceBar() + `<div class="app-card p-3 mb-3"><div class="font-bold text-[#2b2b3d] mb-1">😴 Dormir profundo</div>
+      <div class="text-sm text-slate-600">${r ? `Descansado: quedan <b>${Rested.leftText()}</b> oníricas.` : `Duerme hasta las ${String(CFG.sleepWakeHour).padStart(2, '0')}:00 y despierta <b>Descansado</b> (${(GS.house.level | 0) >= 2 ? 'todo el día' : 'medio día'}).`}${hasFurniture('comfy_bed') ? ' La Cama Mullida mejora el buff.' : ''}</div>
+      <button data-sleep class="btn-game px-3 py-1.5 text-xs mt-2 ${can.ok ? 'bg-indigo-300' : 'bg-slate-200 opacity-60'}">🛏️ ${can.ok ? 'Dormir hasta el amanecer' : esc(can.why)}</button></div>
+      <div class="app-card p-3 ${portal ? '' : 'opacity-60'}"><div class="font-bold text-[#2b2b3d] mb-1">🌌 Caminar entre sueños</div><div class="text-[11px] text-slate-500">Tu cama será el portal a la plaza del Sueño Compartido (modo online). ${portal ? '' : 'Próximamente.'}</div>${portal ? '<button data-portal class="btn-game px-3 py-1.5 text-xs mt-2 bg-violet-300">🌌 Caminar entre sueños</button>' : ''}</div>`;
+    body.querySelector('[data-sleep]').onclick = () => { if (Sleep.canSleep().ok) closeApp(); Sleep.sleep(); };
+    const pb = body.querySelector('[data-portal]'); if (pb) pb.onclick = () => { closeApp(); Interiors.hooks.walkBetweenDreams(); };
+  });
+}
+function openTrophyPanel() {
+  openApp('🏆 Trofeos', '', (body) => {
+    const own = hasFurniture('trophy_shelf'), f = FURNITURE.find(x => x.id === 'trophy_shelf'), tr = museumTrophiesHTML(), ach = Object.keys(GS.achievements?.unlocked || {}).length;
+    body.innerHTML = `<div class="app-card p-3 mb-3"><div class="font-bold text-[#2b2b3d] mb-1">${own ? `${f.icon} ${esc(f.name)}` : '🏛️ Vitrina del museo'}</div>
+      <div class="text-sm text-slate-600">${own ? esc(f.desc) + ' (activo)' : 'Glover vende la Estantería de Trofeos: +5% a toda la confianza que ganes.'}</div>${tr || '<div class="text-[11px] text-slate-500 mt-1">Completa salas del Museo del Sueño para traer sus trofeos a casa.</div>'}
+      <div class="text-[11px] text-slate-500 mt-2">🏆 Logros desbloqueados: <b>${ach}</b>/${ACHIEVEMENTS.length}</div></div>`;
+  });
+}
+function openSafePanel() {
+  openApp('🔐 Caja Fuerte Municipal™', '', (body) => {
+    const exempt = Math.floor(GS.economy.money * CFG.muniSafeExemptPct);
+    body.innerHTML = balanceBar() + `<div class="app-card p-3"><div class="text-sm text-slate-600">El <b>${Math.round(CFG.muniSafeExemptPct * 100)}%</b> de tu capital queda exento de la tasa diaria. Ahora mismo: <b>${fmt(exempt)} $T</b> a salvo de la liquidación.</div>
+      <div class="text-[11px] text-slate-500 mt-2">🐶 Reginald: "¡Ejem! Fiscalmente impecable. Moralmente… ejem." (lo que no tributas no alimenta el pozo de la lotería)</div></div>`;
+  });
+}
+function toggleLavaLamp() {
+  const h = Interiors.houseState(); h.lavaOn = !h.lavaOn; SaveSystem.save('lava-lamp');
+  showToast(h.lavaOn ? '🪔 Lámpara de Lava encendida. Bonita. Solo bonita.' : '🪔 Lámpara apagada. Sigue siendo bonita.', 'text-white'); playBeep(h.lavaOn ? 660 : 440, 0.05, 'triangle');
+}
+/** 🏪 Panel de la tienda de prueba: muestra lo expuesto (datos del layout). En el online aquí irá la compra P2P. */
+function openInteriorShopPanel() {
+  const def = Interiors.active?.def; if (!def || !def.shopItems) return;
+  openApp(def.title, '', (body) => {
+    body.innerHTML = `<div class="app-card p-3 mb-3 text-sm text-slate-700">🦊 ${esc(def.keeperLine)}</div>` + def.shopItems.map(s => `<div class="app-card p-2 mb-1.5 flex items-center gap-2 text-sm"><span class="text-xl">${ITEMS[s.id].icon}</span><span class="flex-1">${esc(ITEMS[s.id].name)}</span><b>${fmt(s.price)} $T</b></div>`).join('') +
+      `<div class="text-[11px] text-slate-500 mt-2">🧪 Simulación: así serán los puestos, locales y boutiques de otros soñadores en el online. Todavía no se vende nada.</div>`;
+  });
+}
+const Interiors = {
+  active: null,            // { kind, opts, def } mientras estás dentro (solo ejecución, nunca en GS)
+  scene: null, root: null, floor: null, interactables: [], boxes: [], walls: [], panes: [], lamps: [], hooks: { dreamNet: null, walkBetweenDreams: null },
+  layouts: INTERIOR_LAYOUTS, actions: INTERIOR_ACTIONS,
+  px: 0, pz: 0, yaw: Math.PI, target: null, _busy: false, _saved: null, _sig: '', _sigT: 0, _armed: false,
+  get OY() { return CFG.interior.originY; },
+  houseState() { const it = (GS.interiors ||= {}); return (it.house ||= { lavaOn: true }); },
+  /** Entra en un interior. kind: 'house' | 'shop' | …  opts.instant = sin fundido (escenas, pruebas). */
+  enter(kind = 'house', opts = {}) {
+    if (this.active || this._busy) return false;
+    if (!this.layouts[kind]) { console.warn('[Interiors] layout desconocido: ' + kind); return false; }
+    if (kind === 'house' && houseSealed()) { openSealedHousePanel(); return false; }   // Sec. 6.4: con runas no se entra
+    if (state.build || state.cinematic) return false;
+    this._busy = true; state.moveTarget = null; state.pendingInteract = null; if (typeof Fishing !== 'undefined') Fishing.cancel();
+    const go = () => { this._busy = false; this._mount(kind, opts); };
+    if (opts.instant) go(); else { playBeep(520, 0.06, 'triangle'); storyFade(CFG.interior.fadeColor, CFG.interior.fadeMs, go); }
+    return true;
+  },
+  /** Sale por la puerta. opts.instant = sin fundido · opts.toDoor = false: vuelve al punto exacto desde el que entraste. */
+  exit(opts = {}) {
+    if (!this.active || (this._busy && !opts.instant)) return false;
+    const go = () => { this._busy = false; this._unmount(opts); };
+    if (opts.instant) go(); else { this._busy = true; playBeep(440, 0.06, 'triangle'); storyFade(CFG.interior.fadeColor, CFG.interior.fadeMs, go); }
+    return true;
+  },
+  _mount(kind, opts) {
+    if (this.active || state.cinematic || Needs._fainting) return;   // una escena o un desmayo durante el fundido mandan
+    const def = this.layouts[kind](opts), pd = player.userData, C = CFG.interior;
+    this._saved = { dir: pd.dir.clone(), fwd: pd.fwd.clone(), cam: { yaw: cam.yaw, tYaw: cam.tYaw, pitch: cam.pitch, tPitch: cam.tPitch, dist: cam.dist, tDist: cam.tDist, min: cam.min, max: cam.max, refF: cam.refF.clone() } };
+    this.active = { kind, opts, def };
+    this._build(def);
+    [this.px, this.pz] = def.spawn; this.yaw = Math.PI; this.target = null; this._armed = false; this._sig = this._signature();
+    this.scene.add(player); this.scene.add(marker); marker.material.opacity = 0;
+    Object.assign(cam, { yaw: 0, tYaw: 0, pitch: C.camPitch, tPitch: C.camPitch, dist: C.camDist, tDist: C.camDist, min: C.camMin, max: C.camMax });
+    state.camTween = null; state.moveTarget = null; state.pendingInteract = null; ui.hint.classList.add('hidden');
+    this._placePlayer(0); const p = this.camPose(); applyLook(p.pos, p.target, p.up); this._frame(0, 0);
+    this._hud(true); if (def.welcome && !opts.silent) showToast(def.welcome, 'text-white');
+  },
+  _unmount(opts = {}) {
+    const a = this.active; if (!a) return;
+    const wasFit = Fitting.isOpen; if (wasFit) Fitting.close(false);
+    scene.add(player); scene.add(marker); marker.material.opacity = 0;
+    this._dispose(); this.active = null; this.target = null;
+    const s = this._saved, pd = player.userData; this._saved = null;
+    Object.assign(cam, s.cam); cam.refF = s.cam.refF;
+    if (a.kind === 'house' && opts.toDoor !== false && house) {   // delante de la puerta, mirando hacia fuera
+      house.updateMatrixWorld(true); const front = house.localToWorld(new THREE.Vector3(0, 0, houseCollider.r + 0.9)), dir = front.clone().normalize();
+      const away = tangent(front.clone().sub(house.position), dir); pd.dir.copy(dir); pd.fwd.copy(away.lengthSq() > 1e-6 ? away : s.fwd);
+    } else { pd.dir.copy(s.dir); pd.fwd.copy(s.fwd); }
+    state.camTween = null; state.moveTarget = null; state.pendingInteract = null; if (wasFit || state.mode === 'dialog') state.mode = 'player';
+    player.position.copy(pd.dir).multiplyScalar(surfaceR(pd.dir)); quatFromFrame(frameAt(pd.dir, pd.fwd), player.quaternion);
+    this._hud(false); const p = camPose(); applyLook(p.pos, p.target, p.up);
+    if (SaveSystem.started) SaveSystem.save('interior-exit');
+  },
+  /** Construye la habitación del layout en una escena nueva (la anterior, si la hay, se libera después) */
+  _build(def) {
+    const C = CFG.interior, OY = this.OY, [w, d] = def.size, hw = w / 2, hd = d / 2, H = def.wallH, T = 0.2, pal = def.palette;
+    const S = new THREE.Scene(); S.background = new THREE.Color(pal.void ?? 0x150f26);
+    const root = new THREE.Group(); root.position.set(0, OY, 0); S.add(root);
+    // luz: cielo de fuera por las ventanas (día/noche) + lámparas cálidas que se notan más de noche
+    const hemi = new THREE.HemisphereLight(0xfff4e0, 0x8d6e63, 0.5), amb = new THREE.AmbientLight(0xffffff, 0.22); S.add(hemi, amb);
+    const win = new THREE.DirectionalLight(0xfff1d6, 1); win.position.set(hw * 0.4, OY + H + 5, -hd - 4); win.target.position.set(0, OY, 0); S.add(win, win.target);
+    win.castShadow = !IS_MOBILE; if (win.castShadow) { const m = Math.max(hw, hd) + 1; Object.assign(win.shadow.camera, { left: -m, right: m, top: m, bottom: -m, near: 0.5, far: 40 }); win.shadow.mapSize.set(1024, 1024); win.shadow.bias = -0.0005; win.shadow.normalBias = 0.03; win.shadow.camera.updateProjectionMatrix(); }
+    { const pts = []; for (let i = 0; i < 160; i++) { const v = randomDir(); pts.push(v.x * 60, OY + v.y * 60, v.z * 60); } const gg = new THREE.BufferGeometry(); gg.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3)); S.add(new THREE.Points(gg, new THREE.PointsMaterial({ color: 0xd1c4e9, size: 1.5, transparent: true, opacity: 0.7, sizeAttenuation: false }))); }   // el vacío onírico
+    const ft = plankTexture(pal.floor[0], pal.floor[1]); ft.repeat.set(w / 4, d / 4);
+    const floor = box(w, 0.2, d, new THREE.MeshStandardMaterial({ map: ft, roughness: 0.8 }), 0, -0.1, 0); floor.castShadow = false; root.add(floor);
+    const wallMat = mat(pal.wall), trimMat = mat(pal.trim), walls = [], panes = [];
+    const mkWall = (len, x, z, rot, nx, nz, off, wins) => {   // pared construida a lo largo de X, cara interior en +Z local
+      const wg = new THREE.Group(); wg.position.set(x, 0, z); wg.rotation.y = rot;
+      wg.add(box(len + T * 2, H, T, wallMat, 0, H / 2, 0)); wg.add(box(len, 0.2, 0.05, trimMat, 0, 0.1, T / 2 + 0.02)); wg.add(box(len + T * 2, 0.14, T + 0.06, trimMat, 0, H, 0));
+      (wins || []).forEach(lx => { wg.add(box(1.5, 1.25, 0.06, mat(0xffffff), lx, 1.75, T / 2 + 0.02)); const pane = box(1.3, 1.05, 0.03, new THREE.MeshStandardMaterial({ color: 0x000000, emissive: 0xa9dcff, emissiveIntensity: 1, roughness: 0.2 }), lx, 1.75, T / 2 + 0.06); pane.castShadow = false; wg.add(pane); panes.push(pane); wg.add(box(0.05, 1.05, 0.04, mat(0xffffff), lx, 1.75, T / 2 + 0.08)); wg.add(box(1.3, 0.05, 0.04, mat(0xffffff), lx, 1.75, T / 2 + 0.08)); wg.add(box(1.6, 0.07, 0.18, mat(0xffffff), lx, 1.12, T / 2 + 0.08)); });
+      root.add(wg); walls.push({ g: wg, nx, nz, off });
+    };
+    mkWall(w, 0, -hd - T / 2, 0, 0, -1, hd, def.windows?.back);
+    mkWall(w, 0, hd + T / 2, Math.PI, 0, 1, hd, def.windows?.front);
+    mkWall(d, -hw - T / 2, 0, Math.PI / 2, -1, 0, hw, (def.windows?.left || []).map(z => -z));
+    mkWall(d, hw + T / 2, 0, -Math.PI / 2, 1, 0, hw, def.windows?.right);
+    const inter = [], boxes = [], lamps = [];
+    for (const p of def.pieces) {
+      const g = makeFurniture(p.type, p.o || {}), rot = p.rot || 0; g.position.set(p.x, p.y || 0, p.z); g.rotation.y = rot; root.add(g);
+      const [fw, fd] = g.userData.foot, q = Math.abs(Math.sin(rot)) > 0.5, hx = (q ? fd : fw) / 2, hz = (q ? fw : fd) / 2;
+      const solid = p.solid !== false && fw > 0 && fd > 0; if (solid) boxes.push({ x: p.x, z: p.z, hx, hz });
+      (g.userData.lights || []).forEach(l => lamps.push(l));
+      if (p.act) {
+        g.userData.interact = { type: 'interior', act: p.act, label: p.label || p.act, range: p.range };
+        Object.assign(g.userData, { lx: p.x, lz: p.z, hx: solid ? hx : 0, hz: solid ? hz : 0, fx: Math.sin(rot), fz: Math.cos(rot), fd2: fd / 2 });
+        g.traverse(m => { if (m.isMesh || m.isSprite) m.userData.root = g; }); inter.push(g);
+      }
+      if (p.type === 'mailbox') this._mailBadge = g.userData.badge;
+      if (p.type === 'lava_lamp') this._lava = g.userData.lava;
+      if (p.type === 'fireplace') this._fire = g.userData.fire;
+    }
+    this.scene = S; this.root = root; this.floor = floor; this.interactables = inter; this.boxes = boxes; this.walls = walls; this.panes = panes; this.lamps = lamps;
+    this._lights = { hemi, amb, win }; this.bounds = { hx: hw - C.playerR - 0.05, hz: hd - C.playerR - 0.05, hw, hd };
+  },
+  _dispose(S = this.scene) {
+    if (!S) return;
+    S.remove(player); S.remove(marker);
+    S.traverse(o => { if (o.geometry) o.geometry.dispose(); const ms = Array.isArray(o.material) ? o.material : o.material ? [o.material] : []; ms.forEach(m => { if (m.map) m.map.dispose(); m.dispose(); }); if (o.isLight && o.shadow && o.shadow.map) o.shadow.map.dispose(); });
+    if (S === this.scene) { this.scene = null; this.root = null; this.floor = null; this.interactables = []; this.boxes = []; this.walls = []; this.panes = []; this.lamps = []; this._mailBadge = this._lava = this._fire = null; }
+  },
+  /** Reconstruye la habitación sin salir (sube de nivel, compras un mueble, cambia el escaparate…) */
+  rebuild() {
+    const a = this.active; if (!a) return;
+    const old = this.scene; a.def = this.layouts[a.kind](a.opts); this._build(a.def);
+    this.scene.add(player); this.scene.add(marker); this._dispose(old);
+    this._moveBy(0, 0); this._sig = this._signature();
+  },
+  _signature() {
+    if (this.active?.kind !== 'house') return '';
+    return [GS.house.level | 0, (GS.furniture?.owned || []).join(','), (Museum.st().trophies || []).join(','), Showcase.list.map(s => s.id + ':' + s.qty).join(',')].join('|');
+  },
+  _hud(on) {
+    const ex = document.getElementById('btnInteriorExit'), pn = document.getElementById('btnInteriorPanel'), pl = document.getElementById('btnPlanet');
+    if (ex) ex.classList.toggle('hidden', !on); if (pn) pn.classList.toggle('hidden', !(on && this.active?.kind === 'house')); if (pl) pl.classList.toggle('hidden', !!on);
+  },
+  /* ---------- movimiento plano con colisiones AABB ---------- */
+  _moveBy(dx, dz) {
+    const r = CFG.interior.playerR, b = this.bounds; let x = clamp(this.px + dx, -b.hx, b.hx), z = clamp(this.pz + dz, -b.hz, b.hz);
+    for (let k = 0; k < 2; k++) for (const o of this.boxes) {
+      const ox = o.hx + r - Math.abs(x - o.x), oz = o.hz + r - Math.abs(z - o.z);
+      if (ox > 0 && oz > 0) { if (ox < oz) x += Math.sign(x - o.x || 1) * ox; else z += Math.sign(z - o.z || 1) * oz; }
+    }
+    this.px = clamp(x, -b.hx, b.hx); this.pz = clamp(z, -b.hz, b.hz);
+  },
+  distTo(obj) { const u = obj.userData, dx = Math.max(Math.abs(this.px - u.lx) - (u.hx || 0), 0), dz = Math.max(Math.abs(this.pz - u.lz) - (u.hz || 0), 0); return Math.hypot(dx, dz); },
+  nearby() {
+    let best = null;
+    for (const obj of this.interactables) { if (obj.visible === false) continue; const d = this.distTo(obj), rg = obj.userData.interact.range ?? CFG.interior.reach; if (d <= rg && (!best || d < best.d)) best = { obj, d }; }
+    return best;
+  },
+  find(act) { return this.interactables.find(o => o.userData.interact.act === act) || null; },
+  act(obj) { const it = obj.userData.interact, f = this.active?.def.actions?.[it.act] || this.actions[it.act]; if (f) f(obj, this.active); else console.warn('[Interiors] acción sin definir: ' + it.act); },
+  /** Coloca al jugador delante de una pieza, mirándola (DBG y pruebas) */
+  placeNear(obj) { const u = obj.userData; this.px = u.lx + u.fx * (u.fd2 + 0.6); this.pz = u.lz + u.fz * (u.fd2 + 0.6); this._moveBy(0, 0); this.yaw = Math.atan2(u.lx - this.px, u.lz - this.pz); this.target = null; this._armed = true; this._placePlayer(0); },
+  faceRoom() { this.yaw = Math.atan2(-this.px, -this.pz); this._placePlayer(0); },
+  fwdVec() { return new THREE.Vector3(Math.sin(this.yaw), 0, Math.cos(this.yaw)); },
+  click(rc) {
+    const hits = rc.intersectObjects(this.interactables.filter(o => o.visible !== false), true);
+    if (hits.length && hits[0].object.userData.root) { const o = hits[0].object.userData.root; if (this.distTo(o) <= (o.userData.interact.range ?? CFG.interior.reach)) interactWith(o); else this.target = { x: o.userData.lx, z: o.userData.lz, obj: o }; return; }
+    const fl = this.floor ? rc.intersectObject(this.floor, false) : [];
+    if (fl.length) { const x = fl[0].point.x, z = fl[0].point.z; this.target = { x, z, obj: null }; marker.position.set(x, this.OY + 0.03, z); marker.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), UP_Y); marker.material.opacity = 1; marker.scale.setScalar(1); }
+  },
+  _placePlayer(bob) { player.position.set(this.px, this.OY + bob, this.pz); player.quaternion.setFromAxisAngle(UP_Y, this.yaw); },
+  /** Sustituye a updatePlayer mientras estás dentro (mismos controles: WASD/flechas, joystick, clic/tap para caminar, E/botón) */
+  tick(dt) {
+    const pd = player.userData, parts = pd.parts, C = CFG.interior; let moving = false;
+    cam.tPitch = clamp(cam.tPitch, C.camPitchMin, C.camPitchMax); cam.tDist = clamp(cam.tDist, C.camMin, C.camMax);
+    if (!this._busy && canControl()) {
+      const k = state.keys; let f = (k.KeyW || k.ArrowUp ? 1 : 0) - (k.KeyS || k.ArrowDown ? 1 : 0), r = (k.KeyD || k.ArrowRight ? 1 : 0) - (k.KeyA || k.ArrowLeft ? 1 : 0);
+      if (!f && !r && (Math.abs(state.joy.x) > 0.12 || Math.abs(state.joy.y) > 0.12)) { f = state.joy.y; r = state.joy.x; }
+      const sy = Math.sin(cam.yaw), cy = Math.cos(cam.yaw); let mx = 0, mz = 0, mag = 1;
+      if (f || r) { mx = -sy * f + cy * r; mz = -cy * f - sy * r; this.target = null; }
+      else if (this.target) {
+        const t = this.target, dx = t.x - this.px, dz = t.z - this.pz;
+        if (t.obj && this.distTo(t.obj) <= (t.obj.userData.interact.range ?? C.reach)) { this.target = null; interactWith(t.obj); }
+        else if (Math.hypot(dx, dz) < 0.12) this.target = null; else { mx = dx; mz = dz; }
+      }
+      const L = Math.hypot(mx, mz);
+      if (L > 1e-6) {
+        mag = (f || r) ? Math.min(1, L) : 1; mx /= L; mz /= L; moving = true;
+        const buff = Date.now() < state.buff.until ? state.buff.mult : 1, speed = CFG.playerSpeed * C.speedMult * mag * buff * Needs.speedMult() * Rested.speedMult();
+        const ox = this.px, oz = this.pz; this._moveBy(mx * speed * dt, mz * speed * dt);
+        if (this.target && dt > 0 && Math.hypot(this.px - ox, this.pz - oz) < speed * dt * 0.05) this.target = null;   // atascado contra un mueble
+        let da = Math.atan2(mx, mz) - this.yaw; da = Math.atan2(Math.sin(da), Math.cos(da)); this.yaw += da * Math.min(1, dt * 12);
+      }
+    }
+    state.moving = moving; state.swimming = false;
+    let bob;
+    if (moving) { state.walkCycle += dt * 11; const s = Math.sin(state.walkCycle); parts.legL.rotation.x = s * 0.7; parts.legR.rotation.x = -s * 0.7; parts.armL.rotation.x = -s * 0.6; parts.armR.rotation.x = s * 0.6; bob = Math.abs(s) * 0.06; }
+    else { ['legL', 'legR', 'armL', 'armR'].forEach(p => parts[p].rotation.x *= 0.85); bob = Math.sin(performance.now() * 0.003) * 0.02; }
+    this._placePlayer(bob);
+    if (marker.material.opacity > 0) { marker.material.opacity -= dt * 0.8; marker.scale.addScalar(dt * 0.8); }
+    const near = canControl() && !this._busy ? this.nearby() : null; ui.hint.classList.toggle('hidden', !near); if (near) ui.hintText.textContent = near.obj.userData.interact.label;
+    if (IS_MOBILE) { document.getElementById('joystick').style.display = canControl() ? 'block' : 'none'; actionBtn.style.display = near ? 'flex' : 'none'; if (near) actionLabel.textContent = near.obj.userData.interact.label; }
+    aura.rotation.y += dt * 2.2; aura.children.forEach(c => { if (c.isMesh && c.userData.i !== undefined) c.position.y = Math.sin(performance.now() * 0.004 + c.userData.i) * 0.15; });
+    if (!this.active) return;   // una interacción pudo sacarte
+    // salir andando: pisar el felpudo de la puerta (tras haberte alejado de ella al entrar)
+    const def = this.active.def, [, d] = def.size, atDoor = this.pz > d / 2 - 0.62 && Math.abs(this.px) < 0.75;
+    if (!atDoor && Math.hypot(this.px - def.spawn[0], this.pz - def.spawn[1]) > 0.9) this._armed = true;
+    if (def.exitZone && atDoor && this._armed && moving && !this._busy) { this._armed = false; this.exit(); return; }
+    if (this.active.kind === 'house' && houseSealed() && !this._busy) { showToast('🔮 Las runas de Sombra te acompañan a la puerta: la casa está sellada', 'text-purple-200'); this.exit(); return; }
+    this._frame(dt, clock.elapsedTime);
+  },
+  /** Luz del día/noche por las ventanas, lámparas, animaciones y paredes recortadas hacia la cámara */
+  _frame(dt, t) {
+    const C = CFG.interior, day = state.dayAmt ?? 1, L = this._lights; if (!L) return;
+    const skyU = sky.material.uniforms; this.panes.forEach(p => { p.material.emissive.copy(skyU.midColor.value).lerp(skyU.topColor.value, 0.35); });
+    L.win.intensity = lerp(C.windowLightNight, C.windowLightDay, day); L.win.color.copy(sun.color); L.hemi.intensity = lerp(0.3, 0.55, day); L.amb.intensity = lerp(0.16, 0.24, day);
+    const lampK = lerp(C.lampNight, C.lampDay, day); this.lamps.forEach(l => { if (!(this._lava && l.light === this._lava.light)) l.light.intensity = l.base * lampK; });
+    if (this._lava) { const on = !!this.houseState().lavaOn, lv = this._lava; lv.light.intensity = on ? lv.base : 0; lv.glass.material.emissiveIntensity = on ? 0.35 + Math.sin(t * 1.3) * 0.1 : 0.02; lv.blobs.forEach((b, i) => { b.visible = on; b.position.y = 1.07 + Math.sin(t * (0.6 + i * 0.23) + i * 2) * 0.18; }); }
+    if (this._fire) this._fire.scale.set(1, 1 + Math.sin(t * 9) * 0.12, 1);
+    if (this._mailBadge) { this._mailBadge.visible = (GS.housing.mailboxUnread || 0) > 0; this._mailBadge.position.y = 1.65 + Math.sin(t * 3) * 0.06; }
+    const cx = camera.position.x, cz = camera.position.z; this.walls.forEach(w => { w.g.visible = !(cx * w.nx + cz * w.nz > w.off - 0.05); });   // recorte tipo maqueta
+    if ((this._sigT += dt) > 0.5) { this._sigT = 0; if (this._signature() !== this._sig) this.rebuild(); }
+  },
+  camPose() {
+    const C = CFG.interior, d = clamp(cam.dist, C.camMin, C.camMax), p = clamp(cam.pitch, C.camPitchMin, C.camPitchMax), sy = Math.sin(cam.yaw), cy = Math.cos(cam.yaw);
+    const target = new THREE.Vector3(this.px, this.OY + 1.25, this.pz);
+    return { pos: new THREE.Vector3(this.px + sy * Math.cos(p) * d, this.OY + 1.25 + Math.sin(p) * d, this.pz + cy * Math.cos(p) * d), target, up: UP_Y.clone() };
+  },
+};
 function applyGameStateToWorld() {
+  if (Interiors.active) Interiors.exit({ instant: true, toDoor: false });   // v1.1: restaurar siempre empieza fuera
   storyMigrateLegacy();
   applyAvatar(GS.avatar);   // v0.7: el look guardado (las partidas antiguas traen el clásico vía deepMerge)
   refreshGoalHUD();
@@ -6672,6 +7171,10 @@ const DBG = (() => {
       'DBG.fair()                -> abre la Feria del Sábado (con DBG.weekday(6)) · DBG.fairOffers() lista las ofertas de esta semana',
       'DBG.welcomeBack()         -> simula volver tras ≥7 días: saludo especial del Oso (Sec. 10.1)',
       "DBG.balance(capital, oficio, días) -> proyección 10K→40M por estrategia (dedicado/mixto/solo Oráculo) sin tocar tu partida",
+      '--- v1.1 · Interior de la casa ---',
+      'DBG.enterHouse(nivel?)    -> entra en tu casa (nivel 0-3 opcional, vía DBG.house) · DBG.exitHouse() -> sale por la puerta',
+      "DBG.enterShop()           -> entra en la tienda de prueba (layout 'shop', base de las tiendas online del Anexo D)",
+      "DBG.interior()            -> muebles interactuables · DBG.interiorGo('sleep'|'kitchen'|'wardrobe'|'mail'|'pc'|'showcase'|'trophies'|'safe'|'piggy'|'lava'|'exit')",
       'DBG.refs                  -> referencias internas (window._dbg solo existe con ?debug=1)',
       'IDs NPC: ' + NPC_IDS.join(', ')
     ].join('\n'));
@@ -6849,6 +7352,13 @@ DBG.balance = (capital = 10000, other = 4000, days = 60) => {
 Object.assign(DBG_REFS, { V10, Events, Fair, Museum, MUSEUM_SETS, Achievements, ACHIEVEMENTS, eventsCalendarHTML, achievementsHTML, Coffee, Weekly });
 DBG.refs = DBG_REFS;
 if (/[?&]debug=1\b/.test(location.search)) window._dbg = DBG_REFS;   // v1.0: ya no es global por defecto
+/* v1.1 · Interior caminable de la casa (Sec. 6.9 Fase 2) */
+DBG.enterHouse = (lv) => { if (lv !== undefined) DBG.house(lv); const ok = Interiors.enter('house'); console.log(ok ? '[DBG] Entrando en casa (nivel ' + (GS.house.level | 0) + ')' : '[DBG] No se puede entrar ' + (houseSealed() ? '(casa sellada)' : Interiors.active ? '(ya estás dentro)' : '')); return ok; };
+DBG.exitHouse = () => { const ok = Interiors.exit(); console.log(ok ? '[DBG] Saliendo…' : '[DBG] No estás dentro'); return ok; };
+DBG.enterShop = (items) => { const ok = Interiors.enter('shop', items ? { items } : {}); console.log(ok ? '[DBG] Tienda de prueba (layout shop)' : '[DBG] Sal primero del interior actual'); return ok; };
+DBG.interior = () => { if (!Interiors.active) { console.log('[DBG] Estás fuera'); return []; } const rows = Interiors.interactables.map(o => ({ act: o.userData.interact.act, etiqueta: o.userData.interact.label, x: +o.userData.lx.toFixed(2), z: +o.userData.lz.toFixed(2), dist: +Interiors.distTo(o).toFixed(2) })); console.table(rows); console.log('[DBG] ' + Interiors.active.kind + ' · ' + Interiors.active.def.title + ' · tú en (' + Interiors.px.toFixed(2) + ', ' + Interiors.pz.toFixed(2) + ')'); return rows; };
+DBG.interiorGo = (act) => { const o = Interiors.active && Interiors.find(act); if (!o) { console.warn('[DBG] pieza no encontrada: ' + act); return false; } Interiors.placeNear(o); console.log('[DBG] Delante de ' + o.userData.interact.label + ' (pulsa E)'); return true; };
+Object.assign(DBG_REFS, { Interiors, INTERIOR_LAYOUTS, INTERIOR_ACTIONS, makeFurniture, HOME_PC_APPS, openHomePC, openBedPanel });
 Object.assign(DBG_REFS, { Awakening, toyPlane, monitorSun, FAREWELLS, DEJA_VU, buyDreamTicket, startAwakening, awakeningHasTicket, awakeningBtns, awakeningGreeting, awakeningChainHTML, act3MissionHUD, dejaVuGreeting, AuraFX, Titles, buildHouse, storyState, setPlaneLit });
 </script>
 </body>
