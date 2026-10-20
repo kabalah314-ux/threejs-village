@@ -2670,7 +2670,8 @@ const AURA_STYLES = {
   ice:     { c: 0x80deea, e: 0x00e5ff, name: 'Hielo' },
   void:    { c: 0x7c4dff, e: 0x651fff, name: 'Vacío' },
   gold:    { c: 0xffd54f, e: 0xffab00, name: 'Dorada' },
-  dreamer: { c: 0xff9ec4, e: 0xb388ff, name: 'Soñador Eterno', rainbow: true },   // v0.9 · solo Final B (intransferible) · arcoíris · +10% confianza y comercio
+  dreamer: { c: 0xff9ec4, e: 0xb388ff, name: 'Soñador Eterno', rainbow: true },
+  veil:    { c: 0xce93d8, e: 0x8e24aa, name: 'Velo' },   // v2.9.2 · temporal: solo durante La Noche del Velo, tras la vela de Sombra   // v0.9 · solo Final B (intransferible) · arcoíris · +10% confianza y comercio
 };
 /** Render del aura: tier (0–4) + estilo. No toca GS: la fuente de verdad es Trust + auraV3. */
 function setAura(tier, styleId) {
@@ -2692,7 +2693,7 @@ function setAura(tier, styleId) {
 /** Recalcula tier desde Trust y estilo desde GS, y repinta. La llama Trust.add() y la carga de partida. */
 function refreshAuraFromTrust() {
   const tier = Math.max((typeof Trust !== 'undefined') ? Trust.auraTier() : 0, GS.achievements?.legendAura ? 4 : 0);   // v1.0 · «Corazón del sueño»: aura legendaria asegurada (solo visual; los perks siguen a la reputación real)
-  setAura(tier, GS.cosmetics.auraV3?.style || 'none');
+  const eq = GS.cosmetics.auraV3?.style || 'none'; setAura(tier, state.veilAura && eq !== 'dreamer' ? 'veil' : eq);   // v2.9.2: aura del Velo (temporal)
   state.auraTier = tier;   // cache de ejecución (debug / futuro HUD)
 }
 const auraStyleUnlocked = (id) => GS.purchases.owned.includes('aura:' + id) || (GS.cosmetics.auraV3?.unlockedStyles || []).includes(id);
@@ -3149,7 +3150,7 @@ const PlanetAO = (() => {
   const on = !!GFX.L.ao, api = { on, baked: false, bake() {} };
   if (!on) return api;
   const geo = planet.geometry, col = geo.attributes.color, pos = geo.attributes.position, nF = pos.count / 3;
-  const base = col.array.slice(), cen = new Float32Array(nF * 3);
+  const base = col.array.slice(), cen = new Float32Array(nF * 3); api.base = base; api.orig = base.slice();   // v2.9.2: la nieve del Solsticio tiñe la base antes del AO
   for (let f = 0; f < nF; f++) for (let k = 0; k < 3; k++) { const i = f * 3 + k; cen[f * 3] += pos.getX(i) / 3; cen[f * 3 + 1] += pos.getY(i) / 3; cen[f * 3 + 2] += pos.getZ(i) / 3; }
   /** dir = null → todo el planeta · dir (unitario) → solo las caras a menos de rebakeAng rad */
   api.bake = (dir = null) => {
@@ -3267,6 +3268,7 @@ drawBoard(); setInterval(tickMarket, 1000);
 const animatedBuilds = [];   // grupos con partes animadas (gotas, aspas, moneda)
 function makeBuildable(type) {
   const g = new THREE.Group();
+  { const sb = seasonBuild(type); if (sb) { g.add(sb); return g; } }   // v2.9.2: decoraciones de temporada
   if (type === 'palm') { g.add(makePalm()); return g; }   // v2.8
   if (type === 'fountain') {
     g.add(cyl(1.6, 1.7, 0.4, mat(0xd7ccc8), 0, 0.2, 0, 16)); g.add(cyl(1.35, 1.35, 0.1, glow(0x4dd0e1, 0x26c6da, 0.4, { transparent: true, opacity: 0.85 }), 0, 0.42, 0, 16));
@@ -3430,10 +3432,10 @@ const Production = {
   harvestGarden(recId) {
     const g = GS.garden, day = GS.daily.dayCount; g.byId ||= {};
     if (g.byId[recId] === day) { showToast('🌷 Este jardín ya dio su cosecha hoy. Vuelve mañana', 'text-white'); return; }
-    const wheat0 = Weather.gardenWheat(CFG.gardenWheatPerDay), wheat = Math.round(wheat0 * NetUp.wheatMult()), bonus = wheat0 - CFG.gardenWheatPerDay, list = [['dream_wheat', wheat], ['flower_bouquet', CFG.gardenBouquetPerDay]];
+    const wheat0 = Weather.gardenWheat(CFG.gardenWheatPerDay), wheat = Math.round(wheat0 * NetUp.wheatMult()), bonus = wheat0 - CFG.gardenWheatPerDay, bq = CFG.gardenBouquetPerDay * seasonFlowerMult(), list = [['dream_wheat', wheat], ['flower_bouquet', bq]];   // v2.9.2: ×2 en primavera
     if (!Inventory.canAddMany(list)) { showToast('🎒 Inventario lleno: libera espacio para cosechar', 'text-red-200'); return; }
     list.forEach(([id, q]) => Inventory.add(id, q, { silent: true })); g.byId[recId] = day; g.lastHarvestDay = day; Net.grant('garden');   // v1.3: tu origen crece en el jardín
-    showToast(`🌷 Cosecha: 🌾 ${wheat} Trigo Onírico${bonus ? ' (¡la lluvia ayuda!)' : ''} · 💐 ${CFG.gardenBouquetPerDay} Ramo`, 'text-white'); playChime(); SaveSystem.saveNow('garden');
+    showToast(`🌷 Cosecha: 🌾 ${wheat} Trigo Onírico${bonus ? ' (¡la lluvia ayuda!)' : ''} · 💐 ${bq} Ramo${bq > 1 ? 's' : ''}${seasonFlowerMult() > 1 ? ' (¡primavera!)' : ''}`, 'text-white'); playChime(); SaveSystem.saveNow('garden');
   },
   useMill(recId) {
     const m = (GS.mill ||= {}), job = m[recId], now = Date.now();
@@ -3694,11 +3696,11 @@ const trustLvName = (id) => TRUST_LEVELS[Trust.level(id)]?.name || '?';
 const greetingFor = (id) => { const g = NPC_SOCIAL[id]?.greetings; return g ? (g[Math.min(Trust.level(id), 4)] || g[0]) : ''; };
 const missionGateOk = (id) => Trust.level(id) >= (NPC_SOCIAL[id]?.trustRequired ?? 0);
 const giftState = (id) => { const e = Trust.entry(id), today = GS.daily.dayCount; const used = e.giftDay === today ? e.giftsToday : 0; return { used, left: Math.max(0, CFG.giftCapPerDay - used) }; };
-const giftBase = (id, itemId) => (NPC_SOCIAL[id]?.giftHates || []).includes(itemId) ? 0 : (NPC_SOCIAL[id]?.giftPrefs?.[itemId] ?? 1);
+const giftBase = (id, itemId) => (NPC_SOCIAL[id]?.giftHates || []).includes(itemId) ? 0 : Math.round((NPC_SOCIAL[id]?.giftPrefs?.[itemId] ?? 1) * seasonGiftMult(itemId));   // v2.9.2: ramos premium en primavera
 const encBtns = (npcId) => (typeof encargoBtns === 'function') ? encargoBtns(npcId) : [];   // el motor de encargos llega en el Bloque 4
 /** 🎰 Servicios especiales por NPC: ruleta, dados, lotería, empleo… (cada bloque añade los suyos) */
 function serviceBtns(npcId) {
-  const btns = [...(typeof Util !== 'undefined' ? Util.btns(npcId) : []), ...(typeof Voyage !== 'undefined' ? Voyage.btns(npcId) : [])];   // v2.8: ⛵ la travesía con Sam
+  const btns = [...seasonBtns(npcId), ...(typeof Util !== 'undefined' ? Util.btns(npcId) : []), ...(typeof Voyage !== 'undefined' ? Voyage.btns(npcId) : [])];   // v2.8: ⛵ la travesía con Sam · v2.9.2: 🎁 regalo de temporada
   if (npcId === 'sombra' && typeof openRoulette === 'function') btns.push(dialogButton('🎰 Ruleta de Runas', 'bg-purple-300 text-[#2b2b3d]', () => openRoulette()));
   if (npcId === 'sam' && typeof openDiceGame === 'function') btns.push(dialogButton('🎲 Dados con Sam', 'bg-sky-300 text-[#2b2b3d]', () => openDiceGame()));
   if (npcId === 'mayor' && typeof openLottery === 'function') btns.push(dialogButton('🎫 Lotería Municipal', 'bg-yellow-200 text-[#2b2b3d]', () => openLottery()));
@@ -4509,6 +4511,16 @@ const ItemArt = (() => {
     globe() { const g = G(); put(g, SG(0.42, 22, 16), M(0x42a5f5, { smooth: true, r: 0.35 }), [0, 0.6, 0]); [[0.3, 0.75, 0.2, 1.4], [-0.25, 0.5, 0.28, 1.1], [0.05, 0.38, 0.38, 0.9], [-0.1, 0.92, 0.12, 0.8]].forEach(([x, y, z, s]) => {
         const p = put(g, SG(0.16 * s, 10, 8), M(0x66bb6a), [x, y, z], [0, 0, 0], [1, 0.8, 0.45]); p.lookAt(x * 3, 0.6 + (y - 0.6) * 3, z * 3); });
       put(g, TG(0.5, 0.025, 6, 30, PI * 1.2), GOLD(), [0, 0.6, 0], [0, 0.4, PI * 0.9]); put(g, CG(0.04, 0.05, 0.16, 8), GOLD(), [0, 0.1, 0]); put(g, CG(0.22, 0.26, 0.06, 18), M(0x5d4037), [0, 0.03, 0]); return g; },
+    blossom(c = 0xf48fb1, mid = 0xffd54f) { const g = G(), s = sub(g, [0.5, 0.2, 0], [0, 0.62, 0]); for (let i = 0; i < 5; i++) { const a = i / 5 * PI * 2; put(s, SG(0.2, 12, 10), M(c, { smooth: true }), [Math.cos(a) * 0.22, Math.sin(a) * 0.22, 0], [0, 0, a], [1.25, 0.85, 0.35]); }
+      put(s, SG(0.12, 12, 10), M(mid, { smooth: true }), [0, 0, 0.06], [0, 0, 0], [1, 1, 0.6]); put(g, CG(0.03, 0.035, 0.6, 6), M(0x689f38), [0.05, 0.28, -0.05], [0.4, 0, -0.1]); put(g, SG(0.14, 10, 8), M(0x7cb342), [0.18, 0.2, 0], [0, 0, -0.6], [1.5, 0.35, 0.8]); return g; },
+    candle(c = 0x8e24aa) { const g = G(); put(g, CG(0.32, 0.36, 0.08, 18), M(0xffd54f, { m: 0.4 }), [0, 0.04, 0]); put(g, CG(0.2, 0.2, 0.62, 16), M(c, { smooth: true }), [0, 0.39, 0]); put(g, SG(0.07, 8, 6), M(c, { smooth: true }), [0.17, 0.55, 0.08], [0, 0, 0], [0.7, 1.6, 0.7]);
+      put(g, CG(0.012, 0.012, 0.08, 4), INK(), [0, 0.74, 0]); put(g, SG(0.07, 10, 8), GLOW(0xffb300, 1.4), [0, 0.84, 0], [0, 0, 0], [0.8, 1.4, 0.8]); put(g, KG(0.05, 0.14, 8), GLOW(0xfff59d, 1.6), [0, 0.92, 0]); return g; },
+    snowflake(c = 0x81d4fa) { const g = G(), s = sub(g, [0, -0.35, 0], [0, 0.55, 0]), m = M(c, { r: 0.2, m: 0.25, e: c, ei: 0.25 }); for (let i = 0; i < 6; i++) { const a = i / 6 * PI * 2, arm = sub(s, [0, 0, a]);
+        put(arm, BG(0.06, 0.5, 0.05), m, [0, 0.25, 0]); [0.22, 0.36].forEach(y => [-1, 1].forEach(k => put(arm, BG(0.035, 0.16, 0.04), m, [k * 0.05, y, 0], [0, 0, k * 0.8]))); }
+      put(s, OG(0.09), m, [0, 0, 0]); return g; },
+    popper(c = 0xffca28) { const g = G(), s = sub(g, [0, 0, -0.6], [-0.15, 0.3, 0]); put(s, KG(0.2, 0.62, 14), M(c), [0, 0, 0], [PI, 0, 0]); [-0.12, 0.05, 0.2].forEach((y, i) => put(s, TG(0.13 + y * 0.18, 0.025, 4, 16), M([0xe53935, 0x42a5f5, 0x66bb6a][i]), [0, y, 0], [PI / 2, 0, 0]));
+      const C = [0xe53935, 0x42a5f5, 0x66bb6a, 0xab47bc, 0xff7043, 0x26c6da]; for (let i = 0; i < 12; i++) { const a = -0.2 + i * 0.13, r = 0.45 + (i % 3) * 0.12; put(g, BG(0.06, 0.06, 0.015), M(C[i % 6]), [0.15 + Math.cos(a) * r, 0.58 + Math.sin(a) * r * 0.9, (i % 2) * 0.05], [i, i * 2, i]); }
+      put(g, TG(0.18, 0.012, 3, 14, PI * 1.2), M(0xec407a), [0.35, 0.75, 0], [0, 0, 0.4]); return g; },
     parcel(c = 0xc69c6d, tw = 0xf5e6c8) { const g = G(); put(g, BG(0.82, 0.56, 0.7), M(c), [0, 0.28, 0], [0, 0.25, 0]); const s = sub(g, [0, 0.25, 0]);
       put(s, BG(0.84, 0.04, 0.06), M(tw), [0, 0.57, 0]); put(s, BG(0.06, 0.04, 0.72), M(tw), [0, 0.57, 0]); put(s, BG(0.06, 0.58, 0.72), M(tw), [0, 0.28, 0], [0, 0, 0], [1, 1, 1.01]); put(s, BG(0.84, 0.58, 0.06), M(tw), [0, 0.28, 0], [0, 0, 0], [1.01, 1, 1]);
       [-1, 1].forEach(k => put(s, TG(0.08, 0.025, 6, 12), M(tw), [k * 0.08, 0.63, 0], [PI / 2, 0, k * 0.6])); put(s, BG(0.3, 0.2, 0.02), WHITE(), [0.18, 0.36, 0.36]); put(s, BG(0.2, 0.025, 0.01), M(0x90a4ae), [0.18, 0.39, 0.372]);
@@ -4537,7 +4549,7 @@ const ItemArt = (() => {
     nimbus_cotton: ['note'], floating_drop: ['notes'], wind_feather: ['disc'], air_seed: ['disc', 0xffc53d, 0xec407a], sleeping_bolt: ['mic'],
     echo_mud: ['screen'], whisper_reed: ['film'], purple_peat: ['rings'], slow_firefly: ['flame'], bottled_secret: ['plaque'],
     living_papyrus: ['tube'], wandering_ink: ['pencil'], origami_card: ['easel'], ancient_seal: ['painting'], blank_page: ['bottle', 0xff8f00],
-    parcel: ['parcel'], sealed_doc: ['scroll', 0xc62828], lottery_ticket: ['ticket', 0x80deea, 0x1565c0],
+    parcel: ['parcel'], sealed_doc: ['scroll', 0xc62828], lottery_ticket: ['ticket', 0x80deea, 0x1565c0], spring_bloom: ['blossom'], veil_candle: ['candle'], snow_crystal: ['snowflake'], anniv_confetti: ['popper'],
     lunar_glass: ['pan'], volt_gear: ['tv'], nimbus_cloth: ['synth'], lava_ink: ['genart'], neon_bait: ['ramen'], ash_brick: ['robot'], prism_paper: ['plate'], edge_compass: ['globe'],
   };
   /** Color del oficio (objetos de perfil): sustituye el color por defecto de la plantilla */
@@ -5284,6 +5296,8 @@ const Trend = {
     return pool[Math.floor(mulberry32((day * 7919) ^ h)() * pool.length)];
   },
   knownToday() { return GS.housing.trendKnownDay === GS.daily.dayCount ? this.forDay(GS.daily.dayCount) : null; },
+  /** v2.9.2 · segunda tendencia (Aniversario): otra del mismo grupo, nunca la misma */
+  forDay2(day) { const pool = CFG.trendPool.filter(id => id !== this.forDay(day)); return pool[Math.floor(mulberry32(day * 104729 + 17)() * pool.length)]; },
 };
 DailySystem.onSettle(() => {
   const today = GS.daily.dayCount;   // ya es el día que empieza
@@ -5339,7 +5353,7 @@ function openRoulette() {
       if (debt > 0) html += `<div class="app-card p-3 mb-3" style="background:#f5f3ff"><div class="text-sm text-slate-700">🔮 Deuda con Sombra: <b class="text-purple-700">${fmt(debt)} $T</b> <span class="text-xs text-slate-500">(interés ${CFG.debtInterestPct}%/día onírico)</span></div><div class="flex gap-2 mt-2 items-center flex-wrap"><input id="rlDebtAmt" type="number" min="1" max="${debt}" class="game w-28 text-xs" placeholder="${debt}"><button data-paydebt class="btn-game px-3 py-1.5 text-xs bg-purple-300">🔮 Pagar</button><button data-paydebt-all class="btn-game px-3 py-1.5 text-xs bg-purple-300">Pagar todo</button></div></div>`;
       html += `<div class="app-card p-4 mb-3 text-center">
         <div class="grid grid-cols-6 gap-2 mb-3">` + ROULETTE_RUNES.map((r, i) => `<button data-rune="${i}" class="rounded-xl border-[3px] p-2 text-3xl ${Roulette.sel === i ? 'border-purple-500 bg-purple-100 scale-105' : 'border-slate-300 bg-white'}" style="box-shadow:0 2px 8px rgba(23,22,60,.12)" title="${r.name}">${r.icon}</button>`).join('') + `</div>
-        <div class="text-[11px] text-slate-500 leading-relaxed">Elige tu runa y apuesta. Si sale, ganas <b>${multTxt(CFG.roulettePayout)} tu apuesta</b>.<br>Probabilidad de acierto: <b>1/${CFG.rouletteSymbols} (${pctTxt(1 / CFG.rouletteSymbols)})</b> · Esperanza matemática: <b class="text-red-500">−${pctTxt(1 - CFG.roulettePayout / CFG.rouletteSymbols)} por tirada</b>.<br>Tope por tirada: <b>${fmt(gambleMaxBet())} $T</b> (${pctTxt(CFG.gambleMaxBetPct, 0)} de tu saldo, mínimo ${fmt(CFG.gambleMaxBetFloor)}).<br>Simulación local: el azar es real dentro del sueño; la casa (el velo) gana a la larga. 🔮</div></div>
+        <div class="text-[11px] text-slate-500 leading-relaxed">Elige tu runa y apuesta. Si sale, ganas <b>${multTxt(roulettePayoutNow())} tu apuesta</b>${seasonIs('veil') ? ' <span class="text-purple-700">(🎃 Noche del Velo: juego justo)</span>' : ''}.<br>Probabilidad de acierto: <b>1/${CFG.rouletteSymbols} (${pctTxt(1 / CFG.rouletteSymbols)})</b> · Esperanza matemática: ${seasonIs('veil') ? '<b class="text-emerald-600">0 % por tirada</b> (esta semana la casa no gana)' : `<b class="text-red-500">−${pctTxt(1 - CFG.roulettePayout / CFG.rouletteSymbols)} por tirada</b>`}.<br>Tope por tirada: <b>${fmt(gambleMaxBet())} $T</b> (${pctTxt(CFG.gambleMaxBetPct, 0)} de tu saldo, mínimo ${fmt(CFG.gambleMaxBetFloor)}).<br>Simulación local: el azar es real dentro del sueño; ${seasonIs('veil') ? 'esta semana Sombra juega limpio. 🎃' : 'la casa (el velo) gana a la larga. 🔮'}</div></div>
       <div class="app-card p-3 mb-3">
         <div class="flex flex-wrap gap-2 items-center">
           <input id="rlAmt" type="number" min="1" class="game w-28 text-sm" placeholder="Apuesta">
@@ -5398,10 +5412,10 @@ function openRoulette() {
         const finish = () => {
           Roulette.spinning = false;
           btns.forEach((b, j) => { b.style.background = j === result ? (win ? '#86efac' : '#fca5a5') : '#fff'; b.style.transform = j === result ? 'scale(1.2)' : ''; });
-          Roulette.history.unshift({ rune: ROULETTE_RUNES[result].icon, win, amount: win ? Math.floor(amount * CFG.roulettePayout) : amount });
+          Roulette.history.unshift({ rune: ROULETTE_RUNES[result].icon, win, amount: win ? Math.floor(amount * roulettePayoutNow()) : amount });
           if (Roulette.history.length > 5) Roulette.history.length = 5;
           if (win) {
-            const prize = Math.floor(amount * CFG.roulettePayout);   // v1.2: 5,5× → redondeo a la baja
+            const prize = Math.floor(amount * roulettePayoutNow());   // v1.2: 5,5× → redondeo a la baja · v2.9.2: 6× en la Noche del Velo
             st2.won += prize; st2.lossStreak = 0;
             Wallet.add(prize, `🎰 Ruleta: ¡${ROULETTE_RUNES[result].name}!`, { noMult: true });
             showToast(`🎉 ¡${ROULETTE_RUNES[result].icon} ${ROULETTE_RUNES[result].name}! +${fmt(prize)} $TOKEN`, 'text-yellow-200');
@@ -5593,7 +5607,7 @@ function runLotteryDraw() {
   const num = Math.floor(Math.random() * 1000);
   const myTickets = L.tickets || [];
   const winTicket = myTickets.find(t => t.num === num);
-  const prize = winTicket ? Math.min(Math.max(0, Math.floor(L.pool)), CFG.lotteryPrizeCap) : 0;
+  const prize = winTicket ? Math.min(Math.max(0, Math.floor(L.pool)), CFG.lotteryPrizeCap * seasonLotteryMult()) : 0;   // v2.9.2: sorteo especial del Aniversario
   const numTxt = String(num).padStart(3, '0');
   if (winTicket && prize > 0) {
     L.pool = Math.max(0, L.pool - prize);
@@ -5633,7 +5647,7 @@ function openLottery() {
       html += `<div class="app-card p-4 mb-3 text-center" style="background:linear-gradient(180deg,#fffde7,#fff)">
         <div class="pixel text-[9px] text-slate-500">POZO ACUMULADO</div>
         <div class="pixel text-xl md:text-2xl token-glow my-1">${COIN} ${fmt(Math.floor(L.pool))}</div>
-        <div class="text-[11px] text-slate-500">premio máximo ${fmt(CFG.lotteryPrizeCap)} $T · el pozo se alimenta de las tasas y los boletos de todos</div>
+        <div class="text-[11px] text-slate-500">premio máximo ${fmt(CFG.lotteryPrizeCap * seasonLotteryMult())} $T${seasonLotteryMult() > 1 ? ' (🎉 sorteo especial del Aniversario)' : ''} · el pozo se alimenta de las tasas y los boletos de todos</div>
         <div class="mt-2 text-sm font-bold text-[#2b2b3d]">🗓️ Sorteo: domingo 20:00 · <span id="lotCd" class="text-sky-700">${fmtCountdown(L.nextDrawAt - Date.now())}</span></div>
         ${L.lastDraw ? `<div class="text-[11px] text-slate-500 mt-1">Último sorteo: nº <b>${String(L.lastDraw.num).padStart(3, '0')}</b> · ${L.lastDraw.winner ? `¡hubo ganador! (${fmt(L.lastDraw.prize)} $T)` : 'sin ganador (pozo acumulado)'}</div>` : ''}
       </div>
@@ -5928,9 +5942,10 @@ const WEATHER_TYPES = {
   stars: { name: 'Lluvia de estrellas', icon: '✨', msg: '✨ Esta noche lloverán estrellas: más Fragmentos de Estrella' },
   sun:   { name: 'Ola de sol',          icon: '🔆', msg: '🔆 Ola de sol: el hambre aprieta más rápido · el Oso paga mejor' },   // v0.8 · Climatizador
   storm: { name: 'Tormenta',            icon: '⛈️', msg: '⛈️ ¡Tormenta! La mejor pesca del sueño: Pez Dorado ×3 también de día' },   // v0.8 · Climatizador
+  snow:  { name: 'Nevada onírica',      icon: '❄️', msg: '❄️ Nieva en el sueño: el Solsticio cubre el planeta de blanco' },   // v2.9.2 · solo en El Solsticio Soñado
 };
 const Weather = (() => {
-  let _id = null, _forced = null, _forcedSlot = -1, _rain = null, _fog = null, _flash = 0; const _v3c = new THREE.Color();
+  let _id = null, _forced = null, _forcedSlot = -1, _rain = null, _snow = null, _fog = null, _flash = 0; const _v3c = new THREE.Color();
   const _q = new THREE.Quaternion(), _v = new THREE.Vector3();
   const hourNow = () => (GS.daily.clockMs / 3600000) % 24;
   const slotNow = () => GS.daily.dayCount * 2 + (hourNow() >= 14 ? 1 : 0);
@@ -5942,6 +5957,7 @@ const Weather = (() => {
     let acc = 0, pick = 'clear';
     for (const k of ['clear', 'rain', 'fog', 'sun', 'storm', 'stars']) { acc += t[k] || 0; if (r < acc) { pick = k; break; } }   // sin Climatizador sun/storm valen 0 → mismo resultado que v0.5
     if (pick === 'stars' && slot % 2 === 0) pick = 'clear';   // las estrellas solo caen en la franja de tarde-noche
+    if (seasonIs('solstice') && hash(slot + 4241) < 0.6) pick = 'snow';   // v2.9.2: nieve del Solsticio con el clima de siempre
     return pick;
   }
   function current() { if (!SaveSystem.started) return 'clear'; const s = slotNow(); if (_forced && _forcedSlot === s) return _forced; return roll(s); }
@@ -5970,6 +5986,14 @@ const Weather = (() => {
       for (let i = 1; i < arr.length; i += 3) { arr[i] -= dt * (id === 'storm' ? 28 : 18); if (arr[i] < 0) arr[i] += 14; }
       a.needsUpdate = true;
     } else if (_rain) _rain.visible = false;
+    /* v2.9.2 · Nieve: copos que caen despacio y se mecen */
+    if (id === 'snow') {
+      if (!_snow) { _snow = buildRain(); _snow.material.dispose?.(); _snow.material = new THREE.PointsMaterial({ color: 0xffffff, size: CFG.gfx.rain.size * 1.6, map: DOT_TEX, alphaTest: 0.02, transparent: true, opacity: 0.95, depthWrite: false }); }
+      _snow.visible = true; _snow.position.copy(player.position); _snow.quaternion.copy(_q.setFromUnitVectors(UP_Y, _v.copy(player.position).normalize()));
+      const a = _snow.geometry.attributes.position, arr = a.array, tt = performance.now() * 0.001;
+      for (let i = 0; i < arr.length; i += 3) { arr[i + 1] -= dt * 2.2; arr[i] += Math.sin(tt + i) * dt * 0.4; if (arr[i + 1] < 0) arr[i + 1] += 14; }
+      a.needsUpdate = true;
+    } else if (_snow) _snow.visible = false;
     /* Niebla: solo cerca del jugador (en Modo Planeta se desvanece) y más oscura de noche */
     if (id === 'storm') { _flash = Math.max(0, _flash - dt * 4); if (Math.random() < dt * 0.25) { _flash = 1; setTimeout(() => playBeep(55, 0.5, 'sawtooth'), 300); } amb.intensity += _flash * 1.4; }   // relámpagos
     else if (id === 'sun') { sun.intensity *= 1.12; amb.intensity *= 1.08; }
@@ -7555,6 +7579,7 @@ const CLIMATE_FX = {
   sun: `el hambre baja un ${Math.round((CFG.climateSunHungerMult - 1) * 100)}% más rápido y el Oso paga ${v08pct(CFG.climateSunBearMult - 1)} por lo que le vendes.`,
   storm: `la mejor pesca del sueño: raros ×${CFG.climateStormRareMult} y Pez Dorado ×${CFG.fishNightGoldenMult} también de día.`,
   stars: `lluvia de estrellas: ${CFG.climateStarsMin}–${CFG.climateStarsMax} Fragmentos esta noche.`,
+  snow: 'nevada del Solsticio Soñado: el planeta se viste de blanco (solo decoración).',   // v2.9.2
 };
 const Climate = {
   slotName: (slot) => slot % 2 ? 'tarde (14–24 h)' : 'mañana (0–14 h)',
@@ -7632,7 +7657,7 @@ const Imports = {
 /* ---------- 🦔 7 · AGENCIA VIRAL (Tendencia del Día: precio de venta a NPCs ×2 + 🔥 en mochila y tiendas) ---------- */
 function viralOn() { return GS.bigJobs?.hedgehogs?.status === 2; }
 function viralItemToday() { return viralOn() ? Trend.forDay(GS.daily.dayCount) : null; }
-function viralSellMult(itemId) { return viralOn() && Trend.forDay(GS.daily.dayCount) === itemId ? CFG.viralSellMult : 1; }
+function viralSellMult(itemId) { return viralOn() && (Trend.forDay(GS.daily.dayCount) === itemId || (seasonIs('anniversary') && Trend.forDay2(GS.daily.dayCount) === itemId)) ? CFG.viralSellMult : 1; }   // v2.9.2: doble tendencia en el Aniversario
 function viralFlame(itemId) { return viralSellMult(itemId) > 1 ? ' 🔥' : ''; }
 const Viral = {
   canvas: null, tex: null, boardDay: -1,
@@ -8360,7 +8385,7 @@ function awakeningChainHTML() {
    Nota: la 🎪 Feria del Sábado (puestos de los vecinos, ofertas de tienda) NO es la
    📈 Feria del Tablón de la v0.8 (especulación por categorías): conviven sin tocarse.
    ========================================================= */
-const GAME_VERSION = '2.9.1', GAME_TAG = 'Encargos y mensajería';
+const GAME_VERSION = '2.9.2', GAME_TAG = 'Eventos de temporada';
 /* ---------- 🗓️ EVENTOS: calendario REAL → flags que leen los sistemas existentes (Sec. 10.10) ---------- */
 const Events = {
   _force: null,   // DBG.weekday(n): simula el día de la semana real (0 = domingo … 6 = sábado)
@@ -8368,7 +8393,7 @@ const Events = {
   starNight() { return this.weekday() === CFG.starNightWeekday; },   // StarFall.rollCount lo lee: 5–8 fragmentos
   fairDay() { return this.weekday() === CFG.fairWeekday; },
   lotteryDay() { return this.weekday() === CFG.lotteryWeekday; },
-  icon() { return this.starNight() ? '🌠' : this.fairDay() ? '🎪' : this.lotteryDay() && Date.now() < (GS.lottery?.nextDrawAt || 0) ? '🎫' : ''; },
+  icon() { const s = seasonNow(); return s ? CFG.seasons[s].icon : this.starNight() ? '🌠' : this.fairDay() ? '🎪' : this.lotteryDay() && Date.now() < (GS.lottery?.nextDrawAt || 0) ? '🎫' : ''; },   // v2.9.2: el evento de temporada manda
 };
 /* ---------- 🎪 FERIA DEL SÁBADO (Sec. 10.6): puestos de los vecinos en la aldea con ofertas únicas ---------- */
 const FAIR_NPC = {   // tienda de referencia (precio base) · id de confianza · voz del puesto (Sec. 2)
@@ -8689,9 +8714,12 @@ function eventsCalendarHTML() {
   const wd = Events.weekday(), L = GS.lottery, days = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
   const row = (on, icon, title, when, txt) => `<div class="app-card p-3 mb-2 flex items-start gap-3 ${on ? 'owned' : ''}"><div class="text-2xl">${icon}</div><div class="flex-1 min-w-0"><div class="font-bold text-sm text-[#2b2b3d]">${title} <span class="text-[11px] font-semibold ${on ? 'text-emerald-700' : 'text-slate-500'}">· ${on ? 'HOY' : when}</span></div><div class="text-[11px] text-slate-600 leading-snug">${txt}</div></div></div>`;
   let html = `<div class="text-xs text-slate-500 mb-2">Citas semanales en <b>tiempo real</b> (hoy es ${days[wd]}). Todas tienen versión offline: nadie se las pierde por no tener cuenta. Nada se rompe si no vienes.</div>`;
+  { const sid = seasonNow(), nx = seasonNext(), S = sid ? CFG.seasons[sid] : null, fmtD = (a) => `${a[1]}/${a[0]}`;   // v2.9.2 · eventos de temporada (arriba del todo: son lo especial)
+    if (S) { const h = seasonHost(sid), done = !!seasonSt().gifts[seasonDate()]; html += row(true, S.icon, S.name, `${fmtD(S.from)}–${fmtD(S.to)}`, `${S.rule} ${h ? (done ? 'Hoy ya recogiste el regalo de temporada: vuelve mañana.' : `🎁 Hoy reparte el regalo de temporada <b>${npcById[h].name}</b>: pásate a saludar.`) : ''}`); }
+    if (nx && nx[0] !== sid) { const N = CFG.seasons[nx[0]]; html += row(false, N.icon, N.name, `${fmtD(N.from)}–${fmtD(N.to)}`, `Próximo evento de temporada: empieza en <b>${nx[1]} día${nx[1] === 1 ? '' : 's'}</b>. ${N.rule}`); } }
   html += row(Events.starNight(), '🌠', 'Noche de Estrellas', 'viernes', `Durante la noche onírica de un viernes real caen <b>${CFG.starFridayMin}–${CFG.starFridayMax} Fragmentos de Estrella</b> garantizados (los demás días, ${CFG.starMin}–${CFG.starMax}).`);
   html += row(Events.fairDay(), '🎪', 'Feria del Sábado', 'sábado', `Los vecinos montan puestos en la aldea: −20% en algo, la Harina del Oso en oferta y stock raro de Ultramar. Distinta de la 📈 Feria del Tablón (lotes por categoría).${Events.fairDay() ? ' <button data-openfair class="btn-game px-2 py-0.5 text-[10px] bg-emerald-200 ml-1">Ver puestos</button>' : ''}`);
-  html += row(Events.lotteryDay() && Date.now() < (L.nextDrawAt || 0), '🎫', 'Sorteo de la Lotería', 'domingo 20:00', `Pozo acumulado: <b>${fmt(Math.floor(L.pool || 0))} $T</b> (cap ${fmt(CFG.lotteryPrizeCap)}) · tus boletos: ${(L.tickets || []).length} · próximo sorteo en <b>${fmtCountdown((L.nextDrawAt || nextSunday20()) - Date.now())}</b>. El resultado llega por carta al buzón.${L.lastDraw ? ` Último número: <b>${String(L.lastDraw.num).padStart(3, '0')}</b>.` : ''}`);
+  html += row(Events.lotteryDay() && Date.now() < (L.nextDrawAt || 0), '🎫', 'Sorteo de la Lotería', 'domingo 20:00', `Pozo acumulado: <b>${fmt(Math.floor(L.pool || 0))} $T</b> (cap ${fmt(CFG.lotteryPrizeCap * seasonLotteryMult())}${seasonLotteryMult() > 1 ? ' · 🎉 sorteo especial' : ''}) · tus boletos: ${(L.tickets || []).length} · próximo sorteo en <b>${fmtCountdown((L.nextDrawAt || nextSunday20()) - Date.now())}</b>. El resultado llega por carta al buzón.${L.lastDraw ? ` Último número: <b>${String(L.lastDraw.num).padStart(3, '0')}</b>.` : ''}`);
   html += `<div class="text-[11px] text-slate-400">Cada día: encargos, tendencia, Oráculo, cosechas, cocina, barco. Lunes a domingo: Sello Semanal.</div>`;
   return html;
 }
@@ -10363,6 +10391,149 @@ function syncLotteryTickets() {
 function taskSt() { const t = (GS.tasks ||= {}), d = GS.daily.dayCount | 0; if (t.day !== d) { t.day = d; t.meme = 0; t.pick = 0; t.gather = 0; } t.taxStreak ??= 0; return t; }
 function taskTick(k, n = 1) { try { const t = taskSt(); t[k] = (t[k] || 0) + n; } catch (e) {} }
 function taskProgress(task) { const t = taskSt(); return task === 'fee' ? t.taxStreak | 0 : t[task] | 0; }
+/* ===== v2.9.2 · 🗓️ EVENTOS DE TEMPORADA (Guía Maestra 2, Bloque I · Guía 1, Sec. 10.6) =====
+   Cuatro eventos con fecha real: El Despertar de Primavera, La Noche del Velo, El Solsticio Soñado y El Aniversario del Sueño.
+   Cada uno trae decoración en la plaza, un objeto de evento (regalo diario del anfitrión, para construir una decoración) y una regla.
+   Regla de contenido: lo exclusivo es cosmético, título o experiencia; nunca ventaja económica (la ruleta del Velo paga justo, sin ventaja). */
+CFG.seasons = {
+  spring:      { from: [3, 20],  to: [4, 3],  name: 'El Despertar de Primavera', icon: '🌸', host: 'bear',      item: 'spring_bloom',  color: '#f48fb1',
+    rule: 'El jardín da el doble de ramos y los ramos regalados cuentan ×1,5.', hello: '¡Primavera en el sueño! El horno huele a flores y el jardín florece el doble. Pásate por la panadería: cada día tengo una Flor del Despertar para ti.' },
+  veil:        { from: [10, 24], to: [11, 2], name: 'La Noche del Velo',          icon: '🎃', host: 'sombra',    item: 'veil_candle',   color: '#8e24aa',
+    rule: 'La ruleta de Sombra paga 6× (juego justo, sin ventaja de la casa) y su vela te da el aura del Velo.', hello: 'Mmm… el velo entre el sueño y el despertar se adelgaza. Esta semana mi ruleta paga justo: una noche de generosidad calculada. Ven a por tu vela, soñador.' },
+  solstice:    { from: [12, 18], to: [1, 6],  name: 'El Solsticio Soñado',        icon: '❄️', host: null,        item: 'snow_crystal',  color: '#81d4fa',
+    rule: 'Nieva en el planeta y cada día un vecino distinto tiene un regalo para ti.', hello: '¡Ejem! Comienza el Solsticio Soñado. Nieve en el planeta y regalos entre vecinos: cada día uno de nosotros tendrá algo para usted. Abríguese.' },
+  anniversary: { from: [9, 26],  to: [10, 2], name: 'El Aniversario del Sueño',   icon: '🎉', host: 'hedgehogs', item: 'anniv_confetti', color: '#ffca28',
+    rule: 'Doble tendencia (dos objetos en tendencia al día), sorteo especial (premio máximo ×2) y título conmemorativo.', hello: '¡BRO! ¡El sueño cumple años! Doble tendencia, sorteo con premio doble y confeti gratis cada día en el estudio. ¡Fiesta!' },
+};
+var _seasonForce;   // DBG.season('veil') · null = ninguno · undefined = calendario real
+/** Evento de temporada activo según la fecha real (local) */
+function seasonNow(d = new Date()) {
+  if (_seasonForce !== undefined) return _seasonForce;
+  const v = (d.getMonth() + 1) * 100 + d.getDate();
+  for (const [id, s] of Object.entries(CFG.seasons || {})) { const a = s.from[0] * 100 + s.from[1], b = s.to[0] * 100 + s.to[1]; if (a <= b ? v >= a && v <= b : v >= a || v <= b) return id; }
+  return null;
+}
+function seasonIs(id) { return seasonNow() === id; }
+/** El próximo evento (para el calendario): [id, días que faltan] */
+function seasonNext(d = new Date()) {
+  let best = null; const y = d.getFullYear(), t0 = new Date(y, d.getMonth(), d.getDate()).getTime();
+  for (const [id, s] of Object.entries(CFG.seasons || {})) for (const yy of [y, y + 1]) { const t = new Date(yy, s.from[0] - 1, s.from[1]).getTime(); if (t > t0 && (!best || t < best[1])) best = [id, t]; }
+  return best ? [best[0], Math.round((best[1] - t0) / 86400000)] : null;
+}
+const seasonDate = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+/** Año del evento (el Solsticio de diciembre y su enero cuentan como el mismo) */
+const seasonYear = (id, d = new Date()) => id === 'solstice' && d.getMonth() === 0 ? d.getFullYear() - 1 : d.getFullYear();
+function seasonSt() { const s = (GS.seasons ||= {}); s.seen ||= {}; s.gifts ||= {}; s.got ||= {}; return s; }
+/* --- reglas (las llaman otras partes del juego) --- */
+function seasonFlowerMult() { return seasonIs('spring') ? 2 : 1; }
+function seasonGiftMult(itemId) { return itemId === 'flower_bouquet' && seasonIs('spring') ? 1.5 : 1; }
+function roulettePayoutNow() { return seasonIs('veil') ? Math.max(CFG.roulettePayout, 6) : CFG.roulettePayout; }   // 6× con 1/6 = juego justo: generosidad calculada
+function seasonLotteryMult() { return seasonIs('anniversary') ? 2 : 1; }
+/** Quién reparte el regalo hoy (en el Solsticio, cada día un vecino distinto) */
+function seasonHost(id = seasonNow(), d = new Date()) {
+  if (!id) return null; const h = CFG.seasons[id].host; if (h) return h;
+  const doy = Math.floor((new Date(d.getFullYear(), d.getMonth(), d.getDate()) - new Date(d.getFullYear(), 0, 0)) / 86400000); return TRUST_NPCS[doy % TRUST_NPCS.length];
+}
+/** 🎁 Regalo de temporada: una vez al día real, del anfitrión */
+function seasonGiftReady(npcId) { const id = seasonNow(); return !!id && seasonHost(id) === npcId && !seasonSt().gifts[seasonDate()]; }
+function claimSeasonGift(npcId) {
+  const id = seasonNow(); if (!id || !seasonGiftReady(npcId)) return false; const S = CFG.seasons[id], st = seasonSt();
+  if (!Inventory.canAdd(S.item, 1)) { showToast('🎒 Haz hueco en la mochila para el regalo de temporada', 'text-red-200'); return false; }
+  Inventory.add(S.item, 1, { silent: true }); st.gifts[seasonDate()] = id; st.got[S.item] = (st.got[S.item] || 0) + 1;
+  if (id === 'veil') { st.veilAura = seasonYear('veil'); state.veilAura = true; } if (id === 'anniversary') Titles.grant('Soñador del Aniversario');   // el aura del Velo se enciende al momento
+  if (id === 'veil' && typeof refreshAuraFromTrust === 'function') refreshAuraFromTrust();
+  playChime(); const o = npcObjs[npcId]; if (o) spawnConfetti(o.position.clone().addScaledVector(o.userData.up, 2.2), 18);
+  showToast(`${S.icon} ${npcById[npcId].name} te regala ${ITEMS[S.item].icon} ${ITEMS[S.item].name} · ${S.name}`, 'text-white'); SaveSystem.saveNow('season-gift:' + id); return true;
+}
+function seasonBtns(npcId) {
+  try { if (!seasonGiftReady(npcId)) return []; const S = CFG.seasons[seasonNow()];
+    return [dialogButton(`🎁 Regalo de temporada`, 'bg-pink-200 text-[#2b2b3d]', (ev) => { if (claimSeasonGift(npcId)) ev?.currentTarget?.remove?.(); })]; } catch (e) { return []; }
+}
+/* --- objetos de evento y sus decoraciones para el jardín (cosméticas: no se venden) --- */
+Object.assign(ITEMS, {
+  spring_bloom:   defItem({ id: 'spring_bloom',   name: 'Flor del Despertar',      icon: '🌸', cat: 'special', rarity: 'rare', sell: 0, desc: 'Regalo del Oso en El Despertar de Primavera. Con 2 construyes un Arco de Flores en tu jardín.' }),
+  veil_candle:    defItem({ id: 'veil_candle',    name: 'Vela del Velo',           icon: '🕯️', cat: 'special', rarity: 'rare', sell: 0, desc: 'Regalo de Sombra en La Noche del Velo. Con 1 construyes un Farolillo del Velo, y su luz te da el aura del Velo mientras dura el evento.' }),
+  snow_crystal:   defItem({ id: 'snow_crystal',   name: 'Cristal de Nieve',        icon: '❄️', cat: 'special', rarity: 'rare', sell: 0, desc: 'Regalo de un vecino en El Solsticio Soñado. Con 2 construyes un Muñeco de Nieve que no se derrite nunca.' }),
+  anniv_confetti: defItem({ id: 'anniv_confetti', name: 'Confeti del Aniversario', icon: '🎊', cat: 'special', rarity: 'rare', sell: 0, desc: 'Regalo de los erizos en El Aniversario del Sueño. Con 1 construyes unos Globos del Aniversario.' }),
+});
+NO_GIFT.push('spring_bloom', 'veil_candle', 'snow_crystal', 'anniv_confetti');
+[{ id: 'bloom_arch', name: 'Arco de Flores', icon: '🌸', cost: 120, mats: { spring_bloom: 2 }, r: 0.9, desc: 'Un arco de flores del Despertar de Primavera. Decoración de temporada (no se marchita).' },
+ { id: 'veil_lantern', name: 'Farolillo del Velo', icon: '🕯️', cost: 80, mats: { veil_candle: 1 }, r: 0.4, desc: 'Luz morada de La Noche del Velo. Decoración de temporada.' },
+ { id: 'snowman', name: 'Muñeco de Nieve', icon: '⛄', cost: 60, mats: { snow_crystal: 2 }, r: 0.6, desc: 'Del Solsticio Soñado. No se derrite: es un sueño.' },
+ { id: 'anniv_balloons', name: 'Globos del Aniversario', icon: '🎈', cost: 80, mats: { anniv_confetti: 1 }, r: 0.5, desc: 'Globos de colores del Aniversario del Sueño.' },
+].forEach(b => { b.unlock = () => !!seasonSt().got[Object.keys(b.mats)[0]]; BUILDABLES.push(b); buildableById[b.id] = b; });
+/** Modelos 3D de las decoraciones de temporada (makeBuildable los pide aquí) */
+function seasonBuild(type) {
+  const g = new THREE.Group();
+  if (type === 'bloom_arch') { [-1, 1].forEach(k => g.add(cyl(0.07, 0.08, 1.9, mat(0x8d6e63), k * 0.85, 0.95, 0, 6)));
+    for (let i = 0; i <= 10; i++) { const a = Math.PI * i / 10, x = Math.cos(a) * 0.85, y = 1.9 + Math.sin(a) * 0.55; g.add(sphere(0.16, mat([0xf48fb1, 0xfff176, 0xce93d8, 0xffffff][i % 4]), x, y, 0, 8)); g.add(sphere(0.1, mat(0x7cb342), x * 0.96, y - 0.08, 0.08, 6)); } return g; }
+  if (type === 'veil_lantern') { g.add(cyl(0.05, 0.07, 1.8, mat(0x2b2b3d), 0, 0.9, 0, 6)); g.add(box(0.5, 0.05, 0.05, mat(0x2b2b3d), 0.2, 1.75, 0)); const l = sphere(0.2, glow(0xce93d8, 0x8e24aa, 1.8), 0.42, 1.5, 0, 10); l.scale.set(1, 1.25, 1); g.add(l);
+    g.add(cyl(0.1, 0.12, 0.06, mat(0x2b2b3d), 0.42, 1.76, 0, 8)); const pl = new THREE.PointLight(0xb388ff, 1.6, 5, 2); pl.position.set(0.42, 1.5, 0); g.add(pl); return g; }
+  if (type === 'snowman') { const W = mat(0xf5f9ff); g.add(sphere(0.5, W, 0, 0.45, 0, 14)); g.add(sphere(0.36, W, 0, 1.12, 0, 14)); g.add(sphere(0.25, W, 0, 1.6, 0, 12));
+    g.add(cyl(0.2, 0.2, 0.04, mat(0x263238), 0, 1.82, 0, 12)); g.add(cyl(0.14, 0.15, 0.26, mat(0x263238), 0, 1.96, 0, 12)); const nose = cone(0.05, 0.22, mat(0xff7043), 0, 1.6, 0.3, 6); nose.rotation.x = Math.PI / 2; g.add(nose);
+    [-0.08, 0.08].forEach(x => g.add(sphere(0.035, mat(0x212121), x, 1.68, 0.22, 6))); const sc = new THREE.Mesh(new THREE.TorusGeometry(0.27, 0.06, 6, 16), mat(0xe53935)); sc.rotation.x = Math.PI / 2; sc.position.y = 1.4; g.add(sc); return g; }
+  if (type === 'anniv_balloons') { g.add(box(0.3, 0.16, 0.3, mat(0x6d4c41), 0, 0.08, 0)); [[0, 2.1, 0, 0xe53935], [-0.35, 1.9, 0.1, 0x42a5f5], [0.35, 1.95, -0.05, 0xffca28], [0.05, 2.45, -0.15, 0x66bb6a], [-0.15, 2.35, 0.25, 0xab47bc]].forEach(([x, y, z, c]) => {
+      const b = sphere(0.24, glow(c, c, 0.12), x, y, z, 12); b.scale.set(1, 1.2, 1); g.add(b); const s = cyl(0.006, 0.006, y - 0.3, mat(0xeeeeee), x / 2, (y - 0.12) / 2 + 0.1, z / 2, 3); s.rotation.z = -x * 0.25; s.rotation.x = z * 0.25; g.add(s); }); return g; }
+  return null;
+}
+/* --- 🎪 decoración de la plaza mientras dura el evento --- */
+const SeasonDecor = (() => {
+  const groups = {}; let shown = null;
+  const at = (x, z) => siteDir(S_V, x, z), put = (g, x, z, yaw = 0) => { placeOnPlanet(g, at(x, z), yaw, 0); return g; };
+  const RING = [[4.2, 2.6], [-4.2, 2.6], [4.6, -1.6], [-4.6, -1.6], [2.2, -4.4], [-2.2, -4.4]];
+  function build(id) {
+    const root = new THREE.Group(); root.visible = false; scene.add(root);
+    if (id === 'spring') RING.forEach(([x, z], i) => { const g = new THREE.Group(); g.add(cyl(0.3, 0.22, 0.4, mat(0xbf6f4a), 0, 0.2, 0, 10)); g.add(sphere(0.32, mat(0x7cb342), 0, 0.5, 0, 10));
+      for (let k = 0; k < 6; k++) { const a = k / 6 * 6.283; g.add(sphere(0.09, mat([0xf48fb1, 0xfff176, 0xce93d8][(k + i) % 3]), Math.cos(a) * 0.26, 0.62 + (k % 2) * 0.08, Math.sin(a) * 0.26, 6)); } root.add(put(g, x, z)); });
+    if (id === 'veil') RING.forEach(([x, z], i) => { const g = new THREE.Group(), p = sphere(0.36, mat(0xff8f00), 0, 0.3, 0, 12); p.scale.set(1.15, 0.85, 1.15); g.add(p); g.add(cyl(0.04, 0.05, 0.16, mat(0x558b2f), 0, 0.64, 0, 6));
+      [-0.12, 0.12].forEach(ex => g.add(cone(0.06, 0.1, glow(0xffe082, 0xffb300, 1.6), ex, 0.36, 0.36, 3))); g.add(box(0.22, 0.05, 0.04, glow(0xffe082, 0xffb300, 1.6), 0, 0.2, 0.37));
+      if (i % 2 === 0) { const l = sphere(0.14, glow(0xce93d8, 0x8e24aa, 1.8), 0.5, 1.3, 0, 8); g.add(l); g.add(cyl(0.02, 0.02, 1.2, mat(0x2b2b3d), 0.5, 0.6, 0, 4)); }
+      root.add(put(g, x, z, i)); });
+    if (id === 'solstice') { const t = new THREE.Group(); [[1.3, 1.6, 0.9], [1.0, 1.4, 1.8], [0.7, 1.2, 2.6]].forEach(([r, h, y]) => t.add(cone(r, h, mat(0x2e7d32), 0, y, 0, 9))); t.add(cyl(0.18, 0.22, 0.6, mat(0x6d4c41), 0, 0.3, 0, 8));
+      for (let k = 0; k < 22; k++) { const y = 0.7 + (k / 22) * 2.4, r = 1.25 * (1 - (y - 0.6) / 2.8) + 0.05, a = k * 2.3; t.add(sphere(0.07, glow([0xffeb3b, 0xef5350, 0x42a5f5, 0xffffff][k % 4], [0xffc107, 0xe53935, 0x1e88e5, 0xffffff][k % 4], 1.6), Math.cos(a) * r, y, Math.sin(a) * r, 6)); }
+      const st = new THREE.Mesh(new THREE.OctahedronGeometry(0.22), glow(0xffe082, 0xffc107, 1.8)); st.position.y = 3.35; t.add(st);
+      [[0.9, 0.5, 0xe53935], [-0.8, 0.6, 0x42a5f5], [0.2, -0.95, 0xffca28]].forEach(([x, z, c]) => { t.add(box(0.36, 0.3, 0.36, mat(c), x, 0.15, z)); t.add(box(0.38, 0.06, 0.08, mat(0xffffff), x, 0.31, z)); });
+      root.add(put(t, -4.4, -3.6)); [[3.4, -4.2], [-3.4, 3.6]].forEach(([x, z]) => { const s = seasonBuild('snowman'); s.scale.setScalar(0.8); root.add(put(s, x, z, 2.6)); }); }
+    if (id === 'anniversary') { RING.forEach(([x, z], i) => { const b = seasonBuild('anniv_balloons'); b.scale.setScalar(0.9); root.add(put(b, x, z, i)); });
+      const bm = new THREE.MeshBasicMaterial({ map: textTexture('¡Feliz aniversario, soñadores!', { w: 1024, h: 224, bg: '#ffca28', color: '#2b2b3d', font: 'bold 74px Fredoka, Arial' }) }), bn = new THREE.Group();
+      [0, Math.PI].forEach(r => { const m = new THREE.Mesh(new THREE.PlaneGeometry(3.2, 0.7), bm); m.rotation.y = r; m.position.z = r ? -0.012 : 0.012; bn.add(m); });   // se lee bien por los dos lados
+      const post = new THREE.Group(); [-1.7, 1.7].forEach(x => post.add(cyl(0.06, 0.07, 3.2, mat(0x8d6e63), x, 1.6, 0, 6))); bn.position.y = 2.8; post.add(bn); root.add(put(post, 0, 5.2, Math.PI)); }
+    return root;
+  }
+  return {
+    groups,
+    /** Enseña la decoración del evento activo (y crea la primera vez) */
+    sync() { const id = seasonNow(); if (id === shown) return; if (shown && groups[shown]) groups[shown].visible = false; shown = id; if (id) { groups[id] ||= build(id); groups[id].visible = true; } },
+    get shown() { return shown; },
+  };
+})();
+/* --- ❄️ nieve: el planeta se cubre de blanco durante el Solsticio (el color se mezcla antes del AO horneado) --- */
+const Snow = (() => {
+  let on = false, orig = null, fac = null;
+  function prep() {
+    const geo = planet.geometry, col = geo.attributes.color, pos = geo.attributes.position, nF = pos.count / 3; orig = (PlanetAO.on && PlanetAO.orig) ? PlanetAO.orig : col.array.slice(); fac = new Float32Array(nF);
+    const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3(), n = new THREE.Vector3(), m = new THREE.Vector3();
+    for (let f = 0; f < nF; f++) { a.fromBufferAttribute(pos, f * 3); b.fromBufferAttribute(pos, f * 3 + 1); c.fromBufferAttribute(pos, f * 3 + 2); m.copy(a).add(b).add(c).divideScalar(3); const h = m.length(); if (h < SEA + 0.05) continue;
+      n.subVectors(b, a).cross(c.sub(a)).normalize(); const up = Math.abs(n.dot(m.normalize())); fac[f] = clamp((up - 0.5) / 0.4, 0, 1) * (h > SEA + 1.4 ? 0.92 : 0.78); }
+  }
+  function apply(v) {
+    v = !!v; if (v === on || !planet?.geometry?.attributes?.color) return; on = v; if (!orig) prep();
+    const target = (PlanetAO.on && PlanetAO.base) ? PlanetAO.base : planet.geometry.attributes.color.array;
+    for (let f = 0; f < fac.length; f++) { const k = on ? fac[f] : 0; for (let i = 0; i < 9; i += 3) { const j = f * 9 + i; target[j] = orig[j] + (0.9 - orig[j]) * k; target[j + 1] = orig[j + 1] + (0.93 - orig[j + 1]) * k; target[j + 2] = orig[j + 2] + (0.98 - orig[j + 2]) * k; } }
+    if (PlanetAO.on && PlanetAO.base) { if (PlanetAO.baked) PlanetAO.bake(); else { planet.geometry.attributes.color.array.set(PlanetAO.base); planet.geometry.attributes.color.needsUpdate = true; } } else planet.geometry.attributes.color.needsUpdate = true;
+  }
+  return { apply, get on() { return on; } };
+})();
+/** Comprueba el evento: decoración, nieve, aviso de inicio (una vez por evento y año) y aura del Velo */
+function seasonTick() {
+  try {
+    const id = seasonNow(); SeasonDecor.sync(); Snow.apply(id === 'solstice');
+    if (id && SaveSystem.started) { const st = seasonSt(), key = id + '-' + seasonYear(id); if (!st.seen[key]) { st.seen[key] = true; const S = CFG.seasons[id], host = seasonHost(id), hn = host ? npcById[host] : null;
+        addLetter(hn ? `${hn.emoji} ${hn.name}` : '🏛️ Ayuntamiento', `${S.icon} ${S.name}. ${S.hello}`); showToast(`${S.icon} Empieza ${S.name}: ${S.rule}`, 'text-white'); SaveSystem.save('season-start'); } }
+    if (typeof refreshAuraFromTrust === 'function' && (seasonSt().veilAura != null)) { const want = id === 'veil' && seasonSt().veilAura === seasonYear('veil'); if (want !== !!state.veilAura) { state.veilAura = want; refreshAuraFromTrust(); } }
+  } catch (e) { console.warn('[temporada]', e.message); }
+}
+setInterval(seasonTick, 60000);   // la fecha real cambia sola (un evento puede empezar con el juego abierto)
 /* recetas de cocina nuevas */
 RECIPES.push(
   { id: 'golden_fish_grill', out: 'golden_fish_grill', qty: 1, in: [['golden_fish', 1]], gourmet: true },
@@ -12231,6 +12402,7 @@ function applyGameStateToWorld() {
   Util.placeBench();   // v2.5: banco de trabajo junto a casa
   WorldFX.build();     // v2.6: postes de viaje, telescopio y estrella de la cima
   syncLotteryTickets();   // v2.9.1: los boletos que ya tenías aparecen en la mochila
+  seasonTick();          // v2.9.2: decoración, nieve y aura del evento de temporada
   Island.build(); Island.restore(); Voyage.placeShip();   // v2.8: la isla (con niebla hasta descubrirla) y el barco si te quedaste allí
   Studio.place();      // v1.6: estudio del perfil junto a casa (si ya tienes perfil): Red del Sueño (re-engancha el mundo de bots; si recargaste dentro, despiertas en casa)
   state.tokensShown = GS.economy.money; ui.tokenValue.textContent = state.tokensShown.toLocaleString('es-ES');
@@ -12275,7 +12447,7 @@ const startGameFromMenu = () => {
   const menu = $('menu'); menu.classList.add('hide'); setTimeout(() => menu.remove(), 700); document.body.classList.remove('menu-open');   // v1.5: el HUD aparece al empezar
   try { audioCtx ||= new (window.AudioContext || window.webkitAudioContext)(); audioCtx.resume(); } catch (e) {}
   playChime();
-  SaveSystem.started = true; SaveSystem.saveNow(hadSave ? 'session-start' : 'new-game');
+  SaveSystem.started = true; SaveSystem.saveNow(hadSave ? 'session-start' : 'new-game'); setTimeout(seasonTick, 2500);   // v2.9.2: aviso del evento de temporada
   cam.rate = 1.7; cam.tDist = 9; cam.tPitch = 0.42; // zoom cinematográfico desde el espacio hasta el personaje
   setTimeout(() => {
     state.menuOpen = false; cam.rate = 10;
@@ -12690,13 +12862,14 @@ DBG.refs = DBG_REFS;
 if (/[?&]debug=1\b/.test(location.search)) window._dbg = DBG_REFS;   // v1.0: ya no es global por defecto
 /* v1.1 · Interior caminable de la casa (Sec. 6.9 Fase 2) */
 /** v1.5 · capturas: DBG.tp(x, z) lleva al jugador a (x, z) del pueblo · DBG.view(dist, pitch, yaw) fija la cámara · DBG.shot('B'|'C'|'D'|'G'|'H') prepara la escena del protocolo */
-DBG.g = { World, WGEO, WorldFX, TRAVEL_POSTS, Island, Voyage, TRIBE, ship, state, IconStudio, ItemArt, itemIcon, PhGlyph, startDialog, openInventory, openHousePanel, addLetter, endDialog, openShop, openGiftPicker, openEncargo, acceptCourier, refreshMissionUI, Gather, Mining, npcObjs, interactables, colliders, SITES, NPCS, CFG, get house() { return house; }, scene, renderer, camera, cam, sky, water, atmo, clouds, PostFX, SkyEnv, PlanetAO, WATER_U, POST_U, Gather, Studio, ToolAnim, Profiles, Hub, Decor, Fitting, player, Interiors };   // v1.5: referencias gráficas para depurar
+DBG.g = { World, WGEO, WorldFX, TRAVEL_POSTS, Island, Voyage, TRIBE, ship, state, IconStudio, ItemArt, itemIcon, PhGlyph, startDialog, openInventory, openHousePanel, addLetter, endDialog, openShop, openGiftPicker, openEncargo, acceptCourier, refreshMissionUI, SeasonDecor, Snow, claimSeasonGift, seasonNow, openWeeklyPanel, openRoulette, Weather, Gather, Mining, npcObjs, interactables, colliders, SITES, NPCS, CFG, get house() { return house; }, scene, renderer, camera, cam, sky, water, atmo, clouds, PostFX, SkyEnv, PlanetAO, WATER_U, POST_U, Gather, Studio, ToolAnim, Profiles, Hub, Decor, Fitting, player, Interiors };   // v1.5: referencias gráficas para depurar
 DBG.post = (v = !PostFX.active) => { PostFX.active = !!v; POST_U.uPost.value = v ? 1 : 0; return PostFX.active; };
 DBG.env = (v = !SkyEnv.enabled) => SkyEnv.setEnabled(v);
 DBG.ao = (v = true) => { if (!PlanetAO.on) return false; if (v) PlanetAO.bake(); else { const c = planet.geometry.attributes.color; PlanetAO.reset(); c.needsUpdate = true; } return v; };
 DBG.tp = (a = 0, b = 0) => { if (typeof a === 'string') { if (SITES[a] && !TRAVEL_POSTS.some(p => p.id === a) && !World.Z[a]) WorldFX.teleport(siteDir(SITES[a], 0, 2)); else WorldFX.tp(a); console.log('[DBG] tp →', a, '· zona', World.zoneAt(player.userData.dir)); return true; }
   const d = siteDir(S_V, a, b); player.userData.dir.copy(d); player.position.copy(d).multiplyScalar(surfaceR(d)); state.moveTarget = null; return true; };   // v2.7: DBG.tp('forest' | 'bakery' | x, z de la plaza)
 DBG.overlays = () => ({ total: Overlays.count, hidden: (() => { let n = 0; scene.traverse(o => { if (o.isSprite && o.layers.mask === (1 << 31) >>> 0) n++; }); return n; })() });   // v2.8
+DBG.season = (id) => { _seasonForce = id === 'real' ? undefined : (id || null); seasonTick(); console.log('[DBG] temporada →', seasonNow()); return seasonNow(); };   // v2.9.2: 'veil', 'spring', 'solstice', 'anniversary', null (ninguna) o 'real'
 DBG.voyage = (go = false) => { const v = Voyage.st(); v.repaired = true; VOYAGE_PARTS.forEach(p => { v.parts[p] = true; }); Trust.entry('sam').points = Math.max(Trust.points('sam'), CFG.trustThresholds[2]); GS.missions.sam.status = 2; if (go) Voyage.sail('island'); return { ready: Voyage.ready(), ...v }; };   // v2.8
 DBG.zone = () => ({ zone: World.zoneAt(player.userData.dir), h: +(heightAt(player.userData.dir) - SEA).toFixed(2), slope: +World.slopeAt(player.userData.dir).toFixed(2), posts: GS.world.posts });
 DBG.view = (dist, pitch, yaw) => { if (dist != null) cam.dist = cam.tDist = dist; if (pitch != null) cam.pitch = cam.tPitch = pitch; if (yaw != null) cam.yaw = cam.tYaw = yaw; return { dist: cam.tDist, pitch: cam.tPitch, yaw: cam.tYaw }; };
