@@ -1455,7 +1455,7 @@ GFX.init(renderer);
    Dentro (interiores y Red del Sueño): RoomEnvironment (luz de estudio). En Baja no hay entorno. */
 const SkyEnv = (() => {
   const E = CFG.gfx.env, on = !!GFX.L.env, seen = new WeakSet();
-  const api = { on, room: null, update() {}, tag() {} };
+  const api = { on, enabled: on, room: null, update() {}, tag() {}, setEnabled() {} };
   if (!on) return api;
   const pmrem = new THREE.PMREMGenerator(renderer), U = sky.material.uniforms;
   const envMat = new THREE.ShaderMaterial({ side: THREE.BackSide, depthWrite: false,
@@ -1469,7 +1469,9 @@ const SkyEnv = (() => {
   const envScene = new THREE.Scene(); envScene.add(new THREE.Mesh(new THREE.SphereGeometry(10, 32, 16), envMat));
   let rt = null, last = { day: -9, dusk: -9, t: -1e9 }; const lastUp = new THREE.Vector3(0, 0, 0);
   api.tag = (root) => root.traverse(o => { if (!o.isMesh) return; (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => { if (!m || seen.has(m) || !m.isMeshStandardMaterial) return; seen.add(m); m.envMapIntensity = m.userData.envI ?? E.intensity; }); });
+  api.setEnabled = (v) => { api.enabled = !!v; scene.environment = api.enabled && rt ? rt.texture : null; return api.enabled; };   // DBG.env(false) → comparar A/B
   api.update = (dayAmt, duskAmt, up, force = false) => {
+    if (!api.enabled) return false;
     const now = performance.now() / 1000, gap = E.minGapS[GFX.load] ?? 3;
     const changed = Math.abs(dayAmt - last.day) > E.regenDay || Math.abs(duskAmt - last.dusk) > E.regenDusk || lastUp.angleTo(up) > E.regenUp || lastUp.lengthSq() === 0;
     if (!force && (!changed || now - last.t < gap)) return false;
@@ -2344,6 +2346,7 @@ const PlanetAO = (() => {
     }
     col.needsUpdate = true; api.baked = true;
   };
+  api.reset = () => { col.array.set(base); col.needsUpdate = true; api.baked = false; };
   return api;
 })();
 const marker = new THREE.Mesh(new THREE.RingGeometry(0.3, 0.45, 24), new THREE.MeshBasicMaterial({ color: 0xffde59, transparent: true, opacity: 0, side: THREE.DoubleSide, depthWrite: false }));
@@ -4482,7 +4485,7 @@ function updateSun() {
   sun.intensity = lerp(L.sunNight, L.sunDay, dayAmt);
   sun.color.setHex(0xfff1d6).lerp(_c1.setHex(0xffb27a), duskAmt * 0.8);
   if (dayAmt < 0.5) sun.color.lerp(_c1.setHex(0x8fb7ff), (0.5 - dayAmt) * 1.2);   // luz de luna azulada
-  const LH = SkyEnv.on ? L.env : L;   // v1.5 · Etapa 1: con entorno, menos hemisférica y ambiente (el cielo ya rellena)
+  const LH = SkyEnv.enabled ? L.env : L;   // v1.5 · Etapa 1: con entorno, menos hemisférica y ambiente (el cielo ya rellena)
   hemi.intensity = lerp(LH.hemiNight, LH.hemiDay, dayAmt); amb.intensity = lerp(LH.ambNight, LH.ambDay, dayAmt); hemi.color.setHex(L.hemiSkyNight).lerp(_c1.setHex(L.hemiSkyDay), dayAmt);
   renderer.toneMappingExposure = lerp(L.exposure.night, L.exposure.day, dayAmt) + duskAmt * L.exposure.dusk;
   const skyU = sky.material.uniforms;
@@ -9675,6 +9678,12 @@ DBG.econReport = (n = 7) => {
 DBG.refs = DBG_REFS;
 if (/[?&]debug=1\b/.test(location.search)) window._dbg = DBG_REFS;   // v1.0: ya no es global por defecto
 /* v1.1 · Interior caminable de la casa (Sec. 6.9 Fase 2) */
+/** v1.5 · capturas: DBG.tp(x, z) lleva al jugador a (x, z) del pueblo · DBG.view(dist, pitch, yaw) fija la cámara · DBG.shot('B'|'C'|'D'|'G'|'H') prepara la escena del protocolo */
+DBG.env = (v = !SkyEnv.enabled) => SkyEnv.setEnabled(v);
+DBG.ao = (v = true) => { if (!PlanetAO.on) return false; if (v) PlanetAO.bake(); else { const c = planet.geometry.attributes.color; PlanetAO.reset(); c.needsUpdate = true; } return v; };
+DBG.tp = (x = 0, z = 0) => { const d = siteDir(S_V, x, z); player.userData.dir.copy(d); player.position.copy(d).multiplyScalar(surfaceR(d)); state.moveTarget = null; return true; };
+DBG.view = (dist, pitch, yaw) => { if (dist != null) cam.dist = cam.tDist = dist; if (pitch != null) cam.pitch = cam.tPitch = pitch; if (yaw != null) cam.yaw = cam.tYaw = yaw; return { dist: cam.tDist, pitch: cam.tPitch, yaw: cam.tYaw }; };
+DBG.shot = (id = 'B') => { const S = { B: [() => DBG.tp(-1, 2), 12, 'clear', 9, 0.42], C: [() => DBG.tp(-9.5, 9.5), 18.5, 'clear', 9, 0.32], D: [() => DBG.tp(3.5, -2.5), 23, 'clear', 10, 0.45], G: [() => {}, 0, 'clear', 60, 0.3], H: [() => DBG.tp(-1, 2), 12, 'storm', 9, 0.42] }[id]; if (!S) return false; S[0](); DBG.time(S[1]); DBG.weather(S[2]); DBG.view(S[3], S[4]); return id; };
 DBG.enterHouse = (lv) => { if (lv !== undefined) DBG.house(lv); const ok = Interiors.enter('house'); console.log(ok ? '[DBG] Entrando en casa (nivel ' + (GS.house.level | 0) + ')' : '[DBG] No se puede entrar ' + (houseSealed() ? '(casa sellada)' : Interiors.active ? '(ya estás dentro)' : '')); return ok; };
 DBG.exitHouse = () => { const ok = Interiors.exit(); console.log(ok ? '[DBG] Saliendo…' : '[DBG] No estás dentro'); return ok; };
 DBG.enterShop = (items) => { const ok = Interiors.enter('shop', items ? { items } : {}); console.log(ok ? '[DBG] Tienda de prueba (layout shop)' : '[DBG] Sal primero del interior actual'); return ok; };
