@@ -7289,7 +7289,7 @@ function awakeningChainHTML() {
    Nota: la 🎪 Feria del Sábado (puestos de los vecinos, ofertas de tienda) NO es la
    📈 Feria del Tablón de la v0.8 (especulación por categorías): conviven sin tocarse.
    ========================================================= */
-const GAME_VERSION = '1.3';
+const GAME_VERSION = '2.0';
 /* ---------- 🗓️ EVENTOS: calendario REAL → flags que leen los sistemas existentes (Sec. 10.10) ---------- */
 const Events = {
   _force: null,   // DBG.weekday(n): simula el día de la semana real (0 = domingo … 6 = sábado)
@@ -9930,6 +9930,7 @@ const Hub = {
         { ic: '📬', ti: 'Cartas', de: (GS.housing.mailboxUnread | 0) ? `${GS.housing.mailboxUnread} sin leer` : 'Tu buzón', bd: (GS.housing.mailboxUnread | 0) ? String(GS.housing.mailboxUnread) : '', fn: () => GS.housing.sealed ? openSealedHousePanel() : openHousePanel('mail') },
         { ic: '🌐', ti: 'Red del Sueño', de: 'Comercio con otros perfiles (demo con bots)', fn: () => NetUI.pc() },
         { ic: '🏛️', ti: 'Mercado real', de: Online.me ? 'Compra y vende con jugadores reales' : 'Necesita cuenta online', fn: () => RealMarket.open() },
+        { ic: '🏆', ti: 'Temporada', de: Online.season ? `${Online.season.season.name} · semana ${Online.season.season.week}/8` : (Online.me ? 'Ranking, evento semanal y premios' : 'Necesita cuenta online'), bd: Online.season?.me?.rank ? '#' + Online.season.me.rank : '', fn: () => RealSeason.open() },
         { ic: '🧭', ti: 'Guía de recursos', de: 'Qué se consigue, dónde y con qué', fn: () => this.guide() },
       ]],
       ['SISTEMA', [
@@ -10002,7 +10003,12 @@ const Online = (() => {
   const tr = (m) => { for (const [re, t] of ES) if (re.test(m)) return t; return m; };
   const rpc = async (fn, args = {}) => { const { data, error } = await (await lib()).rpc(fn, args); if (error) throw new Error(tr(error.message)); return data; };
   async function refreshMe() { me = session ? await rpc('crossia_me') : null; api.status = me ? 'on' : session ? 'noplayer' : 'off';
-    if (me) { GS.meta.profile = { type: PROFILE.ACCOUNT, accountId: me.id, displayName: me.name }; } return me; }
+    if (me) { GS.meta.profile = { type: PROFILE.ACCOUNT, accountId: me.id, displayName: me.name }; api.loadSeason().catch(() => {}); } return me; }
+  /** v2.0 · 🏆 Temporada: se guarda la última consulta (evento de la semana, mi puesto, mi título) */
+  api.season = null; api.title = null;
+  api.loadSeason = async (kind = 'riqueza') => { const d = await rpc('crossia_season', { p_kind: kind }); d._at = Date.now(); d._skew = Date.parse(d.season.now) - Date.now(); api.season = d; api.title = d.title || null; return d; };
+  api.featured = () => { const s = api.season?.season; return s && Number.isInteger(s.featured) && Date.now() + (api.season._skew || 0) < Date.parse(s.ends) ? s.featured : null; };
+  const medal = (t) => (t || '').split(' ')[0];
   /** Al arrancar: si hay sesión guardada, reconecta en silencio */
   api.boot = async () => {
     const fromEmail = /access_token=|[?&]code=|cuenta=ok/.test(location.hash + location.search);   // vuelves del enlace de confirmación del email
@@ -10026,7 +10032,7 @@ const Online = (() => {
   function avatarOf(p) {
     const o = NET_ORIGINS[p.profile] || NET_ORIGINS[0], g = new THREE.Group(), col = mat(o.color);
     g.add(cyl(0.32, 0.38, 0.9, col, 0, 0.55, 0, 12)); g.add(sphere(0.36, mat(0xf1c9a5), 0, 1.3, 0, 14)); g.add(sphere(0.37, mat(0x4e342e), 0, 1.42, -0.04, 12));
-    const tag = new THREE.Sprite(new THREE.SpriteMaterial({ map: textTexture(`${o.icon} ${p.name}`, { w: 512, h: 96, bg: '#fffdf5', font: 'bold 44px Fredoka, Arial' }), depthWrite: false })); tag.scale.set(1.9, 0.36, 1); tag.position.y = 2.05; g.add(tag);
+    const tag = new THREE.Sprite(new THREE.SpriteMaterial({ map: textTexture(`${p.title ? medal(p.title) + ' ' : ''}${o.icon} ${p.name}`, { w: 512, h: 96, bg: '#fffdf5', font: 'bold 44px Fredoka, Arial' }), depthWrite: false })); tag.scale.set(1.9, 0.36, 1); tag.position.y = 2.05; g.add(tag);
     addBlob(g, 0.9); g.traverse(m => { m.raycast = () => {}; }); charify(g); addOutline(g); return g;
   }
   async function join(zone) {
@@ -10034,15 +10040,16 @@ const Online = (() => {
     chan = sb.channel('crossia-' + zone, { config: { presence: { key: me.id }, broadcast: { self: false } } });
     chan.on('presence', { event: 'sync' }, () => { const st = chan.presenceState(); const ids = new Set(Object.keys(st));
       peers.forEach((p, id) => { if (!ids.has(id)) { p.g?.parent?.remove(p.g); peers.delete(id); } });
-      ids.forEach(id => { if (id === me.id) return; const m = st[id][0]; if (!peers.has(id)) peers.set(id, { name: m.name, profile: m.profile, x: m.x || 0, z: m.z || 0, tx: m.x || 0, tz: m.z || 0, yaw: 0, seen: Date.now() }); }); });
+      ids.forEach(id => { if (id === me.id) return; const m = st[id][0]; if (!peers.has(id)) peers.set(id, { name: m.name, profile: m.profile, title: m.title || null, x: m.x || 0, z: m.z || 0, tx: m.x || 0, tz: m.z || 0, yaw: 0, seen: Date.now() }); }); });
     chan.on('broadcast', { event: 'pos' }, ({ payload: m }) => { const p = peers.get(m.id); if (p) { p.tx = m.x; p.tz = m.z; p.yaw = m.yaw; p.seen = Date.now(); } });
-    chan.on('broadcast', { event: 'chat' }, ({ payload: m }) => { pushChat(m.name, m.profile, m.text, false); });
-    chan.subscribe(async (s) => { if (s === 'SUBSCRIBED') await chan.track({ name: me.name, profile: me.profile, x: Interiors.px, z: Interiors.pz }); });
-    try { const h = await rpc('crossia_chat_recent', { p_zone: zone }); chat.length = 0; (h || []).forEach(m => chat.push({ name: m.name, profile: m.profile, text: m.text, me: m.player === me.id, t: Date.parse(m.created_at) })); NetChat.render(); } catch (e) {}
+    chan.on('broadcast', { event: 'chat' }, ({ payload: m }) => { pushChat(m.name, m.profile, m.text, false, m.title); });
+    chan.subscribe(async (s) => { if (s === 'SUBSCRIBED') await chan.track({ name: me.name, profile: me.profile, title: api.title, x: Interiors.px, z: Interiors.pz }); });
+    try { const h = await rpc('crossia_chat_recent', { p_zone: zone }); chat.length = 0; let T = {}; try { T = await rpc('crossia_titles', { p_ids: [...new Set((h || []).map(m => m.player))] }) || {}; } catch (e) {}
+      (h || []).forEach(m => chat.push({ name: m.name, profile: m.profile, title: T[m.player] || null, text: m.text, me: m.player === me.id, t: Date.parse(m.created_at) })); NetChat.render(); } catch (e) {}
   }
-  function pushChat(name, profile, text, mine) { chat.push({ name, profile, text, me: mine, t: Date.now() }); while (chat.length > 60) chat.shift(); NetChat.render(); if (!mine) NetChat.ping(); }
+  function pushChat(name, profile, text, mine, title = null) { chat.push({ name, profile, title, text, me: mine, t: Date.now() }); while (chat.length > 60) chat.shift(); NetChat.render(); if (!mine) NetChat.ping(); }
   api.say = async (text) => { if (!me) throw new Error('Inicia sesión para chatear'); const r = await rpc('crossia_chat_post', { p_zone: chanZone || 'plaza', p_text: text });
-    pushChat(me.name, me.profile, r.text, true); chan?.send({ type: 'broadcast', event: 'chat', payload: { name: me.name, profile: me.profile, text: r.text } }); return r; };
+    pushChat(me.name, me.profile, r.text, true, api.title); chan?.send({ type: 'broadcast', event: 'chat', payload: { name: me.name, profile: me.profile, title: api.title, text: r.text } }); return r; };
   api.report = async (name) => { const p = [...peers.entries()].find(([, v]) => v.name === name); if (!p) throw new Error('No encuentro a ese jugador aquí'); return rpc('crossia_report', { p_target: p[0], p_chat: null, p_reason: 'chat' }); };
   api.update = (dt) => {
     if (me && session && SaveSystem.started && !state.menuOpen && Date.now() - lastPush > C.autosaveMin * 60000) api.push().catch(e => console.warn('[online] push', e.message));
@@ -10074,7 +10081,7 @@ const NetChat = {
     const d = this.ensure(), inside = NetWorld.inside(); d.style.display = inside && SaveSystem.started ? 'block' : 'none'; if (!inside) return;
     const on = !!Online.me, n = Online.peers.size;
     if (!this.open) { d.innerHTML = `<button data-o class="btn-game px-3 py-2 bg-[#fff6c2] text-[#2b2b3d] text-sm">💬 Chat ${on ? `· ${n + 1} aquí` : '(sin conexión)'}${this.unread ? ` <span class="ml-1 px-1.5 rounded-full bg-red-500 text-white text-[10px]">${this.unread}</span>` : ''}</button>`; d.querySelector('[data-o]').onclick = () => { this.open = true; this.unread = 0; this.render(); }; return; }
-    const log = Online.chat.slice(-30).map(m => `<div style="align-self:${m.me ? 'flex-end' : 'flex-start'};background:${m.me ? '#d1fae5' : '#fff'};border:2px solid #e2e8f0;border-radius:12px;padding:3px 8px;max-width:88%"><b style="font-size:11px">${NET_ORIGINS[m.profile]?.icon || ''} ${esc(m.name)}</b><div style="font-size:12px">${esc(m.text)}</div></div>`).join('');
+    const log = Online.chat.slice(-30).map(m => `<div style="align-self:${m.me ? 'flex-end' : 'flex-start'};background:${m.me ? '#d1fae5' : '#fff'};border:2px solid #e2e8f0;border-radius:12px;padding:3px 8px;max-width:88%"><b style="font-size:11px">${NET_ORIGINS[m.profile]?.icon || ''} ${esc(m.name)}</b>${m.title ? ` <span style="font-size:10px;color:#b45309">${esc(m.title)}</span>` : ''}<div style="font-size:12px">${esc(m.text)}</div></div>`).join('');
     d.innerHTML = `<div class="panel p-2" style="background:#fffdf5"><div class="flex items-center justify-between mb-1"><b class="text-sm text-[#2b2b3d]">💬 Chat de la ${esc(NET_ZONES[NetWorld.zone()]?.name || 'Red')}</b><span class="text-[11px] text-slate-500">${on ? `${n + 1} conectado(s)` : ''}</span><button data-x class="btn-game px-2 py-0.5 text-xs bg-slate-200">✕</button></div>
       ${on ? `<div data-log style="display:flex;flex-direction:column;gap:4px;max-height:180px;overflow:auto;margin-bottom:6px">${log || '<div class="text-xs text-slate-400">Nadie ha escrito todavía. ¡Saluda!</div>'}</div>
       <div class="flex flex-wrap gap-1 mb-1">${NetUI.QUICK.map((q, k) => `<button data-q="${k}" class="btn-game px-1.5 py-0.5 text-[10px] bg-sky-100">${q}</button>`).join('')}</div>
@@ -10113,8 +10120,9 @@ const RealMarket = {
           <div class="flex gap-1 mb-2">${tabs.map(([k, l]) => `<button data-tab="${k}" class="btn-game px-3 py-1.5 text-xs ${this.tab === k ? 'bg-[#fff6c2]' : 'bg-white'}">${l}</button>`).join('')}</div>`;
         if (this.tab === 'market') {
           html += `<div class="flex flex-wrap gap-1 mb-2"><button data-f="-1" class="btn-game px-2 py-0.5 text-[11px] ${this.filter < 0 ? 'bg-[#fff6c2]' : 'bg-white'}">Todos</button>${NET_ORIGINS.map((o, i) => `<button data-f="${i}" class="btn-game px-2 py-0.5 text-[11px] ${this.filter === i ? 'bg-[#fff6c2]' : 'bg-white'}">${o.icon}</button>`).join('')}</div>
-            <div class="text-[11px] text-slate-500 mb-1">Comprar = pagas al mejor vendedor. Vender = cobras del mejor comprador (−2 %). Si nadie cruza, tu orden queda en el Tablón.</div>`;
-          html += D.items.filter(x => this.filter < 0 || x.p === this.filter).map(x => `<div class="app-card p-2 mb-1.5 flex items-center gap-2 text-xs"><div class="flex-1 min-w-0"><b>${this.name(x.id)}</b> <span class="text-slate-400">NV${x.t}${x.p === me.profile ? ' · tuyo' : ''}</span><div class="text-slate-500">Venden ${x.ask ? `<b class="text-emerald-700">${fmt(x.ask)}</b> (${x.askQ})` : '—'} · Compran ${x.bid ? `<b class="text-sky-700">${fmt(x.bid)}</b> (${x.bidQ})` : '—'} · Último ${x.last ? fmt(x.last) : '—'} · 24 h: ${x.vol}</div></div>
+            <div class="text-[11px] text-slate-500 mb-1">Comprar = pagas al mejor vendedor. Vender = cobras del mejor comprador (−2 %). Si nadie cruza, tu orden queda en el Tablón.</div>` +
+            (Number.isInteger(Online.featured()) ? `<div class="app-card p-2 mb-2 text-[11px] bg-amber-50">🏆 Evento de la semana: <b>${NET_ORIGINS[Online.featured()].icon} ${NET_ORIGINS[Online.featured()].name}</b> · sus objetos se venden sin comisión en el Tablón.</div>` : '');
+          html += D.items.filter(x => this.filter < 0 || x.p === this.filter).map(x => `<div class="app-card p-2 mb-1.5 flex items-center gap-2 text-xs"><div class="flex-1 min-w-0"><b>${this.name(x.id)}</b> <span class="text-slate-400">NV${x.t}${x.p === me.profile ? ' · tuyo' : ''}</span>${x.p === Online.featured() ? ' <span class="px-1 rounded bg-amber-200 text-[10px] font-bold">0 % esta semana</span>' : ''}<div class="text-slate-500">Venden ${x.ask ? `<b class="text-emerald-700">${fmt(x.ask)}</b> (${x.askQ})` : '—'} · Compran ${x.bid ? `<b class="text-sky-700">${fmt(x.bid)}</b> (${x.bidQ})` : '—'} · Último ${x.last ? fmt(x.last) : '—'} · 24 h: ${x.vol}</div></div>
             <button data-buy="${x.id}" class="btn-game px-2 py-1 text-[11px] bg-emerald-200">Comprar</button><button data-sell="${x.id}" class="btn-game px-2 py-1 text-[11px] bg-sky-200" ${D.stock[x.id] ? '' : 'disabled style="opacity:.45"'}>Vender</button></div>`).join('');
         } else if (this.tab === 'aduana') {
           const left = Math.max(0, 50000 - D.coinsToday), own = [...mine.mats.map(m => m[0]), mine.jewel[0]];
@@ -10158,7 +10166,7 @@ const RealMarket = {
   orderForm(body, side, id, D, render) {
     const x = D.items.find(i => i.id === id), have = D.stock[id] || 0, def = side === 'buy' ? (x.ask || x.last || 50) : (x.bid || x.last || 50);
     const box = document.createElement('div'); box.className = 'app-card p-3 mb-2 text-xs bg-amber-50';
-    box.innerHTML = `<b class="text-sm">${side === 'buy' ? '🟢 Comprar' : '🔵 Vender'} ${this.name(id)}</b><div class="text-slate-500 mt-0.5">${side === 'buy' ? `Pagas desde la Aduana (tienes ${fmt(D.coins)} $T). Si pones más que el mejor vendedor, pagas lo suyo y te devuelve la diferencia.` : `Vendes desde la Aduana (tienes ${have}). Cobras el precio del comprador menos un 2 %.`}</div>
+    box.innerHTML = `<b class="text-sm">${side === 'buy' ? '🟢 Comprar' : '🔵 Vender'} ${this.name(id)}</b><div class="text-slate-500 mt-0.5">${side === 'buy' ? `Pagas desde la Aduana (tienes ${fmt(D.coins)} $T). Si pones más que el mejor vendedor, pagas lo suyo y te devuelve la diferencia.` : `Vendes desde la Aduana (tienes ${have}). Cobras el precio del comprador menos ${x.p === Online.featured() ? '0 % (evento de la semana)' : 'un 2 %'}.`}</div>
       <div class="flex gap-1 mt-2 items-center"><label>Cantidad <input data-oq type="number" min="1" value="1" class="game w-16 text-xs px-1 py-1"></label><label>Precio/u <input data-op type="number" min="1" value="${def}" class="game w-24 text-xs px-1 py-1"></label>
       <button data-ok class="btn-game px-3 py-1 text-[11px] ${side === 'buy' ? 'bg-emerald-300' : 'bg-sky-300'}">Publicar</button><button data-no class="btn-game px-2 py-1 text-[11px] bg-slate-200">✕</button></div>`;
     body.prepend(box); box.querySelectorAll('input').forEach(i => i.onkeydown = (e) => e.stopPropagation());
@@ -10253,6 +10261,46 @@ const RealShops = {
 Interiors.actions.realshop = (obj) => RealShops.visit(obj.userData.owner);
 
 /* ===== 👤 Cuenta online: entrar / crear cuenta / elegir nombre / nube ===== */
+/* ===== v2.0 · 🏆 TEMPORADAS: 8 semanas en un mundo persistente (no se borra nada). Cuatro rankings calculados en el servidor
+   (Magnate = patrimonio en la Aduana y tienda · Comerciante = ventas en el Tablón · Tendero = ventas de tu tienda · Constante = días activos),
+   un evento por semana (un perfil destacado: sus objetos sin comisión en el Tablón) y, al cerrar, título + premio en $T para el top 3. ===== */
+const RealSeason = {
+  kind: 'riqueza',
+  KINDS: { riqueza: ['💰', 'Magnate', 'Patrimonio en la Red: $T de la Aduana + objetos (Aduana y tienda) a precio de mercado'], comercio: ['📈', 'Comerciante', 'Lo que has vendido en el Tablón esta temporada'], tiendas: ['🏪', 'Tendero', 'Lo que ha vendido tu tienda esta temporada'], constancia: ['📅', 'Constante', 'Días con actividad en la Red (comprar, vender o ingresar en la Aduana)'] },
+  PRIZES: [20000, 10000, 5000],
+  left(ms) { if (ms <= 0) return 'terminando…'; const d = Math.floor(ms / 864e5), h = Math.floor(ms % 864e5 / 36e5); return d ? `${d} d ${h} h` : `${h} h ${Math.floor(ms % 36e5 / 6e4)} min`; },
+  open(kind = null) {
+    if (!Online.me) { Account.open(); return; } if (kind) this.kind = kind;
+    openApp('🏆 Temporada', '', (body) => {
+      const render = async () => {
+        body.innerHTML = `<div class="app-card p-3 text-sm text-slate-500">Cargando la temporada…</div>`;
+        let D; try { D = await Online.loadSeason(this.kind); } catch (e) { body.innerHTML = `<div class="app-card p-3 text-sm">❌ ${esc(e.message)}</div>`; return; }
+        const S = D.season, now = Date.now() + (D._skew || 0), total = Date.parse(S.ends) - Date.parse(S.starts), pct = Math.max(0, Math.min(100, (now - Date.parse(S.starts)) / total * 100));
+        const F = Number.isInteger(S.featured) ? NET_ORIGINS[S.featured] : null, nextMs = 7 * 864e5 - ((now - Date.parse(S.starts)) % (7 * 864e5)), K = this.KINDS[this.kind];
+        const nextF = NET_ORIGINS[(S.id * 3 + S.week) % 8];
+        let html = `<div class="app-card p-3 mb-2"><div class="flex items-center gap-3"><div class="text-4xl">🏆</div><div class="flex-1"><div class="font-bold text-[#2b2b3d]">Temporada ${S.id} · ${esc(S.name)}</div>
+            <div class="text-xs text-slate-500">Semana ${S.week} de 8 · termina en <b>${this.left(Date.parse(S.ends) - now)}</b> · lo que tienes no se borra</div></div></div>
+            <div style="height:8px;border-radius:6px;background:#e2e8f0;margin-top:8px;overflow:hidden"><div style="height:100%;width:${pct.toFixed(1)}%;background:linear-gradient(90deg,#fbbf24,#f472b6)"></div></div></div>`;
+        if (F) html += `<div class="app-card p-3 mb-2 bg-amber-50 text-xs"><div class="font-bold text-sm">${F.icon} Semana de ${F.name}</div>Sus objetos se venden <b>sin comisión</b> en el Tablón (normalmente −2 %). Buen momento para comprarles… o para venderlos si eres ${F.name}.
+            <div class="text-slate-500 mt-1">Cambia en ${this.left(nextMs)} → ${S.week < 8 ? `${nextF.icon} ${nextF.name}` : 'nueva temporada'}</div></div>`;
+        html += `<div class="flex gap-1 mb-2 flex-wrap">${Object.entries(this.KINDS).map(([k, [ic, n]]) => `<button data-k="${k}" class="btn-game px-3 py-1.5 text-xs ${this.kind === k ? 'bg-[#fff6c2]' : 'bg-white'}">${ic} ${n}</button>`).join('')}</div>
+          <div class="text-[11px] text-slate-500 mb-1">${K[2]}. Al terminar, el top 3 gana el título «${K[1]} T${S.id}» y ${this.PRIZES.map(fmt).join(' / ')} $T en la Aduana.</div>`;
+        const unit = this.kind === 'constancia' ? ' días' : ' $T';
+        html += (D.top.length ? D.top.map(r => `<div class="app-card p-2 mb-1 flex items-center gap-2 text-xs ${r.me ? 'bg-emerald-50' : ''}"><div class="w-8 text-center font-bold ${r.rank <= 3 ? 'text-base' : 'text-slate-500'}">${r.rank <= 3 ? ['🥇', '🥈', '🥉'][r.rank - 1] : '#' + r.rank}</div>
+            <div class="flex-1">${NET_ORIGINS[r.profile]?.icon || ''} <b>${esc(r.name)}</b>${r.me ? ' (tú)' : ''}</div><b>${fmt(r.score)}${unit}</b></div>`).join('')
+          : `<div class="app-card p-3 text-xs text-slate-500">Nadie puntúa todavía en esta categoría. ¡El primero se lleva el oro!</div>`);
+        html += `<div class="app-card p-2.5 mt-2 text-xs">Tu puesto: ${D.me ? `<b>#${D.me.rank}</b> de ${D.me.of} · ${fmt(D.me.score)}${unit}` : 'sin puntuar aún'}</div>`;
+        html += `<div class="sec-h">Tus títulos</div>` + (D.awards.length ? D.awards.map(a => `<div class="text-xs py-1 border-b border-slate-100"><b>${esc(a.title)}</b> · +${fmt(a.prize)} $T</div>`).join('') : '<div class="text-xs text-slate-400">Todavía ninguno. Tu mejor título aparece junto a tu nombre en la Red y en el chat.</div>');
+        html += `<button data-mk class="btn-game px-3 py-1.5 text-xs bg-amber-200 w-full mt-2">🏛️ Ir al mercado real</button>`;
+        body.innerHTML = html;
+        body.querySelectorAll('[data-k]').forEach(b => b.onclick = () => { this.kind = b.dataset.k; render(); });
+        body.querySelector('[data-mk]').onclick = () => { closeApp(); setTimeout(() => RealMarket.open('market'), 30); };
+      };
+      render();
+    });
+  },
+};
+
 const Account = {
   open() {
     openApp('🌍 Cuenta online', '', async (body) => {
@@ -10434,7 +10482,7 @@ $('btnNewGame').onclick = async () => {
   const ok = await confirmDialog({ title: '¿Seguro que quieres comenzar una nueva partida?', text: 'Se perderá el progreso guardado en este navegador:\n◎ ' + GS.economy.money.toLocaleString('es-ES') + ' $TOKEN · ' + missionsDone() + '/' + NPCS.length + ' misiones · casa nivel ' + GS.house.level, okLabel: 'NUEVA PARTIDA' });
   if (!ok) return; SaveSystem.reset(); location.reload();
 };
-{ const v = document.createElement('div'); v.className = 'text-[10px] text-slate-400 text-center mt-3'; v.textContent = `CrossIA · Micro World: AI Village · v${GAME_VERSION} «Red del Sueño» · guardado v${SAVE_VERSION}`; document.querySelector('#settingsModal .menu-card')?.append(v); }   // v1.0: etiqueta de versión
+{ const v = document.createElement('div'); v.className = 'text-[10px] text-slate-400 text-center mt-3'; v.textContent = `CrossIA · Micro World: AI Village · v${GAME_VERSION} «Temporadas» · guardado v${SAVE_VERSION}`; document.querySelector('#settingsModal .menu-card')?.append(v); }   // v1.0: etiqueta de versión
 // =====================================================================
 // DEBUG (B0.2b) - Herramientas de prueba. Uso: consola -> DBG.help()
 // Panel en pantalla: añadir ?debug=1 a la URL
