@@ -445,6 +445,7 @@ body.mobile .zone-banner { top: 70px; font-size: 13px; padding: 6px 14px; }
       <button id="btnBackpack" class="btn-game clickable px-3 md:px-4 py-2 bg-amber-300 text-[#2b2b3d] text-sm" title="Mochila (B)">🎒<span class="hidden md:inline"> Mochila</span> <span id="invBadge" class="pixel text-[8px] bg-[#2b2b3d] text-yellow-300 px-1.5 py-0.5 rounded ml-1">0/20</span></button>
       <button id="btnTools" class="btn-game clickable px-3 md:px-4 py-2 bg-orange-200 text-[#2b2b3d] text-sm hidden" title="Herramientas">🛠️<span class="hidden md:inline"> Herramientas</span></button>
       <button id="btnWeekly" class="btn-game clickable px-3 md:px-4 py-2 bg-violet-200 text-[#2b2b3d] text-sm hidden" title="Semana y logros">📅<span class="hidden md:inline"> Semana</span></button>
+      <button id="btnOnline" class="btn-game clickable px-3 md:px-4 py-2 bg-white text-[#2b2b3d] text-sm hidden" title="Cuenta online"><span id="netDot" class="inline-block w-2.5 h-2.5 rounded-full bg-slate-300 align-middle"></span><span id="netTxt" class="hidden md:inline ml-1"></span></button>
     </div>
   </div>
 
@@ -6912,7 +6913,7 @@ let _chatIn = -1;
 function animate() {
   requestAnimationFrame(animate);
   const rawDt = clock.getDelta(), dt = Math.min(rawDt, 0.05), t = clock.elapsedTime; GFX.update(dt, rawDt);   // v1.4: gobernador de FPS + viñeta
-  updatePlayer(dt); ToolAnim.update(dt); Gather.update(dt, t); WorldFX.update(dt, t); Voyage.update(dt); Studio.update(t); Online.update(dt); if ((NetWorld.inside() ? 1 : 0) !== _chatIn) { _chatIn = NetWorld.inside() ? 1 : 0; NetChat.render(); } if (!state.cinematic) Needs.update(dt); updateNPCs(dt, t); Awakening.update(dt, t); /* v0.9: el sueño se detiene durante la escena del puerto */ updateCamera(dt); Overlays.update(dt); updateSun(); updateNeon(dt, t); updateUnlocks(dt, t); updateShip(dt); updateConfetti(dt); updateWater(t); V10.update(dt, t); ShootingStars.update(dt, 1 - (state.dayAmt ?? 1)); WIND_U.uTime.value = t; { const w = Weather.id(), tw = (w === 'storm' ? 2.8 : w === 'rain' ? 2 : 1) * lerp(0.5, 1, state.dayAmt ?? 1); WIND_U.uWind.value += (tw - WIND_U.uWind.value) * Math.min(1, dt * 0.8); }
+  updatePlayer(dt); Emotes.update(dt); ToolAnim.update(dt); Gather.update(dt, t); WorldFX.update(dt, t); Voyage.update(dt); Studio.update(t); Online.update(dt); if ((NetWorld.inside() ? 1 : 0) !== _chatIn) { _chatIn = NetWorld.inside() ? 1 : 0; NetChat.render(); } if (!state.cinematic) Needs.update(dt); updateNPCs(dt, t); Awakening.update(dt, t); /* v0.9: el sueño se detiene durante la escena del puerto */ updateCamera(dt); Overlays.update(dt); updateSun(); updateNeon(dt, t); updateUnlocks(dt, t); updateShip(dt); updateConfetti(dt); updateWater(t); V10.update(dt, t); ShootingStars.update(dt, 1 - (state.dayAmt ?? 1)); WIND_U.uTime.value = t; { const w = Weather.id(), tw = (w === 'storm' ? 2.8 : w === 'rain' ? 2 : 1) * lerp(0.5, 1, state.dayAmt ?? 1); WIND_U.uWind.value += (tw - WIND_U.uWind.value) * Math.min(1, dt * 0.8); }
   clouds.children.forEach(p => { p.rotateY(p.userData.speed * dt); const c = p.userData.bob; if (c) c.position.z = c.userData.z0 + Math.sin(t * 0.3 + c.userData.ph) * 0.25; });   // v1.5: las nubes «respiran» arriba y abajo
   updateTokens(); updateGoalHUD(); updateClockHUD(); Weather.update(dt); Fishing.update(dt); Mining.update(dt); StarFall.update(dt); Net.update(dt);
   if (SaveSystem.started && !state.menuOpen && !state.cinematic) {
@@ -8400,7 +8401,7 @@ function awakeningChainHTML() {
    Nota: la 🎪 Feria del Sábado (puestos de los vecinos, ofertas de tienda) NO es la
    📈 Feria del Tablón de la v0.8 (especulación por categorías): conviven sin tocarse.
    ========================================================= */
-const GAME_VERSION = '3.0', GAME_TAG = 'Tiendas reales y métricas';
+const GAME_VERSION = '3.0.1', GAME_TAG = 'Presencia en la Red';
 /* ---------- 🗓️ EVENTOS: calendario REAL → flags que leen los sistemas existentes (Sec. 10.10) ---------- */
 const Events = {
   _force: null,   // DBG.weekday(n): simula el día de la semana real (0 = domingo … 6 = sábado)
@@ -11887,7 +11888,8 @@ const Online = (() => {
   const muted = new Set((() => { try { return JSON.parse(localStorage.getItem('crossia.muted') || '[]'); } catch (e) { return []; } })());
   const blocked = new Set();
   const api = { get me() { return me; }, get session() { return session; }, get ready() { return !!sb; }, peers, chat, muted, blocked, status: 'off', err: '' };
-  api.sync = 'idle'; let syncP = null, syncAt = 0;   // v2.9.3 · ☁️ partida de la nube frente a la de este navegador: idle · checking · ok · conflict · unknown
+  api.sync = 'idle'; let syncP = null, syncAt = 0;
+  api.friends = []; let friendsAt = 0, trackSig = '', trackAt = 0;   // v3.0.1 · H7: amigos y lo que se anuncia en la presencia   // v2.9.3 · ☁️ partida de la nube frente a la de este navegador: idle · checking · ok · conflict · unknown
   api.hidden = (id) => !!id && (muted.has(id) || blocked.has(id));
   api.setMuted = (id, on) => { if (on) muted.add(id); else muted.delete(id); try { localStorage.setItem('crossia.muted', JSON.stringify([...muted])); } catch (e) {} NetChat.render(); };
   api.loadBlocks = async () => { const l = await rpc('crossia_my_blocks'); blocked.clear(); (l || []).forEach(b => blocked.add(b.id)); return l || []; };
@@ -11912,7 +11914,7 @@ const Online = (() => {
   const tr = (m) => { for (const [re, t] of ES) if (re.test(m)) return t; return m; };
   const rpc = async (fn, args = {}) => { const { data, error } = await (await lib()).rpc(fn, args); if (error) throw new Error(tr(error.message)); return data; };
   async function refreshMe() { me = session ? await rpc('crossia_me') : null; api.status = me ? 'on' : session ? 'noplayer' : 'off';
-    if (me) { GS.meta.profile = { type: PROFILE.ACCOUNT, accountId: me.id, displayName: me.name }; api.loadSeason().catch(() => {}); api.loadBlocks().catch(() => {}); } return me; }
+    if (me) { GS.meta.profile = { type: PROFILE.ACCOUNT, accountId: me.id, displayName: me.name }; api.loadSeason().catch(() => {}); api.loadBlocks().catch(() => {}); friendsAt = Date.now(); api.loadFriends().catch(() => {}); } NetStatus.render(); return me; }
   api.refreshMe = refreshMe;
   /** v2.0 · 🏆 Temporada: se guarda la última consulta (evento de la semana, mi puesto, mi título) */
   api.season = null; api.title = null;
@@ -11956,6 +11958,7 @@ const Online = (() => {
   /* --- 🌐 Red real: presencia, posiciones y chat por zona --- */
   function leave() { if (chan) { try { sb.removeChannel(chan); } catch (e) {} } chan = null; chanZone = null; peers.forEach(p => p.g?.parent?.remove(p.g)); peers.clear(); if (typeof RealWorld !== 'undefined') RealWorld._tickAt = 0; }
   function avatarOf(p) {
+    if (p.av) return Presence.build(p);   // v3.0.1 · H7: su avatar y su aura reales
     const o = NET_ORIGINS[p.profile] || NET_ORIGINS[0], g = new THREE.Group(), col = mat(o.color);
     g.add(cyl(0.32, 0.38, 0.9, col, 0, 0.55, 0, 12)); g.add(sphere(0.36, mat(0xf1c9a5), 0, 1.3, 0, 14)); g.add(sphere(0.37, mat(0x4e342e), 0, 1.42, -0.04, 12));
     const tag = new THREE.Sprite(new THREE.SpriteMaterial({ map: textTexture(`${p.bot ? '🌙 ' : p.title ? medal(p.title) + ' ' : ''}${o.icon} ${p.name}`, { w: 512, h: 96, bg: '#fffdf5', font: 'bold 44px Fredoka, Arial' }), depthWrite: false })); tag.scale.set(1.9, 0.36, 1); tag.position.y = 2.05; g.add(tag);
@@ -11966,10 +11969,14 @@ const Online = (() => {
     chan = sb.channel('crossia-' + zone, { config: { presence: { key: me.id }, broadcast: { self: false } } });
     chan.on('presence', { event: 'sync' }, () => { const st = chan.presenceState(); const ids = new Set(Object.keys(st));
       peers.forEach((p, id) => { if (!p.bot && !ids.has(id)) { p.g?.parent?.remove(p.g); peers.delete(id); } });
-      ids.forEach(id => { if (id === me.id) return; const m = st[id][0]; if (!peers.has(id)) peers.set(id, { id, name: m.name, profile: m.profile, title: m.title || null, x: m.x || 0, z: m.z || 0, tx: m.x || 0, tz: m.z || 0, yaw: 0, seen: Date.now() }); }); });
+      ids.forEach(id => { if (id === me.id) return; const m = st[id][0], old = peers.get(id);
+        if (!old) { peers.set(id, { id, name: m.name, profile: m.profile, title: m.title || null, x: m.x || 0, z: m.z || 0, tx: m.x || 0, tz: m.z || 0, yaw: 0, seen: Date.now(), av: Presence.clean(m.av), au: Presence.aura(m.au) });
+          const f = api.friends.find(x => x.id === id && x.mutual); if (f) showToast(`⭐ ${m.name}, de tus amigos, está aquí`, 'text-white'); }
+        else { const av = Presence.clean(m.av), au = Presence.aura(m.au); if (JSON.stringify(av) !== JSON.stringify(old.av) || JSON.stringify(au) !== JSON.stringify(old.au)) { old.av = av; old.au = au; if (old.g) { old.g.parent?.remove(old.g); old.g = null; } } old.name = m.name; old.title = m.title || null; } }); });   // v3.0.1: si cambia de ropa o de aura, se rehace
     chan.on('broadcast', { event: 'pos' }, ({ payload: m }) => { const p = peers.get(m.id); if (p) { p.tx = m.x; p.tz = m.z; p.yaw = m.yaw; p.seen = Date.now(); } });
     chan.on('broadcast', { event: 'chat' }, ({ payload: m }) => { pushChat(m.name, m.profile, m.text, false, m.title, m.id || null); });
-    chan.subscribe(async (s) => { if (s === 'SUBSCRIBED') await chan.track({ name: me.name, profile: me.profile, title: api.title, x: Interiors.px, z: Interiors.pz }); });
+    chan.on('broadcast', { event: 'emote' }, ({ payload: m }) => { const p = peers.get(m.id); if (p && Emotes.LIST[m.e] && !blocked.has(m.id)) p.emote = { kind: m.e, t: 0 }; });   // v3.0.1 · H7: emotes
+    chan.subscribe(async (s) => { if (s === 'SUBSCRIBED') { const P = Presence.mine(); trackSig = JSON.stringify(P); await chan.track({ name: me.name, profile: me.profile, title: api.title, x: Interiors.px, z: Interiors.pz, ...P }); } });   // v3.0.1: + avatar y aura reales
     try { const h = await rpc('crossia_chat_recent', { p_zone: zone }); chat.length = 0; let T = {}; try { T = await rpc('crossia_titles', { p_ids: [...new Set((h || []).map(m => m.player))] }) || {}; } catch (e) {}
       (h || []).forEach(m => chat.push({ id: m.player, name: m.name, profile: m.profile, title: T[m.player] || null, text: m.text, me: m.player === me.id, t: Date.parse(m.created_at) })); NetChat.render(); } catch (e) {}
   }
@@ -11978,6 +11985,12 @@ const Online = (() => {
     pushChat(me.name, me.profile, r.text, true, api.title); chan?.send({ type: 'broadcast', event: 'chat', payload: { id: me.id, name: me.name, profile: me.profile, title: api.title, text: r.text } }); return r; };
   api.report = async (id, reason = 'otro') => rpc('crossia_report', { p_target: id, p_chat: null, p_reason: reason });
   api.rpc = rpc;
+  /** v3.0.1 · H7 · ⭐ amigos (si estáis en las dos listas, ves si está conectado) */
+  api.loadFriends = async () => { if (!me) return []; const l = await rpc('crossia_friends'); api.friends = Array.isArray(l) ? l : []; NetStatus.render(); return api.friends; };
+  api.setFriend = async (id, on) => { const r = await rpc('crossia_friend_set', { p_target: id, p_on: !!on }); await api.loadFriends().catch(() => {}); return r; };
+  api.isFriend = (id) => api.friends.some(f => f.id === id);
+  /** v3.0.1 · H7 · 👋 emote: lo ven los que están en tu zona de la Red */
+  api.emote = (kind) => { if (chan && me && Emotes.LIST[kind]) chan.send({ type: 'broadcast', event: 'emote', payload: { id: me.id, e: kind } }); };
   api.rename = async (n) => { me = await rpc('crossia_rename', { p_name: n }); await refreshMe(); return me; };
   api.acceptRules = async () => { me = await rpc('crossia_accept_rules'); return me; };
   /** H2 · Eliminar cuenta: Edge Function con clave de servicio (borra jugador y, si la cuenta nació en CrossIA, también el usuario) */
@@ -11987,6 +12000,9 @@ const Online = (() => {
   api.update = (dt) => {
     if (me && session && (api.sync === 'idle' || (api.sync === 'unknown' && Date.now() - syncAt > 60000))) api.syncCheck();   // v2.9.3: comprobar (o reintentar) antes de subir nada
     if (me && session && api.sync === 'ok' && SaveSystem.started && !state.menuOpen && Date.now() - lastPush > C.autosaveMin * 60000) api.push().catch(e => console.warn('[online] push', e.message));
+    if (me && session && Date.now() - friendsAt > 120000) { friendsAt = Date.now(); api.loadFriends().catch(() => {}); }   // v3.0.1 · H7: amigos conectados
+    NetStatus.tick(dt);   // v3.0.1 · H7: indicador de conexión en el HUD
+    if (chan && me && Date.now() - trackAt > 4000) { trackAt = Date.now(); const P = Presence.mine(), sig = JSON.stringify(P); if (sig !== trackSig) { trackSig = sig; chan.track({ name: me.name, profile: me.profile, title: api.title, x: Interiors.px, z: Interiors.pz, ...P }).catch?.(() => {}); } }   // te cambias de ropa: los demás lo ven
     const z = NetWorld.inside() ? NetWorld.zone() : null;
     if (!me || !sb) return;
     if (z && z !== chanZone) join(z); else if (!z && chanZone) leave();
@@ -11999,7 +12015,8 @@ const Online = (() => {
     const root = Interiors.root; if (!root) return;
     peers.forEach((p, id) => { if (!p.g) { p.g = avatarOf(p); p.g.position.set(p.x, 0, p.z); root.add(p.g); } p.g.visible = !blocked.has(id);
       if (p.g.parent !== root) root.add(p.g);
-      if (!p.bot) { p.x += (p.tx - p.x) * Math.min(1, dt * 8); p.z += (p.tz - p.z) * Math.min(1, dt * 8); } p.g.position.set(p.x, Math.abs(Math.sin((p.x + p.z) * 3)) * 0.04, p.z); p.g.rotation.y += ((p.yaw || 0) - p.g.rotation.y) * Math.min(1, dt * 8); });
+      const ox = p.x, oz = p.z; if (!p.bot) { p.x += (p.tx - p.x) * Math.min(1, dt * 8); p.z += (p.tz - p.z) * Math.min(1, dt * 8); } p.g.position.set(p.x, Math.abs(Math.sin((p.x + p.z) * 3)) * 0.04, p.z); p.g.rotation.y += ((p.yaw || 0) - p.g.rotation.y) * Math.min(1, dt * 8);
+      Presence.animate(p, dt, Math.hypot(p.x - ox, p.z - oz) / Math.max(dt, 1e-3)); });   // v3.0.1: andar, emotes y aura
   };
   api.lib = lib;
   return api;
@@ -12020,7 +12037,9 @@ const NetChat = {
     if (bdg) { bdg.style.display = inside ? 'flex' : 'none'; bdg.className = NetWorld.real() ? 'real' : 'demo'; bdg.innerHTML = NetWorld.real() ? '🌍 Red real' : '🌙 Demo con bots'; }
     if (!inside) return;
     const on = !!Online.me, n = Online.peers.size;
-    if (!this.open) { d.innerHTML = `<button data-o class="btn-game px-3 py-2 bg-[#fff6c2] text-[#2b2b3d] text-sm">💬 Chat ${on ? `· ${n + 1} aquí` : '(sin conexión)'}${this.unread ? ` <span class="ml-1 px-1.5 rounded-full bg-red-500 text-white text-[10px]">${this.unread}</span>` : ''}</button>`; d.querySelector('[data-o]').onclick = () => { this.open = true; this.unread = 0; this.render(); }; return; }
+    const emo = `<span class="inline-flex gap-1 ml-1 align-middle">${Object.entries(Emotes.LIST).map(([k, [ic, tx]]) => `<button data-emo="${k}" title="${tx}" class="btn-game px-2 py-1.5 bg-white text-sm no-ico">${ic}</button>`).join('')}</span>`;   // v3.0.1 · H7: emotes
+    const bindEmo = () => d.querySelectorAll('[data-emo]').forEach(b => b.onclick = () => Emotes.play(b.dataset.emo));
+    if (!this.open) { d.innerHTML = `<button data-o class="btn-game px-3 py-2 bg-[#fff6c2] text-[#2b2b3d] text-sm">💬 Chat ${on ? `· ${n + 1} aquí` : '(sin conexión)'}${this.unread ? ` <span class="ml-1 px-1.5 rounded-full bg-red-500 text-white text-[10px]">${this.unread}</span>` : ''}</button>${emo}`; d.querySelector('[data-o]').onclick = () => { this.open = true; this.unread = 0; this.render(); }; bindEmo(); return; }
     const log = Online.chat.filter(m => m.me || !Online.hidden(m.id)).slice(-30).map(m => `<div style="align-self:${m.me ? 'flex-end' : 'flex-start'};background:${m.me ? '#d1fae5' : '#fff'};border:1px solid #e2e8f0;border-radius:12px;padding:3px 8px;max-width:88%"><b style="font-size:11px;${m.me || !m.id ? '' : 'cursor:pointer;text-decoration:underline dotted'}" ${m.me || !m.id ? '' : `data-peer="${m.id}"`}>${NET_ORIGINS[m.profile]?.icon || ''} ${esc(m.name)}</b>${m.title ? ` <span style="font-size:10px;color:#b45309">${esc(m.title)}</span>` : ''}<div style="font-size:12px">${esc(m.text)}</div></div>`).join('');
     d.innerHTML = `<div class="panel p-2" style="background:#fffdf5"><div class="flex items-center justify-between mb-1"><b class="text-sm text-[#2b2b3d]">💬 Chat de la ${esc(NET_ZONES[NetWorld.zone()]?.name || 'Red')}</b><span class="text-[11px] text-slate-500">${on ? `${n + 1} conectado(s)` : ''}</span><button data-x class="btn-game px-2 py-0.5 text-xs bg-slate-200">✕</button></div>
       ${on ? `<div data-log style="display:flex;flex-direction:column;gap:4px;max-height:180px;overflow:auto;margin-bottom:6px">${log || '<div class="text-xs text-slate-400">Nadie ha escrito todavía. ¡Saluda!</div>'}</div>
@@ -12350,6 +12369,7 @@ const PeerCard = {
           `<div class="hub-head mb-2">${profChip(o, 'lg')}<div class="flex-1 min-w-0"><div class="nm">${esc(p.name)}${p.title ? ` <span class="text-xs" style="color:#b7791f">${esc(p.title)}</span>` : ''}</div><div class="sub">${o.name}${p.bot ? ' · Comerciante del Sueño (jugador bot: entra cuando hay poca gente y no puntúa en el ranking)' : ''}${blk ? ' · bloqueado' : mut ? ' · silenciado' : ''}</div></div></div>
           <div class="hub-grid">
             <button class="hub-t" data-shop>${uiChip('🏪')}<div class="tx"><div class="ti">Ir a su tienda</div><div class="de">Si tiene puesto o tienda en la Red</div></div></button>
+            ${p.bot ? '' : (() => { const f = Online.friends.find(x => x.id === p.id); return `<button class="hub-t" data-friend>${uiChip(f ? '⭐' : '➕')}<div class="tx"><div class="ti">${f ? 'Quitar de amigos' : 'Añadir a amigos'}</div><div class="de">${f ? (f.mutual ? 'Sois amigos: veis si el otro está conectado' : 'Le tienes en tu lista; cuando te añada, veréis si estáis conectados') : 'Sale en tu lista de amigos y te avisa cuando coincidáis'}</div></div></button>`; })()}
             <button class="hub-t" data-mute>${uiChip(mut ? '💬' : '🔕')}<div class="tx"><div class="ti">${mut ? 'Quitar silencio' : 'Silenciar'}</div><div class="de">${mut ? 'Vuelves a ver sus mensajes' : 'Dejas de ver sus mensajes; solo en tu pantalla'}</div></div></button>
             <button class="hub-t" data-block>${uiChip('🚫')}<div class="tx"><div class="ti">${blk ? 'Desbloquear' : 'Bloquear'}</div><div class="de">${blk ? 'Vuelve a aparecer en tu Red' : 'No ves su chat ni su avatar y no compra en tu tienda'}</div></div></button>
           </div>
@@ -12358,6 +12378,7 @@ const PeerCard = {
         const run = async (fn, ok) => { try { await fn(); render(ok); } catch (e) { render('❌ ' + e.message); } };
         body.querySelector('[data-mute]').onclick = () => { Online.setMuted(p.id, !mut); render(!mut ? '✓ Silenciado: ya no ves sus mensajes' : '✓ Silencio quitado'); };
         body.querySelector('[data-block]').onclick = () => run(() => Online.setBlocked(p.id, !blk), !blk ? '✓ Bloqueado' : '✓ Desbloqueado');
+        { const fb = body.querySelector('[data-friend]'); if (fb) fb.onclick = () => { const on = !Online.isFriend(p.id); run(() => Online.setFriend(p.id, on), on ? `✓ ${p.name} está en tus amigos` : '✓ Quitado de tus amigos'); }; }   // v3.0.1 · H7
         body.querySelector('[data-shop]').onclick = async () => { closeApp(); if (RealWorld.openStallOf(p.id)) return; try { await RealShops.visit(p.id); } catch (e) { showToast('🏪 ' + (e.message || 'No tiene tienda'), 'text-white'); } };
         body.querySelectorAll('[data-rep]').forEach(b => b.onclick = () => run(() => Online.report(p.id, b.dataset.rep), '✓ Reporte enviado. Gracias por cuidar la Red.'));
       };
@@ -12390,6 +12411,8 @@ const Account = {
               <div class="flex gap-2 mt-2"><button data-push class="btn-game px-3 py-1.5 text-xs bg-emerald-200 flex-1">☁️⬆ Subir ahora</button><button data-pull class="btn-game px-3 py-1.5 text-xs bg-sky-200 flex-1">☁️⬇ Traer la de la nube</button></div></div>
             ${me.rules_at ? '' : `<div class="app-card p-3 mb-2 text-xs bg-amber-50">Antes de seguir en la Red, acepta las <a href="#" data-normas2 class="underline">normas</a> (respeto, nada de estafas ni trampas). <button data-accept class="btn-game px-3 py-1 text-xs bg-emerald-200 mt-2 w-full">Acepto las normas</button></div>`}
             <div class="sec-h">Red del Sueño real</div><div class="app-card p-3 text-xs">Entra en la Red desde el PC de tu casa: verás a los jugadores conectados en tu misma zona y podrás chatear con ellos. Para comprar y vender con ellos, el Mercado real.<button data-mkt class="btn-game px-3 py-1.5 text-xs bg-amber-200 w-full mt-2">🏛️ Abrir el Mercado real</button></div>`;
+          const fr = await Online.loadFriends().catch(() => Online.friends);   // v3.0.1 · H7
+          html += `<div class="sec-h">Amigos (${fr.length})</div><div class="app-card p-3 mb-2 text-xs">${fr.length ? fr.map(f => `<div class="flex items-center gap-2 py-1 border-b border-slate-100 last:border-0"><span class="inline-block w-2.5 h-2.5 rounded-full ${f.online ? 'bg-emerald-500' : 'bg-slate-300'}" title="${f.online === null ? 'Cuando te añada, verás si está conectado' : f.online ? 'Conectado' : 'Desconectado'}"></span><span class="flex-1">${NET_ORIGINS[f.profile]?.icon || ''} <b>${esc(f.name)}</b>${f.mutual ? '' : ' <span class="text-slate-400">(aún no te ha añadido)</span>'}</span><button data-fshop="${f.id}" class="btn-game px-2 py-0.5 text-[11px] bg-amber-100">Su tienda</button><button data-unfriend="${f.id}" class="btn-game px-2 py-0.5 text-[11px] bg-white">Quitar</button></div>`).join('') : 'Todavía no tienes amigos en la lista. Toca el nombre de alguien en el chat o en la Red y pulsa «Añadir a amigos».'}</div>`;
           const bl = await Online.loadBlocks().catch(() => []), nextName = me.name_changed_at ? new Date(Date.parse(me.name_changed_at) + 7 * 864e5) : null, canRename = !nextName || nextName < new Date();
           html += `<div class="sec-h">Tu cuenta</div>
             <div class="app-card p-3 mb-2 text-xs"><b>Cambiar de nombre</b> · una vez cada 7 días${canRename ? '' : ` (próximo: ${nextName.toLocaleDateString('es-ES')})`}
@@ -12419,6 +12442,8 @@ const Account = {
         $b('[data-normas2]') && ($b('[data-normas2]').onclick = (e) => { e.preventDefault(); Account.rules(); });
         $b('[data-rename]') && ($b('[data-rename]').onclick = () => run(() => Online.rename(val('[data-newname]')), (m) => `✓ Ahora te llamas ${esc(m?.name || '')}`));
         body.querySelectorAll('[data-unblock]').forEach(b => b.onclick = () => run(() => Online.setBlocked(b.dataset.unblock, false), '✓ Desbloqueado'));
+        body.querySelectorAll('[data-unfriend]').forEach(b => b.onclick = () => run(() => Online.setFriend(b.dataset.unfriend, false), '✓ Quitado de tus amigos'));   // v3.0.1 · H7
+        body.querySelectorAll('[data-fshop]').forEach(b => b.onclick = async () => { closeApp(); if (RealWorld.openStallOf(b.dataset.fshop)) return; try { await RealShops.visit(b.dataset.fshop); } catch (e) { showToast('🏪 ' + (e.message || 'No tiene tienda'), 'text-white'); } });
         $b('[data-del]') && ($b('[data-del]').onclick = () => run(async () => { const nm = val('[data-delname]');
           if (!(await confirmDialog({ title: 'Eliminar cuenta', text: 'Se borran para siempre tu jugador, tu partida en la nube, tu Aduana, tu tienda y tus órdenes. Tu partida de este navegador se queda.', okLabel: 'ELIMINAR' }))) return 'Cancelado';
           await Online.deleteAccount(nm); return 'Cuenta eliminada. Sigues jugando en local.'; }, (m) => m));
@@ -12683,6 +12708,93 @@ const SyncGuard = {
     catch (e) { if (btn) btn.disabled = false; showToast('☁️ ' + e.message, 'text-red-200'); return false; }
   },
 };
+
+/* ===== v3.0.1 · H7 · 👥 PRESENCIA (Guía Maestra 2, Bloque H) =====
+   - Los demás jugadores se ven con su avatar y su aura reales (buildAvatar), no como cápsulas: viajan en la presencia del canal.
+   - Emotes básicos (👋 saludar, 👏 aplaudir, 💃 bailar) que ven los de tu zona, lista de amigos (crossia_friends) e
+     indicador de conexión en el HUD (verde en línea · ámbar conectando o eligiendo partida · rojo sin conexión). */
+const AV_ALL_KEYS = AVATAR_PARTS.map(p => p.key);   // la ropa de los demás se dibuja tal cual (es solo estética)
+const Presence = {
+  /** Lo que anuncias: tu avatar (normalizado) y tu aura (nivel y estilo) */
+  mine() { const eq = GS.cosmetics?.auraV3?.style || 'none'; return { av: avSanitize(GS.avatar), au: [state.auraTier | 0, state.veilAura && eq !== 'dreamer' ? 'veil' : eq] }; },
+  /** Avatar de otro jugador: solo números válidos (si algo no cuadra, se queda la cápsula) */
+  clean(av) {
+    if (!av || typeof av !== 'object') return null; const out = {};
+    for (const sl of AVATAR_SLOTS) {
+      if (sl.style) { const v = av[sl.style]; if (v === null && sl.nullable) out[sl.style] = null; else if (Number.isInteger(v) && v >= 0 && v < AV_STYLES[sl.style].length) out[sl.style] = v; else return null; }
+      const c = av[sl.color], max = sl.colors.length + (sl.fabrics ? AV_FABRICS.length : 0); if (Number.isInteger(c) && c >= 0 && c < max) out[sl.color] = c; else return null;
+    }
+    return out;
+  },
+  aura(au) { if (!Array.isArray(au)) return [0, 'none']; const t = Math.max(0, Math.min(4, au[0] | 0)), st = AURA_STYLES[au[1]] ? au[1] : 'none'; return [t, st]; },
+  /** Aura ligera (sin luz) para los demás */
+  auraGroup([tier, styleId]) {
+    const g = new THREE.Group(), t = AURA_TIERS[tier] || AURA_TIERS[0], st = AURA_STYLES[styleId] || AURA_STYLES.none; g.position.y = 0.9; if (!t.particles) return g;
+    for (let i = 0; i < t.particles; i++) { const a = i / t.particles * Math.PI * 2, rc = st.rainbow ? new THREE.Color().setHSL(i / t.particles, 0.85, 0.65).getHex() : null;
+      const s = sphere(t.size, rc !== null ? glow(rc, rc, 1.6) : glow(st.c, st.e, 1.6), Math.cos(a) * t.radius, 0, Math.sin(a) * t.radius, 6); s.castShadow = false; s.userData.i = i; g.add(s); }
+    if (t.ring) { const r = new THREE.Mesh(new THREE.RingGeometry(0.55, 0.75, 28), new THREE.MeshBasicMaterial({ color: st.e, transparent: true, opacity: 0.32, side: THREE.DoubleSide, depthWrite: false })); r.rotation.x = -Math.PI / 2; r.position.y = -0.78; g.add(r); }
+    return g;
+  },
+  build(p) {
+    const g = new THREE.Group(), body = buildAvatar(p.av, AV_ALL_KEYS); charify(body); addOutline(body); g.add(body);
+    const tag = new THREE.Sprite(new THREE.SpriteMaterial({ map: textTexture(`${p.bot ? '🌙 ' : p.title ? (p.title || '').split(' ')[0] + ' ' : ''}${(NET_ORIGINS[p.profile] || NET_ORIGINS[0]).icon} ${p.name}`, { w: 512, h: 96, bg: '#fffdf5', font: 'bold 44px Fredoka, Arial' }), depthWrite: false })); tag.scale.set(1.9, 0.36, 1); tag.position.y = 2.65; g.add(tag);
+    const au = this.auraGroup(p.au || [0, 'none']); g.add(au); addBlob(g, 0.9);
+    g.traverse(m => { m.raycast = () => {}; }); Object.assign(g.userData, { body, parts: body.userData.parts, aura: au, walk: 0 }); return g;
+  },
+  /** Cada frame: andar, emote y aura de un jugador de la Red */
+  animate(p, dt, speed) {
+    const u = p.g?.userData; if (!u || !u.parts) return; const P = u.parts;
+    if (u.aura) { u.aura.rotation.y += dt * 2.2; u.aura.children.forEach(c => { if (c.isMesh && c.userData.i !== undefined) c.position.y = Math.sin(performance.now() * 0.004 + c.userData.i) * 0.15; }); }
+    if (speed > 0.25) { if (p.emote) { Emotes.rest(P); u.body.rotation.y = 0; p.emote = null; } u.walk += dt * 11; const s = Math.sin(u.walk); P.legL.rotation.x = s * 0.7; P.legR.rotation.x = -s * 0.7; P.armL.rotation.x = -s * 0.6; P.armR.rotation.x = s * 0.6; return; }
+    if (p.emote) { const e = p.emote; e.t += dt; if (!e.b) e.b = Emotes.bubble(p.g, e.kind); if (e.t > Emotes.dur(e.kind)) { Emotes.rest(P); u.body.rotation.y = 0; e.b?.parent?.remove(e.b); p.emote = null; } else { Emotes.pose(P, e.kind, e.t); if (e.kind === 'dance') u.body.rotation.y = e.t * 3; Emotes.fade(e.b, e.t, e.kind); } return; }
+    ['legL', 'legR', 'armL', 'armR'].forEach(k => { P[k].rotation.x *= 0.85; });
+  },
+};
+const Emotes = {
+  LIST: { wave: ['👋', 'Saludar'], clap: ['👏', 'Aplaudir'], dance: ['💃', 'Bailar'] },
+  kind: null, t: 0, b: null,
+  dur: (k) => k === 'dance' ? 3.2 : 2.2,
+  /** Postura del emote en el instante t (los brazos cuelgan del hombro: z los sube de lado, x los lleva al frente) */
+  pose(P, k, t) {
+    if (k === 'wave') { P.armR.rotation.z = 2.7; P.armR.rotation.x = Math.sin(t * 12) * 0.35; P.armL.rotation.z = 0; P.armL.rotation.x = 0; }
+    else if (k === 'clap') { const s = Math.abs(Math.sin(t * 10)); P.armL.rotation.x = -1.35; P.armR.rotation.x = -1.35; P.armL.rotation.z = -0.25 - s * 0.35; P.armR.rotation.z = 0.25 + s * 0.35; }
+    else if (k === 'dance') { const s = Math.sin(t * 8); P.armL.rotation.z = -2.3 - s * 0.4; P.armR.rotation.z = 2.3 - s * 0.4; P.armL.rotation.x = 0; P.armR.rotation.x = 0; P.legL.rotation.x = Math.max(0, s) * 0.6; P.legR.rotation.x = Math.max(0, -s) * 0.6; }
+  },
+  rest(P) { ['armL', 'armR', 'legL', 'legR'].forEach(k => { if (P[k]) { P[k].rotation.z = 0; P[k].rotation.x = 0; } }); },
+  bubble(holder, k) { const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: textTexture(this.LIST[k][0], { w: 128, h: 128, bg: '#fffdf5', font: '84px serif', radius: 64 }), depthWrite: false, transparent: true })); sp.scale.setScalar(0.55); sp.position.y = 3.1; holder.add(sp); return sp; },
+  fade(b, t, k) { if (b) { b.position.y = 3.1 + Math.min(t, 0.4) * 0.5; b.material.opacity = Math.max(0, Math.min(1, (this.dur(k) - t) / 0.4)); } },
+  /** Tu emote: te mueves y se corta */
+  play(k) {
+    if (!this.LIST[k] || state.cinematic || state.build || state.deco) return false;
+    this.stop(); this.kind = k; this.t = 0; this.b = this.bubble(player, k); try { Online.emote(k); } catch (e) {} playBeep(k === 'clap' ? 880 : 660, 0.05, 'triangle'); return true;
+  },
+  stop() { const P = player.userData.parts; if (this.kind && P) { this.rest(P); if (player.userData.body) player.userData.body.rotation.y = 0; } this.b?.parent?.remove(this.b); this.b = null; this.kind = null; },
+  update(dt) {
+    if (!this.kind) return; const P = player.userData.parts; this.t += dt;
+    if (!P || state.moving || this.t > this.dur(this.kind)) { this.stop(); return; }
+    this.pose(P, this.kind, this.t); if (this.kind === 'dance' && player.userData.body) player.userData.body.rotation.y = this.t * 3; this.fade(this.b, this.t, this.kind);
+  },
+};
+/** 🟢 Indicador de conexión en el HUD (solo si tienes cuenta abierta en este navegador) */
+const NetStatus = {
+  acc: 0, last: '',
+  state() {
+    if (!Online.session) return null;
+    if (!Online.me) return ['amber', 'Elige tu nombre'];
+    if (Online.sync === 'conflict') return ['amber', 'Elige partida'];
+    if (Online.sync === 'unknown') return ['red', 'Sin conexión'];
+    if (Online.sync !== 'ok') return ['amber', 'Conectando…'];
+    const n = Online.friends.filter(f => f.mutual && f.online).length; return ['green', `En línea${n ? ` · ⭐ ${n}` : ''}`];
+  },
+  render() {
+    const b = document.getElementById('btnOnline'); if (!b) return; const st = this.state(), sig = JSON.stringify(st); if (sig === this.last) return; this.last = sig;
+    b.classList.toggle('hidden', !st); if (!st) return;
+    const dot = document.getElementById('netDot'), tx = document.getElementById('netTxt');
+    dot.className = `inline-block w-2.5 h-2.5 rounded-full align-middle ${st[0] === 'green' ? 'bg-emerald-500' : st[0] === 'red' ? 'bg-red-500' : 'bg-amber-400'}`; tx.textContent = st[1]; b.title = `Cuenta online: ${st[1]}`;
+  },
+  tick(dt) { if ((this.acc += dt) > 1) { this.acc = 0; this.render(); } },
+};
+ui_bind('btnOnline', () => { if (Online.sync === 'conflict') SyncGuard.reopen(); else Account.open(); });
 
 /* ===== v3.0 · H8 · 📊 MÉTRICAS ANÓNIMAS (Guía 1, Sec. 10.9) =====
    Retención a 1, 7 y 30 días, cuántos llegan al Acto 2 y cuántos compran el billete. Se envía un número aleatorio de este
@@ -13209,7 +13321,7 @@ DBG.refs = DBG_REFS;
 if (/[?&]debug=1\b/.test(location.search)) window._dbg = DBG_REFS;   // v1.0: ya no es global por defecto
 /* v1.1 · Interior caminable de la casa (Sec. 6.9 Fase 2) */
 /** v1.5 · capturas: DBG.tp(x, z) lleva al jugador a (x, z) del pueblo · DBG.view(dist, pitch, yaw) fija la cámara · DBG.shot('B'|'C'|'D'|'G'|'H') prepara la escena del protocolo */
-DBG.g = { World, WGEO, WorldFX, TRAVEL_POSTS, Island, Voyage, TRIBE, ship, state, IconStudio, ItemArt, itemIcon, PhGlyph, startDialog, openInventory, openHousePanel, addLetter, endDialog, openShop, openGiftPicker, openEncargo, acceptCourier, refreshMissionUI, SeasonDecor, Snow, claimSeasonGift, seasonNow, openWeeklyPanel, openRoulette, Weather, Decorate, SyncGuard, Online, RealShops, RealMarket, Metrics, Gather, Mining, npcObjs, interactables, colliders, SITES, NPCS, CFG, get house() { return house; }, scene, renderer, camera, cam, sky, water, atmo, clouds, PostFX, SkyEnv, PlanetAO, WATER_U, POST_U, Gather, Studio, ToolAnim, Profiles, Hub, Decor, Fitting, player, Interiors };   // v1.5: referencias gráficas para depurar
+DBG.g = { World, WGEO, WorldFX, TRAVEL_POSTS, Island, Voyage, TRIBE, ship, state, IconStudio, ItemArt, itemIcon, PhGlyph, startDialog, openInventory, openHousePanel, addLetter, endDialog, openShop, openGiftPicker, openEncargo, acceptCourier, refreshMissionUI, SeasonDecor, Snow, claimSeasonGift, seasonNow, openWeeklyPanel, openRoulette, Weather, Decorate, SyncGuard, Online, RealShops, RealMarket, Metrics, Presence, Emotes, NetStatus, PeerCard, NetChat, Gather, Mining, npcObjs, interactables, colliders, SITES, NPCS, CFG, get house() { return house; }, scene, renderer, camera, cam, sky, water, atmo, clouds, PostFX, SkyEnv, PlanetAO, WATER_U, POST_U, Gather, Studio, ToolAnim, Profiles, Hub, Decor, Fitting, player, Interiors };   // v1.5: referencias gráficas para depurar
 DBG.post = (v = !PostFX.active) => { PostFX.active = !!v; POST_U.uPost.value = v ? 1 : 0; return PostFX.active; };
 DBG.env = (v = !SkyEnv.enabled) => SkyEnv.setEnabled(v);
 DBG.ao = (v = true) => { if (!PlanetAO.on) return false; if (v) PlanetAO.bake(); else { const c = planet.geometry.attributes.color; PlanetAO.reset(); c.needsUpdate = true; } return v; };
