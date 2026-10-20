@@ -1356,6 +1356,7 @@ const placeAtSite = (obj, site, x, z, yaw = 0, lift = 0, radius = null) => place
    3. RENDERER, ESCENA, CIELO, LUCES
    ========================================================= */
 const canvas = document.getElementById('scene');
+if (document.getElementById('menu')) document.body.classList.add('menu-open');   // v1.5: HUD oculto mientras se lee el menú (también si el <body> no trae la clase)
 /* ===== v1.4 · GFX · niveles de calidad Baja / Media / Alta (plan_graficos.md §2) =====
    - Auto-detección (móvil, núcleos, memoria, GPU débil) + gobernador de FPS (resolución dinámica y, en Auto, un nivel menos).
    - Selector en Ajustes (Auto · Baja · Media · Alta) · se guarda en localStorage 'crossia.gfx' (try/catch), NUNCA en GS.
