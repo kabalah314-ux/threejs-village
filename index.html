@@ -10004,9 +10004,14 @@ const Online = (() => {
   async function refreshMe() { me = session ? await rpc('crossia_me') : null; api.status = me ? 'on' : session ? 'noplayer' : 'off';
     if (me) { GS.meta.profile = { type: PROFILE.ACCOUNT, accountId: me.id, displayName: me.name }; } return me; }
   /** Al arrancar: si hay sesión guardada, reconecta en silencio */
-  api.boot = async () => { try { if (!localStorage.getItem('crossia.auth')) return; } catch (e) { return; }
-    try { await lib(); const { data } = await sb.auth.getSession(); session = data.session; if (session) await refreshMe(); } catch (e) { console.warn('[online]', e.message); } };
-  api.signUp = async (email, password, name) => { await lib(); const { data, error } = await sb.auth.signUp({ email, password, options: { data: { app: 'crossia', username: name } } }); if (error) throw new Error(tr(error.message));
+  api.boot = async () => {
+    const fromEmail = /access_token=|[?&]code=|cuenta=ok/.test(location.hash + location.search);   // vuelves del enlace de confirmación del email
+    try { if (!fromEmail && !localStorage.getItem('crossia.auth')) return; } catch (e) { if (!fromEmail) return; }
+    try { await lib(); const { data } = await sb.auth.getSession(); session = data.session; if (session) await refreshMe();
+      if (fromEmail) { try { history.replaceState(null, '', location.pathname); } catch (e) {}
+        if (session) { api.pendingWelcome = true; showToast(me ? `✅ Cuenta confirmada · hola, ${me.name}` : '✅ Cuenta confirmada: elige tu nombre en el online', 'text-white'); } }
+    } catch (e) { console.warn('[online]', e.message); } };
+  api.signUp = async (email, password, name) => { await lib(); const { data, error } = await sb.auth.signUp({ email, password, options: { data: { app: 'crossia', username: name }, emailRedirectTo: location.origin + location.pathname + '?cuenta=ok' } });   // el enlace del email te devuelve al juego ya dentro if (error) throw new Error(tr(error.message));
     if (data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) throw new Error('Ya hay una cuenta con ese email (y no se reenvía el correo): pulsa «Entrar» con tu contraseña');   // Supabase no avisa de emails ya registrados
     session = data.session; return !!session; };
   api.signIn = async (email, password) => { await lib(); const { data, error } = await sb.auth.signInWithPassword({ email, password }); if (error) throw new Error(tr(error.message)); session = data.session; await refreshMe(); return me; };
@@ -10376,7 +10381,8 @@ const startGameFromMenu = () => {
     const welcome = () => {
       showToast(hadSave && !ngFresh ? '💾 Partida restaurada · ¡bienvenido de nuevo!' : '🐻 Busca al Oso Panadero: tiene un “!” sobre la cabeza', 'text-white');
       if (ngFresh) setTimeout(() => showToast(`🌙 Nuevo Sueño+ · el sueño te reconoce: ganancias ×${String(GS.ngplus.multiplier).replace('.', ',')}`, 'text-purple-200'), 1600);
-      Awakening.onSessionStart();   // v0.9: decisión del puerto pendiente (si recargaste en mitad de la escena)
+      Awakening.onSessionStart();
+      if (Online.pendingWelcome && !Online.me) setTimeout(() => { if (!state.modalOpen) Account.open(); }, 900);   // v1.7: vuelves del email → a elegir tu nombre   // v0.9: decisión del puerto pendiente (si recargaste en mitad de la escena)
       if (retroInsignias.length) setTimeout(() => showToast(`🏆 Tus Aliados te guardaban ${retroInsignias.length} prenda(s) insignia: mira el Armario 👗`, 'text-amber-200'), 1800);
     };
     // v0.7 · Sec. 8.2: partida nueva → creador de personaje tras el prólogo (y antes de despertar del todo)
