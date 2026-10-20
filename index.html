@@ -948,7 +948,9 @@ const CFG = {
     fletePerDist: 0.06, decayDays: 5,                                   // Spec 3.2: flete 6 % por salto (sumidero) · los materiales de origen caducan a los 5 días (las joyas no)
     daily: { k: 6, lo: 300, hi: 1500, units: [4, 8], days: 1, trust: 3 },            // Spec 3.2 (diario) · +3 confianza (Doc 5)
     rare: { p: 0.06, k: 5, lo: 2000, hi: 20000, units: [15, 40], days: 3 },           // Spec 3.2 (raro)
-    weekly: { k: 10, lo: 50000, hi: 500000, units: [200, 500], jewels: [2, 5], days: 7, perOrigin: 1, refPop: 500 },   // Spec 3.2: solo dueños de Local o Boutique, 1 por barrio y semana con 500 jugadores (demo: la probabilidad escala con la población, n/500, para no secar un mercado de 80 bots)
+    weekly: { k: 10, lo: 50000, hi: 500000, units: [200, 500], jewels: [2, 5], days: 7, perOrigin: 1, refPop: 500 },
+    realReq: { d: { kinds: [1, 2], units: [2, 4], k: 6, lo: 300, hi: 1500, trust: 3 }, r: { p: 0.1, days: 3, kinds: [2, 3], units: [5, 10], k: 12, lo: 2000, hi: 8000 },
+               w: { kinds: [2, 4], units: [12, 24], jewels: [1, 1], k: 25, lo: 15000, hi: 60000 } },   // v3.0.2 · Pedidos de Ultramar de la Red real: más pequeños que en la demo (aún hay pocos jugadores reales); el semanal es el legendario (con una joya de otro perfil) · el servidor comprueba estos mismos tamaños   // Spec 3.2: solo dueños de Local o Boutique, 1 por barrio y semana con 500 jugadores (demo: la probabilidad escala con la población, n/500, para no secar un mercado de 80 bots)
     saleFee: 0.03, saleFeeMin: 0.02, saleFeeMax: 0.06, listFee: 0.01, barterFee: 0.01, contractFee: 0.02, auctionFee: 0.05,   // Spec 3.2 (Doc 6)
     decreeBand: 0.03, decreeStep: 0.005, taxStep: 0.0025, taxMax: 0.02, rewStep: 0.05, rewMin: 0.80, decreeStartDay: 13,   // Spec 3.3 · demo: el primer decreto, el 2.º domingo (los bots no tienen cohortes que maduren)
     orderDays: 3, maxOrders: 8, buyPerItemDay: 40,                     // Doc 6: las órdenes caducan en 3 días · Spec 4: 3–8 órdenes abiertas y tope de compra por artículo
@@ -8401,7 +8403,7 @@ function awakeningChainHTML() {
    Nota: la 🎪 Feria del Sábado (puestos de los vecinos, ofertas de tienda) NO es la
    📈 Feria del Tablón de la v0.8 (especulación por categorías): conviven sin tocarse.
    ========================================================= */
-const GAME_VERSION = '3.0.1', GAME_TAG = 'Presencia en la Red';
+const GAME_VERSION = '3.0.2', GAME_TAG = 'Decreto y Pedidos reales';
 /* ---------- 🗓️ EVENTOS: calendario REAL → flags que leen los sistemas existentes (Sec. 10.10) ---------- */
 const Events = {
   _force: null,   // DBG.weekday(n): simula el día de la semana real (0 = domingo … 6 = sábado)
@@ -11258,7 +11260,7 @@ const NetWorld = {
   layout(zone, o = {}) {
     const Z = NET_ZONES[zone], [w, d] = Z.size, hw = w / 2, hd = d / 2, W = NetEco.W, P = [...netFloorPieces(zone)];
     const real = this.real(), soon = (what) => showToast(`${what}: en la Red real llega con las secciones nuevas. Aquí, de momento, el Tablón, la Aduana, los puestos y las tiendas.`, 'text-white');
-    const A = { wake: () => this.wake(), tram: () => NetUI.tram(), tablon: () => real ? RealMarket.open('market') : NetUI.tablon(), subastas: () => real ? soon('🔨 Subastas') : NetUI.auctions(), aduana: () => real ? RealMarket.open('aduana') : NetUI.aduana(), contratos: () => real ? soon('📜 Contratos') : NetUI.contracts(), pedidos: () => NetUI.requests(), origen: () => NetUI.originCard(),
+    const A = { wake: () => this.wake(), tram: () => NetUI.tram(), tablon: () => real ? RealMarket.open('market') : NetUI.tablon(), subastas: () => real ? soon('🔨 Subastas') : NetUI.auctions(), aduana: () => real ? RealMarket.open('aduana') : NetUI.aduana(), contratos: () => real ? soon('📜 Contratos') : NetUI.contracts(), pedidos: () => real ? RealRequests.open() : NetUI.requests(), origen: () => NetUI.originCard(),
       rstall: (obj) => RealWorld.openStall(obj.userData.netPlot),
       walk: (obj) => this.go(obj.userData.netTo), plot: (obj) => this.openPlot(zone, obj.userData.netPlot), bot: (obj) => { if (obj.userData.peerId) { PeerCard.openId(obj.userData.peerId); return; } const i = obj.userData.botIdx; if (i !== undefined && i !== null) NetUI.barter(i); }, gate: () => this.go('dorado') };
     if (zone === 'plaza') {
@@ -11925,7 +11927,7 @@ const Online = (() => {
   api.boot = async () => {
     const fromEmail = /access_token=|[?&]code=|cuenta=ok/.test(location.hash + location.search);   // vuelves del enlace de confirmación del email
     try { if (!fromEmail && !localStorage.getItem('crossia.auth')) return; } catch (e) { if (!fromEmail) return; }
-    try { await lib(); const { data } = await sb.auth.getSession(); session = data.session; if (session) await refreshMe(); if (me) { api.syncCheck(); setTimeout(() => RealShops.notices().catch(() => {}), 5000); }   // v2.9.3: ¿la nube tiene esta partida? · v3.0: avisos de tu tienda real
+    try { await lib(); const { data } = await sb.auth.getSession(); session = data.session; if (session) await refreshMe(); if (me) { api.syncCheck(); setTimeout(() => RealShops.notices().catch(() => {}), 5000); setTimeout(() => RealMarket.load().catch(() => {}), 8000); }   // v2.9.3: ¿la nube tiene esta partida? · v3.0: avisos de tu tienda real
       if (fromEmail) { try { history.replaceState(null, '', location.pathname); } catch (e) {}
         if (session) { api.pendingWelcome = true; showToast(me ? `✅ Cuenta confirmada · hola, ${me.name}` : '✅ Cuenta confirmada: elige tu nombre en el online', 'text-white'); } }
     } catch (e) { console.warn('[online]', e.message); } };
@@ -12066,30 +12068,45 @@ const NetChat = {
 const RealMarket = {
   tab: 'market', filter: -1, data: null, busy: false,
   rpc: async (fn, args) => { const s = await Online.lib(); const { data, error } = await s.rpc(fn, args); if (error) throw new Error(error.message); return data; },
-  async load() { this.data = await this.rpc('crossia_market', {}); return this.data; },
+  async load() { this.data = await this.rpc('crossia_market', {}); try { this.decreeNotice(this.data?.decree); } catch (e) {} return this.data; },
   name: (id) => ITEMS[id] ? `${ITEMS[id].icon} ${ITEMS[id].name}` : id,
-  ref(id) { const x = this.data?.items?.find(i => i.id === id); return x?.last || x?.ask || x?.bid || 0; },
+  ref(id) { const x = this.data?.items?.find(i => i.id === id); return x?.avg7 || x?.last || x?.ask || x?.bid || 0; },
+  fee() { return +(this.data?.decree?.fee ?? 0.02); },
+  /** v3.0.2 · 📜 Decreto semanal de la Red real: el Alcalde escribe la primera vez y cada semana que cambia */
+  decreeNotice(dc) {
+    if (!dc || !dc.week) return false; const prev = GS.realDecreeWeek; if (prev === dc.week) return false;
+    GS.realDecreeWeek = dc.week; const fee = pctTxt(+dc.fee), rew = String(+dc.rew).replace('.', ','), g = +dc.g || 0;
+    if (!prev) addLetter('🐶 Mayor Reginald', `¡Ejem! La Red real ya tiene Decreto semanal. Cada lunes miro cuánto dinero tienen de media los jugadores de la Red: si crece más de un 3 %, sube medio punto la comisión del Tablón (hasta el 6 %) y, si crece más de un 6 %, bajan un 5 % las recompensas de los Pedidos de Ultramar (hasta ×0,8). Si baja, al revés. Esta semana: comisión ${fee} · recompensas ×${rew}. Formulario 7-D. Que conste en acta.`);
+    else if (dc.changed) addLetter('🐶 Mayor Reginald', `¡Ejem! Nuevo Decreto de la Red: el dinero medio de los jugadores ${g >= 0 ? 'subió' : 'bajó'} un ${pctTxt(Math.abs(g))} la semana pasada. Comisión del Tablón: ${fee} · recompensas de los Pedidos de Ultramar: ×${rew}. Formulario 7-D sellado.`);
+    SaveSystem.save('real-decree'); return true;
+  },
+  decreeHTML(dc) {
+    if (!dc) return '';
+    const g = +dc.g || 0;
+    return `<div class="app-card p-2 mb-2 text-[11px] text-slate-700">📜 <b>Decreto de la semana</b>${g ? ` (el dinero medio de la Red ${g >= 0 ? 'subió' : 'bajó'} un ${pctTxt(Math.abs(g))})` : ''}: comisión del Tablón <b>${pctTxt(+dc.fee)}</b> (2–6 %) · recompensas de los Pedidos de Ultramar <b>×${String(+dc.rew).replace('.', ',')}</b></div>`;
+  },
   open(tab = null) {
     if (!Online.me) { Account.open(); return; } if (tab) this.tab = tab;
     openApp('🏛️ Mercado real', '', (body) => {
       const render = async (msg = '') => {
         body.innerHTML = `<div class="app-card p-3 text-sm text-slate-500">Cargando el mercado…</div>`;
         let D; try { D = await this.load(); } catch (e) { body.innerHTML = `<div class="app-card p-3 text-sm">❌ ${esc(e.message)}</div>`; return; }
-        const me = Online.me, mine = NET_ORIGINS[me.profile], tabs = [['market', '📈 Mercado'], ['aduana', '🛃 Aduana'], ['orders', `📋 Órdenes (${D.mine.length})`], ['stall', '🧺 Mi puesto'], ['shops', '🏪 Tiendas'], ['myshop', '🏬 Mi tienda']];
+        const me = Online.me, mine = NET_ORIGINS[me.profile], tabs = [['market', '📈 Mercado'], ['aduana', '🛃 Aduana'], ['orders', `📋 Órdenes (${D.mine.length})`], ['stall', '🧺 Mi puesto'], ['shops', '🏪 Tiendas'], ['myshop', '🏬 Mi tienda'], ['pedidos', '📦 Pedidos']];
         let html = (msg ? `<div class="app-card p-2 mb-2 text-xs ${/^❌/.test(msg) ? 'bg-red-50' : 'bg-emerald-50'}">${msg}</div>` : '') +
           `<div class="app-card p-2.5 mb-2 flex items-center gap-3 text-xs"><span class="text-2xl">${mine.icon}</span><div class="flex-1"><b class="text-sm">${esc(me.name)}</b> · ${D.players} jugador(es) en la Red<br>Aduana: <b>${fmt(D.coins)} $T</b> · ${Object.values(D.stock).reduce((a, b) => a + b, 0)} objeto(s) · en tu partida: ${fmt(GS.economy.money)} $T</div></div>
-          <div class="flex gap-1 mb-2">${tabs.map(([k, l]) => `<button data-tab="${k}" class="btn-game px-3 py-1.5 text-xs ${this.tab === k ? 'bg-[#fff6c2]' : 'bg-white'}">${l}</button>`).join('')}</div>`;
+          <div class="flex flex-wrap gap-1 mb-2">${tabs.map(([k, l]) => `<button data-tab="${k}" class="btn-game px-3 py-1.5 text-xs ${this.tab === k ? 'bg-[#fff6c2]' : 'bg-white'}">${l}</button>`).join('')}</div>`;
         if (this.tab === 'market') {
-          html += `<div class="flex flex-wrap gap-1 mb-2"><button data-f="-1" class="btn-game px-2 py-0.5 text-[11px] ${this.filter < 0 ? 'bg-[#fff6c2]' : 'bg-white'}">Todos</button>${NET_ORIGINS.map((o, i) => `<button data-f="${i}" class="btn-game px-2 py-0.5 text-[11px] ${this.filter === i ? 'bg-[#fff6c2]' : 'bg-white'}">${o.icon}</button>`).join('')}</div>
-            <div class="text-[11px] text-slate-500 mb-1">Comprar = pagas al mejor vendedor. Vender = cobras del mejor comprador (−2 %). Si nadie cruza, tu orden queda en el Tablón.</div>` +
+          html += `<div class="flex flex-wrap gap-1 mb-2"><button data-f="-1" class="btn-game px-2 py-0.5 text-[11px] ${this.filter < 0 ? 'bg-[#fff6c2]' : 'bg-white'}">Todos</button>${NET_ORIGINS.map((o, i) => `<button data-f="${i}" class="btn-game px-2 py-0.5 text-[11px] ${this.filter === i ? 'bg-[#fff6c2]' : 'bg-white'}">${o.icon}</button>`).join('')}<button data-f="8" title="Objetos de la isla" class="btn-game px-2 py-0.5 text-[11px] ${this.filter === 8 ? 'bg-[#fff6c2]' : 'bg-white'}">🏝️ Isla</button></div>
+            ${this.decreeHTML(D.decree)}<div class="text-[11px] text-slate-500 mb-1">Comprar = pagas al mejor vendedor. Vender = cobras del mejor comprador (−${pctTxt(this.fee())}). Si nadie cruza, tu orden queda en el Tablón. «Media 7 d» = precio medio de lo vendido esta semana.</div>` +
             (Number.isInteger(Online.featured()) ? `<div class="app-card p-2 mb-2 text-[11px] bg-amber-50">🏆 Evento de la semana: <b>${NET_ORIGINS[Online.featured()].icon} ${NET_ORIGINS[Online.featured()].name}</b> · sus objetos se venden sin comisión en el Tablón.</div>` : '');
-          html += D.items.filter(x => this.filter < 0 || x.p === this.filter).map(x => `<div class="app-card p-2 mb-1.5 flex items-center gap-2 text-xs"><div class="flex-1 min-w-0"><b>${this.name(x.id)}</b> <span class="text-slate-400">NV${x.t}${x.p === me.profile ? ' · tuyo' : ''}</span>${x.p === Online.featured() ? ' <span class="px-1 rounded bg-amber-200 text-[10px] font-bold">0 % esta semana</span>' : ''}<div class="text-slate-500">Venden ${x.ask ? `<b class="text-emerald-700">${fmt(x.ask)}</b> (${x.askQ})` : '—'} · Compran ${x.bid ? `<b class="text-sky-700">${fmt(x.bid)}</b> (${x.bidQ})` : '—'} · Último ${x.last ? fmt(x.last) : '—'} · 24 h: ${x.vol}</div></div>
+          html += D.items.filter(x => this.filter < 0 || x.p === this.filter).map(x => `<div class="app-card p-2 mb-1.5 flex items-center gap-2 text-xs"><div class="flex-1 min-w-0"><b>${this.name(x.id)}</b> <span class="text-slate-400">NV${x.t}${x.p === me.profile ? ' · tuyo' : x.p === 8 ? ' · 🏝️ isla' : ''}</span>${x.p === Online.featured() ? ' <span class="px-1 rounded bg-amber-200 text-[10px] font-bold">0 % esta semana</span>' : ''}<div class="text-slate-500">Venden ${x.ask ? `<b class="text-emerald-700">${fmt(x.ask)}</b> (${x.askQ})` : '—'} · Compran ${x.bid ? `<b class="text-sky-700">${fmt(x.bid)}</b> (${x.bidQ})` : '—'} · Último ${x.last ? fmt(x.last) : '—'} · Media 7 d ${x.avg7 ? `<b>${fmt(x.avg7)}</b>` : '—'} · 24 h: ${x.vol}</div></div>
             <button data-buy="${x.id}" class="btn-game px-2 py-1 text-[11px] bg-emerald-200">Comprar</button><button data-sell="${x.id}" class="btn-game px-2 py-1 text-[11px] bg-sky-200" ${D.stock[x.id] ? '' : 'disabled style="opacity:.45"'}>Vender</button></div>`).join('');
         } else if (this.tab === 'aduana') {
           const left = Math.max(0, 50000 - D.coinsToday), own = [...mine.mats.map(m => m[0]), mine.jewel[0]];
           html += `<div class="sec-h">$TOKEN</div><div class="app-card p-3 mb-2 text-xs">Hoy puedes ingresar <b>${fmt(left)} $T</b> más.<div class="flex gap-1 mt-2"><input data-coins type="number" min="1" placeholder="Cantidad" class="game flex-1 text-xs px-2 py-1"><button data-dc class="btn-game px-2 py-1 text-[11px] bg-emerald-200">Ingresar ⬆</button><button data-wc class="btn-game px-2 py-1 text-[11px] bg-sky-200">Retirar ⬇</button></div></div>
             <div class="sec-h">Tus objetos de ${mine.icon} ${mine.name} (se ingresan con tope diario)</div>` +
-            own.map((id, j) => { const cap = j < 4 ? [10, 8, 5, 3][j] : 1, used = D.depToday[id] || 0, have = Inventory.count(id); return `<div class="app-card p-2 mb-1.5 flex items-center gap-2 text-xs"><div class="flex-1"><b>${this.name(id)}</b><div class="text-slate-500">En tu mochila ${have} · ingresados ${j < 4 ? 'hoy' : 'esta semana'} ${used}/${cap}</div></div><button data-di="${id}" class="btn-game px-2 py-1 text-[11px] bg-emerald-200" ${have && used < cap ? '' : 'disabled style="opacity:.45"'}>Ingresar 1</button></div>`; }).join('') +
+            own.map((id, j) => this.depRow(id, j < 4 ? [10, 8, 5, 3][j] : 1, D, j < 4 ? 'hoy' : 'esta semana')).join('') +
+            `<div class="sec-h">🏝️ Objetos de la isla (los ingresa cualquiera, con tope diario)</div>` + (D.items.filter(x => x.p === 8 && (Inventory.count(x.id) > 0 || D.depToday[x.id])).map(x => this.depRow(x.id, [10, 8, 5, 3][x.t - 1] || 3, D, 'hoy')).join('') || '<div class="text-xs text-slate-400 mb-2">Si traes cocos, mangos, tejidos o máscaras de la isla, aquí los vendes a toda la Red.</div>') +
             `<div class="sec-h">En la Aduana (retirables a tu partida)</div>` + (Object.entries(D.stock).map(([id, q]) => `<div class="app-card p-2 mb-1.5 flex items-center gap-2 text-xs"><div class="flex-1"><b>${this.name(id)}</b> ×${q}</div><button data-wi="${id}" class="btn-game px-2 py-1 text-[11px] bg-sky-200">Retirar 1</button><button data-wa="${id}" data-q="${q}" class="btn-game px-2 py-1 text-[11px] bg-sky-100">Todo</button></div>`).join('') || '<div class="text-xs text-slate-400 mb-2">Vacía.</div>');
         } else if (this.tab === 'stall') {   // v2.4 · puesto gratis: 5 objetos a la vez en la Plaza de la Red real
           const S = await this.rpc('crossia_my_stall', {}), stockIds = Object.keys(D.stock);
@@ -12100,6 +12117,8 @@ const RealMarket = {
           html += `<div class="text-[11px] text-slate-500 mb-1">Tiendas de jugadores reales: venden aunque su dueño no esté. También las ves como puestos en su barrio de la Red.</div>` + await RealShops.listHTML();
         } else if (this.tab === 'myshop') {
           html += await RealShops.mineHTML(D);
+        } else if (this.tab === 'pedidos') {   // v3.0.2 · 📦 Pedidos de Ultramar con la Aduana
+          html += await RealRequests.html(D);
         } else {
           html += `<div class="sec-h">Abiertas</div>` + (D.mine.map(o => `<div class="app-card p-2 mb-1.5 flex items-center gap-2 text-xs"><div class="flex-1">${o.side === 'buy' ? '🟢 Compra' : '🔵 Venta'} <b>${this.name(o.item)}</b> · ${o.rem}/${o.qty} a ${fmt(o.price)} $T</div><button data-cancel="${o.id}" class="btn-game px-2 py-1 text-[11px] bg-rose-200">Cancelar</button></div>`).join('') || '<div class="text-xs text-slate-400">Ninguna.</div>') +
             `<div class="sec-h">Tus últimas operaciones</div>` + (D.trades.map(t => `<div class="text-xs py-1 border-b border-slate-100">${t.side === 'buy' ? '🟢 Compraste' : '🔵 Vendiste'} ${t.qty}× ${this.name(t.item)} a ${fmt(t.price)} $T · ${new Date(t.at).toLocaleString('es-ES')}</div>`).join('') || '<div class="text-xs text-slate-400">Todavía ninguna.</div>');
@@ -12109,6 +12128,7 @@ const RealMarket = {
         body.querySelectorAll('input').forEach(i => i.onkeydown = (e) => e.stopPropagation());
         q$('[data-visit]').forEach(b => b.onclick = () => { closeApp(); setTimeout(() => RealShops.visit(b.dataset.visit), 30); });
         if (this.tab === 'myshop') RealShops.bindMine(body, run);
+        if (this.tab === 'pedidos') RealRequests.bind(body, run, render);
         q$('[data-stk]').forEach(b => b.onclick = () => run(async () => { await this.rpc('crossia_stall_take', { p_item: b.dataset.stk, p_qty: +b.dataset.q }); return '✓ Retirado a tu Aduana'; }));
         const sput = body.querySelector('[data-sput]'); if (sput) sput.onclick = () => run(async () => { const v = (s) => body.querySelector(s)?.value; await this.rpc('crossia_stall_put', { p_item: v('[data-spi]'), p_qty: Math.floor(+v('[data-spq]') || 0), p_price: Math.floor(+v('[data-spr]') || 0) }); RealWorld.prefetch().catch(() => {}); return '✓ A la venta en tu puesto de la Plaza'; });
         q$('[data-tab]').forEach(b => b.onclick = () => { this.tab = b.dataset.tab; render(); });
@@ -12123,8 +12143,8 @@ const RealMarket = {
           return r?.review ? `🔎 Ingreso en revisión: tu capital ha subido de golpe. Si todo está bien, los ${fmt(n)} $T llegarán a tu Aduana tras revisarlo.` : `✓ Ingresados ${fmt(n)} $T`; }));
         body.querySelector('[data-wc]') && (body.querySelector('[data-wc]').onclick = () => run(async () => { const n = coinsIn(); if (n < 1) throw new Error('Pon una cantidad');
           await this.rpc('crossia_withdraw_coins', { p_n: n }); Wallet.add(n, 'Aduana de la Red real (retirada)', { noMult: true, silent: true }); SaveSystem.saveNow('real-withdraw'); return `✓ Retirados ${fmt(n)} $T a tu partida`; }));
-        q$('[data-di]').forEach(b => b.onclick = () => run(async () => { const id = b.dataset.di; if (!Inventory.has(id, 1)) throw new Error('No lo tienes en la mochila');
-          await this.rpc('crossia_deposit_item', { p_item: id, p_qty: 1 }); Inventory.remove(id, 1); Net.lotsSync(id); SaveSystem.saveNow('real-deposit-item'); return `✓ ${this.name(id)} ingresado`; }));
+        q$('[data-di]').forEach(b => b.onclick = () => run(async () => { const id = b.dataset.di, n = Math.max(1, Math.floor(+b.dataset.n || 1)); if (!Inventory.has(id, n)) throw new Error('No lo tienes en la mochila');
+          await this.rpc('crossia_deposit_item', { p_item: id, p_qty: n }); Inventory.remove(id, n); Net.lotsSync(id); SaveSystem.saveNow('real-deposit-item'); return `✓ ${n > 1 ? n + '× ' : ''}${this.name(id)} ingresado${n > 1 ? 's' : ''}`; }));
         const takeOut = (id, q) => run(async () => { if (!Inventory.canAddMany([[id, q]], null)) throw new Error('No cabe en tu mochila');
           await this.rpc('crossia_withdraw_item', { p_item: id, p_qty: q }); Inventory.add(id, q, { silent: true }); Net.lotsAdd(id, q, Net.today()); SaveSystem.saveNow('real-withdraw-item'); return `✓ ${q}× ${this.name(id)} a tu mochila`; });
         q$('[data-wi]').forEach(b => b.onclick = () => takeOut(b.dataset.wi, 1));
@@ -12133,10 +12153,14 @@ const RealMarket = {
       render();
     });
   },
+  depRow(id, cap, D, when) {
+    const used = D.depToday[id] || 0, have = Inventory.count(id), can = Math.min(have, cap - used);
+    return `<div class="app-card p-2 mb-1.5 flex items-center gap-2 text-xs"><div class="flex-1"><b>${this.name(id)}</b><div class="text-slate-500">En tu mochila ${have} · ingresados ${when} ${used}/${cap}</div></div><button data-di="${id}" class="btn-game px-2 py-1 text-[11px] bg-emerald-200" ${can > 0 ? '' : 'disabled style="opacity:.45"'}>Ingresar 1</button>${can > 1 ? `<button data-di="${id}" data-n="${can}" class="btn-game px-2 py-1 text-[11px] bg-emerald-100">×${can}</button>` : ''}</div>`;
+  },
   orderForm(body, side, id, D, render) {
-    const x = D.items.find(i => i.id === id), have = D.stock[id] || 0, def = side === 'buy' ? (x.ask || x.last || 50) : (x.bid || x.last || 50);
+    const x = D.items.find(i => i.id === id), have = D.stock[id] || 0, def = side === 'buy' ? (x.ask || x.avg7 || x.last || 50) : (x.bid || x.avg7 || x.last || 50);
     const box = document.createElement('div'); box.className = 'app-card p-3 mb-2 text-xs bg-amber-50';
-    box.innerHTML = `<b class="text-sm">${side === 'buy' ? '🟢 Comprar' : '🔵 Vender'} ${this.name(id)}</b><div class="text-slate-500 mt-0.5">${side === 'buy' ? `Pagas desde la Aduana (tienes ${fmt(D.coins)} $T). Si pones más que el mejor vendedor, pagas lo suyo y te devuelve la diferencia.` : `Vendes desde la Aduana (tienes ${have}). Cobras el precio del comprador menos ${x.p === Online.featured() ? '0 % (evento de la semana)' : 'un 2 %'}.`}</div>
+    box.innerHTML = `<b class="text-sm">${side === 'buy' ? '🟢 Comprar' : '🔵 Vender'} ${this.name(id)}</b><div class="text-slate-500 mt-0.5">${side === 'buy' ? `Pagas desde la Aduana (tienes ${fmt(D.coins)} $T). Si pones más que el mejor vendedor, pagas lo suyo y te devuelve la diferencia.` : `Vendes desde la Aduana (tienes ${have}). Cobras el precio del comprador menos ${x.p === Online.featured() ? '0 % (evento de la semana)' : 'un ' + pctTxt(this.fee()) + ' (Decreto de la semana)'}.`}</div>
       <div class="flex gap-1 mt-2 items-center"><label>Cantidad <input data-oq type="number" min="1" value="1" class="game w-16 text-xs px-1 py-1"></label><label>Precio/u <input data-op type="number" min="1" value="${def}" class="game w-24 text-xs px-1 py-1"></label>
       <button data-ok class="btn-game px-3 py-1 text-[11px] ${side === 'buy' ? 'bg-emerald-300' : 'bg-sky-300'}">Publicar</button><button data-no class="btn-game px-2 py-1 text-[11px] bg-slate-200">✕</button></div>`;
     body.prepend(box); box.querySelectorAll('input').forEach(i => i.onkeydown = (e) => e.stopPropagation());
@@ -12148,6 +12172,72 @@ const RealMarket = {
       } catch (e) { render('❌ ' + e.message); }
     };
   },
+};
+
+/* ===== v3.0.2 · 📦 PEDIDOS DE ULTRAMAR DE LA RED REAL (H6): tus vecinos piden objetos de otros perfiles y se entregan desde la Aduana
+   (el servidor los gasta y apunta el pedido: cada uno se entrega una vez). El del día, uno raro de vez en cuando (dura 3 días) y el
+   Pedido legendario semanal (con una joya de otro perfil) para dueños de un Local o una Boutique. Los pide el mismo generador que la demo, con la semilla de tu jugador
+   y el día del servidor; la recompensa la paga tu partida, multiplicada por el Decreto de la semana. ===== */
+const RealRequests = {
+  S: null,
+  rpc: (fn, args) => RealMarket.rpc(fn, args),
+  KIND: { d: 'diario', r: 'raro', w: 'semanal' },
+  dayBack(day, k) { return new Date(Date.parse(day + 'T00:00:00Z') - k * 864e5).toISOString().slice(0, 10); },
+  /** pedido determinista: d<día> · r<día> · w<semana ISO> */
+  gen(meId, profile, rid) {
+    const P = CFG.net.realReq[rid[0]], r = netRngOf(meId + ':rq:' + rid), npc = TRUST_NPCS[Math.floor(r() * TRUST_NPCS.length)];
+    const pref = NET_NPC_PREF[npc] ? NET_NPC_PREF[npc].filter(o => o !== profile) : null, w = (m) => CFG.net.spawn[m & 3] * (pref && pref.includes(netOrig(m)) ? 3 : 1);
+    const foreign = []; for (let m = 0; m < 32; m++) if (netOrig(m) !== profile) foreign.push(m);
+    const kk = netRandInt(r, P.kinds[0], P.kinds[1]), ms = [];
+    while (ms.length < kk) { const left = foreign.filter(m => !ms.includes(m)); let x = r() * left.reduce((a, m) => a + w(m), 0), pick = left[left.length - 1]; for (const m of left) { x -= w(m); if (x <= 0) { pick = m; break; } } ms.push(pick); }
+    const tot = Math.max(kk, netRandInt(r, P.units[0], P.units[1])), base = Math.floor(tot / kk), need = {};
+    ms.forEach((m, i) => { need[NET_MATS[m]] = base + (i < tot - base * kk ? 1 : 0); });
+    let val = ms.reduce((a, m) => a + netBase(m) * need[NET_MATS[m]], 0), nj = 0;
+    if (P.jewels) { nj = netRandInt(r, P.jewels[0], P.jewels[1]); const others = [0, 1, 2, 3, 4, 5, 6, 7].filter(o => o !== profile); for (let j = 0; j < nj; j++) { const jm = 32 + others[Math.floor(r() * others.length)]; need[NET_MATS[jm]] = (need[NET_MATS[jm]] || 0) + 1; val += netBase(jm); } }   // nivel legendario: joyas de otros perfiles
+    return { rid, kind: this.KIND[rid[0]], npc, need, units: tot, jewels: nj, base: Math.round(clamp(val * P.k, P.lo, P.hi)) };
+  },
+  pay(q, rew) { return Math.max(1, Math.round(q.base * (+rew || 1))); },
+  /** los pedidos que siguen abiertos (S = crossia_requests_done) */
+  active(S, meId) {
+    const done = new Set(S.done || []), out = [], R = CFG.net.realReq.r;
+    if (!done.has('d' + S.day)) out.push(this.gen(meId, S.profile, 'd' + S.day));
+    for (let k = 0; k < R.days; k++) { const day = this.dayBack(S.day, k), rid = 'r' + day; if (netRngOf(meId + ':rqp:' + day)() < R.p && !done.has(rid)) out.push({ ...this.gen(meId, S.profile, rid), left: R.days - k }); }
+    if (S.rank >= 2 && !done.has('w' + S.week)) out.push(this.gen(meId, S.profile, 'w' + S.week));
+    return out;
+  },
+  text(q) { const l = Object.entries(q.need).map(([id, n]) => `${n}× ${ITEMS[id].icon} ${ITEMS[id].name}`).join(', '); return (NET_REQ_TEXT[q.npc] || NET_REQ_TEXT.bear)(l); },
+  short(q, stock) { return Object.entries(q.need).map(([id, n]) => [id, n - ((stock || {})[id] || 0)]).filter(([, s]) => s > 0); },
+  card(q, S) {
+    const n = npcById[q.npc], short = this.short(q, S.stock), sealed = q.kind === 'semanal' && S.sealed, off = short.length || sealed;
+    const title = q.kind === 'diario' ? 'Pedido del día' : q.kind === 'raro' ? '⭐ Pedido raro' : '🏆 Pedido legendario (semanal)';
+    const due = q.kind === 'diario' ? 'vence hoy' : q.kind === 'raro' ? (q.left > 1 ? `quedan ${q.left} días` : 'vence hoy') : 'vence el domingo';
+    return `<div class="app-card p-3 mb-2 text-xs"><div class="font-bold">${n?.emoji || '📦'} ${n?.name || q.npc} · ${title}</div><div class="text-[11px] text-slate-600 italic my-1">"${esc(this.text(q))}"</div>${Object.entries(q.need).map(([id, k]) => `<span class="mr-2 ${((S.stock || {})[id] || 0) >= k ? 'text-emerald-600' : 'text-red-500'}">${itemIcon(id, 18)} ${Math.min((S.stock || {})[id] || 0, k)}/${k}</span>`).join('')}<div class="mt-1">Pago <b>${fmt(this.pay(q, S.rew))} $T</b>${q.kind === 'diario' ? ` + ${CFG.net.realReq.d.trust} confianza` : ''} · ${due}</div>` +
+      (sealed ? `<div class="mt-1 text-purple-700">🔒 Tu tienda está sellada: paga la cuota para aceptar el Pedido legendario.</div>` : short.length ? `<div class="mt-1 text-red-600">Te faltan en la Aduana: ${short.map(([id, k]) => `${k}× ${this.name(id)}`).join(', ')}</div>` : '') +
+      `<div class="flex flex-wrap gap-2 mt-1.5"><button data-rq="${q.rid}" class="btn-game px-2 py-1 text-[11px] ${off ? 'bg-slate-200 opacity-60' : 'bg-orange-300'}" ${off ? 'disabled' : ''}>Entregar desde la Aduana</button>${short.length ? `<button data-rqm="${netOrig(NET_M[short[0][0]])}" class="btn-game px-2 py-1 text-[11px] bg-white">🔎 Buscar en el Tablón</button>` : ''}</div></div>`;
+  },
+  name: (id) => ITEMS[id] ? `${ITEMS[id].icon} ${ITEMS[id].name}` : id,
+  async html() {
+    const S = this.S = await this.rpc('crossia_requests_done', {}), me = Online.me, list = this.active(S, me.id), W = CFG.net.realReq.w;
+    let h = `<div class="app-card p-2.5 mb-2 text-[11px] text-slate-600">Tus vecinos piden objetos de <b>otros perfiles</b>. En la Red real se entregan <b>desde tu Aduana</b>: cómpralos en el Tablón, en los puestos de la Plaza o en las tiendas (y no los saques a la mochila). Recompensas del Decreto de esta semana: <b>×${String(+S.rew || 1).replace('.', ',')}</b>${GS.stats?.realReqDone ? ` · entregados: ${GS.stats.realReqDone}` : ''}.</div>`;
+    h += list.map(q => this.card(q, S)).join('') || '<div class="app-card p-3 mb-2 text-xs text-slate-500">Hoy ya no queda ningún pedido por entregar. Vuelve mañana.</div>';
+    if (!(S.rank >= 2)) h += `<div class="app-card p-3 mb-2 text-xs bg-slate-50 text-slate-500">🔒 <b>Pedido legendario semanal</b>: se lo encargan a los dueños de un Local o una Boutique de la Red real (${W.units[0]}–${W.units[1]} objetos y una joya de otro perfil · ${fmt(W.lo)}–${fmt(W.hi)} $T). <button data-tab="myshop" class="btn-game px-2 py-0.5 text-[11px] bg-white ml-1">🏬 Mi tienda</button></div>`;
+    return h;
+  },
+  bind(body, run, render) {
+    body.querySelectorAll('[data-rq]').forEach(b => b.onclick = () => run(() => this.deliver(b.dataset.rq)));
+    body.querySelectorAll('[data-rqm]').forEach(b => b.onclick = () => { RealMarket.filter = +b.dataset.rqm; RealMarket.tab = 'market'; render(); });
+  },
+  async deliver(rid) {
+    const S = this.S, me = Online.me; if (!S || !me) throw new Error('Abre otra vez los pedidos');
+    const q = this.active(S, me.id).find(x => x.rid === rid); if (!q) throw new Error('Ese pedido ya no está');
+    const short = this.short(q, S.stock); if (short.length) throw new Error('Te faltan en la Aduana: ' + short.map(([id, k]) => `${k}× ${ITEMS[id]?.name || id}`).join(', '));
+    const r = await this.rpc('crossia_request_deliver', { p_rid: rid, p_need: q.need });
+    const who = npcById[q.npc]?.name || q.npc, got = Wallet.add(this.pay(q, r?.rew ?? S.rew), `Pedido de Ultramar de la Red (${who})`, { src: 'real-pedidos' });
+    if (q.kind === 'diario') Trust.add(q.npc, CFG.net.realReq.d.trust, 'net:pedido');
+    GS.stats.realReqDone = (GS.stats.realReqDone || 0) + 1; playChime(); SaveSystem.saveNow('real-req');
+    return `📦 ¡Pedido entregado a ${who}! +${fmt(got)} $T${q.kind === 'diario' ? ` · +${CFG.net.realReq.d.trust} confianza` : ''}`;
+  },
+  open() { if (!Online.me) { Account.open(); return; } RealMarket.open('pedidos'); },
 };
 
 /* ===== v1.9 · 🏪 TIENDAS DE JUGADORES (F3): se compran con $T de la Aduana (puesto 5.000 · local 50.000 · boutique 500.000), viven en su barrio
@@ -13321,7 +13411,7 @@ DBG.refs = DBG_REFS;
 if (/[?&]debug=1\b/.test(location.search)) window._dbg = DBG_REFS;   // v1.0: ya no es global por defecto
 /* v1.1 · Interior caminable de la casa (Sec. 6.9 Fase 2) */
 /** v1.5 · capturas: DBG.tp(x, z) lleva al jugador a (x, z) del pueblo · DBG.view(dist, pitch, yaw) fija la cámara · DBG.shot('B'|'C'|'D'|'G'|'H') prepara la escena del protocolo */
-DBG.g = { World, WGEO, WorldFX, TRAVEL_POSTS, Island, Voyage, TRIBE, ship, state, IconStudio, ItemArt, itemIcon, PhGlyph, startDialog, openInventory, openHousePanel, addLetter, endDialog, openShop, openGiftPicker, openEncargo, acceptCourier, refreshMissionUI, SeasonDecor, Snow, claimSeasonGift, seasonNow, openWeeklyPanel, openRoulette, Weather, Decorate, SyncGuard, Online, RealShops, RealMarket, Metrics, Presence, Emotes, NetStatus, PeerCard, NetChat, Gather, Mining, npcObjs, interactables, colliders, SITES, NPCS, CFG, get house() { return house; }, scene, renderer, camera, cam, sky, water, atmo, clouds, PostFX, SkyEnv, PlanetAO, WATER_U, POST_U, Gather, Studio, ToolAnim, Profiles, Hub, Decor, Fitting, player, Interiors };   // v1.5: referencias gráficas para depurar
+DBG.g = { World, WGEO, WorldFX, TRAVEL_POSTS, Island, Voyage, TRIBE, ship, state, IconStudio, ItemArt, itemIcon, PhGlyph, startDialog, openInventory, openHousePanel, addLetter, endDialog, openShop, openGiftPicker, openEncargo, acceptCourier, refreshMissionUI, SeasonDecor, Snow, claimSeasonGift, seasonNow, openWeeklyPanel, openRoulette, Weather, Decorate, SyncGuard, Online, RealShops, RealMarket, RealRequests, Metrics, Presence, Emotes, NetStatus, PeerCard, NetChat, Gather, Mining, npcObjs, interactables, colliders, SITES, NPCS, CFG, get house() { return house; }, scene, renderer, camera, cam, sky, water, atmo, clouds, PostFX, SkyEnv, PlanetAO, WATER_U, POST_U, Gather, Studio, ToolAnim, Profiles, Hub, Decor, Fitting, player, Interiors };   // v1.5: referencias gráficas para depurar
 DBG.post = (v = !PostFX.active) => { PostFX.active = !!v; POST_U.uPost.value = v ? 1 : 0; return PostFX.active; };
 DBG.env = (v = !SkyEnv.enabled) => SkyEnv.setEnabled(v);
 DBG.ao = (v = true) => { if (!PlanetAO.on) return false; if (v) PlanetAO.bake(); else { const c = planet.geometry.attributes.color; PlanetAO.reset(); c.needsUpdate = true; } return v; };
