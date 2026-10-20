@@ -1060,7 +1060,7 @@ CATEGORIES.manufacture = { name: 'Manufacturas', icon: '🏭' };
    (sus objetos valen menos entre ellos) y los opuestos se necesitan (valen hasta ×12). */
 const NET_ORIGINS = [
   { id: 'dev',      icon: '🤖', name: 'Dev de IA',      short: 'Dev',      color: 0x7c4dff, act: 'Programar',    station: '💻', tag: 'Entrenas modelos y automatizas lo que haga falta',
-    mats: [['hot_amber', 'Línea de Código', '⌨️'], ['sweet_obsidian', 'Dataset Limpio', '🗂️'], ['lava_pepper', 'Prompt Maestro', '🪄'], ['golden_ash', 'Modelo Entrenado', '🧠']], jewel: ['magma_heart', 'Chip Neuronal', '💠'] },
+    mats: [['hot_amber', 'Línea de Código', '⌨️'], ['sweet_obsidian', 'Dataset Limpio', '🗂️'], ['lava_pepper', 'Prompt Maestro', '📝'], ['golden_ash', 'Modelo Entrenado', '🧠']], jewel: ['magma_heart', 'Chip Neuronal', '💠'] },
   { id: 'inventor', icon: '🔬', name: 'Inventor/a',     short: 'Inventor', color: 0x26a69a, act: 'Experimentar', station: '🧪', tag: 'Conviertes cualquier chatarra en un prototipo',
     mats: [['moon_wood', 'Tornillo Cuántico', '🔩'], ['silver_moss', 'Fórmula Garabateada', '📐'], ['night_mushroom', 'Prototipo Chispeante', '🔋'], ['moon_resin', 'Patente Soñada', '📜']], jewel: ['moon_tear', 'Motor Perpetuo', '⚙️'] },
   { id: 'chef',     icon: '👩‍🍳', name: 'Chef',          short: 'Chef',     color: 0xff7043, act: 'Cocinar',      station: '🍳', tag: 'Tus platos hacen que el sueño huela bien',
@@ -1074,7 +1074,7 @@ const NET_ORIGINS = [
   { id: 'youtuber', icon: '🎥', name: 'Youtuber',       short: 'Youtuber', color: 0xff1744, act: 'Grabar',       station: '📹', tag: 'Todo lo que pasa en el sueño acaba en un vídeo',
     mats: [['echo_mud', 'Miniatura', '🖼️'], ['whisper_reed', 'Clip Divertido', '🎞️'], ['purple_peat', 'Colaboración', '🤝'], ['slow_firefly', 'Vídeo Viral', '🔥']], jewel: ['bottled_secret', 'Placa de Diamante', '💎'] },
   { id: 'artista',  icon: '🎨', name: 'Artista',        short: 'Artista',  color: 0xffb300, act: 'Pintar',       station: '🖌️', tag: 'Ves colores donde los demás ven paredes',
-    mats: [['living_papyrus', 'Pigmento', '🧴'], ['wandering_ink', 'Boceto', '✏️'], ['origami_card', 'Lienzo', '🖼️'], ['ancient_seal', 'Obra Maestra', '🏛️']], jewel: ['blank_page', 'Musa Embotellada', '🫙'] },
+    mats: [['living_papyrus', 'Pigmento', '🧴'], ['wandering_ink', 'Boceto', '✏️'], ['origami_card', 'Lienzo', '🖼️'], ['ancient_seal', 'Obra Maestra', '🏛️']], jewel: ['blank_page', 'Musa Embotellada', '🏺'] },
 ];
 const NET_MATS = [];   // m → id de ITEMS
 NET_ORIGINS.forEach((o, oi) => o.mats.forEach(([id, name, icon], j) => {
@@ -5658,8 +5658,9 @@ const ToolAnim = (() => {
   const api = {
     get busy() { return !!cur; },
     /** kind: herramienta (id de ITEMS) o 'studio' · onHit: acción real · dur en s */
-    play(kind, onHit, dur = C.dur[kind] ?? 0.9) {
+    play(kind, onHit, dur = C.dur[kind] ?? 0.9, face = null) {
       if (cur) return false;
+      if (face && !Interiors.active) { const f = tangent(face.clone().sub(player.position), player.userData.dir); if (f.lengthSq() > 1e-6) player.userData.fwd.copy(f.normalize()); }   // mira a lo que vas a usar
       const parts = player.userData.parts; if (!parts?.armR) { onHit && onHit(); return true; }
       let prop = null; if (kind !== 'studio') { prop = props[kind] ||= mk(kind); parts.armR.add(prop); prop.position.set(0, -0.62, 0.05); prop.rotation.set(0, 0, 0); }
       cur = { kind, onHit, dur, t: 0, hit: false, prop }; state.toolBusy = true;
@@ -5702,7 +5703,7 @@ const Gather = (() => {
     if (!needTool('axe')) return; const g = st(), i = chopIdx; if (i < 0 || g.chopped.includes(i)) return;
     ToolAnim.play('axe', () => { sfx(); if (!g.chopped.includes(i)) g.chopped.push(i); Tools.wear('axe');
       const got = [['wood_log', 1 + (Math.random() < 0.5 ? 1 : 0)]]; if (Math.random() < G.chop.fruit) got.push(['golden_fruit', 1]); if (Math.random() < G.chop.sap) got.push(['dream_sap', 1]);
-      give(got, '🪓 Talas el árbol'); Net.grant('chop'); chopSpot.visible = false; SaveSystem.save('chop'); });
+      give(got, '🪓 Talas el árbol'); Net.grant('chop'); chopSpot.visible = false; SaveSystem.save('chop'); }, undefined, chopSpot.position.clone());
   }
   /* --- 🕳️ Pala: montículos del día · 🧲 Detector: señales enterradas que solo ves con él (y se cavan con la pala) --- */
   const moundMat = mat(0x8d6e63, { flatShading: true }), sparkMat = new THREE.SpriteMaterial({ map: DOT_TEX, color: 0xfff3b0, transparent: true, depthWrite: false });
@@ -5724,7 +5725,7 @@ const Gather = (() => {
     ToolAnim.play('shovel', () => { sfx(); g.dug.push(key); Tools.wear('shovel'); if (treasure) Tools.wear('detector');
       const T = treasure ? G.detect.loot : G.dig.loot, got = [roll(T)]; if (Math.random() < (treasure ? 0.5 : 0.25)) got.push(roll(T));
       give(got, treasure ? '🧲 ¡Tesoro enterrado!' : '🕳️ Excavas el montículo'); Net.grant(treasure ? 'detect' : 'dig');
-      scene.remove(o); const k = interactables.indexOf(o); if (k >= 0) interactables.splice(k, 1); SaveSystem.save('dig'); if (treasure) playChime(); });
+      scene.remove(o); const k = interactables.indexOf(o); if (k >= 0) interactables.splice(k, 1); SaveSystem.save('dig'); if (treasure) playChime(); }, undefined, o.position.clone());
   }
   /* --- 🦋 Red: mariposas de día, luciérnagas de noche, revoloteando cerca de ti --- */
   const bugTex = {}; const tex = (e) => bugTex[e] ||= (() => { const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d'); x.font = '48px "Segoe UI Emoji","Apple Color Emoji","Noto Color Emoji",sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(e, 32, 36); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.userData.shared = true; return t; })();
@@ -5745,7 +5746,7 @@ const Gather = (() => {
     if (!needTool('bug_net')) return; const g = st(); if (g.bugs >= G.bug.perDay) { showToast(`🦋 Por hoy ya has cazado ${G.bug.perDay}: deja algunas para mañana`, 'text-white'); return; }
     ToolAnim.play('bug_net', () => { if (!o.parent) return; const u = o.userData; Tools.wear('bug_net'); g.bugs++;
       if (Math.random() < G.bug.escape) { showToast('💨 ¡Se te ha escapado!', 'text-white'); removeBug(o); return; }
-      give([[u.night ? 'firefly_jar' : u.rare ? 'rainbow_butterfly' : 'dream_butterfly', 1]], u.night ? '✨ Atrapas una luciérnaga' : '🦋 Atrapas una mariposa'); Net.grant('bug'); removeBug(o); SaveSystem.save('bug'); });
+      give([[u.night ? 'firefly_jar' : u.rare ? 'rainbow_butterfly' : 'dream_butterfly', 1]], u.night ? '✨ Atrapas una luciérnaga' : '🦋 Atrapas una mariposa'); Net.grant('bug'); removeBug(o); SaveSystem.save('bug'); }, undefined, o.position.clone());
   }
   /* --- bucle --- */
   let acc = 0; const pos = new THREE.Vector3();
@@ -5799,7 +5800,7 @@ const Studio = (() => {
       for (let i = 0; i < 6; i++) spawnConfetti(obj.position.clone().addScaledVector(obj.userData.dir, 2.4), 3);
       if (s.wear === S.maint) showToast('🔧 Tu estudio necesita mantenimiento antes de la próxima sesión', 'text-amber-200');
       SaveSystem.save('studio');
-    }, S.secs);
+    }, S.secs, obj.position.clone());
   }
   function maintain() {
     const s = ss(), hasMats = S.fixMats.every(([id, q]) => Inventory.has(id, q));
@@ -5811,7 +5812,7 @@ const Studio = (() => {
 })();
 
 // v1.6: el pico y la caña también se animan
-{ const _hit = Mining.hit; Mining.hit = (g) => { if (state.toolBusy || !Tools.usable('pickaxe')) return _hit.call(Mining, g); ToolAnim.play('pickaxe', () => _hit.call(Mining, g)); }; }
+{ const _hit = Mining.hit; Mining.hit = (g) => { if (state.toolBusy || !Tools.usable('pickaxe')) return _hit.call(Mining, g); ToolAnim.play('pickaxe', () => _hit.call(Mining, g), undefined, g.position.clone()); }; }
 { const _cast = Fishing.cast; Fishing.cast = () => { if (state.toolBusy || !Tools.usable('fishing_rod')) return _cast.call(Fishing); ToolAnim.play('fishing_rod', () => _cast.call(Fishing)); }; }
 function animate() {
   requestAnimationFrame(animate);
@@ -9685,6 +9686,33 @@ const NetUI = {
     });
   },
   /** 🤝 Trueque con un bot (oferta / contraoferta) */
+  /* v1.6 · 💬 CHAT (demo con bots): frases rápidas + texto libre (filtrado). En el online real: mismo panel, con bloqueo y reporte. */
+  QUICK: ['👋 ¡Hola!', '🔎 ¿Qué buscas?', '💰 ¿Cuánto me das?', '🙏 ¿Me haces un descuento?', '🤝 ¡Trato hecho!', '😊 ¡Gracias!'],
+  BAD: /\b(idiota|imbecil|imbécil|tonto|gilipollas|puta|puto|mierda|joder|cabr[oó]n|subnormal|estupido|estúpido)\b/gi,
+  chatLog(i) { this._chat ||= {}; return (this._chat[i] ||= []); },
+  chatReply(i, text) {
+    const s = NetEco.S[i], b = NetEco.W.bots[i], bt = this._bt || {}, t = text.toLowerCase(), o = NET_ORIGINS[s.origin], me = NET_ORIGINS[Net.origin()];
+    const need = (b.rq || []).flatMap(q => Object.keys(q.need).map(Number)).filter((v, k, a) => a.indexOf(v) === k), want = need.length ? need.slice(0, 3).map(m => netItem(m).icon + ' ' + netItem(m).name).join(', ') : null;
+    if (/hola|buenas|hey|saludos/.test(t)) return `¡Hola! Soy ${s.name}, ${o.icon} ${o.name.toLowerCase()}.${want ? ` Ando buscando ${want}.` : ' Hoy solo miro.'}`;
+    if (/busca|necesit|quier/.test(t)) return want ? `Me hace falta ${want}. Lo de ${me.icon} ${me.short} me interesa bastante.` : 'Ahora mismo nada concreto… pero enséñame lo que traes.';
+    if (/cu[aá]nto|precio|vale|pagas|das/.test(t)) { const give = Object.entries(bt.give || {}); if (!give.length) return 'Pon en «Das» lo que quieres cambiar y te digo cuánto vale para mí.'; const v = give.reduce((a, [id, q]) => a + (NetEco.W.price[NET_M[id]] || 0) * q, 0); return `Por eso te daría unos ${fmt(Math.round(v * (s.origin === Net.origin() ? 0.85 : 1.05)))} $T en género. ¿Hacemos números?`; }
+    if (/descuento|rebaja|barato|menos|regate/.test(t)) { if (bt.counter && !bt.haggled) { bt.haggled = true; bt.counter = Math.max(1, Math.round(bt.counter * 0.7)); return `Vaaale… porque me caes bien: con ${fmt(bt.counter)} $T más, trato hecho.`; } return bt.haggled ? 'Más no puedo bajar, que tengo una tienda que mantener.' : 'Primero propón un trueque y luego hablamos de rebajas 😉'; }
+    if (/trato|acepto|vale|hecho/.test(t)) return bt.counter ? 'Pues dale a «Aceptar contraoferta» y listo.' : 'Pulsa «Proponer trueque» y lo cerramos.';
+    if (/gracias|genial|guay/.test(t)) return '¡A ti! Vuelve cuando quieras.';
+    if (this.BAD.test(text)) { this.BAD.lastIndex = 0; return 'Eh, sin faltar, que esto es un sueño bonito.'; }
+    return ['Jaja, interesante.', 'Mmm… ¿y eso cuánto vale?', 'Cuéntame más.', '¡Qué dices! 😄'][Math.floor(Math.random() * 4)];
+  },
+  chatSay(i, text, re) {
+    const clean = String(text).slice(0, 140).replace(this.BAD, (w) => '*'.repeat(w.length)).trim(); this.BAD.lastIndex = 0; if (!clean) return;
+    const log = this.chatLog(i); log.push(['me', clean]); const reply = this.chatReply(i, text); setTimeout(() => { log.push(['bot', reply]); while (log.length > 12) log.shift(); re(); }, 450); re();
+  },
+  chatHTML(i) {
+    const s = NetEco.S[i], log = this.chatLog(i);
+    return `<div class="app-card p-2 mb-2"><div class="text-[11px] font-bold text-slate-500 mb-1">💬 CHAT CON ${esc(s.name).toUpperCase()}</div>
+      <div class="text-xs max-h-28 overflow-auto mb-1.5" style="display:flex;flex-direction:column;gap:3px">${log.map(([w, t]) => `<div style="align-self:${w === 'me' ? 'flex-end' : 'flex-start'};background:${w === 'me' ? '#d1fae5' : '#f1f5f9'};border-radius:10px;padding:4px 8px;max-width:85%">${esc(t)}</div>`).join('') || '<div class="text-slate-400">Saluda o usa una frase rápida.</div>'}</div>
+      <div class="flex flex-wrap gap-1 mb-1.5">${this.QUICK.map((q, k) => `<button data-q="${k}" class="btn-game px-2 py-0.5 text-[10px] bg-sky-100">${q}</button>`).join('')}</div>
+      <div class="flex gap-1"><input data-chat type="text" maxlength="140" placeholder="Escribe un mensaje…" class="game flex-1 text-xs px-2 py-1"><button data-send class="btn-game px-2 py-1 text-xs bg-emerald-200">Enviar</button></div></div>`;
+  },
   barter(i) {
     this._bt = { i, give: {}, get: {}, money: 0, counter: 0 };
     this._wrap('🤝 Trueque', (body, re) => {
@@ -9692,7 +9720,7 @@ const NetUI = {
       const theirs = Object.entries(b.inv).map(([m, q]) => [+m, Math.floor(q)]).filter(([, q]) => q > 0).slice(0, 10);
       const mine = Inventory.slots.map(x => x.id).filter((v, k, a) => a.indexOf(v) === k && NET_M[v] !== undefined);
       const need = (b.rq || []).flatMap(q => Object.keys(q.need).map(Number)).filter((v, k, a) => a.indexOf(v) === k);
-      body.innerHTML = balanceBar() + this.demoTag() + `<div class="app-card p-3 mb-2 text-xs"><b>${NET_ORIGINS[s.origin].icon} ${s.name}</b> · bot ${s.cls === 'casual' ? 'ocasional' : s.cls === 'trader' ? 'comerciante' : s.cls === 'shopkeeper' ? 'tendero' : 'acaparador'} · aura ${AURA_TIERS[s.aura].name}${need.length ? `<br>Busca: ${need.slice(0, 5).map(m => netItem(m).icon).join(' ')}` : ''}</div>
+      body.innerHTML = balanceBar() + this.demoTag() + this.chatHTML(i) + `<div class="app-card p-3 mb-2 text-xs"><b>${NET_ORIGINS[s.origin].icon} ${s.name}</b> · bot ${s.cls === 'casual' ? 'ocasional' : s.cls === 'trader' ? 'comerciante' : s.cls === 'shopkeeper' ? 'tendero' : 'acaparador'} · aura ${AURA_TIERS[s.aura].name}${need.length ? `<br>Busca: ${need.slice(0, 5).map(m => netItem(m).icon).join(' ')}` : ''}</div>
         <div class="grid grid-cols-2 gap-2 text-[11px]"><div class="app-card p-2"><div class="font-bold mb-1">Recibes</div>${theirs.map(([m, q]) => `<div class="flex items-center justify-between py-0.5"><span>${netItem(m).icon} ${netItem(m).name} (${q})</span><input data-get="${NET_MATS[m]}" type="number" min="0" max="${q}" value="${bt.get[NET_MATS[m]] || 0}" class="game w-12 text-xs"></div>`).join('') || '—'}</div>
         <div class="app-card p-2"><div class="font-bold mb-1">Das</div>${mine.map(id => `<div class="flex items-center justify-between py-0.5"><span>${ITEMS[id].icon} ${ITEMS[id].name} (${Inventory.count(id)})</span><input data-give="${id}" type="number" min="0" max="${Inventory.count(id)}" value="${bt.give[id] || 0}" class="game w-12 text-xs"></div>`).join('') || '—'}<label class="block mt-1">+ $T <input data-money type="number" min="0" value="${bt.money}" class="game w-20 text-xs"></label></div></div>
         ${bt.counter ? `<div class="app-card p-2 mt-2 text-xs bg-amber-50">${s.name}: "Me falta un poco… añade <b>${fmt(bt.counter)} $T</b> y trato hecho."<button data-acc class="btn-game px-2 py-1 text-[11px] bg-amber-300 ml-2">Aceptar contraoferta</button></div>` : ''}
@@ -9701,6 +9729,10 @@ const NetUI = {
       const go = (extra = 0) => { read(); const r = Net.barter(i, { items: bt.give, money: bt.money + extra }, bt.get); if (r.ok) { showToast(`🤝 ¡Trato con ${s.name}! (comisión ${fmt(r.fee)} $T)`, 'text-white'); bt.give = {}; bt.get = {}; bt.money = 0; bt.counter = 0; re(); } else if (r.counter) { bt.counter = r.counter; re(); } else this.res(r); };
       this.on(body, '[data-prop]', () => go(0));
       this.on(body, '[data-acc]', () => { const c = bt.counter; bt.counter = 0; go(c); });
+      body.querySelectorAll('[data-q]').forEach(el => el.onclick = () => { read(); this.chatSay(i, this.QUICK[+el.dataset.q].replace(/^\S+\s/, ''), re); });
+      const inp = body.querySelector('[data-chat]'), send = () => { read(); const v = inp.value; inp.value = ''; this.chatSay(i, v, re); };
+      body.querySelector('[data-send]').onclick = send; inp.onkeydown = (e) => { e.stopPropagation(); if (e.key === 'Enter') send(); };
+      const lg = body.querySelector('.max-h-28'); if (lg) lg.scrollTop = 1e6;
     });
   },
   /** 🔧 Estaciones de fabricación (Taller de Glover / laboratorio de Dax) */
@@ -9838,7 +9870,7 @@ const Profiles = {
       st.persona.start = fx; SaveSystem.saveNow('profile-intro');
     };
     this.talk('🐻', 'Oso Panadero', [
-      { text: P.hello, choices: [[`Sí, soy ${o.name.toLowerCase()} ${o.icon}`, () => null]] },
+      { text: P.hello, choices: [[`Sí: ${o.name} ${o.icon}`, () => null]] },
       { text: P.q, choices: P.a.map(([label, reply], k) => [label, () => { st.persona.q1 = k; return reply; }]) },
       { text: PROFILE_Q2.q, choices: PROFILE_Q2.a.map(([label, fx, reply]) => [label, () => { gift(fx); return reply; }]) },
       { text: `Junto a tu casa te espera tu estudio ${o.station}. Ahí podrás ${o.act.toLowerCase()} y sacar ${ITEMS[o.mats[0][0]].name.toLowerCase()} y cosas mucho mejores. En otros sueños lo pagan caro… ¡pero primero vamos a ponerte guapo!` },
