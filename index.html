@@ -598,7 +598,8 @@ const CFG = {
   world: {
     zones: {
       town:     { brg: 0,   m: 0,  rIn: 9,   rOut: 15, name: 'Pueblo',                icon: '🏘️' },
-      south:    { brg: 180, m: 20, rIn: 7,   rOut: 12, name: 'Pueblo',                icon: '🏘️' },   // prado de la futura Calle Mayor (v2.7)
+      south:    { brg: 180, m: 18, rIn: 11,  rOut: 15, name: 'Pueblo',                icon: '🏘️' },   // Calle Mayor (v2.7)
+      home:     { brg: 180, m: 34, rIn: 7,   rOut: 10, name: 'Pueblo',                icon: '🏘️' },   // tu casa y el jardín, al final de la calle
       fields:   { brg: 4,   m: 21, rIn: 6,   rOut: 11, name: 'Campos de Dax',         icon: '🌾' },
       forest:   { brg: 47,  m: 30, rIn: 10,  rOut: 15, name: 'Bosque',                icon: '🌲' },
       pond:     { brg: 69,  m: 21, rIn: 2.2, rOut: 4,  name: 'Charca del Bosque',     icon: '🪷' },
@@ -607,7 +608,11 @@ const CFG = {
       mountain: { brg: 333, m: 39, rIn: 8.6, rOut: 12, name: 'Montaña',               icon: '⛰️' },
       sea:      { port: 22,          rIn: 12,  rOut: 19, name: 'Mar del Borde',         icon: '🌊' },   // a 22 m del muelle de Sam, mar adentro
     },
-    sites: { workshop: [47, 15], lab: [14, 21], studio: [185, 15], sombra: [100, 32] },   // [rumbo, metros] desde el pueblo
+    sites: { workshop: [47, 15], lab: [14, 21], sombra: [100, 32] },   // [rumbo, metros] desde el pueblo
+    /* v2.7 · Bloque D · EL PUEBLO (metros reales sobre la esfera): plaza en el centro, la Calle Mayor hacia el sur y tu casa al final */
+    town: { plaza: 5.5, hall: 8, street: [5.5, 26], width: 4, lamps: [7, 12.5, 18, 23], plotX: 7,
+      plots: { bakery: [9.5, 1], store: [9.5, -1], studio: [16.5, 1], houseA: [16.5, -1], houseB: [23.5, 1], houseC: [23.5, -1] },   // [s, lado: 1 este · −1 oeste]
+      home: 28, garden: 38, gardenR: 7, capsule: [-11, 39, 8, 11] },   // tu casa (y su jardín de obras) · meseta del pueblo [desde, hasta, r0, r1]
     base: 1.2, noise: 0.28, townH: 1.02, hillH: 1.1, dunes: 0.75, seaDepth: 2.0, pondDepth: 0.75,
     mountain: { H: 6.2, top: 1.9, start: 7.9, turns: 1.3, w: 1.15, edge: 0.45 },   // campana de 6,2 m · sendero de 2,3 m de ancho y 1,3 vueltas
     colors: { sand: 0xf0e2ad, sand2: 0xe8d6a0, rock: 0x8e8f99, rock2: 0x7c7e8a, foot: 0x6aa84f, snow: 0xf6f8fb, snowTint: 0xe6defa, path: 0xd9b98a,
@@ -633,8 +638,8 @@ const CFG = {
   /* ===== v1.7 · ONLINE REAL (F1) · Supabase compartido con NEURON (esquema crossia) · la clave publicable es pública por diseño ===== */
   online: { url: 'https://glsmahzpvzabeeucyqif.supabase.co', key: 'sb_publishable_SmbXr1nXApZ8HRF1ezbXcg_lqtr2yaZ', lib: 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm', autosaveMin: 5, posEvery: 0.25 },
   /* ===== v1.6 · ESTUDIO DEL PERFIL ===== */
-  util: { benchPos: [-4.2, -0.6], luckMult: 1.6, luckMs: 600000, fossilMaxBonus: 3, fossilBounty: 250, coinSwap: 10, coinSwapCash: 600, rainbowFabric: 'rainbow' },   // v2.5 · Bloque G
-  studio: { pos: [-2.8, -7.8], perDay: 3, secs: 2.4, hunger: 4, maint: 9, fixFee: 80, fixMats: [['wood_log', 2], ['stone', 1]], bonusP: 0.35, inspireP: 0.12 },
+  util: { benchPos: [5.2, 1.0], luckMult: 1.6, luckMs: 600000, fossilMaxBonus: 3, fossilBounty: 250, coinSwap: 10, coinSwapCash: 600, rainbowFabric: 'rainbow' },   // v2.5 · Bloque G
+  studio: { pos: [-5.4, 1.2], perDay: 3, secs: 2.4, hunger: 4, maint: 9, fixFee: 80, fixMats: [['wood_log', 2], ['stone', 1]], bonusP: 0.35, inspireP: 0.12 },
   /* ===== v0.4 · PESCA (Sec. 5.5–5.6) ===== */
   fishTable: { fish: 65, tropical_fish: 25, golden_fish: 5, old_boot: 5 },   // % base
   fishNightGoldenMult: 3,         // Pez Dorado ×3 de noche
@@ -743,7 +748,7 @@ const CFG = {
     { npc: 'sam',    id: 'sky_compass',     price: 520, stock: 1, rare: true },
     { npc: 'sombra', id: 'timeless_clock',  price: 850, stock: 1, rare: true },
   ],
-  fairStallSpots: [[-1.6, 2.3, 0.15], [1.1, 2.1, -0.1], [3.4, 1.7, -0.3]],   // aldea: x, z, giro de los 3 puestos (junto al camino de piedras)
+  fairStallSpots: [[-4.2, 1.6, 1.3], [-2.3, 3.9, 0.5], [2.3, 3.9, -0.5]],   // v2.7: en la plaza   // aldea: x, z, giro de los 3 puestos (junto al camino de piedras)
   museumIslands: [[-3.45, 2.59], [-2.25, 3.6], [-0.78, 4.13], [0.78, 4.13], [2.25, 3.6], [3.45, 2.59]],   // v2.5: 6 salas en arco   // jardines del ayuntamiento: centro de cada set (x, z)
   museumSignSpot: [-1.5, 2.2],
   maxPixelRatioMobile: 1.25,      // v1.0 · rendimiento: 1.5 → 1.25 en táctil (la mayor parte del coste es de relleno de píxeles)
@@ -972,7 +977,7 @@ const state = {
 const SAVE_KEY = 'crossia.save';         // clave en localStorage
 // El proyecto se llamaba «usainbot»: la partida guardada con la clave antigua se mueve a la nueva una sola vez.
 try { const old = localStorage.getItem('usainbot.save'); if (old && !localStorage.getItem(SAVE_KEY)) localStorage.setItem(SAVE_KEY, old); if (old) localStorage.removeItem('usainbot.save'); } catch {}
-const SAVE_VERSION = 4;                   // súbela y añade un paso en migrate() si cambia el formato
+const SAVE_VERSION = 5;                   // súbela y añade un paso en migrate() si cambia el formato
 const PROFILE = { GUEST: 'GUEST', ACCOUNT: 'ACCOUNT' };
 const uid = () => (crypto.randomUUID ? crypto.randomUUID() : 'g-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 10));
 
@@ -1063,6 +1068,13 @@ function migrate(save) {
     const move = (d) => { const c = d3(d, Vn); if (!(c > 0.35)) return null; const x = d3(d, E0) * 16 / c, y = d3(d, N0) * 16 / c, p = Vn.map((v, i) => v * R + E0[i] * x + N0[i] * y), k = Math.hypot(...p); return p.map(v => v / k); };
     (save.world?.buildings || []).forEach(b => { if (Array.isArray(b.dir) && b.dir.length === 3) { const m = move(b.dir); if (m) b.dir = m; } });
     if (Array.isArray(save.player?.dir) && save.player.dir.length === 3) { const m = move(save.player.dir); save.player.dir = m; if (!m) save.player.fwd = null; }   // lejos del pueblo → amaneces en casa
+  }
+  // v4 → v5 (v2.7 · Calle Mayor, Bloque D): tus construcciones se mudan al jardín de detrás de tu casa, a las mismas distancias entre ellas
+  if ((save.version || 1) < 5) {
+    const W = WGEO, T = CFG.world.town, g = W.street(T.garden), Sg = g.F, Eg = W.nrm(W.crs(g.p, Sg));   // sur sigue siendo sur: lo que estaba al norte (junto a tu casa antigua) queda junto a la nueva
+    (save.world?.buildings || []).forEach(b => { if (!Array.isArray(b.dir) || b.dir.length !== 3) return; const d = W.nrm({ x: b.dir[0], y: b.dir[1], z: b.dir[2] }); if (W.ang(d, W.V) * R > 12) return;
+      const l = W.toLocal(W.V, d), p = W.nrm({ x: g.p.x * R + Eg.x * l.x + Sg.x * l.z, y: g.p.y * R + Eg.y * l.x + Sg.y * l.z, z: g.p.z * R + Eg.z * l.x + Sg.z * l.z }); b.dir = [p.x, p.y, p.z]; b.mv = 5; });
+    if (save.story?.prologueDone) (save.world ||= {}).townLetter = true;
   }
   save.version = SAVE_VERSION; return save;
 }
@@ -1416,7 +1428,7 @@ const BUILDABLES = [
   { id: 'statue',   name: 'Estatua $TOKEN',   icon: '🏆', cost: 1000, mats: { stone: 2, mystic_crystal: 1 }, r: 1.2, desc: 'Monumento dorado giratorio. Requiere casa nivel 2.', unlock: () => GS.house.level >= 2, unlockText: 'Casa nivel 2 (Villa)' },
 ];
 const buildableById = Object.fromEntries(BUILDABLES.map(b => [b.id, b]));
-const BUILD_ZONE = { site: 'village', radius: 0.5 / R16 };   // v2.6: los mismos 8 m de siempre   // zona de construcción: la meseta de la aldea (alrededor de la casa del jugador)
+const BUILD_ZONE = { site: 'garden', radius: CFG.world.town.gardenR / R };   // v2.7: el jardín de detrás de tu casa (7 m)   // zona de construcción: la meseta de la aldea (alrededor de la casa del jugador)
 /** Estado persistente de una tienda; repone el stock cuando vence restockAt */
 function shopState(id) {
   const def = SHOPS[id]; GS.shops[id] ||= { stock: {}, restockAt: 0 }; const s = GS.shops[id];
@@ -1546,9 +1558,13 @@ const WGEO = (() => {
   const offset = (d, x, z) => { const f = frame(d); return nrm({ x: d.x * R + f.E.x * x - f.N.x * z, y: d.y * R + f.E.y * x - f.N.y * z, z: d.z * R + f.E.z * x - f.N.z * z }); };
   /** Inversa de offset (proyección gnomónica): metros {x, z} de d alrededor de c, como si el planeta tuviera radio r */
   const toLocal = (c, d, r = R) => { const f = frame(c), k = r / Math.max(1e-6, dot(d, c)); return { x: dot(d, f.E) * k, z: -dot(d, f.N) * k }; };
+  /** v2.7 · Calle Mayor: punto a s metros del centro de la plaza (rumbo 180 = sur) y x metros hacia el este, con su marco F (a lo largo) y L (a lo ancho) */
+  const street = (s, x = 0, brg = 180) => { const a = s / R, b = brg * Math.PI / 180, t = mix(VF.N, Math.cos(b), VF.E, Math.sin(b));
+    const P = nrm(mix(V, Math.cos(a), t, Math.sin(a))), F = nrm(mix(t, Math.cos(a), V, -Math.sin(a))), L = nrm(crs(P, F));
+    if (!x) return { p: P, F, L }; const q = x / R, Q = nrm(mix(P, Math.cos(q), L, Math.sin(q))); return { p: Q, F: nrm(mix(F, 1, Q, -dot(F, Q))), L: nrm(mix(L, Math.cos(q), P, -Math.sin(q))) }; };
   /** Dirección a r metros de c con ángulo th (0 = norte local, π/2 = este) */
   const polar = (c, r, th) => { const f = frame(c), a = r / R, t = mix(f.N, Math.cos(th), f.E, Math.sin(th)); return nrm(mix(c, Math.cos(a), t, Math.sin(a))); };
-  return { dot, nrm, crs, mix, ang, frame, V, fromV, offset, toLocal, polar, v3: (p) => new THREE.Vector3(p.x, p.y, p.z) };
+  return { dot, nrm, crs, mix, ang, frame, V, fromV, offset, toLocal, polar, street, v3: (p) => new THREE.Vector3(p.x, p.y, p.z) };
 })();
 /** Un "sitio" es una meseta plana con su propio marco local (E = este, S = sur). r0/r1 se dan como ángulos del planeta antiguo (radio 16) = metros / 16 */
 function makeSite(dir, h, r0, r1) {
@@ -1556,19 +1572,31 @@ function makeSite(dir, h, r0, r1) {
   const N = new THREE.Vector3().crossVectors(dir, E).normalize();
   return { dir, h, r0: r0 / R16, r1: r1 / R16, E, N, S: N.clone().negate() };
 }
-const siteFromV = (k) => WGEO.v3(WGEO.fromV(...CFG.world.sites[k]));   // v2.6: Glover, Dax, Sombra y los erizos ya viven donde dice la Guía (Bloque D1)
+const siteFromV = (k) => WGEO.v3(WGEO.fromV(...CFG.world.sites[k]));
+/** v2.7 · Sitio sobre la Calle Mayor en metros reales: s a lo largo (sur +) y x a lo ancho (este +). face: 'street' (la fachada mira a la calle), 'south' o 'north' */
+function streetSite(s, x, face, h = R + 1.0, rM = 4) {
+  const g = WGEO.street(s, x), dir = WGEO.v3(g.p), S = face === 'south' ? WGEO.v3(g.F) : face === 'north' ? WGEO.v3(g.F).negate() : WGEO.v3(g.L).multiplyScalar(x > 0 ? -1 : 1);
+  return { dir, h, r0: rM / R, r1: (rM + 2) / R, E: new THREE.Vector3().crossVectors(dir, S).normalize(), N: S.clone().negate(), S };
+}
+const TOWN = CFG.world.town;   // v2.6: Glover, Dax, Sombra y los erizos ya viven donde dice la Guía (Bloque D1)
 const SITES = {
   village:  makeSite(n3(0.15, 0.55, 0.82), R + 1.0, 0.5, 0.8),
-  townhall: makeSite(n3(-0.7, 0.3, 0.6), R + 1.1, 0.33, 0.6),
+  townhall: streetSite(-TOWN.hall, 0, 'south'),   // v2.7: en el lado norte de la plaza, mirando a la fuente
   workshop: makeSite(siteFromV('workshop'), R + 0.95, 0.33, 0.6),   // a la salida del pueblo, hacia el bosque
   sombra:   makeSite(siteFromV('sombra'), R + CFG.world.base + CFG.world.hillH, 0.3, 0.55),   // en lo alto de la colina de las piedras
   lab:      makeSite(siteFromV('lab'), R + 1.0, 0.4, 0.65),   // en los campos, camino de la montaña
-  studio:   makeSite(siteFromV('studio'), R + 1.0, 0.3, 0.55),   // en el prado sur, donde irá la Calle Mayor
+  ...Object.fromEntries(Object.entries(TOWN.plots).map(([k, [s, side]]) => [k, streetSite(s, side * TOWN.plotX, 'street')])),   // v2.7: panadería, tienda de Rocco, Studio Viral y 3 casas vacías
+  home:     streetSite(TOWN.home, 0, 'north'),   // tu casa, al final de la calle, mirando a la plaza
+  garden:   streetSite(TOWN.garden, 0, 'north', R + 1.0, TOWN.gardenR),   // el jardín de obras, detrás
   port:     makeSite(n3(-0.8, -0.1, -0.55), SEA + 0.4, 0.18, 0.34),
 };
 const V = SITES.village.dir, V_N = SITES.village.N, V_S = SITES.village.S;
 const CHANNELS = [];   // v2.6: el Mar del Borde ya abre el paso del barco frente al muelle
-const TERRAIN_SITES = [SITES.village, SITES.townhall, SITES.workshop, SITES.sombra, SITES.lab, SITES.studio, SITES.port];
+/** v2.7 · La meseta del pueblo: una cápsula a lo largo de la Calle Mayor (de la plaza al jardín) */
+const TOWN_SEG = (() => { const [a0, a1, r0, r1] = TOWN.capsule, g = WGEO.street(0); return { seg: true, a: g.p, t: g.F, aMin: a0 / R, aMax: a1 / R, h: R + 1.0, r0: r0 / R, r1: r1 / R, dir: WGEO.v3(g.p) }; })();
+const segAngle = (d, s) => { const th = Math.max(s.aMin, Math.min(s.aMax, Math.atan2(d.x * s.t.x + d.y * s.t.y + d.z * s.t.z, d.x * s.a.x + d.y * s.a.y + d.z * s.a.z))), c = Math.cos(th), k = Math.sin(th);
+  return Math.acos(Math.max(-1, Math.min(1, d.x * (s.a.x * c + s.t.x * k) + d.y * (s.a.y * c + s.t.y * k) + d.z * (s.a.z * c + s.t.z * k)))); };
+const TERRAIN_SITES = [SITES.village, TOWN_SEG, SITES.workshop, SITES.sombra, SITES.lab, SITES.port];
 
 function terrainNoise(x, y, z) {
   let n = Math.sin(x * 3.1 + y * 1.7) * Math.cos(z * 2.3 - x * 1.1);
@@ -1618,7 +1646,7 @@ const World = (() => {
   /** Relieve sin las mesetas de los sitios (las pone heightAt después) */
   function relief(d) {
     let h = R + C.base + terrainNoise(d.x * R16, d.y * R16, d.z * R16) * C.noise;
-    const wt = Math.max(w('town', d), w('south', d)), wf = w('fields', d) * 0.7, flat = Math.max(wt, wf);
+    const wt = Math.max(w('town', d), w('south', d), w('home', d)), wf = w('fields', d) * 0.7, flat = Math.max(wt, wf);
     if (flat > 0) h += (R + C.townH + terrainNoise(d.x * 3, d.y * 3, d.z * 3) * 0.05 - h) * flat * 0.9;
     const wd = w('desert', d); if (wd > 0) h += wd * dunes(d);
     const wh = w('hill', d); if (wh > 0) h += wh * C.hillH;
@@ -1634,7 +1662,7 @@ const World = (() => {
     if (h == null) h = heightAt(d);
     if (h <= SEA + 0.12) return meters('pond', d) < Z.pond.rOut + 1 ? 'pond' : 'sea';
     if (meters('mountain', d) < MZ.rIn + 1) return 'mountain';
-    const ws = { desert: w('desert', d), forest: Math.max(w('forest', d), w('pond', d)), hill: w('hill', d), fields: w('fields', d), town: Math.max(w('town', d), w('south', d)) };
+    const ws = { desert: w('desert', d), forest: Math.max(w('forest', d), w('pond', d)), hill: w('hill', d), fields: w('fields', d), town: Math.max(w('town', d), w('south', d), w('home', d)) };
     let best = 'wild', bw = 0.5; for (const k in ws) if (ws[k] > bw) { bw = ws[k]; best = k; }
     if (best === 'wild' && meters('sea', d) < Z.sea.rOut + 5) return 'coast';
     return best;
@@ -1682,7 +1710,7 @@ const World = (() => {
 /** Altura del suelo en dir: relieve de las zonas + mesetas de los sitios (casas, talleres, muelle) */
 function heightAt(dir) {
   let h = World.relief(dir);
-  for (const s of TERRAIN_SITES) { const t = 1 - smoothstep(s.r0, s.r1, Math.acos(clamp(dir.x * s.dir.x + dir.y * s.dir.y + dir.z * s.dir.z, -1, 1))); if (t > 0) h += (s.h - h) * t; }
+  for (const s of TERRAIN_SITES) { const t = 1 - smoothstep(s.r0, s.r1, s.seg ? segAngle(dir, s) : Math.acos(clamp(dir.x * s.dir.x + dir.y * s.dir.y + dir.z * s.dir.z, -1, 1))); if (t > 0) h += (s.h - h) * t; }
   return h;
 }
 const isLand = (dir) => heightAt(dir) > SEA + 0.12;
@@ -2242,7 +2270,7 @@ const bakery = (() => {
   Object.assign(g.userData, { neonMats: [neonPink, neonCyan], bulbs, lights: [lPink, lCyan] });
   return g;
 })();
-placeAtSite(bakery, S_V, 6.2, -4.5, -0.55, -0.1); scene.add(bakery); colliders.push({ pos: bakery.position.clone(), r: 3.2 });
+placeAtSite(bakery, SITES.bakery, 0, -2.4, 0, -0.1); scene.add(bakery);   // v2.7: Calle Mayor, primera casa junto a la plaza colliders.push({ pos: bakery.position.clone(), r: 3.2 });
 
 /** Casa del jugador con 3 niveles: Casa → Tienda → Villa */
 let house = null, houseCollider = { pos: new THREE.Vector3(), r: 2.8 }; colliders.push(houseCollider);
@@ -2279,7 +2307,7 @@ function buildHouse(level) {
   // v2.2 · el armario ya no está fuera: se usa dentro de casa (Guía Maestra 2, Bloque B)
   if (wardrobeObj) { const k = interactables.indexOf(wardrobeObj); if (k >= 0) interactables.splice(k, 1); wardrobeObj = null; }
   refreshMerchantSign(g);   // v1.2: cartel de las Licencias de Comerciante (si tienes alguna)
-  placeAtSite(g, S_V, -6.5, -3.5, 0.5, -0.1); scene.add(g); house = g;
+  placeAtSite(g, SITES.home, 0, -2.2, 0, -0.1); scene.add(g); house = g;   // v2.7: al final de la Calle Mayor
   houseCollider.pos.copy(g.position); houseCollider.r = [2.8, 3.3, 4.2, 5.0][level];
   if (GS.house.level !== level) { GS.house.level = level; SaveSystem.save('house'); }
 }
@@ -2288,7 +2316,7 @@ buildHouse(0);
 const laptopMats = { body: mat(0xcfd8dc), disp: glow(0x1de9b6, 0x00e5a0, 1.2), light: new THREE.PointLight(0x1de9b6, 1.2, 3, 2) };
 // v2.2 · la Laptop de IA ya no está fuera: se abre desde el escritorio de casa (💻 PC de casa → Laptop de IA) o desde el diálogo de cada vecino
 const stoneMat = mat(0xd9cfc1, { flatShading: true });
-for (let i = 0; i <= 10; i++) { const t = i / 10; const s = cyl(0.45 + Math.random() * 0.15, 0.5, 0.12, stoneMat, 0, 0, 0, 7); placeAtSite(s, S_V, lerp(-4, 4.5, t), lerp(1.2, 0.2, t) + Math.sin(t * Math.PI) * 1.2, Math.random() * 3, 0.04); scene.add(s); }
+// v2.7: el camino de piedras de la aldea pasa a ser la Calle Mayor (adoquines, ver «CALLE MAYOR Y PLAZA»)
 
 /* =========================================================
    8. JUGADOR + AURA
@@ -2565,7 +2593,7 @@ function applyAvatar(cfg, wardrobe) {
   return body;
 }
 applyAvatar(AVATAR_CLASSIC);
-player.userData.dir = siteDir(S_V, -2.5, 3.5); player.userData.fwd = frameAt(player.userData.dir, V_N).fwd;
+player.userData.dir = siteDir(S_V, 0, 3.6); player.userData.fwd = frameAt(player.userData.dir, V_N).fwd;
 scene.add(player);
 const playerBlob = addBlob(player);   // v1.4 · QW3: sombra de contacto (viaja con el jugador también a los interiores)
 const aura = new THREE.Group(); aura.position.y = 0.9; player.add(aura);
@@ -2641,7 +2669,7 @@ const card = (emoji, name, sub) => `<div class="bg-white rounded-2xl shadow p-3 
 const previewShell = (color, title, sub, body) => `<div class="min-h-full bg-gradient-to-b from-white to-slate-50"><div class="${color} text-white px-5 py-3 flex items-center justify-between"><div class="font-bold text-lg">${title}</div><div class="text-xs bg-white/20 px-2 py-1 rounded-full">${COIN} $TOKEN</div></div><div class="px-5 py-3 text-center text-slate-500 text-sm">${sub}</div><div class="grid grid-cols-3 gap-3 px-5 pb-5">${body}</div></div>`;
 
 const NPCS = [
-  { id: 'bear', name: 'Oso Panadero', emoji: '🐻', species: 'bear', site: 'village', pos: [4.3, -1.2], yaw: Math.PI + 0.6, reward: 500, building: 'bakery', app: 'bakery',
+  { id: 'bear', name: 'Oso Panadero', emoji: '🐻', species: 'bear', site: 'bakery', pos: [-2.3, 1.1], yaw: 0, reward: 500, building: 'bakery', app: 'bakery',
     intro: '¡Hola! Mi panadería necesita una web interactiva para vender pasteles en la isla. ¿Puedes usar tu laptop con IA para crearla?',
     waiting: '¿Ya tienes lista mi web? ¡Usa tu laptop con IA, confío en ti! 🥐', done: '¡Gracias a tu web los pasteles vuelan por todo el planeta! 🍰 ¿Viste mis luces neón?',
     celebrate: '¡¡WOW!! ¡La web es perfecta! 🎉 Toma 500 $TOKEN por tu trabajo. ¡Enciendo las luces de neón para celebrarlo!',
@@ -2649,7 +2677,7 @@ const NPCS = [
       prompt: 'Crea una web interactiva para "La Panadería del Oso": catálogo de pasteles, carrito y pagos con $TOKEN. Estilo cartoon pastel y responsive. 🐻🍰',
       code: ['// panaderia.html · generado por villager-gpt', 'const pasteles = [{ nombre: "Tarta Fresa", precio: 12 }, { nombre: "Cupcake", precio: 5 }, { nombre: "Croissant", precio: 4 }];', 'const carrito = [];', 'function render() {', '  catalogo.innerHTML = pasteles.map(p => card(p)).join("");', '}', 'async function pagar() {', '  await PlanetWallet.transfer({ to: "oso.bakery", amount: total(), token: "$TOKEN" });', '  confetti(); // 🎉 pedido confirmado', '}', 'render();'],
       preview: previewShell('bg-pink-400', '🐻 La Panadería del Oso', 'Pasteles recién horneados · envío en bici 🚲', card('🍰', 'Tarta Fresa', '12 $TOKEN') + card('🧁', 'Cupcake', '5 $TOKEN') + card('🥐', 'Croissant', '4 $TOKEN')) } },
-  { id: 'mayor', name: 'Mayor Reginald', emoji: '🐶', species: 'stbernard', site: 'townhall', pos: [2.2, 1.2], yaw: Math.PI, reward: 1000, building: 'townhall', app: 'board',
+  { id: 'mayor', name: 'Mayor Reginald', emoji: '🐶', species: 'stbernard', site: 'townhall', pos: [2.2, 1.2], yaw: 0, reward: 1000, building: 'townhall', app: 'board',
     intro: '¡Ejem! Soy el Alcalde Reginald. Tengo 4.000 formularios en papel, tres sellos rotos y una ordenanza de 1987 que nadie encuentra. ¿Podrías crear un Gestor Legal con Smart Contracts usando tu IA para los papeles del ayuntamiento?',
     waiting: '¿Cómo va ese gestor legal? Los papeles ya llegan al techo… literalmente.', done: '¡El ayuntamiento por fin es digital! Mira el Tablón Holográfico: holders y precio del token en tiempo real. ¡Ejem, magnífico!',
     celebrate: '¡Por mis bigotes! ¡Smart contracts firmados en segundos! Toma 1000 $TOKEN. ¡Activo el Tablón de Anuncios Holográfico!',
@@ -2689,7 +2717,7 @@ const NPCS = [
       prompt: 'Programa una Ruta de Navegación Automatizada con Drones Marítimos e IA: el barco mercante debe llegar solo al puerto, esquivar tormentas y traer noticias y datos del mercado crypto. 🐦⚓',
       code: ['// navegacion.html · piloto automático', 'const ruta = await AI.route({ desde: "Isla Lejana", hasta: "Puerto Sam" });', 'Drones.escoltar(ruta, { evitarTormentas: true });', 'Barco.on("llegada", async () => {', '  const noticias = await CryptoFeed.latest(["$TOKEN", "BTC", "ETH"]);', '  Puerto.anunciar(noticias); // 📰 ticker en el muelle', '});', 'Barco.zarpar({ cada: "60s" });'],
       preview: previewShell('bg-sky-600', '⚓ Navegación Automática', 'Barco mercante: en ruta · ETA 18s', card('🚢', 'Mercante', 'en ruta') + card('🛸', 'Drones', '4 escoltas') + card('📰', 'Noticias', 'crypto feed')) } },
-  { id: 'hedgehogs', name: 'Barnaby Jr. & Pip', emoji: '🦔', species: 'hedgehogs', site: 'studio', pos: [2.4, 1.4], yaw: Math.PI, reward: 600, building: 'studio', app: 'memes',
+  { id: 'hedgehogs', name: 'Barnaby Jr. & Pip', emoji: '🦔', species: 'hedgehogs', site: 'studio', pos: [2.4, 1.4], yaw: 0, reward: 600, building: 'studio', app: 'memes',
     intro: '¡Broooo! Somos Barnaby Jr. y Pip. Nuestro último meme hizo 3 likes (2 eran de mamá). Necesitamos un Generador Automático de Memes e Imágenes Virales con IA. ¡Vamos a petarlo!',
     waiting: '¿Y el generador de memes? El algoritmo no espera a nadie, bro.', done: '¡¡SOMOS VIRALES!! El generador está en el estudio. ¡Crea memes del proyecto y tuitéalos!',
     celebrate: '¡¡ESTO ES ORO, BRO!! +600 $TOKEN. ¡La Herramienta de Memes está desbloqueada en el estudio!',
@@ -2762,7 +2790,12 @@ registerInteractable(bakery, { type: 'building', label: 'Entrar a la Panadería'
   [-2.2, 2.2].forEach(x => b.add(cyl(0.22, 0.22, 3.6, mat(0xffffff), x, 1.7, 2.4, 10)));
   b.add(cyl(0.05, 0.05, 3, mat(0x5d4037), 3.6, 5, -0.5, 6)); b.add(box(1, 0.6, 0.04, mat(0xe53935), 4.1, 6.2, -0.5));
   addProp(b, s, 0, -2, 0, -0.1, 3.8); registerInteractable(b, { type: 'building', label: 'Ayuntamiento' }, 'mayor'); buildings.mayor = b;
-  [[-4, 2.5], [4, 2.5]].forEach(([x, z]) => { const l = new THREE.Group(); l.add(cyl(0.06, 0.08, 2.2, mat(0x2b2b3d), 0, 1.1, 0, 6)); l.add(sphere(0.2, glow(0xfff3b0, 0xffe08a, 0.8), 0, 2.3, 0, 8)); addProp(l, s, x, z, 0, 0, 0.3); }); }
+  [[-4.6, 1.0], [4.6, 1.0]].forEach(([x, z]) => { const l = new THREE.Group(); l.add(cyl(0.06, 0.08, 2.2, mat(0x2b2b3d), 0, 1.1, 0, 6)); l.add(sphere(0.2, glow(0xfff3b0, 0xffe08a, 0.8), 0, 2.3, 0, 8)); addProp(l, s, x, z, 0, 0, 0.3); }); }   // v2.7: sin pisar el museo
+/* v2.7 · Tres casas vacías en la Calle Mayor, para vecinos futuros */
+[['houseA', 0xd7ecff, 0x5c7cfa], ['houseB', 0xfff0d6, 0xef6c00], ['houseC', 0xe8f5e9, 0x2e7d32]].forEach(([k, wall, roof]) => {
+  const b = makeBuilding({ w: 4.2, h: 2.9, d: 3.6, wall, roof, roofType: 'cone', sign: 'SE ALQUILA', signColor: '#5d4037' });
+  addProp(b, SITES[k], 0, -2.4, 0, -0.1, 2.9); registerInteractable(b, { type: 'gather', label: '🏠 Casa vacía (para futuros vecinos)', fn: () => showToast('🏠 «Se alquila». El Mayor dice que pronto llegarán vecinos nuevos al pueblo.', 'text-white') });
+});
 // Taller de Glover
 { const s = SITES.workshop; const b = makeBuilding({ w: 4.8, h: 3, d: 4, wall: 0xd7a86e, roof: 0x6d4c41, roofType: 'flat', sign: 'TALLER GLOVER', signColor: '#5d4037' });
   b.add(cyl(0.12, 0.12, 5, mat(0xff9800), 2.6, 2.5, -1.5, 6)); const arm = box(4, 0.2, 0.2, mat(0xff9800), 1.2, 5, -1.5); b.add(arm); b.add(cyl(0.02, 0.02, 1.5, mat(0x333333), -0.6, 4.25, -1.5, 4)); b.add(box(0.6, 0.6, 0.6, mat(0xb5651d), -0.6, 3.2, -1.5));
@@ -2808,7 +2841,7 @@ const storeBuilding = (() => {
   b.add(cyl(0.3, 0.35, 0.5, mat(0x8d6e63), 2.9, 0.25, 1.4, 10)); b.add(sphere(0.2, mat(0xffd54f), 2.9, 0.6, 1.4, 8)); b.add(sphere(0.16, mat(0xff8f5a), 2.7, 0.55, 1.6, 8)); // cesta de frutas
   b.add(box(2.4, 1.2, 0.08, new THREE.MeshStandardMaterial({ map: textTexture('COMPRA · VENDE', { bg: '#fffde7', color: '#2e7d32', font: 'bold 52px Fredoka, Arial' }) }), 0, 4.0, 0.3)); // cartel superior
   const l = new THREE.PointLight(0xffe082, 2, 7, 2); l.position.set(0, 2.2, 3); b.add(l);
-  addProp(b, S_V, -6.5, 5.8, Math.PI + 0.75, -0.1, 3.4); registerInteractable(b, { type: 'store', label: 'Entrar en la Tienda' }); return b;
+  addProp(b, SITES.store, 0, -2.4, 0, -0.1, 3.4); registerInteractable(b, { type: 'store', label: 'Entrar en la Tienda' }); return b;   // v2.7: frente a la panadería
 })();
 const vendor = (() => {
   const g = makeCritter({ fur: 0x8d8d8d, belly: 0xe0e0e0, ears: 'pointy', decorate: (g) => {
@@ -2821,7 +2854,7 @@ const vendor = (() => {
   } });
   const bubble = new THREE.Sprite(new THREE.SpriteMaterial({ map: bubbleTexture('🛒', '#c8f7c5'), depthTest: false })); bubble.position.set(0, 3.3, 0); bubble.renderOrder = 10; g.add(bubble); g.userData.bubble = bubble;
   addBlob(g);   // v1.4 · QW3
-  placeAtSite(g, S_V, -3.6, 4.4, Math.PI * 0.55); registerInteractable(g, { type: 'vendor', label: 'Comerciar con Rocco' }); scene.add(g); colliders.push({ pos: g.position.clone(), r: 0.9, noAO: true }); return g;
+  placeAtSite(g, SITES.store, 2.6, 1.0, 0); registerInteractable(g, { type: 'vendor', label: 'Comerciar con Rocco' }); scene.add(g); colliders.push({ pos: g.position.clone(), r: 0.9, noAO: true }); return g;
 })();
 /** Diálogo del tendero (reutiliza el panel de diálogo y el zoom de cámara) */
 function startVendorDialog() {
@@ -2917,13 +2950,15 @@ const inZone = (id, rMax, rMin = 0) => () => WGEO.v3(World.around(id, _wr, rMax,
 function scatter(count, tries, fn, gen = rndDir) { let placed = 0; for (let i = 0; i < tries && placed < count; i++) if (fn(gen())) placed++; return placed; }
 /** E5 · Postes de viaje (el módulo WorldFX les da vida) · y claros que la decoración respeta */
 const TRAVEL_POSTS = [
-  { id: 'plaza',  name: 'Plaza del pueblo',    icon: '🏘️', dir: WGEO.v3(WGEO.offset(SITES.village.dir, 3.2, 1.6)) },
+  { id: 'plaza',  name: 'Plaza del pueblo',    icon: '🏘️', dir: WGEO.v3(WGEO.offset(SITES.village.dir, 4.4, -1.6)) },
   { id: 'forest', name: 'Claro del bosque',    icon: '🌲', dir: WGEO.v3(WGEO.fromV(47, 24)) },
   { id: 'coast',  name: 'Muelle de Sam',       icon: '⚓', dir: WGEO.v3(WGEO.offset(SITES.port.dir, 3.6, -3.4)) },
   { id: 'desert', name: 'Ruinas del desierto', icon: '🏜️', dir: WGEO.v3(World.Z.desert.c) },
   { id: 'summit', name: 'Cima de la montaña',  icon: '⛰️', dir: WGEO.v3(WGEO.offset(World.Z.mountain.c, 0.9, 0.5)) },
 ];
-const RESERVED = [...TRAVEL_POSTS.map(p => ({ dir: p.dir, r: 2.4 })), { dir: WGEO.v3(World.Z.desert.c), r: 5.4 }, { dir: WGEO.v3(World.Z.mountain.c), r: 2.4 }];
+const RESERVED = [...TRAVEL_POSTS.map(p => ({ dir: p.dir, r: 2.4 })), { dir: WGEO.v3(World.Z.desert.c), r: 5.4 }, { dir: WGEO.v3(World.Z.mountain.c), r: 2.4 },
+  { dir: SITES.village.dir.clone(), r: CFG.world.town.plaza + 0.8 }];   // v2.7: la plaza
+for (let s = CFG.world.town.street[0] - 1; s <= CFG.world.town.street[1] + 2; s += 2) RESERVED.push({ dir: WGEO.v3(WGEO.street(s).p), r: CFG.world.town.width / 2 + 1 });   // v2.7: la Calle Mayor
 const reserved = (d) => RESERVED.some(o => angleBetween(o.dir, d) * R < o.r);
 const nearAnySite = (d, margin) => Object.values(SITES).some(s => angleBetween(d, s.dir) < s.r0 + margin);
 const okGround = (d, maxSlope = 0.45) => isLand(d) && !nearAnySite(d, 0.02) && !reserved(d) && World.mountain(d).path < 0.05 && World.slopeAt(d) < maxSlope;
@@ -2969,14 +3004,13 @@ function addTreeAt(dir, scale, kind = null) {
   placeOnPlanet(deck, WGEO.v3(World.Z.mountain.c), 0, 0); scene.add(deck);
 }
 /* --- Árboles --- */
-[[-10, -6, 1.1], [-11.5, 1, 0.9], [-9, 7, 1.2], [-3, 10, 1], [4, 10.5, 0.9], [10, 6, 1.1], [11.5, -1, 1], [9, -8.5, 1.2], [2, -11, 1], [-5, -11, 0.9], [-1, -6.5, 0.8], [7.5, 4.5, 0.85]]
-  .forEach(([x, z, s]) => { const d = siteDir(S_V, x, z); if (isLand(d) && !reserved(d)) addTreeAt(d, s); });
 { const spaced = (d, m) => !treeDirs.some(t => angleBetween(t, d) * R < m);
   scatter(72, 1600, d => okGround(d, 0.5) && World.meters('pond', d) > 5.5 && spaced(d, 1.7) && addTreeAt(d, 0.85 + _wr() * 0.55, _wr() < 0.55 ? 'pine' : 'broad'), inZone('forest', 14.5));   // 🌲 bosque
   scatter(16, 500, d => okGround(d, 0.55) && spaced(d, 1.8) && addTreeAt(d, 0.65 + _wr() * 0.3, 'pine'), inZone('mountain', 12.5, 7.4));   // pinos al pie de la montaña
   scatter(16, 900, d => isLand(d) && !nearAnySite(d, 0.03) && !reserved(d) && heightAt(d) - SEA < 0.75 && spaced(d, 2.2) && addTreeAt(d, 1, 'palm'), inZone('sea', 21, 16));   // 🌴 playa
   scatter(34, 2500, d => okGround(d) && ['wild', 'coast'].includes(World.zoneAt(d)) && spaced(d, 2.6) && addTreeAt(d, 0.8 + _wr() * 0.5, _wr() < 0.45 ? 'broad' : null));   // campo abierto
   scatter(5, 300, d => okGround(d) && spaced(d, 3) && addTreeAt(d, 0.8 + _wr() * 0.3, 'broad'), inZone('fields', 10, 4));   // campos de Dax
+  scatter(16, 1500, d => okGround(d) && World.zoneAt(d) === 'town' && spaced(d, 3.2) && addTreeAt(d, 0.75 + _wr() * 0.4, _wr() < 0.55 ? 'broad' : null), inZone('south', 16, 2));   // v2.7: árboles entre las casas
 }
 /* --- Rocas --- */
 { const rockMat = mat(0x9e9aa8, { flatShading: true }), rockProto = () => { const g = new THREE.Group(); g.add(mesh(new THREE.DodecahedronGeometry(1, 0), rockMat)); return g; };
@@ -3009,13 +3043,47 @@ function addTreeAt(dir, scale, kind = null) {
 const flowerColors = [0xff6b9d, 0xffd93d, 0xff8c42, 0xc77dff, 0xffffff];
 const FLOWER_HEAD = mat(0xffffff); FLOWER_HEAD.userData.tint = true;
 const flowerProto = () => { const f = new THREE.Group(); f.add(mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.35, 4), matC(0x3f8f3a), 0, 0.17, 0, false)); f.add(mesh(new THREE.SphereGeometry(0.11, 6, 6), FLOWER_HEAD, 0, 0.38, 0, false)); return f; };
-const MEADOW = ['town', 'fields', 'wild', 'hill', 'forest'];
-{ const total = Math.round(330 * GFX.T.decor), q = new THREE.Vector3(), okF = (d) => isLand(d) && heightAt(d) - SEA < 1.4 && MEADOW.includes(World.zoneAt(d)) && World.slopeAt(d) < 0.5; let placed = 0;   // v1.5 · Etapa 6: flores en matas de 3–7 e instanciadas
+const MEADOW = ['town', 'fields', 'wild', 'hill', 'forest'];   // (la calle y la plaza quedan libres: reserved)
+{ const total = Math.round(330 * GFX.T.decor), q = new THREE.Vector3(), okF = (d) => isLand(d) && heightAt(d) - SEA < 1.4 && !reserved(d) && MEADOW.includes(World.zoneAt(d)) && World.slopeAt(d) < 0.5; let placed = 0;   // v1.5 · Etapa 6: flores en matas de 3–7 e instanciadas
   for (let i = 0; i < 1500 && placed < total; i++) { const d = i % 3 === 0 ? inZone('fields', 11)() : rndDir(); if (!okF(d)) continue; const col = flowerColors[Math.floor(_wr() * 5)], k = 3 + Math.floor(_wr() * 5);
     for (let j = 0; j < k && placed < total; j++) { q.copy(d).add(rndDir().multiplyScalar(0.025 / R16)).normalize(); if (!okF(q)) continue; Decor.add('flower', flowerProto, { amp: 0.05, H: 0.45, colors: true, clear: true }, q, _wr() * 6, 0.8 + _wr() * 0.4, 0, null, _wr() < 0.8 ? col : flowerColors[Math.floor(_wr() * 5)]); placed++; } } }
 { const n = Math.round((GFX.T.grass ?? 160) * 1.5), G = matC(0x5cbf4a, true);   // v1.5 · Etapa 6: matas de 3 hojas instanciadas
   const grassProto = () => { const g = new THREE.Group(); [[0, 0, 0], [0.09, 0.35, 2.1], [-0.08, -0.3, 4.2]].forEach(([x, tilt, ry]) => { const c = mesh(new THREE.ConeGeometry(0.07, 0.42, 3), G, x, 0.2, 0, false); c.rotation.set(tilt, ry, tilt * 0.5); g.add(c); }); return g; };
-  scatter(n, n * 4, d => { if (!isLand(d) || heightAt(d) - SEA > 1.6 || nearAnySite(d, 0.02) || !MEADOW.includes(World.zoneAt(d))) return false; Decor.add('grass', grassProto, { amp: 0.06, H: 0.42, clear: true }, d, _wr() * 6, 0.8 + _wr() * 0.6); return true; }); }
+  scatter(n, n * 4, d => { if (!isLand(d) || heightAt(d) - SEA > 1.6 || nearAnySite(d, 0.02) || reserved(d) || !MEADOW.includes(World.zoneAt(d))) return false; Decor.add('grass', grassProto, { amp: 0.06, H: 0.42, clear: true }, d, _wr() * 6, 0.8 + _wr() * 0.6); return true; }); }
+/* ===== v2.7 · 🏘️ CALLE MAYOR Y PLAZA (Guía Maestra 2, Bloque D) · adoquines sobre el terreno, farolas, bancos y el letrero ===== */
+{ const T = CFG.world.town;
+  const cv = document.createElement('canvas'); cv.width = cv.height = 256; const cx = cv.getContext('2d');
+  if (cx && typeof cx.fillRect === 'function') { cx.fillStyle = '#857f77'; cx.fillRect(0, 0, 256, 256); const r = mulberry32(77);
+    for (let row = 0; row < 8; row++) for (let col = 0; col < 9; col++) { const x = col * 32 - 16 + (row % 2) * 16 + (r() - 0.5) * 3, y = row * 32 + (r() - 0.5) * 3, l = 176 + Math.floor(r() * 46), t = Math.floor(r() * 14);
+      cx.fillStyle = `rgb(${l},${l - 7 - t},${l - 18 - t})`; cx.beginPath(); if (cx.roundRect) cx.roundRect(x + 2, y + 2, 28, 28, 7); else cx.rect(x + 2, y + 2, 28, 28); cx.fill(); } }
+  const tex = new THREE.CanvasTexture(cv); tex.wrapS = tex.wrapT = THREE.RepeatWrapping; tex.colorSpace = THREE.SRGBColorSpace;
+  const cob = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.95, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+  /** Malla que se pega al suelo: pts = [[dir, u, v]] en una rejilla filas × columnas */
+  const surf = (pts, cols, rows, lift) => {
+    const pos = new Float32Array(pts.length * 3), uv = new Float32Array(pts.length * 2), idx = [];
+    pts.forEach(([d, u, v], i) => { const h = heightAt(d) + lift; pos[i * 3] = d.x * h; pos[i * 3 + 1] = d.y * h; pos[i * 3 + 2] = d.z * h; uv[i * 2] = u; uv[i * 2 + 1] = v; });
+    for (let r = 0; r < rows - 1; r++) for (let c = 0; c < cols - 1; c++) { const a = r * cols + c, b = a + 1, d = a + cols, e = d + 1; idx.push(a, d, b, b, d, e); }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.BufferAttribute(uv, 2)); g.setIndex(idx); g.computeVertexNormals();
+    const m = new THREE.Mesh(g, cob); m.receiveShadow = true; m.raycast = () => {}; scene.add(m); return m;
+  };
+  { const pts = [], xs = [-1, -0.5, 0, 0.5, 1].map(k => k * T.width / 2); let rows = 0;   // la calle, cada medio metro
+    for (let sv = T.plaza - 0.3; sv <= T.street[1] + 1e-6; sv += 0.5) { rows++; xs.forEach(x => pts.push([WGEO.street(sv, x).p, x / 1.6, sv / 1.6])); }
+    surf(pts, xs.length, rows, 0.035); }
+  { const pts = [], NA = 44, rings = Math.round(T.plaza / 0.5) + 1;   // la plaza, por anillos
+    for (let k = 0; k < rings; k++) { const r = Math.max(0.01, k * 0.5); for (let j = 0; j <= NA; j++) { const th = -j / NA * Math.PI * 2; pts.push([WGEO.polar(WGEO.V, r, th), r * Math.sin(th) / 1.6, r * Math.cos(th) / 1.6]); } }   // (giro horario: misma cara que la calle)
+    surf(pts, NA + 1, rings, 0.045); }
+  // farolas a los dos lados (el brazo vuela sobre la calle) · bulbo que brilla solo
+  const DARK = matC(0x37474f, true), BULB = glow(0xfff3c4, 0xffd27a, 1.3);
+  const lampProto = () => { const g = new THREE.Group(); g.add(cyl(0.06, 0.09, 2.6, DARK, 0, 1.3, 0, 6)); g.add(box(0.5, 0.06, 0.06, DARK, 0.22, 2.55, 0)); g.add(mesh(new THREE.SphereGeometry(0.17, 8, 6), BULB, 0.45, 2.42, 0)); return g; };
+  T.lamps.forEach(sv => [-1, 1].forEach(side => { const d = WGEO.v3(WGEO.street(sv, side * (T.width / 2 + 0.7)).p); Decor.add('stLamp', lampProto, { shadow: true }, d, side > 0 ? Math.PI : 0, 1); colliders.push({ pos: d.clone().multiplyScalar(heightAt(d)), r: 0.18, noAO: true }); }));
+  // bancos de piedra en la plaza
+  const STONE = matC(0xcfc6b8, true), benchProto = () => { const g = new THREE.Group(); g.add(box(1.5, 0.14, 0.5, STONE, 0, 0.46, 0)); [-0.55, 0.55].forEach(x => g.add(box(0.22, 0.4, 0.42, STONE, x, 0.2, 0))); return g; };
+  [[-4.9, -1.2, 1.4], [4.8, 2.4, -1.2]].forEach(([x, z, yaw]) => { const d = siteDir(S_V, x, z); Decor.add('pBench', benchProto, { shadow: true }, d, yaw, 1); colliders.push({ pos: d.clone().multiplyScalar(heightAt(d)), r: 0.6, noAO: true }); });
+  // letrero «Calle Mayor» a la entrada de la calle
+  { const g = new THREE.Group(), wood = matC(0x6d4c41, true); g.add(cyl(0.05, 0.06, 2.1, wood, 0, 1.05, 0, 6));
+    const sign = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 0.34), new THREE.MeshBasicMaterial({ map: textTexture('Calle Mayor', { w: 512, h: 144, bg: '#2e4057', color: '#fff8e7', font: 'bold 70px Fredoka, Arial' }), side: THREE.DoubleSide }));
+    sign.position.set(0.55, 1.85, 0); g.add(sign); const d = WGEO.v3(WGEO.street(T.plaza + 0.3, T.width / 2 + 0.9).p); placeOnPlanet(g, d, Math.PI / 2, 0); scene.add(g); colliders.push({ pos: g.position.clone(), r: 0.15, noAO: true }); }
+}
 Decor.build();
 /* ===== v1.5 · Etapa 1 · AO horneado en el color del planeta (med/alta) =====
    Por cara: oscurece el suelo cerca de árboles, casas, puestos y construcciones (colliders sin noAO). Se hornea al aplicar la partida
@@ -3070,7 +3138,7 @@ function addPickup(itemId, dir) {
   const rDir = () => { const u = rnd() * 2 - 1, th = rnd() * 6.2832, s = Math.sqrt(1 - u * u); return new THREE.Vector3(s * Math.cos(th), u, s * Math.sin(th)); };
   let tries = 0;
   while (pickups.length < 18 && tries++ < 4000) {
-    const d = rDir(); if (!isLand(d) || nearAnySite(d, 0.02)) continue;
+    const d = rDir(); if (!isLand(d) || nearAnySite(d, 0.02) || reserved(d)) continue;
     if (pickups.some(p => angleBetween(p.userData.dir, d) < 0.14)) continue;
     const rel = heightAt(d) - SEA; addPickup(rel < 0.45 ? 'seashell' : rel > 1.5 ? 'stone' : (rnd() < 0.6 ? 'wood_log' : 'stone'), d);
   }
@@ -3176,10 +3244,11 @@ function makeBuildable(type) {
 const structures = {};
 function buildStructure(id) {
   if (structures[id]) return; structures[id] = true;
-  if (id === 'lamps') [[-3, 2.5], [-0.5, 3], [2, 2.6], [4.5, 1.5]].forEach(([x, z]) => addProp(makeBuildable('lamp'), S_V, x, z, 0, 0, 0.3));
-  else if (id === 'fountain') addProp(makeBuildable('fountain'), S_V, 0, 4.5, 0, 0, 1.8);
-  else if (id === 'windmill') addProp(makeBuildable('windmill'), S_V, 1, 7.5, Math.PI, 0, 1.6);
-  else if (id === 'statue') addProp(makeBuildable('statue'), S_V, 0, -4, 0, 0, 1.2);
+  // v2.7: farolas y estatua en la plaza, la fuente en su centro y el molino en los campos de Dax
+  if (id === 'lamps') [[-4.4, -2.0], [4.4, -3.2], [-2.9, 5.0], [2.9, 5.0]].forEach(([x, z]) => addProp(makeBuildable('lamp'), S_V, x, z, 0, 0, 0.3));
+  else if (id === 'fountain') addProp(makeBuildable('fountain'), S_V, 0, 0, 0, 0, 1.8);
+  else if (id === 'windmill') addProp(makeBuildable('windmill'), SITES.lab, 6.2, 1.0, Math.PI, 0, 1.6);
+  else if (id === 'statue') addProp(makeBuildable('statue'), S_V, -4.6, 1.0, 0, 0, 1.2);
 }
 
 // --- Construcciones del jugador (persistentes) ---
@@ -3201,7 +3270,14 @@ function restoreBuildings() {
   GS.world.buildings ||= [];
   const seen = new Set();
   GS.world.buildings = GS.world.buildings.filter(r => r && r.id && !seen.has(r.id) && seen.add(r.id));
-  GS.world.buildings.forEach(placeBuilding);
+  // v2.7: las construcciones mudadas al jardín se colocan una a una; si una no cabe, vuelve a ti (coste y materiales) con una carta de Glover
+  const back = [];
+  GS.world.buildings.slice().forEach(r => { if (r.mv === 5) { delete r.mv; const def = buildableById[r.type], d = Array.isArray(r.dir) ? new THREE.Vector3().fromArray(r.dir).normalize() : null;
+      if (!def || !d || !buildPlacementValid(def, d)) { back.push(r); GS.world.buildings.splice(GS.world.buildings.indexOf(r), 1); return; } } placeBuilding(r); });
+  if (back.length) { const names = back.map(r => { const def = buildableById[r.type]; if (!def) return null; Wallet.add(def.cost || 0, `Mudanza: ${def.name}`, { noMult: true, silent: true });
+      Object.entries(def.mats || {}).forEach(([id, q]) => { if (q > 0 && Inventory.canAdd(id, q)) Inventory.add(id, q, { silent: true }); }); return `${def.icon} ${def.name}`; }).filter(Boolean);
+    addLetter('🐿️ Glover', `Te he mudado las construcciones al jardín de detrás de tu casa nueva, al final de la Calle Mayor. Estas no cabían: ${names.join(', ')}. Te devuelvo lo que costaron (y los materiales) para que las montes donde quieras.`); SaveSystem.save('move-back'); }
+  if (GS.world.townLetter) { delete GS.world.townLetter; addLetter('🐶 Mayor Reginald', '¡Ejem! El pueblo estrena Calle Mayor: ayuntamiento en la plaza, la panadería y la tienda de Rocco a la entrada de la calle, el Studio Viral a media calle y su casa al final, con un jardín para construir. Glover le ha mudado todo. Formulario 1-CM (mudanza municipal).'); }
 }
 const embargoActive = () => (GS.debt || 0) >= CFG.debtEmbargoAt;   // v0.3 · Sec. 4.7: con embargo no se construye ni se demuele
 function removeBuilding(id, refund = 0.5) {
@@ -3256,7 +3332,7 @@ function updateBuildPreview(force = false) {
   placeOnPlanet(b.preview, b.dir, b.yaw, 0, SITES.village.S); placeOnPlanet(buildRing, b.dir, 0, 0.06, SITES.village.S); buildRing.rotateX(-Math.PI / 2);
   buildRing.material.color.setHex(valid ? 0x22c55e : 0xef4444);
   b.preview.traverse(o => { if (o.isMesh && o.material.emissive) o.material.emissive.setHex(valid ? 0x000000 : 0x7f1d1d); });
-  const st = $('buildStatus'); st.textContent = valid ? '✅ Posición válida' : (!buildZoneOk(b.dir) ? '⛔ Fuera de la zona de construcción (aldea)' : !isLand(b.dir) ? '⛔ No se puede construir en el agua' : '⛔ Espacio ocupado'); st.className = `text-xs font-semibold ${valid ? 'text-emerald-600' : 'text-red-600'}`;
+  const st = $('buildStatus'); st.textContent = valid ? '✅ Posición válida' : (!buildZoneOk(b.dir) ? '⛔ Fuera del jardín de obras (detrás de tu casa, al final de la Calle Mayor)' : !isLand(b.dir) ? '⛔ No se puede construir en el agua' : '⛔ Espacio ocupado'); st.className = `text-xs font-semibold ${valid ? 'text-emerald-600' : 'text-red-600'}`;
   $('buildConfirm').disabled = !valid;
 }
 function setBuildCursorFromPointer(clientX, clientY) {
@@ -6130,7 +6206,7 @@ const Gather = (() => {
   const st = () => { const w = GS.world; w.gather ||= {}; const g = w.gather; const d = GS.daily.dayCount | 0; if (g.day !== d) { g.day = d; g.dug = []; g.chopped = []; g.found = []; g.bugs = 0; } return g; };
   const rngDay = (tag) => mulberry32(_hashStr(GS.meta.saveId + ':' + tag + ':' + (GS.daily.dayCount | 0)));
   /** v2.6 · E4: montículos y señales por zonas: unos en el desierto (más fósiles, monedas y cofres) y otros cerca del pueblo */
-  const spawnAt = (r, where) => { for (let i = 0; i < 40; i++) { const d = WGEO.v3(where === 'desert' ? World.around('desert', r, 12.5) : World.around('town', r, G.nearM, 7)); if (isLand(d) && !nearAnySite(d, 0) && World.slopeAt(d) < 0.5 && !colliders.some(c => c.pos.distanceTo(_v.copy(d).multiplyScalar(heightAt(d))) < c.r + 0.8)) return d; } return null; };
+  const spawnAt = (r, where) => { for (let i = 0; i < 40; i++) { const d = WGEO.v3(where === 'desert' ? World.around('desert', r, 12.5) : World.around('town', r, G.nearM, 7)); if (isLand(d) && !nearAnySite(d, 0) && !reserved(d) && World.slopeAt(d) < 0.5 && !colliders.some(c => c.pos.distanceTo(_v.copy(d).multiplyScalar(heightAt(d))) < c.r + 0.8)) return d; } return null; };
   const roll = (tbl) => { let s = Math.random() * tbl.reduce((a, x) => a + x[1], 0); for (const [id, w, q] of tbl) if ((s -= w) < 0) return [id, typeof q === 'number' ? q : q[0] + Math.floor(Math.random() * (q[1] - q[0] + 1))]; return null; };
   const give = (list, label) => { const ok = list.filter(Boolean); if (!Inventory.canAddMany(ok, null)) { showToast('🎒 Inventario lleno', 'text-red-200'); return false; } ok.forEach(([id, q]) => Inventory.add(id, q, { silent: true })); if (ok.length) showToast(`${label} → ${ok.map(([id, q]) => `${ITEMS[id].icon} ${ITEMS[id].name} ×${q}`).join(' · ')}`, 'text-white'); return true; };
   const needTool = (id) => { if (Tools.usable(id)) return true; showToast(Tools.needMsg(id), 'text-red-200'); return false; };
@@ -6223,7 +6299,7 @@ const Studio = (() => {
     g.add(box(0.5, 0.36, 0.05, mat(o.color, { emissive: o.color, emissiveIntensity: 0.35 }), 0, 1.06, -0.45));   // «pantalla/obra» con el color del perfil
     const awn = box(2.0, 0.08, 1.2, mat(o.color), 0, 2.05, -0.1); awn.rotation.x = 0.18; g.add(awn); [-0.95, 0.95].forEach(x => g.add(cyl(0.05, 0.05, 2.0, mat(0xffffff), x, 1.0, -0.62, 6)));
     icon = new THREE.Sprite(new THREE.SpriteMaterial({ map: iconTex(o.station, col + 'cc'), transparent: true, depthWrite: false })); icon.scale.setScalar(0.9); icon.position.y = 2.75; g.add(icon);
-    placeAtSite(g, S_V, ...S.pos, 0); scene.add(g); colliders.push({ pos: g.position.clone(), r: 1.2 });
+    placeAtSite(g, SITES.home, ...S.pos, 0); scene.add(g); colliders.push({ pos: g.position.clone(), r: 1.2 });   // v2.7: junto a tu casa
     registerInteractable(g, { type: 'gather', label: label(), fn: () => work() }); obj = g;
     if (typeof Decor !== 'undefined') Decor.clearAround(g.position.clone().normalize(), 1.6 / R);
   }
@@ -6639,7 +6715,7 @@ function ensureBigProp(id) {
     [[-0.45, 0.45], [0.45, 0.45], [0, -0.55]].forEach(([wx, wz]) => { const w = cyl(0.22, 0.22, 0.08, mat(0x2b2b3d), wx, 0.22, wz, 12); w.rotation.z = Math.PI / 2; g.add(w); });
     g.add(box(0.08, 0.7, 0.08, mat(0x90a4ae), 0, 0.6, -0.5)); g.add(box(0.6, 0.06, 0.06, mat(0x90a4ae), 0, 0.95, -0.55));
     const sp = new THREE.Group(); sp.add(cyl(0.05, 0.05, 1.7, mat(0x5d4037), 0, 0.85, 0, 6)); sp.add(mesh(new THREE.PlaneGeometry(1.0, 0.5), new THREE.MeshBasicMaterial({ map: textTexture('🥐 PEDIDOS', { bg: '#fff3e0', color: '#bf360c', font: 'bold 60px Fredoka, Arial' }), side: THREE.DoubleSide }), 0, 1.55, 0.04, false)); sp.position.set(1.1, 0, 0); g.add(sp);
-    addProp(g, S_V, 2.8, -3.6, 0.6, 0, 0.7);
+    addProp(g, SITES.bakery, 2.9, 1.3, 0.4, 0, 0.7);   // v2.7: junto a la panadería
   } else if (id === 'mayor') {   // 🏅 Quiosco del Censo Digital con estrella de Ciudadano Ejemplar
     g.add(cyl(0.6, 0.7, 0.3, mat(0xeceff1), 0, 0.15, 0, 12)); g.add(box(0.5, 1.5, 0.35, mat(0x1e3a8a), 0, 1.05, 0));
     g.add(mesh(new THREE.PlaneGeometry(0.44, 0.7), new THREE.MeshBasicMaterial({ map: textTexture('CENSO', { w: 256, h: 384, bg: '#0b1d4a', color: '#7ef0c0', font: 'bold 64px Fredoka, Arial' }) }), 0, 1.25, 0.18, false));
@@ -7487,7 +7563,7 @@ const Awakening = {
     toyPlane.visible = true; this.sc = { gathered: true };
   },
   face(o) { const up = o.userData.up, f = tangent(player.position.clone().sub(o.position), up); if (f.lengthSq() > 0) quatFromFrame(frameAt(up, f), o.quaternion); },
-  restoreNpcs() { NPCS.forEach(n => placeAtSite(npcObjs[n.id], SITES[n.site], n.pos[0], n.pos[1], n.yaw)); placeAtSite(vendor, S_V, -3.6, 4.4, Math.PI * 0.55); this.sc = null; },
+  restoreNpcs() { NPCS.forEach(n => placeAtSite(npcObjs[n.id], SITES[n.site], n.pos[0], n.pos[1], n.yaw)); placeAtSite(vendor, SITES.store, 2.6, 1.0, 0); this.sc = null; },
   wide(dur = 1.2) { const up = SITES.port.dir.clone(); const pose = { pos: this.at(1.6, 7.2).multiplyScalar(SEA + 3.4), target: this.at(-0.6, 1.4).multiplyScalar(SEA + 1.9), up }; state.mode = 'dialog'; state.dialogPose = pose; tweenCamera(pose, dur); },
   focus(o, dur = 1.0) {
     const up = o.userData.up || SITES.port.dir, target = o.position.clone().addScaledVector(up, o === npcObjs.hedgehogs ? 1.0 : 1.4);
@@ -9360,7 +9436,7 @@ const Util = {
     g.add(box(1.6, 0.12, 0.8, wood, 0, 0.86, 0)); [[-0.7, -0.32], [0.7, -0.32], [-0.7, 0.32], [0.7, 0.32]].forEach(([x, z]) => g.add(box(0.1, 0.84, 0.1, dark, x, 0.42, z)));
     g.add(box(0.55, 0.18, 0.3, mat(0x90a4ae), -0.35, 1.0, 0)); g.add(box(0.08, 0.5, 0.08, dark, 0.45, 1.15, 0.1)); g.add(box(0.3, 0.12, 0.12, mat(0x78909c), 0.45, 1.42, 0.1));   // tornillo de banco + martillo
     g.add(box(1.5, 0.05, 0.3, dark, 0, 0.3, 0));
-    placeAtSite(g, S_V, ...CFG.util.benchPos, 0.6); scene.add(g); colliders.push({ pos: g.position.clone(), r: 0.9 });
+    placeAtSite(g, SITES.home, ...CFG.util.benchPos, 0.6); scene.add(g); colliders.push({ pos: g.position.clone(), r: 0.9 });   // v2.7: junto a tu casa
     registerInteractable(g, { type: 'gather', label: '🔨 Banco de trabajo (fabricar herramientas)', fn: () => this.openBench() }); this._bench = g;
     if (typeof Decor !== 'undefined' && Decor.clearAround) Decor.clearAround(g.position.clone().normalize(), 1.4 / R);
   },
@@ -11728,12 +11804,12 @@ DBG.refs = DBG_REFS;
 if (/[?&]debug=1\b/.test(location.search)) window._dbg = DBG_REFS;   // v1.0: ya no es global por defecto
 /* v1.1 · Interior caminable de la casa (Sec. 6.9 Fase 2) */
 /** v1.5 · capturas: DBG.tp(x, z) lleva al jugador a (x, z) del pueblo · DBG.view(dist, pitch, yaw) fija la cámara · DBG.shot('B'|'C'|'D'|'G'|'H') prepara la escena del protocolo */
-DBG.g = { World, WGEO, WorldFX, TRAVEL_POSTS, state, Gather, Mining, scene, renderer, camera, cam, sky, water, atmo, clouds, PostFX, SkyEnv, PlanetAO, WATER_U, POST_U, Gather, Studio, ToolAnim, Profiles, Hub, Decor, Fitting, player, Interiors };   // v1.5: referencias gráficas para depurar
+DBG.g = { World, WGEO, WorldFX, TRAVEL_POSTS, state, Gather, Mining, npcObjs, interactables, colliders, SITES, NPCS, CFG, get house() { return house; }, scene, renderer, camera, cam, sky, water, atmo, clouds, PostFX, SkyEnv, PlanetAO, WATER_U, POST_U, Gather, Studio, ToolAnim, Profiles, Hub, Decor, Fitting, player, Interiors };   // v1.5: referencias gráficas para depurar
 DBG.post = (v = !PostFX.active) => { PostFX.active = !!v; POST_U.uPost.value = v ? 1 : 0; return PostFX.active; };
 DBG.env = (v = !SkyEnv.enabled) => SkyEnv.setEnabled(v);
 DBG.ao = (v = true) => { if (!PlanetAO.on) return false; if (v) PlanetAO.bake(); else { const c = planet.geometry.attributes.color; PlanetAO.reset(); c.needsUpdate = true; } return v; };
-DBG.tp = (x = 0, z = 0) => { const d = siteDir(S_V, x, z); player.userData.dir.copy(d); player.position.copy(d).multiplyScalar(surfaceR(d)); state.moveTarget = null; return true; };
-DBG.tp = (id) => { WorldFX.tp(id); console.log('[DBG] tp →', id, '· zona', World.zoneAt(player.userData.dir)); };   // v2.6: plaza, forest, coast, desert, summit o cualquier zona
+DBG.tp = (a = 0, b = 0) => { if (typeof a === 'string') { if (SITES[a] && !TRAVEL_POSTS.some(p => p.id === a) && !World.Z[a]) WorldFX.teleport(siteDir(SITES[a], 0, 2)); else WorldFX.tp(a); console.log('[DBG] tp →', a, '· zona', World.zoneAt(player.userData.dir)); return true; }
+  const d = siteDir(S_V, a, b); player.userData.dir.copy(d); player.position.copy(d).multiplyScalar(surfaceR(d)); state.moveTarget = null; return true; };   // v2.7: DBG.tp('forest' | 'bakery' | x, z de la plaza)
 DBG.zone = () => ({ zone: World.zoneAt(player.userData.dir), h: +(heightAt(player.userData.dir) - SEA).toFixed(2), slope: +World.slopeAt(player.userData.dir).toFixed(2), posts: GS.world.posts });
 DBG.view = (dist, pitch, yaw) => { if (dist != null) cam.dist = cam.tDist = dist; if (pitch != null) cam.pitch = cam.tPitch = pitch; if (yaw != null) cam.yaw = cam.tYaw = yaw; return { dist: cam.tDist, pitch: cam.tPitch, yaw: cam.tYaw }; };
 DBG.shot = (id = 'B') => { const S = { B: [() => DBG.tp(-1, 2), 12, 'clear', 9, 0.42], C: [() => DBG.tp(-9.5, 9.5), 18.5, 'clear', 9, 0.32], D: [() => DBG.tp(3.5, -2.5), 23, 'clear', 10, 0.45], G: [() => {}, 0, 'clear', 60, 0.3], H: [() => DBG.tp(-1, 2), 12, 'storm', 9, 0.42] }[id]; if (!S) return false; S[0](); DBG.time(S[1]); DBG.weather(S[2]); DBG.view(S[3], S[4]); return id; };
