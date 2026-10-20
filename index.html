@@ -1445,7 +1445,7 @@ const starsMat = new THREE.ShaderMaterial({
   uniforms: { ...POST_U, uTime: { value: 0 }, uPR: { value: 1 }, uOpacity: { value: 0.2 }, uTw: { value: CFG.gfx.stars.twinkle }, uSpeed: { value: CFG.gfx.stars.speed } },
   vertexShader: `attribute float aSize; attribute float aPhase; attribute vec3 aCol; uniform float uTime, uPR, uTw, uSpeed; varying vec3 vCol; varying float vTw;
     void main(){ vCol = aCol; float tw = (1.0 - uTw) + uTw * sin(uTime * uSpeed + aPhase); vTw = 0.55 + 0.45 * tw; gl_PointSize = aSize * tw * uPR; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
-  fragmentShader: POST_GLSL + `uniform float uOpacity; varying vec3 vCol; varying float vTw; void main(){ float r = length(gl_PointCoord - 0.5); float a = smoothstep(0.5, 0.12, r); if (a < 0.01) discard; gl_FragColor = vec4(postOut(min(vCol * 0.82, vec3(0.82))), a * uOpacity * vTw); }`   // sin HDR extremo: con alfa, un blanco «infinito» saturaba el cuadrado entero del punto,
+  fragmentShader: POST_GLSL + `uniform float uOpacity; varying vec3 vCol; varying float vTw; void main(){ float r = length(gl_PointCoord - 0.5); float a = smoothstep(0.5, 0.12, r); if (a < 0.01) discard; gl_FragColor = vec4(postOut(min(vCol * 0.82, vec3(0.82))), a * uOpacity * vTw); }`,   // sin HDR extremo: con alfa, un blanco «infinito» saturaba el cuadrado entero del punto
 });
 { const n = GFX.T.stars, [s0, s1] = CFG.gfx.stars.size, pts = [], sz = [], ph = [], col = [], tint = [[1, 0.82, 0.92], [0.78, 0.9, 1]];
   for (let i = 0; i < n; i++) { const d = randomDir(); pts.push(d.x * 380, d.y * 380, d.z * 380); sz.push(s0 + Math.pow(Math.random(), 2.2) * (s1 - s0)); ph.push(Math.random() * 6.283); const c = Math.random() < CFG.gfx.stars.tint ? tint[i % 2] : [1, 1, 1]; col.push(...c); }
@@ -1663,7 +1663,7 @@ const atmo = new THREE.Mesh(new THREE.SphereGeometry(R * CFG.gfx.halo.scale, GFX
   side: THREE.BackSide, blending: THREE.AdditiveBlending, transparent: true, depthWrite: false,
   uniforms: { ...POST_U, uCol: { value: sky.material.uniforms.midColor.value }, uSunCol: { value: sky.material.uniforms.sunCol.value }, uSunV: { value: new THREE.Vector3(0, 1, 0) }, uOpacity: { value: CFG.gfx.halo.near }, uPow: { value: CFG.gfx.halo.pow } },
   vertexShader: `varying vec3 vN; varying vec3 vV; void main(){ vec4 mv = modelViewMatrix * vec4(position, 1.0); vN = normalize(normalMatrix * normal); vV = normalize(-mv.xyz); gl_Position = projectionMatrix * mv; }`,
-  fragmentShader: POST_GLSL + `uniform vec3 uCol, uSunCol, uSunV; uniform float uOpacity, uPow; varying vec3 vN; varying vec3 vV; void main(){ vec3 n = normalize(vN); float x = clamp(-dot(n, normalize(vV)), 0.0, 1.0); float a = smoothstep(0.0, 0.32, x) * pow(1.0 - x, uPow) * 3.2; vec3 col = mix(uCol, uSunCol * 1.1, pow(max(dot(n, uSunV), 0.0), 2.0) * 0.6); gl_FragColor = vec4(postOutLin(col * a * uOpacity), 1.0); }`   // v1.5 · Etapa 3: el limbo del lado del sol se ve cálido,
+  fragmentShader: POST_GLSL + `uniform vec3 uCol, uSunCol, uSunV; uniform float uOpacity, uPow; varying vec3 vN; varying vec3 vV; void main(){ vec3 n = normalize(vN); float x = clamp(-dot(n, normalize(vV)), 0.0, 1.0); float a = smoothstep(0.0, 0.32, x) * pow(1.0 - x, uPow) * 3.2; vec3 col = mix(uCol, uSunCol * 1.1, pow(max(dot(n, uSunV), 0.0), 2.0) * 0.6); gl_FragColor = vec4(postOutLin(col * a * uOpacity), 1.0); }`,   // v1.5 · Etapa 3: el limbo del lado del sol se ve cálido
 }));
 atmo.renderOrder = -1; atmo.raycast = () => {}; scene.add(atmo);
 
@@ -5375,7 +5375,8 @@ function animate() {
   requestAnimationFrame(animate);
   const rawDt = clock.getDelta(), dt = Math.min(rawDt, 0.05), t = clock.elapsedTime; GFX.update(dt, rawDt);   // v1.4: gobernador de FPS + viñeta
   updatePlayer(dt); if (!state.cinematic) Needs.update(dt); updateNPCs(dt, t); Awakening.update(dt, t); /* v0.9: el sueño se detiene durante la escena del puerto */ updateCamera(dt); updateSun(); updateNeon(dt, t); updateUnlocks(dt, t); updateShip(dt); updateConfetti(dt); updateWater(t); V10.update(dt, t); ShootingStars.update(dt, 1 - (state.dayAmt ?? 1));
-  clouds.children.forEach(p => { p.rotateY(p.userData.speed * dt); const c = p.userData.bob; c.position.z = c.userData.z0 + Math.sin(t * 0.3 + c.userData.ph) * 0.25; });   // v1.5: las nubes «respiran» arriba y abajo updateTokens(); updateGoalHUD(); updateClockHUD(); Weather.update(dt); Fishing.update(dt); Mining.update(dt); StarFall.update(dt); Net.update(dt);
+  clouds.children.forEach(p => { p.rotateY(p.userData.speed * dt); const c = p.userData.bob; if (c) c.position.z = c.userData.z0 + Math.sin(t * 0.3 + c.userData.ph) * 0.25; });   // v1.5: las nubes «respiran» arriba y abajo
+  updateTokens(); updateGoalHUD(); updateClockHUD(); Weather.update(dt); Fishing.update(dt); Mining.update(dt); StarFall.update(dt); Net.update(dt);
   if (SaveSystem.started && !state.menuOpen && !state.cinematic) {
     GS.meta.playTimeSec += dt;
     GS.daily.clockMs += dt * 1000 * DAY_SCALE;                 // v0.1: el reloj onírico solo avanza jugando
