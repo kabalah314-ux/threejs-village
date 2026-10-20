@@ -587,6 +587,9 @@ const CFG = {
     ao: { strength: 0.28, reach: 1.25, inner: 0.55, rebakeAng: 0.16 },
     // Etapa 1 · caja de sombra del sol según la distancia de cámara (cerca / media / Modo Planeta = todo el planeta)
     shadowBox: { near: 14, mid: 24, nearDist: 14, midDist: 30, planet: 21 },
+    // Etapa 2 · post-procesado (med/alta): bloom HDR + gradación cálida · el umbral sube de día (paredes al sol ≈ 2–3 en HDR) para que solo brillen sol, neón y luces
+    post: { bloomDay: 0.22, bloomNight: 0.85, thrDay: 3.2, thrNight: 0.9, radius: 0.55, tierBloom: { med: 0.85, high: 1 }, samples: { med: 2, high: 4 }, dreamBloom: 0.7, dreamThr: 1.1,
+      sat: 1.08, lift: [0.035, 0.025, 0.06], gain: [1.03, 1.0, 0.96], dusk: 0.6, dream: 1 },
     // QW13 · exposición según la hora
     exposure: { night: 0.95, day: 1.08, dusk: 0.05 },
     // Lluvia: gota con textura de trazo suave (antes cuadrados blancos)
@@ -1353,7 +1356,7 @@ const GFX = (() => {
     /** Ajustes: 'auto' | 'low' | 'med' | 'high' */
     set(v) {
       pref = ['auto', ...ORDER].includes(v) ? v : 'auto'; write(pref);
-      id = pref === 'auto' ? detect(gpu) : pref; dyn = 1; st.acc = st.n = 0; api.apply();
+      id = pref === 'auto' ? detect(gpu) : pref; dyn = 1; st.acc = st.n = 0; api.apply(); if (typeof PostFX !== 'undefined') PostFX.ensure();
       return id;
     },
     resize() { if (!renderer) return; renderer.setPixelRatio(api.pixelRatio()); renderer.setSize(innerWidth, innerHeight); },
@@ -1368,7 +1371,7 @@ const GFX = (() => {
       const avg = st.acc / st.n * 1000; st.acc = st.n = 0;
       if (avg <= G.maxDtMs) return;
       if (dyn > G.dynMin + 1e-3) { dyn = Math.max(G.dynMin, dyn * G.dynStep); api.resize(); return; }
-      if (pref === 'auto' && !st.dropped && ORDER.indexOf(id) > 0) { st.dropped = true; id = ORDER[ORDER.indexOf(id) - 1]; dyn = 1; api.apply(); showToast(`🎨 Calidad ajustada a ${T[id].name} para ir más fluido`, 'text-white'); }
+      if (pref === 'auto' && !st.dropped && ORDER.indexOf(id) > 0) { st.dropped = true; id = ORDER[ORDER.indexOf(id) - 1]; dyn = 1; api.apply(); PostFX.ensure(); showToast(`🎨 Calidad ajustada a ${T[id].name} para ir más fluido`, 'text-white'); }
     },
     info() { return { pref, tier: id, load: api.load, dyn: +dyn.toFixed(2), pixelRatio: renderer ? renderer.getPixelRatio() : null, gpu }; },
   };
@@ -1404,26 +1407,37 @@ const BLOB_GEO = new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2); BLOB_GEO.u
 /** Sombra de contacto hija de un personaje (scale = ancho en unidades del personaje) */
 function addBlob(parent, scale = 1) { const m = new THREE.Mesh(BLOB_GEO, BLOB_MAT); m.scale.set(CFG.gfx.blob.size * scale, 1, CFG.gfx.blob.size * scale); m.position.y = CFG.gfx.blob.y; m.renderOrder = 1; m.castShadow = m.receiveShadow = false; m.raycast = () => {}; m.userData.blob = true; parent.add(m); return m; }
 
+/* v1.5 · Etapa 2: con post-procesado la imagen pasa por ACES + sRGB al final (OutputPass). Los ShaderMaterial propios (cielo, estrellas, halo,
+   domo de la Red) pintan colores «de pantalla»: postOut() los convierte a HDR lineal con el ACES inverso exacto → se ven igual con y sin post,
+   y el disco del sol (>1) acaba muy brillante en HDR → lo coge el bloom. uPost = 0 → sin cambios (nivel Baja o si el CDN falla). */
+const POST_U = { uPost: { value: 0 }, uExpo: { value: 1 } };
+const POST_GLSL = `uniform float uPost, uExpo;
+vec3 postOut(vec3 c){ if (uPost < 0.5) return c; c = max(c, 0.0);
+  vec3 l = mix(c / 12.92, pow((c + 0.055) / 1.055, vec3(2.4)), step(0.04045, c));
+  vec3 x = clamp(mat3(vec3(0.643038, 0.059269, 0.005962), vec3(0.311187, 0.931436, 0.063929), vec3(0.045775, 0.009295, 0.930118)) * l, 0.0, 0.999);
+  vec3 A = 1.0 - 0.983729 * x, B = 0.0245786 - 0.432951 * x, C = -0.000090537 - 0.238081 * x;
+  vec3 v = (-B + sqrt(max(B * B - 4.0 * A * C, 0.0))) / (2.0 * A);
+  return max(mat3(vec3(1.764741, -0.147028, -0.036337), vec3(-0.675778, 1.160252, -0.162436), vec3(-0.088963, -0.013224, 1.198773)) * v, 0.0) * 0.6 / uExpo; }`;
 const sky = new THREE.Mesh(new THREE.SphereGeometry(400, 32, 16), new THREE.ShaderMaterial({
   side: THREE.BackSide, depthWrite: false,
-  uniforms: { topColor: { value: new THREE.Color(0x2f7fd8) }, midColor: { value: new THREE.Color(0xa9dcff) }, bottomColor: { value: new THREE.Color(0xffd6a8) },
+  uniforms: { ...POST_U, topColor: { value: new THREE.Color(0x2f7fd8) }, midColor: { value: new THREE.Color(0xa9dcff) }, bottomColor: { value: new THREE.Color(0xffd6a8) },
     sunDir: { value: new THREE.Vector3(0, 1, 0) }, sunCol: { value: new THREE.Color(0xfff1d6) }, moonCol: { value: new THREE.Color(CFG.gfx.sky.moon) }, uDay: { value: 1 },   // v1.4 · QW5
     uDisc: { value: new THREE.Vector2(...CFG.gfx.sky.disc) }, uMoonDisc: { value: new THREE.Vector2(...CFG.gfx.sky.moonDisc) }, uSky: { value: new THREE.Vector4(CFG.gfx.sky.discI, CFG.gfx.sky.haloPow, CFG.gfx.sky.haloI, CFG.gfx.sky.moonI) } },
   vertexShader: `varying vec3 vPos; void main(){ vPos = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
-  fragmentShader: `uniform vec3 topColor, midColor, bottomColor, sunDir, sunCol, moonCol; uniform float uDay; uniform vec2 uDisc, uMoonDisc; uniform vec4 uSky; varying vec3 vPos;
+  fragmentShader: POST_GLSL + `uniform vec3 topColor, midColor, bottomColor, sunDir, sunCol, moonCol; uniform float uDay; uniform vec2 uDisc, uMoonDisc; uniform vec4 uSky; varying vec3 vPos;
     void main(){ vec3 d = normalize(vPos); float h = d.y; vec3 c = h > 0.0 ? mix(midColor, topColor, pow(h, 0.55)) : mix(midColor, bottomColor, pow(-h, 0.7));
       float s = max(dot(d, sunDir), 0.0); c += sunCol * (smoothstep(uDisc.x, uDisc.y, s) * uSky.x + pow(s, uSky.y) * uSky.z) * (0.25 + 0.75 * uDay);
       float m = max(dot(d, -sunDir), 0.0); c += moonCol * (smoothstep(uMoonDisc.x, uMoonDisc.y, m) + pow(m, 220.0) * 0.25) * uSky.w * (1.0 - uDay);
-      gl_FragColor = vec4(c, 1.0); }`
+      gl_FragColor = vec4(postOut(c), 1.0); }`
 }));
 scene.add(sky);
 /* v1.4 · QW6 · estrellas que parpadean (ShaderMaterial: tamaño y fase por estrella, disco suave, 10 % teñidas) · uOpacity sustituye a la opacidad global */
 const starsMat = new THREE.ShaderMaterial({
   transparent: true, depthWrite: false,
-  uniforms: { uTime: { value: 0 }, uPR: { value: 1 }, uOpacity: { value: 0.2 }, uTw: { value: CFG.gfx.stars.twinkle }, uSpeed: { value: CFG.gfx.stars.speed } },
+  uniforms: { ...POST_U, uTime: { value: 0 }, uPR: { value: 1 }, uOpacity: { value: 0.2 }, uTw: { value: CFG.gfx.stars.twinkle }, uSpeed: { value: CFG.gfx.stars.speed } },
   vertexShader: `attribute float aSize; attribute float aPhase; attribute vec3 aCol; uniform float uTime, uPR, uTw, uSpeed; varying vec3 vCol; varying float vTw;
     void main(){ vCol = aCol; float tw = (1.0 - uTw) + uTw * sin(uTime * uSpeed + aPhase); vTw = 0.55 + 0.45 * tw; gl_PointSize = aSize * tw * uPR; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
-  fragmentShader: `uniform float uOpacity; varying vec3 vCol; varying float vTw; void main(){ float r = length(gl_PointCoord - 0.5); float a = smoothstep(0.5, 0.12, r); if (a < 0.01) discard; gl_FragColor = vec4(vCol, a * uOpacity * vTw); }`,
+  fragmentShader: POST_GLSL + `uniform float uOpacity; varying vec3 vCol; varying float vTw; void main(){ float r = length(gl_PointCoord - 0.5); float a = smoothstep(0.5, 0.12, r); if (a < 0.01) discard; gl_FragColor = vec4(postOut(vCol), a * uOpacity * vTw); }`,
 });
 { const n = GFX.T.stars, [s0, s1] = CFG.gfx.stars.size, pts = [], sz = [], ph = [], col = [], tint = [[1, 0.82, 0.92], [0.78, 0.9, 1]];
   for (let i = 0; i < n; i++) { const d = randomDir(); pts.push(d.x * 380, d.y * 380, d.z * 380); sz.push(s0 + Math.pow(Math.random(), 2.2) * (s1 - s0)); ph.push(Math.random() * 6.283); const c = Math.random() < CFG.gfx.stars.tint ? tint[i % 2] : [1, 1, 1]; col.push(...c); }
@@ -1487,6 +1501,54 @@ const SkyEnv = (() => {
   }).catch(e => console.warn('[gfx] RoomEnvironment no disponible', e));
   return api;
 })();
+/* ===== v1.5 · Etapa 2 · POST-PROCESADO (med/alta) =====
+   RenderPass (HDR HalfFloat + MSAA) → UnrealBloom (umbral alto de día, bajo de noche) → OutputPass (ACES + sRGB) → FinalPass (saturación,
+   sombras lavanda, luces cálidas, tinte de atardecer, toque de sueño en la Red). Módulos con import() dinámico: Baja no descarga nada y,
+   si el CDN falla, se sigue dibujando como siempre (renderer.render). */
+const PostFX = (() => {
+  const P = CFG.gfx.post, api = { active: false, loading: false, failed: false, render: (sc, cm) => renderer.render(sc, cm) };
+  let composer = null, rp = null, bloom = null, fin = null, size = '';
+  const ok = () => renderer.capabilities.isWebGL2 && (renderer.extensions.has('EXT_color_buffer_half_float') || renderer.extensions.has('EXT_color_buffer_float'));
+  const FinalShader = {
+    uniforms: { tDiffuse: { value: null }, uSat: { value: P.sat }, uLift: { value: new THREE.Vector3(...P.lift) }, uGain: { value: new THREE.Vector3(...P.gain) }, uDusk: { value: 0 }, uDream: { value: 0 } },
+    vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+    fragmentShader: `uniform sampler2D tDiffuse; uniform float uSat, uDusk, uDream; uniform vec3 uLift, uGain; varying vec2 vUv;
+      void main(){ vec4 t = texture2D(tDiffuse, vUv); vec3 c = t.rgb; float l = dot(c, vec3(0.299, 0.587, 0.114));
+        c = mix(vec3(l), c, uSat + uDream * 0.1);
+        c = c * uGain + uLift * (1.0 - c);                                         // sombras hacia lavanda (nunca negras) · luces cálidas
+        c *= mix(vec3(1.0), vec3(1.06, 0.98, 0.92), uDusk);                         // atardecer melocotón
+        c += vec3(0.05, 0.02, 0.09) * (1.0 - l) * uDream;                           // Red del Sueño: sombras magenta-violeta
+        gl_FragColor = vec4(clamp(c, 0.0, 1.0), t.a); }` };
+  async function load() {
+    if (api.loading || composer || api.failed) return; api.loading = true;
+    try {
+      if (!ok()) throw new Error('sin WebGL2 o sin render target HalfFloat');
+      const [{ EffectComposer }, { RenderPass }, { UnrealBloomPass }, { OutputPass }, { ShaderPass }] = await Promise.all([
+        import('three/addons/postprocessing/EffectComposer.js'), import('three/addons/postprocessing/RenderPass.js'), import('three/addons/postprocessing/UnrealBloomPass.js'),
+        import('three/addons/postprocessing/OutputPass.js'), import('three/addons/postprocessing/ShaderPass.js')]);
+      const w = innerWidth, h = innerHeight, rt = new THREE.WebGLRenderTarget(w, h, { type: THREE.HalfFloatType, samples: P.samples[GFX.id] ?? 0 });
+      composer = new EffectComposer(renderer, rt);
+      rp = new RenderPass(scene, camera); bloom = new UnrealBloomPass(new THREE.Vector2(w, h), P.bloomNight, P.radius, P.thrNight); fin = new ShaderPass(FinalShader);
+      composer.addPass(rp); composer.addPass(bloom); composer.addPass(new OutputPass()); composer.addPass(fin);
+      size = ''; api.active = GFX.id !== 'low'; POST_U.uPost.value = api.active ? 1 : 0;
+    } catch (e) { api.failed = true; console.warn('[gfx] post-procesado desactivado:', e.message || e); }
+    api.loading = false;
+  }
+  api.ensure = () => { const want = GFX.id !== 'low'; if (want && !composer) load(); api.active = want && !!composer; POST_U.uPost.value = api.active ? 1 : 0; };
+  api.render = (sc, cm) => {
+    if (!api.active) { renderer.render(sc, cm); return; }
+    const pr = renderer.getPixelRatio(), key = innerWidth + 'x' + innerHeight + '@' + pr;
+    if (key !== size) { size = key; composer.setPixelRatio(pr); composer.setSize(innerWidth, innerHeight); }
+    const day = state.dayAmt ?? 1, net = !!Interiors.active?.def?.net, dusk = state.duskAmt ?? 0, tb = P.tierBloom[GFX.id] ?? 1;
+    rp.scene = sc; rp.camera = cm; POST_U.uExpo.value = renderer.toneMappingExposure;
+    bloom.strength = (net ? P.dreamBloom : lerp(P.bloomNight, P.bloomDay, Interiors.active && !net ? 0.5 : day)) * tb;
+    bloom.threshold = net ? P.dreamThr : lerp(P.thrNight, P.thrDay, Interiors.active ? 0.6 : day);
+    fin.uniforms.uDusk.value = Interiors.active ? 0 : dusk * P.dusk; fin.uniforms.uDream.value = net ? P.dream : 0;
+    composer.render();
+  };
+  return api;
+})();
+PostFX.ensure();
 
 /* =========================================================
    4. HELPERS LOW-POLY
@@ -1568,9 +1630,9 @@ water.receiveShadow = true; water.material.userData.envI = CFG.gfx.env.water; sc
 /* v1.4 · QW10 · halo atmosférico del planeta (menú y Modo Planeta): esfera BackSide aditiva con el color del horizonte del cielo */
 const atmo = new THREE.Mesh(new THREE.SphereGeometry(R * CFG.gfx.halo.scale, GFX.id === 'low' ? 48 : 64, GFX.id === 'low' ? 32 : 40), new THREE.ShaderMaterial({
   side: THREE.BackSide, blending: THREE.AdditiveBlending, transparent: true, depthWrite: false,
-  uniforms: { uCol: { value: sky.material.uniforms.midColor.value }, uOpacity: { value: CFG.gfx.halo.near }, uPow: { value: CFG.gfx.halo.pow } },
+  uniforms: { ...POST_U, uCol: { value: sky.material.uniforms.midColor.value }, uOpacity: { value: CFG.gfx.halo.near }, uPow: { value: CFG.gfx.halo.pow } },
   vertexShader: `varying vec3 vN; varying vec3 vV; void main(){ vec4 mv = modelViewMatrix * vec4(position, 1.0); vN = normalize(normalMatrix * normal); vV = normalize(-mv.xyz); gl_Position = projectionMatrix * mv; }`,
-  fragmentShader: `uniform vec3 uCol; uniform float uOpacity, uPow; varying vec3 vN; varying vec3 vV; void main(){ float x = clamp(-dot(normalize(vN), normalize(vV)), 0.0, 1.0); float a = smoothstep(0.0, 0.32, x) * pow(1.0 - x, uPow) * 3.2; gl_FragColor = vec4(uCol * a * uOpacity, 1.0); }`,
+  fragmentShader: POST_GLSL + `uniform vec3 uCol; uniform float uOpacity, uPow; varying vec3 vN; varying vec3 vV; void main(){ float x = clamp(-dot(normalize(vN), normalize(vV)), 0.0, 1.0); float a = smoothstep(0.0, 0.32, x) * pow(1.0 - x, uPow) * 3.2; gl_FragColor = vec4(postOut(uCol * a * uOpacity), 1.0); }`,
 }));
 atmo.renderOrder = -1; atmo.raycast = () => {}; scene.add(atmo);
 
@@ -4482,7 +4544,7 @@ function updateSun() {
   sun.position.copy(_sunDir).multiplyScalar(50).add(_shC); sun.target.position.copy(_shC); sun.target.updateMatrixWorld();
   const dayAmt = smoothstep(-0.06, 0.28, elev);            // 0 noche → 1 día pleno
   const duskAmt = Math.max(0, 1 - Math.abs(elev) / 0.28);  // pico en amanecer/atardecer
-  state.dayAmt = dayAmt;
+  state.dayAmt = dayAmt; state.duskAmt = duskAmt;
   const L = CFG.gfx;   // v1.4 · QW1: hemisférica fuerte + ambiente bajo (antes 0.55/0.55) · QW13: exposición según la hora
   sun.intensity = lerp(L.sunNight, L.sunDay, dayAmt);
   sun.color.setHex(0xfff1d6).lerp(_c1.setHex(0xffb27a), duskAmt * 0.8);
@@ -5284,7 +5346,7 @@ function animate() {
     GS.daily.clockMs += dt * 1000 * DAY_SCALE;                 // v0.1: el reloj onírico solo avanza jugando
     if (GS.daily.clockMs >= DAY_MS) { GS.daily.clockMs -= DAY_MS; GS.daily.dayCount++; if (typeof settleDay === 'function') settleDay(); SaveSystem.save('new-day'); }
   }
-  sky.position.copy(camera.position); renderer.render(Interiors.active ? Interiors.scene : scene, camera);   // v1.1: dentro no se dibuja el planeta
+  sky.position.copy(camera.position); PostFX.render(Interiors.active ? Interiors.scene : scene, camera);   // v1.5 · Etapa 2: bloom + gradación (med/alta)   // v1.1: dentro no se dibuja el planeta
 }
 window.addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); GFX.resize(); });   // v1.4: GFX.resize (pixel ratio por nivel + resolución dinámica)
 /* =========================================================
@@ -7426,9 +7488,9 @@ function buildDreamSurroundings(S, root, def) {
   // cielo de gradiente lavanda → melocotón (sigue a la cámara en _frame)
   const dome = new THREE.Mesh(new THREE.SphereGeometry(150, 32, 16), new THREE.ShaderMaterial({
     side: THREE.BackSide, depthWrite: false, fog: false,
-    uniforms: { topColor: { value: new THREE.Color(SK.top) }, midColor: { value: new THREE.Color(SK.mid) }, bottomColor: { value: new THREE.Color(SK.bot) } },
+    uniforms: { ...POST_U, topColor: { value: new THREE.Color(SK.top) }, midColor: { value: new THREE.Color(SK.mid) }, bottomColor: { value: new THREE.Color(SK.bot) } },
     vertexShader: `varying vec3 vPos; void main(){ vPos = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
-    fragmentShader: `uniform vec3 topColor, midColor, bottomColor; varying vec3 vPos; void main(){ float h = normalize(vPos).y; vec3 c = h > 0.0 ? mix(midColor, topColor, pow(h, 0.6)) : mix(midColor, bottomColor, pow(-h, 0.5)); gl_FragColor = vec4(c, 1.0); }`,
+    fragmentShader: POST_GLSL + `uniform vec3 topColor, midColor, bottomColor; varying vec3 vPos; void main(){ float h = normalize(vPos).y; vec3 c = h > 0.0 ? mix(midColor, topColor, pow(h, 0.6)) : mix(midColor, bottomColor, pow(-h, 0.5)); gl_FragColor = vec4(postOut(c), 1.0); }`,
   }));
   dome.renderOrder = -2; dome.raycast = () => {}; S.add(dome);
   { const pts = []; for (let i = 0; i < D.stars; i++) { const v = randomDir(); if (v.y < 0.12) v.y = 0.12 + Math.random() * 0.8; v.normalize(); pts.push(v.x * 140, v.y * 140, v.z * 140); }
