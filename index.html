@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Micro World: AI Village — Planeta</title>
+<title>CrossIA — Micro World: AI Village</title>
 <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Fredoka:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -81,7 +81,7 @@
 <div id="menu">
   <div class="menu-card w-[min(760px,96vw)] max-h-[94vh] overflow-auto p-5 md:p-8 text-center">
     <div class="floaty text-5xl md:text-6xl mb-3">🌍</div>
-    <h1 class="menu-title text-lg md:text-3xl">USAINBOT</h1>
+    <h1 class="menu-title text-lg md:text-3xl">CROSSIA</h1>
     <div class="text-emerald-600 font-bold text-base md:text-xl -mt-1 mb-3">Micro World · AI Village</div>
     <div id="saveSummary" class="hidden step p-3 mb-3 text-left text-xs md:text-sm text-[#2b2b3d]"></div>
     <p class="text-[#2b2b3d] font-medium text-sm md:text-base max-w-[560px] mx-auto leading-snug">
@@ -538,7 +538,9 @@ const state = {
    GUEST/ACCOUNT y el almacenamiento es un adaptador
    intercambiable (LocalStorageAdapter → futuro RemoteAdapter).
    ========================================================= */
-const SAVE_KEY = 'usainbot.save';        // clave en localStorage
+const SAVE_KEY = 'crossia.save';         // clave en localStorage
+// El proyecto se llamaba «usainbot»: la partida guardada con la clave antigua se mueve a la nueva una sola vez.
+try { const old = localStorage.getItem('usainbot.save'); if (old && !localStorage.getItem(SAVE_KEY)) localStorage.setItem(SAVE_KEY, old); if (old) localStorage.removeItem('usainbot.save'); } catch {}
 const SAVE_VERSION = 3;                   // súbela y añade un paso en migrate() si cambia el formato
 const PROFILE = { GUEST: 'GUEST', ACCOUNT: 'ACCOUNT' };
 const uid = () => (crypto.randomUUID ? crypto.randomUUID() : 'g-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 10));
@@ -624,7 +626,7 @@ function migrate(save) {
 /** Adaptadores de almacenamiento: misma interfaz para un futuro RemoteAdapter (cuentas / sync online) */
 const LocalStorageAdapter = {
   name: 'localStorage',
-  available() { try { localStorage.setItem('__usainbot_test', '1'); localStorage.removeItem('__usainbot_test'); return true; } catch { return false; } },
+  available() { try { localStorage.setItem('__crossia_test', '1'); localStorage.removeItem('__crossia_test'); return true; } catch { return false; } },
   read(key) { try { const raw = localStorage.getItem(key); return raw ? JSON.parse(raw) : null; } catch (e) { console.warn('[Save] lectura fallida', e); return null; } },
   write(key, data) { try { localStorage.setItem(key, JSON.stringify(data)); return true; } catch (e) { console.warn('[Save] escritura fallida', e); return false; } },
   remove(key) { try { localStorage.removeItem(key); } catch {} },
@@ -6529,7 +6531,7 @@ $('btnSettings').onclick = () => openSettings(false);
 $('btnSettingsGame').onclick = () => openSettings(true);
 $('btnCloseSettings').onclick = closeSettings;
 $('btnSaveNow').onclick = () => { SaveSystem.started = true; SaveSystem.saveNow('manual'); refreshSettingsInfo(); };
-$('btnExport').onclick = () => { const blob = new Blob([SaveSystem.exportJSON()], { type: 'application/json' }); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `usainbot-partida-${new Date().toISOString().slice(0, 10)}.json`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000); };
+$('btnExport').onclick = () => { const blob = new Blob([SaveSystem.exportJSON()], { type: 'application/json' }); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `crossia-partida-${new Date().toISOString().slice(0, 10)}.json`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000); };
 $('importFile').onchange = async (e) => {
   const file = e.target.files[0]; e.target.value = ''; if (!file) return;
   const ok = await confirmDialog({ title: '⬆️ Importar partida', text: 'La partida importada sustituirá al progreso guardado en este navegador.\n\n¿Continuar?', okLabel: 'IMPORTAR' }); if (!ok) return;
@@ -6539,7 +6541,7 @@ $('btnNewGame').onclick = async () => {
   const ok = await confirmDialog({ title: '¿Seguro que quieres comenzar una nueva partida?', text: 'Se perderá el progreso guardado en este navegador:\n🪙 ' + GS.economy.money.toLocaleString('es-ES') + ' $TOKEN · ' + missionsDone() + '/' + NPCS.length + ' misiones · casa nivel ' + GS.house.level, okLabel: 'NUEVA PARTIDA' });
   if (!ok) return; SaveSystem.reset(); location.reload();
 };
-{ const v = document.createElement('div'); v.className = 'text-[10px] text-slate-400 text-center mt-3'; v.textContent = `Micro World: AI Village · v${GAME_VERSION} «El Juego Completo» · guardado v${SAVE_VERSION}`; document.querySelector('#settingsModal .menu-card')?.append(v); }   // v1.0: etiqueta de versión
+{ const v = document.createElement('div'); v.className = 'text-[10px] text-slate-400 text-center mt-3'; v.textContent = `CrossIA · Micro World: AI Village · v${GAME_VERSION} «El Juego Completo» · guardado v${SAVE_VERSION}`; document.querySelector('#settingsModal .menu-card')?.append(v); }   // v1.0: etiqueta de versión
 // =====================================================================
 // DEBUG (B0.2b) - Herramientas de prueba. Uso: consola -> DBG.help()
 // Panel en pantalla: añadir ?debug=1 a la URL
