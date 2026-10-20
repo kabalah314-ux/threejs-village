@@ -10670,7 +10670,7 @@ const Account = {
       <p><b>1. Respeto.</b> Nada de insultos, acoso, odio ni contenido sexual. El chat tiene filtro y se puede reportar.</p>
       <p class="mt-2"><b>2. Tratos limpios.</b> Nada de estafas ni engaños en trueques, tiendas o subastas.</p>
       <p class="mt-2"><b>3. Sin trampas.</b> Nada de bots propios, partidas trucadas ni cuentas múltiples para sacar ventaja. La Aduana revisa los saltos raros de capital.</p>
-      <p class="mt-2"><b>4. Edad.</b> Hay que tener 13 años o más para jugar online, y 18 para cualquier compra con $CROSSIA.</p>
+      <p class="mt-2"><b>4. Wallet.</b> Registrarse y jugar online es libre. Para vincular una wallet y operar con $CROSSIA hay que ser mayor de 18 años; se confirma en el momento de vincularla.</p>
       <p class="mt-2"><b>5. Tus datos.</b> Guardamos tu email, tu partida en la nube y tu actividad en la Red. Puedes borrar tu cuenta cuando quieras desde Cuenta online.</p>
       <p class="mt-2 text-slate-500 text-xs">Si alguien incumple las normas, toca su nombre y pulsa Reportar. Con 3 reportes de personas distintas en 24 h su chat queda en pausa hasta que se revise.</p></div>`);
   },
@@ -10697,10 +10697,9 @@ const Account = {
         } else if (Online.session) {
           html += `<div class="app-card p-3 mb-2 text-sm">Último paso: elige tu nombre en el online.${o ? ` Tu perfil será ${o.icon} ${o.name}.` : ''}</div><input data-name maxlength="18" placeholder="Nombre (3–18)" value="${esc(Online.session?.user?.user_metadata?.username || '')}" class="game w-full text-sm px-3 py-2 mb-2"><button data-reg class="btn-play w-full" style="font-size:12px;padding:12px">CREAR MI JUGADOR</button>`;
         } else {
-          html += `<div class="app-card p-3 mb-2 text-xs text-slate-600">Con una cuenta tu partida se guarda en la nube (la recuperas en otro dispositivo) y en la Red del Sueño ves a otros jugadores reales y hablas con ellos. Es gratis. Edad mínima: 13 años.</div>
+          html += `<div class="app-card p-3 mb-2 text-xs text-slate-600">Con una cuenta tu partida se guarda en la nube (la recuperas en otro dispositivo) y en la Red del Sueño ves a otros jugadores reales y hablas con ellos. Es gratis.</div>
             <input data-email type="email" placeholder="Email" class="game w-full text-sm px-3 py-2 mb-2"><input data-pass type="password" placeholder="Contraseña (mín. 6)" class="game w-full text-sm px-3 py-2 mb-2"><input data-name maxlength="18" placeholder="Nombre en el juego (solo para crear cuenta)" class="game w-full text-sm px-3 py-2 mb-2">
-            <label class="flex items-start gap-2 text-xs text-slate-600 mb-1"><input data-age type="checkbox" class="mt-0.5"><span>Tengo 13 años o más.</span></label>
-            <label class="flex items-start gap-2 text-xs text-slate-600 mb-2"><input data-rules type="checkbox" class="mt-0.5"><span>Acepto las <a href="#" data-normas class="underline">normas de la Red</a> (respeto, nada de estafas ni trampas) y que se guarden mi email y mi partida.</span></label>
+                        <label class="flex items-start gap-2 text-xs text-slate-600 mb-2"><input data-rules type="checkbox" class="mt-0.5"><span>Acepto las <a href="#" data-normas class="underline">normas de la Red</a> (respeto, nada de estafas ni trampas) y que se guarden mi email y mi partida.</span></label>
             <div class="flex gap-2"><button data-in class="btn-game px-3 py-2 text-sm bg-emerald-300 flex-1">Entrar</button><button data-up class="btn-game px-3 py-2 text-sm bg-violet-200 flex-1">Crear cuenta</button></div>
             <div class="text-[10px] text-slate-500 mt-2">Al crear la cuenta puede llegarte un email para confirmarla. Tus datos: email y partida; nada más. Cuenta de OOOX compartida con otros juegos de OOOX.</div>`;
         }
@@ -10710,7 +10709,7 @@ const Account = {
         const run = async (fn, ok) => { try { const r = await fn(); await render(typeof ok === 'function' ? ok(r) : ok); } catch (e) { await render('❌ ' + e.message); } };
         $b('[data-in]') && ($b('[data-in]').onclick = () => run(() => Online.signIn(val('[data-email]'), val('[data-pass]')), (m) => m ? `✓ Hola de nuevo, ${esc(m.name)}` : '✓ Sesión iniciada'));
         $b('[data-normas]') && ($b('[data-normas]').onclick = (e) => { e.preventDefault(); Account.rules(); });
-        $b('[data-up]') && ($b('[data-up]').onclick = () => run(async () => { if (!$b('[data-age]')?.checked || !$b('[data-rules]')?.checked) throw new Error('Marca las dos casillas para crear la cuenta'); const n = val('[data-name]'); if (n.length < 3) throw new Error('Pon un nombre de 3–18 caracteres'); const s = await Online.signUp(val('[data-email]'), val('[data-pass]'), n); if (s) await Online.register(n); return s; }, (s) => s ? '✓ ¡Cuenta creada y partida subida a la nube!' : '📧 Te hemos enviado un email: confírmalo y luego pulsa «Entrar» aquí.'));
+        $b('[data-up]') && ($b('[data-up]').onclick = () => run(async () => { if (!$b('[data-rules]')?.checked) throw new Error('Acepta las normas para crear la cuenta'); const n = val('[data-name]'); if (n.length < 3) throw new Error('Pon un nombre de 3–18 caracteres'); const s = await Online.signUp(val('[data-email]'), val('[data-pass]'), n); if (s) await Online.register(n); return s; }, (s) => s ? '✓ ¡Cuenta creada y partida subida a la nube!' : '📧 Te hemos enviado un email: confírmalo y luego pulsa «Entrar» aquí.'));
         $b('[data-reg]') && ($b('[data-reg]').onclick = () => run(async () => { const m = await Online.register(val('[data-name]')); await Online.acceptRules().catch(() => {}); return m; }, '✓ Jugador creado y partida subida a la nube'));
         $b('[data-accept]') && ($b('[data-accept]').onclick = () => run(() => Online.acceptRules(), '✓ Gracias. Normas aceptadas'));
         $b('[data-normas2]') && ($b('[data-normas2]').onclick = (e) => { e.preventDefault(); Account.rules(); });
