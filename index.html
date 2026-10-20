@@ -3763,7 +3763,7 @@ const UI_ICONS = {
   '🔍': ['magnifying-glass', 'ink'], '📍': ['map-pin', 'coral'], '🔔': ['bell', 'gold'], '❓': ['question', 'sky'], '🗺': ['map-trifold', 'sky'], '🧾': ['receipt', 'ink'], '💳': ['credit-card', 'ink'], '🪪': ['identification-card', 'ink'],
   '🎯': ['target', 'coral'], '🧠': ['brain', 'rose'], '👁': ['eye', 'ink'], '📄': ['file-code', 'sky'], '🔨': ['hammer', 'coral'], '🏅': ['medal', 'gold'], '📣': ['megaphone', 'rose'], '🎟': ['ticket', 'gold'], '🛍': ['shopping-bag', 'rose'],
   '📸': ['camera', 'sky'], '📷': ['camera', 'sky'], '🏦': ['bank', 'gold'], '⚖': ['scales', 'ink'], '🧪': ['flask', 'lilac'], '🌱': ['plant', 'mint'], '🌾': ['grains', 'mint'], '⛏': ['pick', 'coral'], '🎣': ['fish-simple', 'sky'], '🪓': ['axe', 'coral'],
-  '🦋': ['butterfly', 'rose'], '🧲': ['magnet', 'coral'], '📨': ['envelope-open', 'rose'], '🚀': ['rocket-launch', 'lilac'], '🔑': ['key', 'gold'], '🏁': ['flag-checkered', 'ink'], '▶': ['play', 'mint'], '⏸': ['pause', 'ink'], '💡': ['lightbulb', 'gold'], '💺': ['armchair', 'mint'], '🪞': ['user-focus', 'rose'], '👕': ['t-shirt', 'rose'], '🥣': ['bowl-food', 'mint'], '💎': ['diamond', 'sky'], '🍹': ['cookie', 'rose'], '🏭': ['factory', 'coral'], '🌾': ['grains', 'mint'], '🥖': ['bread', 'gold'], '🎉': ['confetti', 'rose'], '📮': ['mailbox', 'rose'], '🪑': ['chair', 'mint'], '🎵': ['music-notes', 'lilac'], '🧳': ['suitcase', 'gold'], '🗓': ['calendar', 'rose'], '🧑‍🍳': ['chef-hat', 'mint'], '🎓': ['graduation-cap', 'sky'], '🔭': ['binoculars', 'lilac'], '🛡': ['shield-check', 'mint'], '🚫': ['prohibit', 'coral'], '➕': ['plus', 'mint'], '➖': ['minus', 'coral'], '🔁': ['repeat', 'sky'], '♻': ['recycle', 'mint'], '🪄': ['magic-wand', 'lilac'], '🌈': ['rainbow', 'rose'], '❤': ['heart', 'rose'], '💖': ['heart', 'rose'], '🗳': ['archive-box', 'ink'],
+  '🦋': ['butterfly', 'rose'], '🧲': ['magnet', 'coral'], '📨': ['envelope-open', 'rose'], '🚀': ['rocket-launch', 'lilac'], '🔑': ['key', 'gold'], '🏁': ['flag-checkered', 'ink'], '▶': ['play', 'mint'], '⏸': ['pause', 'ink'], '💡': ['lightbulb', 'gold'], '🔕': ['bell-slash', 'ink'], '👥': ['users', 'lilac'], '💺': ['armchair', 'mint'], '🪞': ['user-focus', 'rose'], '👕': ['t-shirt', 'rose'], '🥣': ['bowl-food', 'mint'], '💎': ['diamond', 'sky'], '🍹': ['cookie', 'rose'], '🏭': ['factory', 'coral'], '🌾': ['grains', 'mint'], '🥖': ['bread', 'gold'], '🎉': ['confetti', 'rose'], '📮': ['mailbox', 'rose'], '🪑': ['chair', 'mint'], '🎵': ['music-notes', 'lilac'], '🧳': ['suitcase', 'gold'], '🗓': ['calendar', 'rose'], '🧑‍🍳': ['chef-hat', 'mint'], '🎓': ['graduation-cap', 'sky'], '🔭': ['binoculars', 'lilac'], '🛡': ['shield-check', 'mint'], '🚫': ['prohibit', 'coral'], '➕': ['plus', 'mint'], '➖': ['minus', 'coral'], '🔁': ['repeat', 'sky'], '♻': ['recycle', 'mint'], '🪄': ['magic-wand', 'lilac'], '🌈': ['rainbow', 'rose'], '❤': ['heart', 'rose'], '💖': ['heart', 'rose'], '🗳': ['archive-box', 'ink'],
 };
 const UI_EMO_RE = new RegExp('^\\s*(' + Object.keys(UI_ICONS).sort((a, b) => b.length - a.length).map(k => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|') + ')\\uFE0F?\\s*');
 /** Icono suelto (en línea con el texto) */
@@ -7481,7 +7481,7 @@ function awakeningChainHTML() {
    Nota: la 🎪 Feria del Sábado (puestos de los vecinos, ofertas de tienda) NO es la
    📈 Feria del Tablón de la v0.8 (especulación por categorías): conviven sin tocarse.
    ========================================================= */
-const GAME_VERSION = '2.2';
+const GAME_VERSION = '2.3';
 /* ---------- 🗓️ EVENTOS: calendario REAL → flags que leen los sistemas existentes (Sec. 10.10) ---------- */
 const Events = {
   _force: null,   // DBG.weekday(n): simula el día de la semana real (0 = domingo … 6 = sábado)
@@ -9590,7 +9590,7 @@ const NetWorld = {
   layout(zone, o = {}) {
     const Z = NET_ZONES[zone], [w, d] = Z.size, hw = w / 2, hd = d / 2, W = NetEco.W, P = [...netFloorPieces(zone)];
     const A = { wake: () => this.wake(), tram: () => NetUI.tram(), tablon: () => NetUI.tablon(), subastas: () => NetUI.auctions(), aduana: () => NetUI.aduana(), contratos: () => NetUI.contracts(), pedidos: () => NetUI.requests(), origen: () => NetUI.originCard(),
-      walk: (obj) => this.go(obj.userData.netTo), plot: (obj) => this.openPlot(zone, obj.userData.netPlot), bot: (obj) => { const i = obj.userData.botIdx; if (i !== undefined && i !== null) NetUI.barter(i); }, gate: () => this.go('dorado') };
+      walk: (obj) => this.go(obj.userData.netTo), plot: (obj) => this.openPlot(zone, obj.userData.netPlot), bot: (obj) => { if (obj.userData.peerId) { PeerCard.openId(obj.userData.peerId); return; } const i = obj.userData.botIdx; if (i !== undefined && i !== null) NetUI.barter(i); }, gate: () => this.go('dorado') };
     if (zone === 'plaza') {
       const lines = []; if (W) { const mv = []; for (let m = 0; m < 32; m++) { const h = W.hist, a = h.length > 1 ? h[h.length - 2][m] : W.price[m]; mv.push([m, W.price[m] / Math.max(0.01, a) - 1]); } mv.sort((a, b) => Math.abs(b[1]) - Math.abs(a[1])); mv.slice(0, 6).forEach(([m, g]) => lines.push({ t: `${netItem(m).name}: ${fmt(Math.round(W.price[m]))} $T (${g >= 0 ? '+' : ''}${(g * 100).toFixed(1)} %)`, up: g >= 0 })); }
       P.push(
@@ -9710,7 +9710,13 @@ const NetWorld = {
     });
     Object.values(R.M).forEach(im => im.instanceMatrix.needsUpdate = true);
     const px = R.proxy; if (px) {
-      px.visible = !!best; if (best) { px.position.set(best.x, 0, best.z); px.userData.lx = best.x; px.userData.lz = best.z; px.userData.botIdx = best.i; px.userData.interact.label = `🤝 Truecar con ${best.s.name} (bot de ${NET_ORIGINS[best.s.origin].icon})`; }
+      const pr = typeof Online !== 'undefined' && Online.nearestPeer ? Online.nearestPeer(I.px, I.pz) : null;   // v2.3: las personas reales también se pueden tocar (ficha de jugador)
+      if (pr && pr.d < Math.min(bd, 2.6)) {
+        px.visible = true; px.position.set(pr.p.x, 0, pr.p.z); px.userData.lx = pr.p.x; px.userData.lz = pr.p.z; px.userData.botIdx = null; px.userData.peerId = pr.id; px.userData.interact.label = `👤 ${pr.p.name} · ver ficha`;
+        if (R.tagFor !== 'peer:' + pr.id && px.userData.tag) { R.tagFor = 'peer:' + pr.id; const old = px.userData.tag.material.map; px.userData.tag.material.map = textTexture(' ', { w: 384, h: 96 }); px.userData.tag.material.needsUpdate = true; if (old) old.dispose(); }
+        best = null;
+      } else px.userData.peerId = null;
+      if (!px.userData.peerId) { px.visible = !!best; if (best) { px.position.set(best.x, 0, best.z); px.userData.lx = best.x; px.userData.lz = best.z; px.userData.botIdx = best.i; px.userData.interact.label = `🤝 Truecar con ${best.s.name} (bot de ${NET_ORIGINS[best.s.origin].icon})`; } }
       if (best && R.tagFor !== best.i && px.userData.tag) { R.tagFor = best.i; const old = px.userData.tag.material.map; px.userData.tag.material.map = textTexture(`${NET_ORIGINS[best.s.origin].icon} ${best.s.name}`, { w: 384, h: 96, bg: '#ffffffdd', font: 'bold 40px Fredoka, Arial' }); px.userData.tag.material.needsUpdate = true; if (old) old.dispose(); }
     }
     R.spin.forEach(s => { s.rotation.z += dt * 0.8; });
@@ -10184,8 +10190,16 @@ const Hub = {
 const Online = (() => {
   const C = CFG.online; let sb = null, loading = null, session = null, me = null, chan = null, chanZone = null, lastPush = 0, lastPos = '', posAcc = 0;
   const peers = new Map();   // id → { name, profile, x, z, yaw, tx, tz, g, seen }
-  const chat = [];           // [{ name, profile, text, me, t }]
-  const api = { get me() { return me; }, get session() { return session; }, get ready() { return !!sb; }, peers, chat, status: 'off', err: '' };
+  const chat = [];           // [{ id, name, profile, text, me, t }]
+  /** v2.3 · moderación: silenciados (solo en este navegador) y bloqueados (en el servidor) */
+  const muted = new Set((() => { try { return JSON.parse(localStorage.getItem('crossia.muted') || '[]'); } catch (e) { return []; } })());
+  const blocked = new Set();
+  const api = { get me() { return me; }, get session() { return session; }, get ready() { return !!sb; }, peers, chat, muted, blocked, status: 'off', err: '' };
+  api.hidden = (id) => !!id && (muted.has(id) || blocked.has(id));
+  api.setMuted = (id, on) => { if (on) muted.add(id); else muted.delete(id); try { localStorage.setItem('crossia.muted', JSON.stringify([...muted])); } catch (e) {} NetChat.render(); };
+  api.loadBlocks = async () => { const l = await rpc('crossia_my_blocks'); blocked.clear(); (l || []).forEach(b => blocked.add(b.id)); return l || []; };
+  api.setBlocked = async (id, on) => { await rpc(on ? 'crossia_block' : 'crossia_unblock', { p_target: id }); if (on) blocked.add(id); else blocked.delete(id); const p = peers.get(id); if (p && p.g) p.g.visible = !on; NetChat.render(); };
+  api.nearestPeer = (x, z) => { let best = null; peers.forEach((p, id) => { if (blocked.has(id) || !p.g) return; const d = Math.hypot(p.x - x, p.z - z); if (!best || d < best.d) best = { id, p, d }; }); return best; };
   async function lib() {
     if (sb) return sb; if (loading) return loading;
     loading = import(C.lib).then(({ createClient }) => { sb = createClient(C.url, C.key, { auth: { persistSession: true, storageKey: 'crossia.auth', autoRefreshToken: true } });
@@ -10198,7 +10212,8 @@ const Online = (() => {
   const tr = (m) => { for (const [re, t] of ES) if (re.test(m)) return t; return m; };
   const rpc = async (fn, args = {}) => { const { data, error } = await (await lib()).rpc(fn, args); if (error) throw new Error(tr(error.message)); return data; };
   async function refreshMe() { me = session ? await rpc('crossia_me') : null; api.status = me ? 'on' : session ? 'noplayer' : 'off';
-    if (me) { GS.meta.profile = { type: PROFILE.ACCOUNT, accountId: me.id, displayName: me.name }; api.loadSeason().catch(() => {}); } return me; }
+    if (me) { GS.meta.profile = { type: PROFILE.ACCOUNT, accountId: me.id, displayName: me.name }; api.loadSeason().catch(() => {}); api.loadBlocks().catch(() => {}); } return me; }
+  api.refreshMe = refreshMe;
   /** v2.0 · 🏆 Temporada: se guarda la última consulta (evento de la semana, mi puesto, mi título) */
   api.season = null; api.title = null;
   api.loadSeason = async (kind = 'riqueza') => { const d = await rpc('crossia_season', { p_kind: kind }); d._at = Date.now(); d._skew = Date.parse(d.season.now) - Date.now(); api.season = d; api.title = d.title || null; return d; };
@@ -10235,17 +10250,24 @@ const Online = (() => {
     chan = sb.channel('crossia-' + zone, { config: { presence: { key: me.id }, broadcast: { self: false } } });
     chan.on('presence', { event: 'sync' }, () => { const st = chan.presenceState(); const ids = new Set(Object.keys(st));
       peers.forEach((p, id) => { if (!ids.has(id)) { p.g?.parent?.remove(p.g); peers.delete(id); } });
-      ids.forEach(id => { if (id === me.id) return; const m = st[id][0]; if (!peers.has(id)) peers.set(id, { name: m.name, profile: m.profile, title: m.title || null, x: m.x || 0, z: m.z || 0, tx: m.x || 0, tz: m.z || 0, yaw: 0, seen: Date.now() }); }); });
+      ids.forEach(id => { if (id === me.id) return; const m = st[id][0]; if (!peers.has(id)) peers.set(id, { id, name: m.name, profile: m.profile, title: m.title || null, x: m.x || 0, z: m.z || 0, tx: m.x || 0, tz: m.z || 0, yaw: 0, seen: Date.now() }); }); });
     chan.on('broadcast', { event: 'pos' }, ({ payload: m }) => { const p = peers.get(m.id); if (p) { p.tx = m.x; p.tz = m.z; p.yaw = m.yaw; p.seen = Date.now(); } });
-    chan.on('broadcast', { event: 'chat' }, ({ payload: m }) => { pushChat(m.name, m.profile, m.text, false, m.title); });
+    chan.on('broadcast', { event: 'chat' }, ({ payload: m }) => { pushChat(m.name, m.profile, m.text, false, m.title, m.id || null); });
     chan.subscribe(async (s) => { if (s === 'SUBSCRIBED') await chan.track({ name: me.name, profile: me.profile, title: api.title, x: Interiors.px, z: Interiors.pz }); });
     try { const h = await rpc('crossia_chat_recent', { p_zone: zone }); chat.length = 0; let T = {}; try { T = await rpc('crossia_titles', { p_ids: [...new Set((h || []).map(m => m.player))] }) || {}; } catch (e) {}
-      (h || []).forEach(m => chat.push({ name: m.name, profile: m.profile, title: T[m.player] || null, text: m.text, me: m.player === me.id, t: Date.parse(m.created_at) })); NetChat.render(); } catch (e) {}
+      (h || []).forEach(m => chat.push({ id: m.player, name: m.name, profile: m.profile, title: T[m.player] || null, text: m.text, me: m.player === me.id, t: Date.parse(m.created_at) })); NetChat.render(); } catch (e) {}
   }
-  function pushChat(name, profile, text, mine, title = null) { chat.push({ name, profile, title, text, me: mine, t: Date.now() }); while (chat.length > 60) chat.shift(); NetChat.render(); if (!mine) NetChat.ping(); }
+  function pushChat(name, profile, text, mine, title = null, id = null) { chat.push({ id: mine ? me?.id : id, name, profile, title, text, me: mine, t: Date.now() }); while (chat.length > 60) chat.shift(); NetChat.render(); if (!mine) NetChat.ping(); }
   api.say = async (text) => { if (!me) throw new Error('Inicia sesión para chatear'); const r = await rpc('crossia_chat_post', { p_zone: chanZone || 'plaza', p_text: text });
-    pushChat(me.name, me.profile, r.text, true, api.title); chan?.send({ type: 'broadcast', event: 'chat', payload: { name: me.name, profile: me.profile, title: api.title, text: r.text } }); return r; };
-  api.report = async (name) => { const p = [...peers.entries()].find(([, v]) => v.name === name); if (!p) throw new Error('No encuentro a ese jugador aquí'); return rpc('crossia_report', { p_target: p[0], p_chat: null, p_reason: 'chat' }); };
+    pushChat(me.name, me.profile, r.text, true, api.title); chan?.send({ type: 'broadcast', event: 'chat', payload: { id: me.id, name: me.name, profile: me.profile, title: api.title, text: r.text } }); return r; };
+  api.report = async (id, reason = 'otro') => rpc('crossia_report', { p_target: id, p_chat: null, p_reason: reason });
+  api.rpc = rpc;
+  api.rename = async (n) => { me = await rpc('crossia_rename', { p_name: n }); await refreshMe(); return me; };
+  api.acceptRules = async () => { me = await rpc('crossia_accept_rules'); return me; };
+  /** H2 · Eliminar cuenta: Edge Function con clave de servicio (borra jugador y, si la cuenta nació en CrossIA, también el usuario) */
+  api.deleteAccount = async (confirmName) => { await lib(); const { data, error } = await sb.functions.invoke('crossia-delete-account', { body: { confirm: confirmName } });
+    if (error) { let m = error.message; try { const j = await error.context?.json?.(); if (j?.error) m = j.error; } catch (e) {} throw new Error(m); }
+    leave(); try { await sb.auth.signOut(); } catch (e) {} session = null; me = null; api.status = 'off'; GS.meta.profile = { type: PROFILE.GUEST, accountId: null, displayName: 'Invitado' }; SaveSystem.saveNow('account-deleted'); return data; };
   api.update = (dt) => {
     if (me && session && SaveSystem.started && !state.menuOpen && Date.now() - lastPush > C.autosaveMin * 60000) api.push().catch(e => console.warn('[online] push', e.message));
     const z = NetWorld.inside() ? NetWorld.zone() : null;
@@ -10255,7 +10277,7 @@ const Online = (() => {
     if (!chan || !z) return;
     posAcc += dt; if (posAcc > C.posEvery) { posAcc = 0; const k = `${Interiors.px.toFixed(2)},${Interiors.pz.toFixed(2)}`; if (k !== lastPos) { lastPos = k; chan.send({ type: 'broadcast', event: 'pos', payload: { id: me.id, x: Interiors.px, z: Interiors.pz, yaw: Interiors.yaw } }); } }
     const root = Interiors.root; if (!root) return;
-    peers.forEach(p => { if (!p.g) { p.g = avatarOf(p); p.g.position.set(p.x, 0, p.z); root.add(p.g); }
+    peers.forEach((p, id) => { if (!p.g) { p.g = avatarOf(p); p.g.position.set(p.x, 0, p.z); root.add(p.g); } p.g.visible = !blocked.has(id);
       if (p.g.parent !== root) root.add(p.g);
       p.x += (p.tx - p.x) * Math.min(1, dt * 8); p.z += (p.tz - p.z) * Math.min(1, dt * 8); p.g.position.set(p.x, Math.abs(Math.sin((p.x + p.z) * 3)) * 0.04, p.z); p.g.rotation.y += ((p.yaw || 0) - p.g.rotation.y) * Math.min(1, dt * 8); });
   };
@@ -10276,7 +10298,7 @@ const NetChat = {
     const d = this.ensure(), inside = NetWorld.inside(); d.style.display = inside && SaveSystem.started ? 'block' : 'none'; if (!inside) return;
     const on = !!Online.me, n = Online.peers.size;
     if (!this.open) { d.innerHTML = `<button data-o class="btn-game px-3 py-2 bg-[#fff6c2] text-[#2b2b3d] text-sm">💬 Chat ${on ? `· ${n + 1} aquí` : '(sin conexión)'}${this.unread ? ` <span class="ml-1 px-1.5 rounded-full bg-red-500 text-white text-[10px]">${this.unread}</span>` : ''}</button>`; d.querySelector('[data-o]').onclick = () => { this.open = true; this.unread = 0; this.render(); }; return; }
-    const log = Online.chat.slice(-30).map(m => `<div style="align-self:${m.me ? 'flex-end' : 'flex-start'};background:${m.me ? '#d1fae5' : '#fff'};border:2px solid #e2e8f0;border-radius:12px;padding:3px 8px;max-width:88%"><b style="font-size:11px">${NET_ORIGINS[m.profile]?.icon || ''} ${esc(m.name)}</b>${m.title ? ` <span style="font-size:10px;color:#b45309">${esc(m.title)}</span>` : ''}<div style="font-size:12px">${esc(m.text)}</div></div>`).join('');
+    const log = Online.chat.filter(m => m.me || !Online.hidden(m.id)).slice(-30).map(m => `<div style="align-self:${m.me ? 'flex-end' : 'flex-start'};background:${m.me ? '#d1fae5' : '#fff'};border:1px solid #e2e8f0;border-radius:12px;padding:3px 8px;max-width:88%"><b style="font-size:11px;${m.me || !m.id ? '' : 'cursor:pointer;text-decoration:underline dotted'}" ${m.me || !m.id ? '' : `data-peer="${m.id}"`}>${NET_ORIGINS[m.profile]?.icon || ''} ${esc(m.name)}</b>${m.title ? ` <span style="font-size:10px;color:#b45309">${esc(m.title)}</span>` : ''}<div style="font-size:12px">${esc(m.text)}</div></div>`).join('');
     d.innerHTML = `<div class="panel p-2" style="background:#fffdf5"><div class="flex items-center justify-between mb-1"><b class="text-sm text-[#2b2b3d]">💬 Chat de la ${esc(NET_ZONES[NetWorld.zone()]?.name || 'Red')}</b><span class="text-[11px] text-slate-500">${on ? `${n + 1} conectado(s)` : ''}</span><button data-x class="btn-game px-2 py-0.5 text-xs bg-slate-200">✕</button></div>
       ${on ? `<div data-log style="display:flex;flex-direction:column;gap:4px;max-height:180px;overflow:auto;margin-bottom:6px">${log || '<div class="text-xs text-slate-400">Nadie ha escrito todavía. ¡Saluda!</div>'}</div>
       <div class="flex flex-wrap gap-1 mb-1">${NetUI.QUICK.map((q, k) => `<button data-q="${k}" class="btn-game px-1.5 py-0.5 text-[10px] bg-sky-100">${q}</button>`).join('')}</div>
@@ -10292,6 +10314,7 @@ const NetChat = {
     inp.onkeydown = (e) => { e.stopPropagation(); if (e.key === 'Enter') { const v = inp.value.trim(); if (v) { inp.value = ''; send(v); } } };
     inp.onkeyup = (e) => e.stopPropagation();
     d.querySelectorAll('[data-q]').forEach(b => b.onclick = () => send(NetUI.QUICK[+b.dataset.q]));
+    d.querySelectorAll('[data-peer]').forEach(b => b.onclick = () => PeerCard.openId(b.dataset.peer));
   },
 };
 
@@ -10345,7 +10368,9 @@ const RealMarket = {
         q$('[data-cancel]').forEach(b => b.onclick = () => run(async () => { await this.rpc('crossia_order_cancel', { p_id: +b.dataset.cancel }); return '✓ Orden cancelada: lo apartado vuelve a tu Aduana'; }));
         const coinsIn = () => Math.floor(+(body.querySelector('[data-coins]')?.value || 0));
         body.querySelector('[data-dc]') && (body.querySelector('[data-dc]').onclick = () => run(async () => { const n = coinsIn(); if (n < 1) throw new Error('Pon una cantidad'); if (!Wallet.canAfford(n)) throw new Error('No tienes tantos $T en tu partida');
-          await this.rpc('crossia_deposit_coins', { p_n: n }); Wallet.spend(n, 'Aduana de la Red real (ingreso)', { silent: true }); SaveSystem.saveNow('real-deposit'); return `✓ Ingresados ${fmt(n)} $T`; }));
+          await Online.push(true);   // v2.3: la Aduana compara con tu última partida en la nube
+          const r = await this.rpc('crossia_deposit_coins', { p_n: n }); Wallet.spend(n, 'Aduana de la Red real (ingreso)', { silent: true }); SaveSystem.saveNow('real-deposit');
+          return r?.review ? `🔎 Ingreso en revisión: tu capital ha subido de golpe. Si todo está bien, los ${fmt(n)} $T llegarán a tu Aduana tras revisarlo.` : `✓ Ingresados ${fmt(n)} $T`; }));
         body.querySelector('[data-wc]') && (body.querySelector('[data-wc]').onclick = () => run(async () => { const n = coinsIn(); if (n < 1) throw new Error('Pon una cantidad');
           await this.rpc('crossia_withdraw_coins', { p_n: n }); Wallet.add(n, 'Aduana de la Red real (retirada)', { noMult: true, silent: true }); SaveSystem.saveNow('real-withdraw'); return `✓ Retirados ${fmt(n)} $T a tu partida`; }));
         q$('[data-di]').forEach(b => b.onclick = () => run(async () => { const id = b.dataset.di; if (!Inventory.has(id, 1)) throw new Error('No lo tienes en la mochila');
@@ -10484,7 +10509,7 @@ const RealSeason = {
         html += (D.top.length ? D.top.map(r => `<div class="app-card p-2 mb-1 flex items-center gap-2 text-xs ${r.me ? 'bg-emerald-50' : ''}"><div class="w-8 text-center font-bold ${r.rank <= 3 ? 'text-base' : 'text-slate-500'}">${r.rank <= 3 ? ['🥇', '🥈', '🥉'][r.rank - 1] : '#' + r.rank}</div>
             <div class="flex-1">${NET_ORIGINS[r.profile]?.icon || ''} <b>${esc(r.name)}</b>${r.me ? ' (tú)' : ''}</div><b>${fmt(r.score)}${unit}</b></div>`).join('')
           : `<div class="app-card p-3 text-xs text-slate-500">Nadie puntúa todavía en esta categoría. ¡El primero se lleva el oro!</div>`);
-        html += `<div class="app-card p-2.5 mt-2 text-xs">Tu puesto: ${D.me ? `<b>#${D.me.rank}</b> de ${D.me.of} · ${fmt(D.me.score)}${unit}` : 'sin puntuar aún'}</div>`;
+        html += `<div class="app-card p-2.5 mt-2 text-xs">Tu puesto: ${D.me?.newbie ? `entras en el ranking cuando tu cuenta cumpla ${D.me.hours} h (llevas ${fmt(D.me.score)}${unit})` : D.me ? `<b>#${D.me.rank}</b> de ${D.me.of} · ${fmt(D.me.score)}${unit}` : 'sin puntuar aún'}</div>`;
         html += `<div class="sec-h">Tus títulos</div>` + (D.awards.length ? D.awards.map(a => `<div class="text-xs py-1 border-b border-slate-100"><b>${esc(a.title)}</b> · +${fmt(a.prize)} $T</div>`).join('') : '<div class="text-xs text-slate-400">Todavía ninguno. Tu mejor título aparece junto a tu nombre en la Red y en el chat.</div>');
         html += `<button data-mk class="btn-game px-3 py-1.5 text-xs bg-amber-200 w-full mt-2">🏛️ Ir al mercado real</button>`;
         body.innerHTML = html;
@@ -10496,7 +10521,47 @@ const RealSeason = {
   },
 };
 
+/* ===== v2.3 · 👤 FICHA DE JUGADOR (Guía Maestra 2, H1 y C3): desde el chat o tocando su avatar en la Red.
+   Silenciar (solo en tu pantalla), Bloquear (en el servidor: no ves su chat ni su avatar y no puede comprar en tu tienda) y Reportar con motivo. ===== */
+const PeerCard = {
+  REASONS: [['insulto', 'Insultos o acoso'], ['estafa', 'Estafa en un trato'], ['nombre', 'Nombre ofensivo'], ['trampas', 'Trampas o bots'], ['otro', 'Otro motivo']],
+  find(id) { const p = Online.peers.get(id); if (p) return { id, name: p.name, profile: p.profile, title: p.title }; const c = [...Online.chat].reverse().find(m => m.id === id); return c ? { id, name: c.name, profile: c.profile, title: c.title } : { id, name: 'Jugador', profile: 0 }; },
+  openId(id) { if (!id || !Online.me || id === Online.me.id) return; this.open(this.find(id)); },
+  open(p) {
+    openApp('👤 Jugador', '', (body) => {
+      const render = (msg = '') => {
+        const o = NET_ORIGINS[p.profile] || NET_ORIGINS[0], mut = Online.muted.has(p.id), blk = Online.blocked.has(p.id);
+        body.innerHTML = (msg ? `<div class="app-card p-2 mb-2 text-xs ${/^❌/.test(msg) ? 'bg-red-50' : 'bg-emerald-50'}">${msg}</div>` : '') +
+          `<div class="hub-head mb-2">${profChip(o, 'lg')}<div class="flex-1 min-w-0"><div class="nm">${esc(p.name)}${p.title ? ` <span class="text-xs" style="color:#b7791f">${esc(p.title)}</span>` : ''}</div><div class="sub">${o.name}${blk ? ' · bloqueado' : mut ? ' · silenciado' : ''}</div></div></div>
+          <div class="hub-grid">
+            <button class="hub-t" data-shop>${uiChip('🏪')}<div class="tx"><div class="ti">Ir a su tienda</div><div class="de">Si tiene puesto o tienda en la Red</div></div></button>
+            <button class="hub-t" data-mute>${uiChip(mut ? '💬' : '🔕')}<div class="tx"><div class="ti">${mut ? 'Quitar silencio' : 'Silenciar'}</div><div class="de">${mut ? 'Vuelves a ver sus mensajes' : 'Dejas de ver sus mensajes; solo en tu pantalla'}</div></div></button>
+            <button class="hub-t" data-block>${uiChip('🚫')}<div class="tx"><div class="ti">${blk ? 'Desbloquear' : 'Bloquear'}</div><div class="de">${blk ? 'Vuelve a aparecer en tu Red' : 'No ves su chat ni su avatar y no compra en tu tienda'}</div></div></button>
+          </div>
+          <div class="sec-h">Reportar</div><div class="app-card p-3 text-xs text-slate-600">Si incumple las normas, cuéntanoslo. Con 3 reportes de personas distintas en 24 h su chat queda en pausa hasta que se revise.
+            <div class="flex flex-wrap gap-1 mt-2">${this.REASONS.map(([k, l]) => `<button data-rep="${k}" class="btn-game px-2.5 py-1 text-[11px] bg-white">${l}</button>`).join('')}</div></div>`;
+        const run = async (fn, ok) => { try { await fn(); render(ok); } catch (e) { render('❌ ' + e.message); } };
+        body.querySelector('[data-mute]').onclick = () => { Online.setMuted(p.id, !mut); render(!mut ? '✓ Silenciado: ya no ves sus mensajes' : '✓ Silencio quitado'); };
+        body.querySelector('[data-block]').onclick = () => run(() => Online.setBlocked(p.id, !blk), !blk ? '✓ Bloqueado' : '✓ Desbloqueado');
+        body.querySelector('[data-shop]').onclick = async () => { try { closeApp(); await RealShops.visit(p.id); } catch (e) { showToast('🏪 ' + (e.message || 'No tiene tienda'), 'text-white'); } };
+        body.querySelectorAll('[data-rep]').forEach(b => b.onclick = () => run(() => Online.report(p.id, b.dataset.rep), '✓ Reporte enviado. Gracias por cuidar la Red.'));
+      };
+      render();
+    });
+  },
+};
+
 const Account = {
+  /** v2.3 · Normas de la Red (H2) */
+  rules() {
+    openApp('📜 Normas de la Red', `<div class="app-card p-4 text-sm leading-relaxed">
+      <p><b>1. Respeto.</b> Nada de insultos, acoso, odio ni contenido sexual. El chat tiene filtro y se puede reportar.</p>
+      <p class="mt-2"><b>2. Tratos limpios.</b> Nada de estafas ni engaños en trueques, tiendas o subastas.</p>
+      <p class="mt-2"><b>3. Sin trampas.</b> Nada de bots propios, partidas trucadas ni cuentas múltiples para sacar ventaja. La Aduana revisa los saltos raros de capital.</p>
+      <p class="mt-2"><b>4. Edad.</b> Hay que tener 13 años o más para jugar online, y 18 para cualquier compra con $CROSSIA.</p>
+      <p class="mt-2"><b>5. Tus datos.</b> Guardamos tu email, tu partida en la nube y tu actividad en la Red. Puedes borrar tu cuenta cuando quieras desde Cuenta online.</p>
+      <p class="mt-2 text-slate-500 text-xs">Si alguien incumple las normas, toca su nombre y pulsa Reportar. Con 3 reportes de personas distintas en 24 h su chat queda en pausa hasta que se revise.</p></div>`);
+  },
   open() {
     openApp('🌍 Cuenta online', '', async (body) => {
       const render = async (msg = '') => {
@@ -10507,12 +10572,23 @@ const Account = {
           html += `<div class="app-card p-3 mb-2 flex items-center gap-3"><div class="text-4xl">${NET_ORIGINS[me.profile]?.icon || '👤'}</div><div class="flex-1"><div class="font-bold text-[#2b2b3d]">${esc(me.name)}</div><div class="text-xs text-slate-500">${NET_ORIGINS[me.profile]?.name || ''} · cuenta online activa</div></div><button data-out class="btn-game px-2 py-1 text-xs bg-slate-200">Salir</button></div>
             <div class="sec-h">Partida en la nube</div><div class="app-card p-3 mb-2 text-xs">Última copia: <b>${cloud}</b> · se guarda sola cada ${CFG.online.autosaveMin} min mientras juegas.
               <div class="flex gap-2 mt-2"><button data-push class="btn-game px-3 py-1.5 text-xs bg-emerald-200 flex-1">☁️⬆ Subir ahora</button><button data-pull class="btn-game px-3 py-1.5 text-xs bg-sky-200 flex-1">☁️⬇ Traer la de la nube</button></div></div>
+            ${me.rules_at ? '' : `<div class="app-card p-3 mb-2 text-xs bg-amber-50">Antes de seguir en la Red, acepta las <a href="#" data-normas2 class="underline">normas</a> (respeto, nada de estafas ni trampas). <button data-accept class="btn-game px-3 py-1 text-xs bg-emerald-200 mt-2 w-full">Acepto las normas</button></div>`}
             <div class="sec-h">Red del Sueño real</div><div class="app-card p-3 text-xs">Entra en la Red desde el PC de tu casa: verás a los jugadores conectados en tu misma zona y podrás chatear con ellos. Para comprar y vender con ellos, el Mercado real.<button data-mkt class="btn-game px-3 py-1.5 text-xs bg-amber-200 w-full mt-2">🏛️ Abrir el Mercado real</button></div>`;
+          const bl = await Online.loadBlocks().catch(() => []), nextName = me.name_changed_at ? new Date(Date.parse(me.name_changed_at) + 7 * 864e5) : null, canRename = !nextName || nextName < new Date();
+          html += `<div class="sec-h">Tu cuenta</div>
+            <div class="app-card p-3 mb-2 text-xs"><b>Cambiar de nombre</b> · una vez cada 7 días${canRename ? '' : ` (próximo: ${nextName.toLocaleDateString('es-ES')})`}
+              <div class="flex gap-2 mt-2"><input data-newname maxlength="18" placeholder="Nombre nuevo (3–18)" class="game flex-1 text-xs px-2 py-1" ${canRename ? '' : 'disabled'}><button data-rename class="btn-game px-3 py-1 text-xs bg-sky-200" ${canRename ? '' : 'disabled'}>Cambiar</button></div></div>
+            <div class="app-card p-3 mb-2 text-xs"><b>Jugadores bloqueados</b> (${bl.length})${bl.length ? bl.map(b => `<div class="flex items-center justify-between py-1 border-b border-slate-100"><span>${esc(b.name)}</span><button data-unblock="${b.id}" class="btn-game px-2 py-0.5 text-[11px] bg-white">Desbloquear</button></div>`).join('') : '<div class="text-slate-500 mt-1">Ninguno. Puedes bloquear a alguien tocando su nombre en el chat o su avatar en la Red.</div>'}</div>
+            <div class="app-card p-3 mb-2 text-xs"><b>Normas y privacidad</b> · <a href="#" data-normas2 class="underline">leer las normas</a>. Guardamos tu email, tu partida en la nube y lo que haces en la Red (chat, órdenes, tienda).</div>
+            <div class="app-card p-3 text-xs bg-red-50"><b class="text-red-700">Eliminar cuenta</b><div class="text-slate-600 mt-1">Borra para siempre tu jugador, tu partida en la nube, tu Aduana, tu tienda y tus órdenes. Escribe tu nombre de jugador para confirmar.</div>
+              <div class="flex gap-2 mt-2"><input data-delname maxlength="18" placeholder="${esc(me.name)}" class="game flex-1 text-xs px-2 py-1"><button data-del class="btn-game px-3 py-1 text-xs bg-red-300">Eliminar</button></div></div>`;
         } else if (Online.session) {
           html += `<div class="app-card p-3 mb-2 text-sm">Último paso: elige tu nombre en el online.${o ? ` Tu perfil será ${o.icon} ${o.name}.` : ''}</div><input data-name maxlength="18" placeholder="Nombre (3–18)" value="${esc(Online.session?.user?.user_metadata?.username || '')}" class="game w-full text-sm px-3 py-2 mb-2"><button data-reg class="btn-play w-full" style="font-size:12px;padding:12px">CREAR MI JUGADOR</button>`;
         } else {
           html += `<div class="app-card p-3 mb-2 text-xs text-slate-600">Con una cuenta tu partida se guarda en la nube (la recuperas en otro dispositivo) y en la Red del Sueño ves a otros jugadores reales y hablas con ellos. Es gratis. Edad mínima: 13 años.</div>
             <input data-email type="email" placeholder="Email" class="game w-full text-sm px-3 py-2 mb-2"><input data-pass type="password" placeholder="Contraseña (mín. 6)" class="game w-full text-sm px-3 py-2 mb-2"><input data-name maxlength="18" placeholder="Nombre en el juego (solo para crear cuenta)" class="game w-full text-sm px-3 py-2 mb-2">
+            <label class="flex items-start gap-2 text-xs text-slate-600 mb-1"><input data-age type="checkbox" class="mt-0.5"><span>Tengo 13 años o más.</span></label>
+            <label class="flex items-start gap-2 text-xs text-slate-600 mb-2"><input data-rules type="checkbox" class="mt-0.5"><span>Acepto las <a href="#" data-normas class="underline">normas de la Red</a> (respeto, nada de estafas ni trampas) y que se guarden mi email y mi partida.</span></label>
             <div class="flex gap-2"><button data-in class="btn-game px-3 py-2 text-sm bg-emerald-300 flex-1">Entrar</button><button data-up class="btn-game px-3 py-2 text-sm bg-violet-200 flex-1">Crear cuenta</button></div>
             <div class="text-[10px] text-slate-500 mt-2">Al crear la cuenta puede llegarte un email para confirmarla. Tus datos: email y partida; nada más. Cuenta de OOOX compartida con otros juegos de OOOX.</div>`;
         }
@@ -10521,8 +10597,16 @@ const Account = {
         body.querySelectorAll('input').forEach(stop);
         const run = async (fn, ok) => { try { const r = await fn(); await render(typeof ok === 'function' ? ok(r) : ok); } catch (e) { await render('❌ ' + e.message); } };
         $b('[data-in]') && ($b('[data-in]').onclick = () => run(() => Online.signIn(val('[data-email]'), val('[data-pass]')), (m) => m ? `✓ Hola de nuevo, ${esc(m.name)}` : '✓ Sesión iniciada'));
-        $b('[data-up]') && ($b('[data-up]').onclick = () => run(async () => { const n = val('[data-name]'); if (n.length < 3) throw new Error('Pon un nombre de 3–18 caracteres'); const s = await Online.signUp(val('[data-email]'), val('[data-pass]'), n); if (s) await Online.register(n); return s; }, (s) => s ? '✓ ¡Cuenta creada y partida subida a la nube!' : '📧 Te hemos enviado un email: confírmalo y luego pulsa «Entrar» aquí.'));
-        $b('[data-reg]') && ($b('[data-reg]').onclick = () => run(() => Online.register(val('[data-name]')), '✓ Jugador creado y partida subida a la nube'));
+        $b('[data-normas]') && ($b('[data-normas]').onclick = (e) => { e.preventDefault(); Account.rules(); });
+        $b('[data-up]') && ($b('[data-up]').onclick = () => run(async () => { if (!$b('[data-age]')?.checked || !$b('[data-rules]')?.checked) throw new Error('Marca las dos casillas para crear la cuenta'); const n = val('[data-name]'); if (n.length < 3) throw new Error('Pon un nombre de 3–18 caracteres'); const s = await Online.signUp(val('[data-email]'), val('[data-pass]'), n); if (s) await Online.register(n); return s; }, (s) => s ? '✓ ¡Cuenta creada y partida subida a la nube!' : '📧 Te hemos enviado un email: confírmalo y luego pulsa «Entrar» aquí.'));
+        $b('[data-reg]') && ($b('[data-reg]').onclick = () => run(async () => { const m = await Online.register(val('[data-name]')); await Online.acceptRules().catch(() => {}); return m; }, '✓ Jugador creado y partida subida a la nube'));
+        $b('[data-accept]') && ($b('[data-accept]').onclick = () => run(() => Online.acceptRules(), '✓ Gracias. Normas aceptadas'));
+        $b('[data-normas2]') && ($b('[data-normas2]').onclick = (e) => { e.preventDefault(); Account.rules(); });
+        $b('[data-rename]') && ($b('[data-rename]').onclick = () => run(() => Online.rename(val('[data-newname]')), (m) => `✓ Ahora te llamas ${esc(m?.name || '')}`));
+        body.querySelectorAll('[data-unblock]').forEach(b => b.onclick = () => run(() => Online.setBlocked(b.dataset.unblock, false), '✓ Desbloqueado'));
+        $b('[data-del]') && ($b('[data-del]').onclick = () => run(async () => { const nm = val('[data-delname]');
+          if (!(await confirmDialog({ title: 'Eliminar cuenta', text: 'Se borran para siempre tu jugador, tu partida en la nube, tu Aduana, tu tienda y tus órdenes. Tu partida de este navegador se queda.', okLabel: 'ELIMINAR' }))) return 'Cancelado';
+          await Online.deleteAccount(nm); return 'Cuenta eliminada. Sigues jugando en local.'; }, (m) => m));
         $b('[data-mkt]') && ($b('[data-mkt]').onclick = () => { closeApp(); setTimeout(() => RealMarket.open(), 30); });
         $b('[data-out]') && ($b('[data-out]').onclick = () => run(() => Online.signOut(), 'Has salido de tu cuenta (sigues jugando en local)'));
         $b('[data-push]') && ($b('[data-push]').onclick = () => run(() => Online.push(true), (r) => `✓ Subida (${Math.round((r?.bytes || 0) / 1024)} KB)`));
@@ -10677,7 +10761,7 @@ $('btnNewGame').onclick = async () => {
   const ok = await confirmDialog({ title: '¿Seguro que quieres comenzar una nueva partida?', text: 'Se perderá el progreso guardado en este navegador:\n◎ ' + GS.economy.money.toLocaleString('es-ES') + ' $TOKEN · ' + missionsDone() + '/' + NPCS.length + ' misiones · casa nivel ' + GS.house.level, okLabel: 'NUEVA PARTIDA' });
   if (!ok) return; SaveSystem.reset(); location.reload();
 };
-{ const v = document.createElement('div'); v.className = 'text-[10px] text-slate-400 text-center mt-3'; v.textContent = `CrossIA · Micro World: AI Village · v${GAME_VERSION} «Casa y probador» · guardado v${SAVE_VERSION}`; document.querySelector('#settingsModal .menu-card')?.append(v); }   // v1.0: etiqueta de versión
+{ const v = document.createElement('div'); v.className = 'text-[10px] text-slate-400 text-center mt-3'; v.textContent = `CrossIA · Micro World: AI Village · v${GAME_VERSION} «Red segura» · guardado v${SAVE_VERSION}`; document.querySelector('#settingsModal .menu-card')?.append(v); }   // v1.0: etiqueta de versión
 // =====================================================================
 // DEBUG (B0.2b) - Herramientas de prueba. Uso: consola -> DBG.help()
 // Panel en pantalla: añadir ?debug=1 a la URL
