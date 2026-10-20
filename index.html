@@ -41,6 +41,34 @@
   .bar > div { height: 100%; width: 0%; background: linear-gradient(90deg,#34d399,#22d3ee,#a78bfa); transition: width .35s ease; }
   ::-webkit-scrollbar { width: 6px; height: 6px } ::-webkit-scrollbar-thumb { background: rgba(0,0,0,.25); border-radius: 999px }
   /* ===== Menú de entrada ===== */
+  /* v1.5 · Etapa 7 · tokens */
+  :root { --ink:#2b2b3d; --paper:#fffdf5; --glass:rgba(255,253,245,.88); --r-lg:22px; --r-md:14px; --sh:0 5px 0 var(--ink), 0 14px 30px rgba(43,43,61,.22); --accent:#ffd94a; --mint:#7dffa8; }
+  .menu-v15 { width: min(440px, 94vw); max-height: 94vh; overflow: auto; padding: 22px 22px 18px; text-align: center; background: var(--glass); border-radius: 28px; }
+  .logo { font-family: 'Fredoka', system-ui, sans-serif; font-weight: 700; font-size: clamp(50px, 8vw, 84px); line-height: .95; letter-spacing: .01em; margin: 2px 0 6px; white-space: nowrap; }
+  .logo span { display: inline-block; color: #ffd94a; background: linear-gradient(#fff6c2 10%, #ffd94a 60%, #ffb300); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; -webkit-text-stroke: 3px var(--ink); paint-order: stroke fill; filter: drop-shadow(0 5px 0 var(--ink)); animation: floaty 3.2s ease-in-out infinite; animation-delay: calc(var(--i) * 90ms); }
+  .logo-sub { font-family: 'Press Start 2P', monospace; font-size: 10px; color: #059669; letter-spacing: .06em; }
+  .menu-pitch { color: var(--ink); font-weight: 500; font-size: 14px; line-height: 1.35; margin-top: 10px; }
+  .menu-row { display: flex; justify-content: center; gap: 8px; margin-top: 12px; }
+  .menu-more { margin-top: 10px; padding: 8px 12px; text-align: left; }
+  .menu-more summary { cursor: pointer; font-weight: 700; color: var(--ink); font-size: 13px; list-style: none; }
+  .menu-more summary::-webkit-details-marker { display: none; }
+  .menu-more summary::after { content: '▾'; float: right; transition: transform .2s; } .menu-more[open] summary::after { transform: rotate(180deg); }
+  .menu-more .grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; margin-top: 10px; }
+  @media (min-width: 900px) { #menu { justify-content: flex-start !important; padding-left: max(4vw, 24px) !important; background: linear-gradient(90deg, rgba(20,30,70,.42), rgba(20,30,70,.12) 45%, transparent 70%) !important; } }
+  @media (max-width: 899px) { #menu { align-items: flex-end !important; padding: 8px !important; background: linear-gradient(transparent 35%, rgba(20,30,70,.35)) !important; } .menu-v15 { max-height: 58vh; padding: 16px 16px 14px; } .logo { font-size: clamp(44px, 14vw, 64px); } .menu-pitch { font-size: 13px; } }
+  @media (prefers-reduced-motion: reduce) { .logo span, .floaty { animation: none !important; } }
+  /* v1.5 · Etapa 7 · pantalla de carga (CSS puro: se ve antes de que cargue el módulo) */
+  #boot { position: fixed; inset: 0; z-index: 80; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; background: radial-gradient(ellipse at 50% 30%, #a9dcff, #6a8fd8 55%, #2f3a7a); transition: opacity .5s; font-family: 'Fredoka', system-ui, sans-serif; }
+  #boot.hide { opacity: 0; pointer-events: none; }
+  #boot .bplanet { width: 120px; height: 120px; border-radius: 50%; border: 4px solid #2b2b3d; background: radial-gradient(circle at 35% 30%, #9be27f 0 18%, transparent 19%), radial-gradient(circle at 68% 62%, #86d764 0 22%, transparent 23%), radial-gradient(circle at 30% 75%, #7ccf5a 0 12%, transparent 13%), radial-gradient(circle at 40% 35%, #7fe3e0, #2a8fd6 70%); box-shadow: 0 6px 0 #2b2b3d, 0 0 50px rgba(255,255,255,.45); animation: bspin 6s linear infinite; position: relative; }
+  #boot .bplanet::after { content: ''; position: absolute; width: 46px; height: 16px; border-radius: 10px; background: #fff; border: 3px solid #2b2b3d; top: 14px; right: -26px; animation: floaty 2.4s ease-in-out infinite; }
+  @keyframes bspin { to { transform: rotate(360deg); } }
+  #boot .btxt { color: #fff; font-weight: 700; font-size: 18px; text-shadow: 0 2px 0 #2b2b3d; }
+  #boot .bbar { width: min(280px, 70vw); height: 14px; border: 3px solid #2b2b3d; border-radius: 10px; background: rgba(255,255,255,.6); overflow: hidden; }
+  #boot .bbar i { display: block; height: 100%; width: 4%; background: linear-gradient(90deg, #7dffa8, #22c55e); animation: bfill 6s cubic-bezier(.2,.7,.3,1) forwards; }
+  #boot .bbar i.done { animation: none; width: 100% !important; transition: width .25s; }
+  @keyframes bfill { to { width: 88%; } }
+  #boot .bstep { font-family: 'Press Start 2P', monospace; font-size: 9px; color: #e0e7ff; }
   #menu { position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center; padding: 12px; background: radial-gradient(ellipse at 50% 120%, rgba(255,214,168,.55), transparent 60%), linear-gradient(rgba(20,40,90,.55), rgba(20,40,90,.25)); transition: opacity .6s; }
   #menu.hide { opacity: 0; pointer-events: none; }
   .menu-card { background: rgba(255,255,255,.92); backdrop-filter: blur(12px); border: 4px solid #2b2b3d; border-radius: 26px; box-shadow: 0 10px 0 #2b2b3d, 0 30px 80px rgba(0,0,0,.4); }
@@ -97,28 +125,34 @@
 </style>
 </head>
 <body>
+<div id="boot"><div class="bplanet"></div><div class="btxt">Soñando el mundo…</div><div class="bbar"><i id="bootBar"></i></div><div id="bootStep" class="bstep">CIELO</div></div>
+<script>setTimeout(function(){var b=document.getElementById('boot');if(b){var t=b.querySelector('.btxt');if(t)t.textContent='Tarda más de lo normal… revisa tu conexión y recarga';}},25000);</script>
 <!-- ================= MENÚ DE ENTRADA ================= -->
 <div id="menu">
-  <div class="menu-card w-[min(760px,96vw)] max-h-[94vh] overflow-auto p-5 md:p-8 text-center">
-    <div class="floaty text-5xl md:text-6xl mb-3">🌍</div>
-    <h1 class="menu-title text-lg md:text-3xl">CROSSIA</h1>
-    <div class="text-emerald-600 font-bold text-base md:text-xl -mt-1 mb-3">Micro World · AI Village</div>
-    <div id="saveSummary" class="hidden step p-3 mb-3 text-left text-xs md:text-sm text-[#2b2b3d]"></div>
-    <p class="text-[#2b2b3d] font-medium text-sm md:text-base max-w-[560px] mx-auto leading-snug">
-      Un planeta diminuto habitado por animales con grandes problemas… y tú eres el único humano con una <b>Laptop de IA</b>.
-      Ayuda a los 7 vecinos creando sus web apps, gana <b class="text-amber-600">$TOKEN</b> y haz evolucionar el mundo.
-    </p>
-
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-3 mt-4 text-left">
+  <!-- v1.5 · Etapa 7: menú que enseña el planeta (columna izquierda en escritorio · hoja inferior en móvil) -->
+  <div class="menu-card menu-v15">
+    <h1 class="logo" aria-label="CrossIA"><span style="--i:0">C</span><span style="--i:1">R</span><span style="--i:2">O</span><span style="--i:3">S</span><span style="--i:4">S</span><span style="--i:5">I</span><span style="--i:6">A</span></h1>
+    <div class="logo-sub">MICRO WORLD · AI VILLAGE</div>
+    <p class="menu-pitch">Un planeta diminuto, siete vecinos con grandes problemas y tú, el único humano con una <b>Laptop de IA</b>. Crea sus web apps, gana <b class="text-amber-600">$TOKEN</b> y haz crecer el mundo.</p>
+    <div id="saveSummary" class="hidden step p-3 mt-3 text-left text-xs md:text-sm text-[#2b2b3d]"></div>
+    <div class="mt-4 flex flex-col items-center gap-2">
+      <button id="btnPlay" class="btn-play" disabled>⏳ CARGANDO…</button>
+      <div id="playSub" class="text-[11px] text-slate-500">Sin registro · empiezas como invitado</div>
+    </div>
+    <div class="menu-row">
+      <button id="btnSettings" class="btn-game px-4 py-2 bg-slate-200 text-[#2b2b3d] text-sm">⚙️ AJUSTES</button>
+    </div>
+    <details class="menu-more step">
+      <summary>📖 Cómo se juega</summary>
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-3 mt-4 text-left">
       <div class="step p-3"><div class="text-2xl">🗺️</div><div class="font-bold text-sm text-[#2b2b3d] mt-1">1. Explora</div><div class="text-xs text-slate-600">Camina, nada y da la vuelta al planeta. Haz zoom hasta verlo entero.</div></div>
       <div class="step p-3"><div class="text-2xl">❗</div><div class="font-bold text-sm text-[#2b2b3d] mt-1">2. Habla</div><div class="text-xs text-slate-600">Busca a los vecinos con un “!” y acepta sus misiones.</div></div>
       <div class="step p-3"><div class="text-2xl">💻</div><div class="font-bold text-sm text-[#2b2b3d] mt-1">3. Genera con IA</div><div class="text-xs text-slate-600">Abre la laptop, escribe el prompt y crea su web app.</div></div>
       <div class="step p-3"><div class="text-2xl"><i class="ico-coin"></i></div><div class="font-bold text-sm text-[#2b2b3d] mt-1">4. Gana $TOKEN</div><div class="text-xs text-slate-600">Desbloquea tiendas, skins, el barco mercante, memes y frutas doradas.</div></div>
     </div>
-
-    <div class="mt-4 step p-3 text-left text-xs md:text-sm text-[#2b2b3d]">
-      <div class="pixel text-[9px] text-slate-500 mb-2">CONTROLES</div>
-      <div id="ctrlDesktop" class="space-y-1 font-medium">
+      <div class="mt-3 text-left text-xs md:text-sm text-[#2b2b3d]">
+        <div class="pixel text-[9px] text-slate-500 mb-2">CONTROLES</div>
+        <div id="ctrlDesktop" class="space-y-1 font-medium">
         <div><kbd class="px-1.5 py-0.5 bg-slate-200 rounded border border-slate-400">W A S D</kbd> mover · <kbd class="px-1.5 py-0.5 bg-slate-200 rounded border border-slate-400">Clic</kbd> en el suelo para caminar · <kbd class="px-1.5 py-0.5 bg-slate-200 rounded border border-slate-400">E</kbd> interactuar</div>
         <div><kbd class="px-1.5 py-0.5 bg-slate-200 rounded border border-slate-400">Arrastrar</kbd> rotar cámara · <kbd class="px-1.5 py-0.5 bg-slate-200 rounded border border-slate-400">Rueda</kbd> zoom (de tu personaje al planeta entero) · <kbd class="px-1.5 py-0.5 bg-slate-200 rounded border border-slate-400">Esc</kbd> cerrar</div>
       </div>
@@ -127,23 +161,16 @@
         <div>💛 <b>Botón amarillo</b> (abajo‑derecha) para hablar / interactuar cuando aparezca</div>
         <div>☝️ <b>Arrastra</b> con un dedo para rotar la cámara · 👌 <b>Pellizca</b> para hacer zoom hasta ver el planeta</div>
       </div>
-    </div>
-
-    <div class="mt-5 flex flex-col items-center gap-2">
-      <button id="btnPlay" class="btn-play" disabled>⏳ CARGANDO…</button>
-      <div id="playSub" class="text-[11px] text-slate-500">Sin registro · empiezas como invitado</div>
-    </div>
-
-    <div class="mt-4 step p-3 text-left text-xs md:text-sm text-[#2b2b3d]">
-      <div class="pixel text-[9px] text-slate-500 mb-2">💾 GUARDADO LOCAL</div>
+      </div>
+    </details>
+    <details class="menu-more step">
+      <summary>💾 Guardado local</summary>
+      <div class="text-left text-xs md:text-sm text-[#2b2b3d] mt-2">
       <p class="font-medium">Tu progreso se guarda <b>automáticamente en este navegador</b>. No necesitas cuenta para jugar.</p>
       <p class="text-slate-600 mt-1">El progreso de invitado no está vinculado a una cuenta: si borras los datos del navegador o cambias de navegador o dispositivo, no estará disponible allí. Si quieres protegerlo y usarlo en otros dispositivos, podrás <b>vincular una cuenta</b> en el futuro.</p>
       <p id="storageWarn" class="hidden text-amber-700 font-semibold mt-1">⚠️ El almacenamiento de este navegador no está disponible (modo privado o bloqueado): el progreso solo durará hasta cerrar la pestaña.</p>
-    </div>
-
-    <div class="mt-3 flex justify-center">
-      <button id="btnSettings" class="btn-game px-5 py-2 bg-slate-200 text-[#2b2b3d] text-sm">⚙️ AJUSTES</button>
-    </div>
+      </div>
+    </details>
   </div>
 </div>
 
@@ -596,6 +623,8 @@ const CFG = {
     shooting: { every: [18, 38], dur: 0.9, len: 26 },
     // Etapa 5 · personajes: contorno (grosor en u de objeto, radio mínimo de malla), rim, squash & stretch (muelle k/amortiguación)
     chars: { ink: 0x2b2b3d, outline: 0.022, minR: 0.075, rim: 0.16, rimNight: 0x9fb5ff, sqStart: -0.08, sqStop: 0.05, sqSplash: -0.15, sqK: 180, sqD: 14, sqWalk: 0.035, hideDist: 30 },
+    // Etapa 7 · menú: cámara más cerca y desplazada a la derecha (escritorio), hora visual de mañana dorada mientras se lee
+    menu: { dist: 48, pitch: 0.25, dayT: 0.30, offset: 0.17, minW: 900, blendS: 1.2 },
     // QW13 · exposición según la hora
     exposure: { night: 0.95, day: 1.08, dusk: 0.05 },
     // Lluvia: gota con textura de trazo suave (antes cuadrados blancos)
@@ -2943,6 +2972,13 @@ function camPose() {
 function tweenCamera(pose, duration, onDone) { state.camTween = { fromPos: camera.position.clone(), toPos: pose.pos.clone(), fromLook: currentLook.clone(), toLook: pose.target.clone(), fromUp: camera.up.clone(), toUp: pose.up.clone(), t: 0, duration, onDone }; }
 const easeInOut = (x) => x < 0.5 ? 2 * x * x : 1 - Math.pow(-2 * x + 2, 2) / 2;
 function applyLook(pos, target, up) { camera.position.copy(pos); camera.up.copy(up).normalize(); camera.lookAt(target); currentLook.copy(target); }
+let _vo = '';
+/** v1.5 · Etapa 7: con el menú en escritorio, el planeta se ve en el hueco de la derecha (la tarjeta va a la izquierda) */
+function menuViewOffset(on) {
+  const M = CFG.gfx.menu, key = on && innerWidth >= M.minW ? innerWidth + 'x' + innerHeight : '';
+  if (key === _vo) return; _vo = key;
+  if (key) camera.setViewOffset(innerWidth, innerHeight, -innerWidth * M.offset, 0, innerWidth, innerHeight); else camera.clearViewOffset();
+}
 function updateCamera(dt) {
   cam.refF = tangent(cam.refF, player.userData.dir); if (cam.refF.lengthSq() < 1e-6) cam.refF = frameAt(player.userData.dir, V_N).fwd;
   const k = 1 - Math.exp(-dt * (cam.rate || 10)); cam.yaw += (cam.tYaw - cam.yaw) * k; cam.pitch += (cam.tPitch - cam.pitch) * k; cam.dist += (cam.tDist - cam.dist) * k;
@@ -2955,6 +2991,7 @@ function updateCamera(dt) {
   }
   if (state.mode === 'dialog') { const p = state.dialogPose; applyLook(p.pos, p.target, p.up); return; }
   if (state.menuOpen) cam.tYaw += dt * 0.12; // el planeta gira lentamente detrás del menú
+  menuViewOffset(state.menuOpen && !document.getElementById('menu')?.classList.contains('hide'));   // v1.5 · Etapa 7
   const p = camPose(); applyLook(p.pos, p.target, p.up);
   ui.btnPlanet.classList.toggle('active', cam.dist > 30); ui.btnPlayer.classList.toggle('active', cam.dist <= 30);
 }
@@ -4726,8 +4763,16 @@ const SKY_DAY   = { top: new THREE.Color(0x2f7fd8), mid: new THREE.Color(0xa9dcf
 const SKY_DUSK  = { top: new THREE.Color(0x6a5acd), mid: new THREE.Color(0xffa07a), bot: new THREE.Color(0xffc8a8) };
 const _sunDir = new THREE.Vector3(), _c1 = new THREE.Color(), _c2 = new THREE.Color();
 const _shC = new THREE.Vector3(), _shM = new THREE.Matrix4(), _shQ = new THREE.Quaternion(), _shQi = new THREE.Quaternion(), _zero3 = new THREE.Vector3(), _xAxis = new THREE.Vector3(1, 0, 0); let _envTagN = 0;
+let _menuVis = 1, _menuVisT = 0;
+/** v1.5 · Etapa 7: hora VISUAL (con el menú abierto, mañana dorada; al empezar, se funde a la hora real en 1,2 s). Nunca toca GS.daily.clockMs */
+function visualDayT() {
+  const now = performance.now(), dt = _menuVisT ? Math.min(0.1, (now - _menuVisT) / 1000) : 0; _menuVisT = now;
+  _menuVis = state.menuOpen ? 1 : Math.max(0, _menuVis - dt / CFG.gfx.menu.blendS);
+  const real = dayT(); if (_menuVis <= 0) return real;
+  let d = CFG.gfx.menu.dayT - real; d -= Math.round(d); return (real + d * easeInOut(_menuVis) + 1) % 1;
+}
 function updateSun() {
-  const t = dayT(), ang = (t - 0.25) * Math.PI * 2, elev = Math.sin(ang);
+  const t = visualDayT(), ang = (t - 0.25) * Math.PI * 2, elev = Math.sin(ang);
   _sunDir.set(Math.cos(ang), Math.max(elev, -0.35), 0.35).normalize();
   // v1.5 · Etapa 1: caja de sombra adaptativa (cerca nítida · Modo Planeta = todo el planeta centrado) + ajuste al texel (la sombra no «nada» al andar)
   const SB = CFG.gfx.shadowBox, far = cam.dist >= SB.midDist, ext = far ? SB.planet : cam.dist < SB.nearDist ? SB.near : SB.mid, sc = sun.shadow.camera;
@@ -9512,19 +9557,27 @@ const retroInsignias = NPCS.filter(n => Trust.level(n.id) >= 4 && grantInsignia(
 deliverPendingFashion();   // v0.7: prendas del Sello Semanal que esperaban al avatar
 
 // ---- Menú ----
-cam.dist = cam.tDist = 70; cam.pitch = cam.tPitch = 0.35; // vista desde el espacio mientras se lee el menú
+cam.dist = cam.tDist = CFG.gfx.menu.dist; cam.pitch = cam.tPitch = CFG.gfx.menu.pitch; // vista desde el espacio mientras se lee el menú (v1.5: más cerca)
 { const p = camPose(); applyLook(p.pos, p.target, p.up); }
 animate();
 // 🛠️ DEBUG · referencias internas para la consola: DBG.refs (siempre) y window._dbg (solo con ?debug=1 en la URL, v1.0)
 const DBG_REFS = { get GS() { return GS; }, AvatarParts: AVATAR_PARTS, AV_STYLES, AVATAR_SLOTS, buildAvatar, applyAvatar, avSanitize, avatarCombinations, Fitting, Boutique, INSIGNIAS, grantInsignia, deliverPendingFashion, grantRandomImport, grantSpecialPiece, maybeOpenCreator, refreshMissionUI, Inventory, Wallet, Needs, Production, Trust, Trend, Weather, openHousePanel, placedBuildings, settleDay, updateEmbargo, enterBuildMode, interactWith: (o) => interactWith(o), set clock(fictMs) { GS.daily.clockMs = fictMs; }, set hunger(v) { GS.needs.hunger = v; },
   /* v0.8 · El Comerciante */ BIG_JOBS, BIG_UNLOCKS, completeBigJob, bigJobState, bigJobReady, bigJobDialog, bigProps, act2State, BakeryOrders, Census, Bridge, Feria, Oracle, Climate, Imports, Viral, giveRumor, rumorFor, deliverEncargo, currentEncargo, importsOnCrate, buildCost, censusTaxMult, laptopProj, openLaptop, shopSellPrice };
-if (!SaveSystem.persistent) $('storageWarn').classList.remove('hidden');
+if (!SaveSystem.persistent) { $('storageWarn').classList.remove('hidden'); const d = $('storageWarn').closest('details'); if (d) d.open = true; }
 if (hadSave) {
   $('saveSummary').classList.remove('hidden');
   $('saveSummary').innerHTML = `<div class="pixel text-[9px] text-emerald-600 mb-1">PARTIDA ENCONTRADA</div><div class="flex flex-wrap gap-x-3 gap-y-1 font-semibold"><span>👤 Invitado</span><span>${COIN} ${GS.economy.money.toLocaleString('es-ES')} $TOKEN</span><span>📜 Misiones ${missionsDone()}/${NPCS.length}</span><span>🏠 Casa nivel ${GS.house.level}</span><span class="text-slate-500 font-medium">💾 guardada ${timeAgo(GS.meta.lastSavedAt)}</span></div>`;
 }
 const btnPlay = $('btnPlay');
 btnPlay.disabled = false; btnPlay.textContent = hadSave ? '▶ CONTINUAR' : '▶ JUGAR';
+/* v1.5 · Etapa 7: precompila los shaders (sin tirones en el primer frame ni en la primera noche) y funde la pantalla de carga */
+(async () => {
+  const bar = document.getElementById('bootBar'), st = document.getElementById('bootStep'), boot = document.getElementById('boot');
+  try { if (st) st.textContent = 'SHADERS'; updateSun(); if (renderer.compileAsync) await Promise.race([renderer.compileAsync(scene, camera), new Promise(r => setTimeout(r, 4000))]); else renderer.compile(scene, camera); } catch (e) { console.warn('[boot] compile', e); }
+  await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+  if (bar) bar.classList.add('done'); if (st) st.textContent = '¡LISTO!';
+  setTimeout(() => { if (boot) { boot.classList.add('hide'); setTimeout(() => boot.remove(), 600); } }, 250);
+})();
 $('playSub').textContent = hadSave ? 'Partida de invitado guardada en este navegador' : 'Sin registro · empiezas como invitado · se guarda automáticamente';
 const startGameFromMenu = () => {
   const menu = $('menu'); menu.classList.add('hide'); setTimeout(() => menu.remove(), 700);
