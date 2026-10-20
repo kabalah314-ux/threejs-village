@@ -601,6 +601,7 @@ const CFG = {
   /* ===== v1.7 · ONLINE REAL (F1) · Supabase compartido con NEURON (esquema crossia) · la clave publicable es pública por diseño ===== */
   online: { url: 'https://glsmahzpvzabeeucyqif.supabase.co', key: 'sb_publishable_SmbXr1nXApZ8HRF1ezbXcg_lqtr2yaZ', lib: 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm', autosaveMin: 5, posEvery: 0.25 },
   /* ===== v1.6 · ESTUDIO DEL PERFIL ===== */
+  util: { benchPos: [-4.2, -0.6], luckMult: 1.6, luckMs: 600000, fossilMaxBonus: 3, fossilBounty: 250, coinSwap: 10, coinSwapCash: 600, rainbowFabric: 'rainbow' },   // v2.5 · Bloque G
   studio: { pos: [-2.8, -7.8], perDay: 3, secs: 2.4, hunger: 4, maint: 9, fixFee: 80, fixMats: [['wood_log', 2], ['stone', 1]], bonusP: 0.35, inspireP: 0.12 },
   /* ===== v0.4 · PESCA (Sec. 5.5–5.6) ===== */
   fishTable: { fish: 65, tropical_fish: 25, golden_fish: 5, old_boot: 5 },   // % base
@@ -711,7 +712,7 @@ const CFG = {
     { npc: 'sombra', id: 'timeless_clock',  price: 850, stock: 1, rare: true },
   ],
   fairStallSpots: [[-1.6, 2.3, 0.15], [1.1, 2.1, -0.1], [3.4, 1.7, -0.3]],   // aldea: x, z, giro de los 3 puestos (junto al camino de piedras)
-  museumIslands: [[-3.2, 3.0], [-1.65, 3.85], [0, 4.15], [1.65, 3.85], [3.2, 3.0]],   // jardines del ayuntamiento: centro de cada set (x, z)
+  museumIslands: [[-3.45, 2.59], [-2.25, 3.6], [-0.78, 4.13], [0.78, 4.13], [2.25, 3.6], [3.45, 2.59]],   // v2.5: 6 salas en arco   // jardines del ayuntamiento: centro de cada set (x, z)
   museumSignSpot: [-1.5, 2.2],
   maxPixelRatioMobile: 1.25,      // v1.0 · rendimiento: 1.5 → 1.25 en táctil (la mayor parte del coste es de relleno de píxeles)
   starLightOnMobile: false,       // v1.0 · rendimiento: las estrellas caídas no crean PointLight en móvil (cada luz nueva recompila shaders)
@@ -1190,6 +1191,18 @@ const ITEMS = {
   buried_chest:   defItem({ id: 'buried_chest',   name: 'Cofre Enterrado',     icon: '🧰', cat: 'special', rarity: 'rare', sell: 60, usable: true, desc: 'Lo encuentra el detector. Ábrelo: monedas, perlas, gemas, fósiles…' }),
   golden_gift_box: defItem({ id: 'golden_gift_box', name: 'Caja Regalo Dorada', icon: '🎁', cat: 'special', rarity: 'epic', sell: 0, usable: true, desc: 'Premio del Sello Semanal. Botín mejorado: perlas, gemas, estrellas, mermelada…' }),
 };
+/* ===== v2.5 · NINGÚN OBJETO INÚTIL (Guía Maestra 2, Bloque G): materiales intermedios, platos nuevos y kit de reparación ===== */
+Object.assign(ITEMS, {
+  treated_wood:     defItem({ id: 'treated_wood',     name: 'Madera Tratada',        icon: '🪵', cat: 'material',   rarity: 'uncommon', sell: 30, desc: 'Tronco barnizado con savia onírica. La pide el banco de trabajo (detector, kit de reparación) y el barco de Sam.' }),
+  leather:          defItem({ id: 'leather',          name: 'Cuero Reciclado',       icon: '👝', cat: 'material',   rarity: 'uncommon', sell: 28, desc: 'Glover lo saca de tres botas viejas. Sirve para el kit de reparación de herramientas.' }),
+  wing_dust:        defItem({ id: 'wing_dust',        name: 'Polvo de Ala',          icon: '✨', cat: 'material',   rarity: 'uncommon', sell: 40, desc: 'Dax lo obtiene de dos mariposas. Tiñe telas en la Boutique y a los erizos les encanta.' }),
+  repair_kit:       defItem({ id: 'repair_kit',       name: 'Kit de Reparación',     icon: '🧰', cat: 'special',    rarity: 'rare',     sell: 60, usable: true, desc: 'Úsalo y todas tus herramientas quedan como nuevas.' }),
+  golden_fish_grill: defItem({ id: 'golden_fish_grill', name: 'Pez Dorado a la Brasa', icon: '🍱', cat: 'consumable', rarity: 'rare',   sell: 220, usable: true, desc: 'Plato gourmet: saciedad +70 y velocidad +40 % durante 60 s.' }),
+  tropical_ceviche: defItem({ id: 'tropical_ceviche', name: 'Ceviche Tropical',      icon: '🥗', cat: 'consumable', rarity: 'uncommon', sell: 70, usable: true, desc: 'Fresco y ácido: saciedad +40 y velocidad +25 % durante 40 s.' }),
+  spice_stew:       defItem({ id: 'spice_stew',       name: 'Guiso Especiado',       icon: '🍲', cat: 'consumable', rarity: 'rare',     sell: 180, usable: true, desc: 'Con especia de Ultramar: saciedad +60 y velocidad +30 % durante 60 s.' }),
+  spice_bun:        defItem({ id: 'spice_bun',        name: 'Bollo de Especias',     icon: '🍩', cat: 'consumable', rarity: 'uncommon', sell: 90, usable: true, desc: 'El Oso lo pide en sus pedidos legendarios. Saciedad +30 y velocidad +30 % durante 30 s.' }),
+});
+
 /* ===== v1.3 · 🌐 RED DEL SUEÑO: 8 Orígenes Oníricos (Doc Sec. 3), 32 materiales + 8 joyas y manufacturas (Doc Sec. 4) =====
    Anexo C.4: el origen es un campo OPCIONAL de ITEMS (`origin`), nunca de GS → las partidas no migran.
    Índice de material m (NetEco): 0–31 nativos (origen·4 + j, j = abundancia 0…3) y 32–39 joyas. El anillo de orígenes define la distancia 1–4. */
@@ -2156,6 +2169,7 @@ const AV_FABRICS = [
   { id: 'coral',     name: 'Lino de Coral',      hex: 0xff7f6e, fx: { emissive: 0xff5252, emissiveIntensity: 0.12 }, rarity: 'uncommon' },
   { id: 'star_ink',  name: 'Tinta Estelar',      hex: 0x111122, fx: { emissive: 0x3949ab, emissiveIntensity: 0.3 }, rarity: 'legendary' },
   { id: 'mint_neon', name: 'Neón de Menta',      hex: 0x69f0ae, fx: { emissive: 0x00e676, emissiveIntensity: 0.4 }, rarity: 'uncommon' },
+  { id: 'rainbow',   name: 'Seda Arcoíris',      hex: 0xf48fb1, fx: { emissive: 0xb388ff, emissiveIntensity: 0.32, metalness: 0.2, roughness: 0.35 }, rarity: 'epic', origin: 'special' },   // v2.5: tinte de la Boutique (mariposa arcoíris + polvo de ala)
 ];
 const AV_ORIGINS = {
   base:     { icon: '🆓', name: 'Base · gratis para siempre' },
@@ -2320,7 +2334,7 @@ const AVATAR_SLOTS = [
 /** Catálogo plano de piezas (Sec. 8.9: id, slot, decorador, rareza, precio, origen) — patrón ITEMS/BUILDABLES */
 const AVATAR_PARTS = [
   ...Object.entries(AV_STYLES).flatMap(([slot, list]) => list.map((s, idx) => ({ rarity: 'common', colorable: true, ...s, slot, idx, key: `${slot}:${s.id}` }))),
-  ...AV_FABRICS.map((f, i) => ({ id: f.id, name: f.name, icon: '🧵', slot: 'fabric', idx: i, key: `fabric:${f.id}`, origin: 'import', rarity: f.rarity, colorable: false })),
+  ...AV_FABRICS.map((f, i) => ({ id: f.id, name: f.name, icon: '🧵', slot: 'fabric', idx: i, key: `fabric:${f.id}`, origin: f.origin || 'import', rarity: f.rarity, colorable: false })),
 ];
 const AV_PART_BY_KEY = Object.fromEntries(AVATAR_PARTS.map(p => [p.key, p]));
 /** ¿Es tuya la pieza? Base = siempre · el resto = GS.avatar.wardrobe */
@@ -3292,11 +3306,11 @@ const trustLvName = (id) => TRUST_LEVELS[Trust.level(id)]?.name || '?';
 const greetingFor = (id) => { const g = NPC_SOCIAL[id]?.greetings; return g ? (g[Math.min(Trust.level(id), 4)] || g[0]) : ''; };
 const missionGateOk = (id) => Trust.level(id) >= (NPC_SOCIAL[id]?.trustRequired ?? 0);
 const giftState = (id) => { const e = Trust.entry(id), today = GS.daily.dayCount; const used = e.giftDay === today ? e.giftsToday : 0; return { used, left: Math.max(0, CFG.giftCapPerDay - used) }; };
-const giftBase = (id, itemId) => NPC_SOCIAL[id]?.giftPrefs?.[itemId] ?? 1;
+const giftBase = (id, itemId) => (NPC_SOCIAL[id]?.giftHates || []).includes(itemId) ? 0 : (NPC_SOCIAL[id]?.giftPrefs?.[itemId] ?? 1);
 const encBtns = (npcId) => (typeof encargoBtns === 'function') ? encargoBtns(npcId) : [];   // el motor de encargos llega en el Bloque 4
 /** 🎰 Servicios especiales por NPC: ruleta, dados, lotería, empleo… (cada bloque añade los suyos) */
 function serviceBtns(npcId) {
-  const btns = [];
+  const btns = typeof Util !== 'undefined' ? Util.btns(npcId) : [];
   if (npcId === 'sombra' && typeof openRoulette === 'function') btns.push(dialogButton('🎰 Ruleta de Runas', 'bg-purple-300 text-[#2b2b3d]', () => openRoulette()));
   if (npcId === 'sam' && typeof openDiceGame === 'function') btns.push(dialogButton('🎲 Dados con Sam', 'bg-sky-300 text-[#2b2b3d]', () => openDiceGame()));
   if (npcId === 'mayor' && typeof openLottery === 'function') btns.push(dialogButton('🎫 Lotería Municipal', 'bg-yellow-200 text-[#2b2b3d]', () => openLottery()));
@@ -3484,7 +3498,7 @@ function openGiftPicker(npcId) {
       body.querySelectorAll('[data-gift]').forEach(b => b.onclick = () => {
         const id = b.dataset.gift; if (!Inventory.remove(id, 1)) return;
         const r = Trust.addGift(npcId, id);
-        showToast(`🎁 ${n.name} recibe ${ITEMS[id].icon} ${ITEMS[id].name}: +${r.pts} confianza`, 'text-white');
+        showToast(r.hated ? `😒 ${n.name}: "¿…Y qué hago yo con esto?" (+0 confianza)` : `🎁 ${n.name} recibe ${ITEMS[id].icon} ${ITEMS[id].name}: +${r.pts} confianza`, 'text-white');
         playBeep(880, 0.08, 'triangle'); render();
       });
     };
@@ -3959,7 +3973,7 @@ function mountInventory(body, backFn, initialPage = 'items') {
       if (!Inventory.slots.length) html += `<div class="app-card p-3 mt-3 text-xs text-slate-600">💡 Explora el planeta: recoge 🐚 conchas en las playas, 🌲 troncos en los bosques, ⛰️ piedras en las montañas y 🔮 cristales junto a la carpa de Madame Sombra. Las 🍋 Frutas Doradas crecen junto al laboratorio de Dax.</div>`;
       const s = Inventory.slots[sel];
       if (s) { const it = ITEMS[s.id]; const buyers = Object.entries(SHOPS).filter(([sid]) => shopBuysItem(sid, s.id)).map(([sid, d]) => `${d.icon} ${d.name} (${shopSellPrice(sid, s.id)} $T)`);
-        html += `<div class="app-card p-4 mt-3 fade-in"><div class="flex items-start gap-3"><div class="text-5xl leading-none">${it.icon}</div><div class="flex-1"><div class="font-bold text-lg text-[#2b2b3d] flex items-center gap-2 flex-wrap">${it.name} <span class="text-slate-500 text-base">×${s.qty}</span> ${rarityBadge(it.rarity)}</div><div class="text-xs text-slate-500">${CATEGORIES[it.cat].icon} ${CATEGORIES[it.cat].name}</div><p class="text-sm text-[#2b2b3d] mt-1">${it.desc}</p>${it.maxDur ? `<div class="text-xs mt-1 flex items-center gap-2 flex-wrap">🛠️ Durabilidad: <b>${Tools.dur(s)}/${it.maxDur}</b>${Tools.dur(s) <= 0 ? ' · <b class="text-red-600">ROTA</b>' : ''} · al venderla pagan sell × durabilidad <button data-tools class="btn-game px-2 py-0.5 text-[11px] bg-orange-200">🔧 Reparar</button></div>` : ''}
+        html += `<div class="app-card p-4 mt-3 fade-in"><div class="flex items-start gap-3"><div class="text-5xl leading-none">${it.icon}</div><div class="flex-1"><div class="font-bold text-lg text-[#2b2b3d] flex items-center gap-2 flex-wrap">${it.name} <span class="text-slate-500 text-base">×${s.qty}</span> ${rarityBadge(it.rarity)}</div><div class="text-xs text-slate-500">${CATEGORIES[it.cat].icon} ${CATEGORIES[it.cat].name}</div><p class="text-sm text-[#2b2b3d] mt-1">${it.desc}</p>${(() => { const u = typeof Util !== 'undefined' ? Util.usesOf(it.id) : []; return u.length ? `<p class="text-xs text-slate-500 mt-1"><b>Sirve para:</b> ${u.slice(0, 5).join(' · ')}</p>` : ''; })()}${it.maxDur ? `<div class="text-xs mt-1 flex items-center gap-2 flex-wrap">🛠️ Durabilidad: <b>${Tools.dur(s)}/${it.maxDur}</b>${Tools.dur(s) <= 0 ? ' · <b class="text-red-600">ROTA</b>' : ''} · al venderla pagan sell × durabilidad <button data-tools class="btn-game px-2 py-0.5 text-[11px] bg-orange-200">🔧 Reparar</button></div>` : ''}
           <div class="text-xs text-slate-600 mt-2">${it.sellable ? `Valor de venta: <b>${it.sell} $T</b> · Se vende en: ${buyers.join(' · ') || '—'}` : 'No se puede vender'}${it.buy ? ` · Precio de compra: ${it.buy} $T` : ''}</div></div></div>
           <div class="flex gap-2 mt-3">${it.usable ? `<button data-use="${s.id}" class="btn-game px-4 py-1.5 text-sm bg-emerald-300">✨ Usar 1</button>` : ''}<button data-close-sel class="btn-game px-3 py-1.5 text-sm bg-slate-200">Cerrar</button></div></div>`; }
     }
@@ -5254,7 +5268,7 @@ const Fishing = (() => {
   }
   function rollCatch() {
     const t = CFG.fishTable, night = isNightNow();
-    const rare = Weather.fishRareMult() * (1 + clamp(_depth / 1.5, 0, 1) * CFG.fishDepthRareBonus) * (typeof AuraFX !== 'undefined' ? AuraFX.rareLootBoost() : 1) * NetUp.fishRareMult();   // v1.3: Caña de Coral ×1,5
+    const rare = Weather.fishRareMult() * (1 + clamp(_depth / 1.5, 0, 1) * CFG.fishDepthRareBonus) * (typeof AuraFX !== 'undefined' ? AuraFX.rareLootBoost() : 1) * NetUp.fishRareMult() * (typeof Util !== 'undefined' ? Util.luck() : 1);   // v1.3 · v2.5 luciérnagas: Caña de Coral ×1,5
     const w = { fish: t.fish, tropical_fish: t.tropical_fish * rare * Weather.tropicalMult(), golden_fish: t.golden_fish * rare * (night || Weather.goldenAlways() ? CFG.fishNightGoldenMult : 1), old_boot: t.old_boot };   // v0.8: ⛈️ Pez Dorado ×3 también de día · 🌧️ +tropical
     let r = Math.random() * Object.values(w).reduce((a, b) => a + b, 0);
     for (const [id, v] of Object.entries(w)) { if ((r -= v) < 0) return id; }
@@ -5895,14 +5909,14 @@ const Gather = (() => {
       const m = new THREE.Group(); const hill = mesh(new THREE.SphereGeometry(0.42, 8, 5, 0, 6.29, 0, 1.5), moundMat, 0, -0.08, 0); hill.scale.y = 0.55; m.add(hill);
       const sp = new THREE.Sprite(sparkMat); sp.scale.setScalar(0.35); sp.position.y = 0.45; m.add(sp); m.userData.spark = sp;
       placeOnPlanet(m, d, r() * 6); m.userData.key = key; scene.add(m); registerInteractable(m, { type: 'gather', label: 'Excavar el montículo 🕳️', fn: (o) => dig(o, false) }); mounds.push(m); }
-    const r2 = rngDay('signals'); for (let i = 0; i < G.detect.perDay; i++) { const d = nearVillage(r2, G.detect.ang); if (!d) continue; const key = 's' + i; if (g.dug.includes(key)) continue;
+    const r2 = rngDay('signals'); for (let i = 0; i < G.detect.perDay + (typeof Util !== 'undefined' ? Util.detectBonus() : 0); i++) { const d = nearVillage(r2, G.detect.ang); if (!d) continue; const key = 's' + i; if (g.dug.includes(key)) continue;
       const s = new THREE.Group(); const ring = new THREE.Mesh(new THREE.RingGeometry(0.35, 0.48, 24).rotateX(-Math.PI / 2), ringMat); ring.position.y = 0.04; ring.raycast = () => {}; s.add(ring); s.userData.ring = ring;
       placeOnPlanet(s, d, 0); s.userData.key = key; s.visible = false; scene.add(s); registerInteractable(s, { type: 'gather', label: 'Cavar la señal del detector 🧲', fn: (o) => dig(o, true) }); signals.push(s); }
   }
   function dig(o, treasure) {
     if (!needTool('shovel')) return; const g = st(), key = o.userData.key; if (g.dug.includes(key)) return;
     ToolAnim.play('shovel', () => { sfx(); g.dug.push(key); Tools.wear('shovel'); if (treasure) Tools.wear('detector');
-      const T = treasure ? G.detect.loot : G.dig.loot, got = [roll(T)]; if (Math.random() < (treasure ? 0.5 : 0.25)) got.push(roll(T));
+      const T = treasure ? G.detect.loot : G.dig.loot, got = [roll(T)]; if (Math.random() < (treasure ? 0.5 : 0.25) * (typeof Util !== 'undefined' ? Util.luck() : 1)) got.push(roll(T));
       give(got, treasure ? '🧲 ¡Tesoro enterrado!' : '🕳️ Excavas el montículo'); Net.grant(treasure ? 'detect' : 'dig');
       scene.remove(o); const k = interactables.indexOf(o); if (k >= 0) interactables.splice(k, 1); SaveSystem.save('dig'); if (treasure) playChime(); }, undefined, o.position.clone());
   }
@@ -7723,7 +7737,7 @@ const ACHIEVEMENTS = [
   { id: 'siete_trabajos', cat: 'world', icon: '💼', name: 'Siete Trabajos Mayores', desc: 'Completa los 7 Trabajos Mayores del Acto 2.',  prog: () => [bigJobsDoneCount(), CFG.act2BigJobs], r: [['golden_gift_box', 1]] },
   { id: 'ultramarino',   cat: 'world',  icon: '🧭', name: 'Ultramarino',          desc: 'Recibe 10 importaciones del mercante.',           prog: () => [achStat('importsReceived'), 10], r: [['gift_box', 1]] },
   { id: 'mecenas',       cat: 'world',  icon: '🏛️', name: 'Mecenas',              desc: 'Dona tu primera pieza al Museo del Sueño.',       prog: () => [Museum.st().donated.length, 1], r: [['flower_bouquet', 2]] },
-  { id: 'museo',         cat: 'world',  icon: '🖼️', name: 'Museo completo',       desc: 'Completa las 5 salas del Museo del Sueño.',       prog: () => [Museum.doneCount(), MUSEUM_SETS.length], r: [['golden_gift_box', 2]], fashion: true },
+  { id: 'museo',         cat: 'world',  icon: '🖼️', name: 'Museo completo',       desc: 'Completa todas las salas del Museo del Sueño.',       prog: () => [Museum.doneCount(), MUSEUM_SETS.length], r: [['golden_gift_box', 2]], fashion: true },
   { id: 'azar',          cat: 'risk',   icon: '🍀', name: 'El azar sonríe',       desc: 'Gana la Lotería del Sueño.',                      test: () => !!GS.lottery?.lastDraw?.winner || !!Achievements.st().track.lotteryWon, r: [['gift_box', 1]] },
   { id: 'honrado',       cat: 'risk',   icon: '🕊️', name: 'Jugador honrado',      desc: `Deja de apostar tras perder ${CFG.achHonestLosses} seguidas. Saber parar también es ganar.`, secret: true, test: () => !!Achievements.st().track.honestDone, r: [['coffee', 1], ['flower_bouquet', 1]] },
   { id: 'cuentas',       cat: 'risk',   icon: '🧾', name: 'Cuentas claras',       desc: 'Salda por completo una deuda (alquiler o Deuda Onírica).', test: () => !!Achievements.st().track.hadDebt && !(GS.debt > 0) && !(GS.housing?.rentDebt > 0) && !GS.housing?.sealed, r: [['gift_box', 1]] },
@@ -8953,6 +8967,147 @@ const NET_UPGRADES = [
   { id: 'crystal_showcase', icon: '🖼️', name: 'Escaparate de Cristal',  station: 'glover', in: [['lunar_glass', 2], ['prism_coral', 5], ['ash_brick', 2]], fx: '+4 huecos de escaparate en casa (Tienda o Villa)' },
   { id: 'net_antenna',      icon: '📡', name: 'Antena de la Red',       station: 'dax',    in: [['static_feather', 5], ['volt_gear', 2], ['whisper_reed', 5]], fx: 'Ves el Índice de la Red desde el PC de casa' },
 ];
+/* ===== v2.5 · 🔨 UTILIDAD DE LOS OBJETOS (Guía Maestra 2, Bloque G e I-regalos): banco de trabajo, recetas nuevas, servicios de vecinos,
+   sala del museo «Excavación y naturaleza», suerte de las luciérnagas, regalos detestados y la regla «todo objeto sirve para algo». ===== */
+const WORKBENCH = [
+  { id: 'pickaxe',      in: [['wood_log', 3], ['stone', 5]],                          note: 'Mina rocas' },
+  { id: 'axe',          in: [['wood_log', 2], ['stone', 4]],                          note: 'Tala árboles' },
+  { id: 'shovel',       in: [['wood_log', 3], ['stone', 3]],                          note: 'Excava montículos' },
+  { id: 'fishing_rod',  in: [['wood_log', 4], ['seashell', 2]],                       note: 'Pesca en la orilla' },
+  { id: 'bug_net',      in: [['wood_log', 2], ['dream_sap', 1]],                      note: 'Caza bichos' },
+  { id: 'detector',     in: [['treated_wood', 2], ['mystic_crystal', 1], ['old_coin', 3]], note: 'Encuentra tesoros' },
+  { id: 'treated_wood', in: [['wood_log', 2], ['dream_sap', 1]],                      note: 'Barniz de savia' },
+  { id: 'repair_kit',   in: [['leather', 1], ['treated_wood', 1], ['seashell', 2]],   note: 'Repara todas tus herramientas' },
+];
+const VOYAGE_PARTS = ['sky_compass', 'edge_map', 'timeless_clock'];   // las pide Sam para la travesía a la isla (Bloque F)
+const ISLAND_CURRENCY = ['old_coin'];                                  // la moneda de la tribu (Bloque F)
+const GIFT_HATES = { bear: ['old_boot', 'stone'], mayor: ['old_boot', 'dream_sap'], glover: ['flower_bouquet', 'cupcake'], sombra: ['old_boot', 'coffee'], dax: ['gasil_fuel', 'old_coin'], sam: ['flower_bouquet', 'cupcake'], hedgehogs: ['stone', 'gasil_fuel'] };
+const Util = {
+  st() { const u = (GS.util ||= {}); u.fossils ||= 0; u.dustMade ||= 0; u.butterflies ||= 0; u.coinsSwapped ||= 0; u.hatesSeen ||= {}; return u; },
+  luckUntil: 0,
+  luck() { return Date.now() < this.luckUntil ? CFG.util.luckMult : 1; },
+  detectBonus() { return Math.min(CFG.util.fossilMaxBonus, Math.floor(this.st().fossils / 3)); },
+  /** 🔨 Banco de trabajo */
+  missing(r) { return r.in.filter(([id, q]) => !Inventory.has(id, q)).map(([id, q]) => `${q - Inventory.count(id)}× ${ITEMS[id].icon} ${ITEMS[id].name}`); },
+  craft(id) {
+    const r = WORKBENCH.find(x => x.id === id); if (!r) return false;
+    const miss = this.missing(r); if (miss.length) { showToast('❌ Te falta: ' + miss.join(' · '), 'text-red-200'); return false; }
+    if (!Inventory.canAdd(id, 1)) { showToast('🎒 Inventario lleno', 'text-red-200'); return false; }
+    r.in.forEach(([iid, q]) => Inventory.remove(iid, q)); Inventory.add(id, 1, { silent: true });
+    playChime(); showToast(`🔨 Fabricado: ${ITEMS[id].icon} ${ITEMS[id].name}`, 'text-white'); SaveSystem.save('workbench:' + id); return true;
+  },
+  openBench() {
+    openApp('🔨 Banco de trabajo', '', (body) => {
+      const render = () => {
+        body.innerHTML = `<div class="app-card p-3 mb-2 text-xs text-slate-600">Fabrica herramientas y materiales con lo que encuentras por el mundo. Las tiendas siguen vendiéndolas, pero aquí te salen por materiales.</div>` +
+          WORKBENCH.map(r => { const it = ITEMS[r.id], miss = this.missing(r);
+            return `<div class="app-card p-2.5 mb-1.5 flex items-center gap-3"><div class="text-3xl w-10 text-center">${it.icon}</div><div class="flex-1 min-w-0 text-xs"><div class="font-bold text-sm text-[#2b2b3d]">${it.name}</div><div class="text-slate-500">${r.note}</div>
+              <div class="mt-0.5">${r.in.map(([id, q]) => `<span class="${Inventory.has(id, q) ? 'text-emerald-700' : 'text-red-600'}">${q}× ${ITEMS[id].icon} ${ITEMS[id].name}</span>`).join(' · ')}</div></div>
+              <button data-craft="${r.id}" class="btn-game px-3 py-1.5 text-xs ${miss.length ? 'bg-slate-200 opacity-60' : 'bg-emerald-300'}">Fabricar</button></div>`; }).join('');
+        body.querySelectorAll('[data-craft]').forEach(b => b.onclick = () => { this.craft(b.dataset.craft); render(); });
+      };
+      render();
+    });
+  },
+  _bench: null,
+  placeBench() {
+    if (this._bench) return; const g = new THREE.Group(), wood = mat(0xa1887f), dark = mat(0x6d4c41);
+    g.add(box(1.6, 0.12, 0.8, wood, 0, 0.86, 0)); [[-0.7, -0.32], [0.7, -0.32], [-0.7, 0.32], [0.7, 0.32]].forEach(([x, z]) => g.add(box(0.1, 0.84, 0.1, dark, x, 0.42, z)));
+    g.add(box(0.55, 0.18, 0.3, mat(0x90a4ae), -0.35, 1.0, 0)); g.add(box(0.08, 0.5, 0.08, dark, 0.45, 1.15, 0.1)); g.add(box(0.3, 0.12, 0.12, mat(0x78909c), 0.45, 1.42, 0.1));   // tornillo de banco + martillo
+    g.add(box(1.5, 0.05, 0.3, dark, 0, 0.3, 0));
+    placeAtSite(g, S_V, ...CFG.util.benchPos, 0.6); scene.add(g); colliders.push({ pos: g.position.clone(), r: 0.9 });
+    registerInteractable(g, { type: 'gather', label: '🔨 Banco de trabajo (fabricar herramientas)', fn: () => this.openBench() }); this._bench = g;
+    if (typeof Decor !== 'undefined' && Decor.clearAround) Decor.clearAround(g.position.clone().normalize(), 1.4 / R);
+  },
+  /** Servicios de vecinos */
+  gloverBoots() { if (!Inventory.has('old_boot', 3)) { showToast('🐿️ Glover: "Tráeme 3 botas viejas y te hago cuero. Tolerancia cero con los cordones."', 'text-white'); return; } if (!Inventory.canAdd('leather', 1)) { showToast('🎒 Inventario lleno', 'text-red-200'); return; } Inventory.remove('old_boot', 3); Inventory.add('leather', 1, { silent: true }); playChime(); showToast('👝 Glover recicla 3 botas: 1 Cuero Reciclado', 'text-white'); SaveSystem.save('leather'); },
+  daxDust() { if (!Inventory.has('dream_butterfly', 2)) { showToast('🦎 Dax: "Con 2 Mariposas Soñadas te saco Polvo de Ala. Sin dolor, lo prometo: solo brillo."', 'text-white'); return; } if (!Inventory.canAdd('wing_dust', 1)) { showToast('🎒 Inventario lleno', 'text-red-200'); return; } Inventory.remove('dream_butterfly', 2); Inventory.add('wing_dust', 1, { silent: true }); this.st().dustMade++; playChime(); showToast('✨ Dax: 1 Polvo de Ala', 'text-white'); SaveSystem.save('wing-dust'); },
+  daxFossils() {
+    const u = this.st(); if (!Inventory.has('fossil', 3)) { showToast(`🦎 Dax: "Para estudiar necesito 3 Fósiles Soñados. Llevas ${u.fossils} estudiados."`, 'text-white'); return; }
+    Inventory.remove('fossil', 3); u.fossils += 3; Wallet.add(CFG.util.fossilBounty, 'Dax: estudio de fósiles', { noMult: true }); const b = this.detectBonus();
+    playChime(); showToast(`🦴 Dax estudia 3 fósiles: +${fmt(CFG.util.fossilBounty)} $T${b ? ` · tu detector encuentra +${b} señal(es) al día` : ''}`, 'text-white'); SaveSystem.save('fossils');
+  },
+  roccoCoins() {
+    const u = this.st(), n = CFG.util.coinSwap; if (!Inventory.has('old_coin', n)) { showToast(`🦝 Rocco: "Colecciono monedas antiguas. Tráeme ${n} y te doy algo que no se ve en tiendas."`, 'text-white'); return; }
+    Inventory.remove('old_coin', n); u.coinsSwapped++; const prize = FURNITURE.find(f => ['piggy_xl', 'lava_lamp', 'trophy_shelf'].includes(f.id) && !hasFurniture(f.id));
+    if (prize) { (GS.furniture.owned ||= []).push(prize.id); showToast(`🦝 Rocco: "Trato hecho." Te da ${prize.icon} ${prize.name} para tu casa`, 'text-white'); }
+    else { Wallet.add(CFG.util.coinSwapCash, 'Rocco: colección de monedas', { noMult: true }); showToast(`🦝 Rocco: "Ya tienes de todo. Toma ${fmt(CFG.util.coinSwapCash)} $T."`, 'text-white'); }
+    playChime(); SaveSystem.save('rocco-coins');
+  },
+  boutiqueRainbow() {
+    const key = 'fabric:' + CFG.util.rainbowFabric; if (avOwns(key)) { showToast('✓ Ya tienes ese tinte', 'text-white'); return; }
+    if (!Inventory.has('rainbow_butterfly', 1) || !Inventory.has('wing_dust', 2)) { showToast('🦔 "Bro, el tinte especial: 1 Mariposa Arcoíris + 2 Polvos de Ala."', 'text-white'); return; }
+    Inventory.remove('rainbow_butterfly', 1); Inventory.remove('wing_dust', 2); (GS.avatar.wardrobe ||= []).push(key); playChime(); showToast(`🧵 Tinte especial desbloqueado: ${AV_FABRICS.find(f => f.id === CFG.util.rainbowFabric)?.name || 'tela'} (en el Armario)`, 'text-white'); SaveSystem.save('rainbow-dye');
+  },
+  btns(npcId) {
+    const b = [];
+    if (npcId === 'glover') b.push(dialogButton('👝 Reciclar 3 botas', 'bg-orange-200 text-[#2b2b3d]', () => this.gloverBoots()));
+    if (npcId === 'dax') { b.push(dialogButton('🦴 Estudiar 3 fósiles', 'bg-teal-200 text-[#2b2b3d]', () => this.daxFossils())); b.push(dialogButton('✨ Polvo de Ala (2 mariposas)', 'bg-teal-200 text-[#2b2b3d]', () => this.daxDust())); }
+    if (npcId === 'hedgehogs') b.push(dialogButton('🧵 Tinte especial', 'bg-fuchsia-200 text-[#2b2b3d]', () => this.boutiqueRainbow()));
+    if (npcId === 'rocco') b.push(dialogButton(`💰 Cambiar ${CFG.util.coinSwap} monedas antiguas`, 'bg-amber-200 text-[#2b2b3d]', () => this.roccoCoins()));
+    return b;
+  },
+  /** 🧾 ¿Para qué sirve cada objeto? (la prueba del arnés exige al menos un uso por objeto) */
+  uses() {
+    const U = {}, add = (id, why) => { if (!id) return; (U[id] ||= new Set()).add(why); };
+    RECIPES.forEach(r => { r.in.forEach(([id]) => add(id, `cocina: ${ITEMS[r.out]?.name || r.out}`)); });
+    WORKBENCH.forEach(r => r.in.forEach(([id]) => add(id, `banco: ${ITEMS[r.id].name}`)));
+    BUILDABLES.forEach(b => Object.keys(b.mats || {}).forEach(id => add(id, `construir: ${b.name}`)));
+    Object.entries(NPC_SOCIAL).forEach(([npc, s]) => { (s.encargos || []).forEach(e => add(e.item, 'encargos de vecinos')); Object.entries(s.giftPrefs || {}).forEach(([id, v]) => { if (v >= 3) add(id, 'regalo favorito'); }); });
+    MUSEUM_SETS.forEach(set => set.pieces.forEach(id => add(id, `museo: ${set.name}`)));
+    Object.keys(ITEM_EFFECTS).forEach(id => add(id, 'se usa'));
+    Object.values(ITEMS).forEach(it => { if (it.maxDur) add(it.id, 'herramienta'); if (it.cat === 'origin') add(it.id, 'comercio en la Red'); if (it.cat === 'manufacture') add(it.id, 'manufactura de la Red'); });
+    (typeof NET_RECIPES !== 'undefined' ? NET_RECIPES : []).forEach(r => r.in.forEach(([id]) => add(id, 'manufacturas de la Red')));
+    (typeof NET_UPGRADES !== 'undefined' ? NET_UPGRADES : []).forEach(r => r.in.forEach(([id]) => add(id, 'mejoras de la Red')));
+    Object.values(CFG.toolRepair || {}).forEach(t => (t.diy || []).forEach(([id]) => add(id, 'reparar herramientas')));
+    (CFG.bridgePhases || []).forEach(p => Object.keys(p).forEach(id => add(id, 'puente de Glover')));
+    VOYAGE_PARTS.forEach(id => add(id, 'travesía con Sam'));
+    ISLAND_CURRENCY.forEach(id => add(id, 'moneda de la isla'));
+    add('old_boot', 'Glover: cuero'); add('dream_butterfly', 'Dax: polvo de ala'); add('fossil', 'Dax: estudio'); add('old_coin', 'Rocco: colección'); add('rainbow_butterfly', 'Boutique: tinte'); add('wing_dust', 'Boutique: tinte');
+    add('dream_wheat', 'molino: harina'); add('gasil_fuel', 'avión de Sam'); add('dream_ticket', 'final del juego'); add('poor_bread', 'se come'); add('lottery_ticket', 'lotería');
+    return U;
+  },
+  usesOf(id) { return [...(this.uses()[id] || [])]; },
+};
+/* recetas de cocina nuevas */
+RECIPES.push(
+  { id: 'golden_fish_grill', out: 'golden_fish_grill', qty: 1, in: [['golden_fish', 1]], gourmet: true },
+  { id: 'tropical_ceviche',  out: 'tropical_ceviche',  qty: 1, in: [['tropical_fish', 1], ['golden_fruit', 1]] },
+  { id: 'spice_stew',        out: 'spice_stew',        qty: 1, in: [['dream_spice', 1], ['fish', 1]] },
+  { id: 'spice_bun',         out: 'spice_bun',         qty: 1, in: [['dream_spice', 1], ['flour', 1]] },
+);
+Object.assign(CFG.cookSecs, { golden_fish_grill: 45, tropical_ceviche: 25, spice_stew: 50, spice_bun: 30 });
+Object.assign(ITEM_EFFECTS, {
+  golden_fish_grill: () => { Needs.eat(70); applyBuff(1.4, 60, '🍱 ¡Pez Dorado a la Brasa! Velocidad +40% · saciedad +70'); },
+  tropical_ceviche:  () => { Needs.eat(40); applyBuff(1.25, 40, '🥗 Ceviche Tropical: velocidad +25% · saciedad +40'); },
+  spice_stew:        () => { Needs.eat(60); applyBuff(1.3, 60, '🍲 Guiso Especiado: velocidad +30% · saciedad +60'); },
+  spice_bun:         () => { Needs.eat(30); applyBuff(1.3, 30, '🍩 Bollo de Especias: velocidad +30% · saciedad +30'); },
+  firefly_jar:       () => { Util.luckUntil = Date.now() + CFG.util.luckMs; showToast('🏮 Las luciérnagas te acompañan: más suerte con el detector y la pesca durante 10 min', 'text-white'); playChime(); },
+  repair_kit:        () => { let n = 0; GS.inventory.slots.forEach(s => { if (Tools.isTool(s.id) && Tools.dur(s) < Tools.max(s.id)) { s.dur = Tools.max(s.id); n++; } }); if (!n) { showToast('🧰 Tus herramientas ya están perfectas', 'text-white'); return false; } showToast(`🧰 ${n} herramienta(s) como nuevas`, 'text-white'); refreshInvBadge(); },
+});
+ITEMS.firefly_jar.usable = true; ITEMS.firefly_jar.desc = 'Se caza con red de noche. Úsala: más suerte con el detector y la pesca durante 10 minutos. También va al museo.';
+ITEMS.fossil.desc = 'Un hueso de un animal que nadie ha soñado aún. Dax lo estudia (3 = recompensa y +1 señal del detector) y el Museo tiene sala para él.';
+ITEMS.dream_butterfly.desc = 'Se caza con red de día. A los erizos les encantan (colección) y Dax saca Polvo de Ala de dos.';
+ITEMS.dream_sap.desc = 'Gotea de algunos árboles al talarlos. Con dos troncos hace Madera Tratada en el banco de trabajo.';
+ITEMS.old_coin && (ITEMS.old_coin.desc = 'Moneda de un sueño antiguo. Rocco colecciona 10; el museo tiene sala; y dicen que al otro lado del mar aún se usan.');
+ITEMS.old_boot && (ITEMS.old_boot.desc = 'Una bota vieja. Glover recicla tres en Cuero Reciclado.');
+/* gustos y encargos: mariposas a los erizos, croissant y pez tropical en encargos */
+Object.assign(NPC_SOCIAL.hedgehogs.giftPrefs, { dream_butterfly: 5, rainbow_butterfly: 15, wing_dust: 6 });
+NPC_SOCIAL.hedgehogs.encargos.push({ id: 'h_bf', item: 'dream_butterfly', qty: 3, tokens: 90, trust: 3, text: '¡Bro! Estamos haciendo un reel de mariposas. ¿Nos cazas 3 Mariposas Soñadas?' });
+NPC_SOCIAL.bear.encargos.push({ id: 'b_cr', item: 'spice_bun', qty: 1, tokens: 260, trust: 4, text: '¡Pedido legendario! Un cliente de Ultramar quiere un Bollo de Especias. ¿Me lo cocinas tú? Yo no tengo la especia.' });
+NPC_SOCIAL.sam.encargos.push({ id: 's_tf', item: 'tropical_fish', qty: 2, tokens: 110, trust: 3, text: 'Arrr… un cliente pide 2 Peces Tropicales. ¿Me los pescas, grumete?' });
+NPC_SOCIAL.sam.encargos.push({ id: 's_gf', item: 'golden_fish_grill', qty: 1, tokens: 420, trust: 4, text: 'Hoy me apetece algo de lujo: un Pez Dorado a la Brasa. Pago bien.' });
+Object.entries(GIFT_HATES).forEach(([npc, list]) => { if (NPC_SOCIAL[npc]) NPC_SOCIAL[npc].giftHates = list; });
+/* museo: sala nueva */
+MUSEUM_SETS.push({ id: 'nature', icon: '🦴', name: 'Excavación y Naturaleza', color: 0x8d6e63, pieces: ['fossil', 'old_coin', 'dream_butterfly', 'firefly_jar'], title: 'Naturalista del Sueño', trophy: { icon: '🦴', name: 'Trofeo Naturalista' },
+  letter: ['🦎 Professor Dax', '¡Una sala entera de naturaleza onírica! El fósil, la moneda, la mariposa y el bote de luciérnagas. Te he preparado el Trofeo Naturalista. Científicamente, es precioso.'] });
+/* regalos detestados: +0 y frase (Guía 1, 3.3 y 5.8) */
+{ const _ag = Trust.addGift.bind(Trust); Trust.addGift = function (id, itemId) {
+    if ((NPC_SOCIAL[id]?.giftHates || []).includes(itemId)) { const u = Util.st(); (u.hatesSeen[id] ||= []); if (!u.hatesSeen[id].includes(itemId)) u.hatesSeen[id].push(itemId); return { pts: 0, base: 0, capped: false, hated: true }; }
+    return _ag(id, itemId);
+  }; }
+
+
 NET_RECIPES.forEach(r => { const it = ITEMS[r.id]; it.sell = Math.round(r.in.reduce((a, [id, q]) => a + (ITEMS[id].sell || 0) * q, 0) * 1.5); it.sellable = it.sell > 0; });   // valor de catálogo: insumos × 1,5
 RECIPES.push({ id: 'neon_bait', out: 'neon_bait', qty: 1, in: [['neon_algae', 1], ['slow_firefly', 1]], net: true });   // la cocina fabrica por lotes (Doc 4)
 CFG.cookSecs.neon_bait = 30;
@@ -10768,6 +10923,7 @@ function applyGameStateToWorld() {
   PlanetAO.bake();     // v1.5 · Etapa 1: AO horneado (med/alta)
   if (typeof Online !== 'undefined') Online.boot();   // v1.7: reconecta la cuenta online si había sesión
   Net.apply();         // v1.3
+  Util.placeBench();   // v2.5: banco de trabajo junto a casa
   Studio.place();      // v1.6: estudio del perfil junto a casa (si ya tienes perfil): Red del Sueño (re-engancha el mundo de bots; si recargaste dentro, despiertas en casa)
   state.tokensShown = GS.economy.money; ui.tokenValue.textContent = state.tokensShown.toLocaleString('es-ES');
   refreshMissionUI();
