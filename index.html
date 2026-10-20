@@ -8403,7 +8403,7 @@ function awakeningChainHTML() {
    Nota: la 🎪 Feria del Sábado (puestos de los vecinos, ofertas de tienda) NO es la
    📈 Feria del Tablón de la v0.8 (especulación por categorías): conviven sin tocarse.
    ========================================================= */
-const GAME_VERSION = '3.0.2', GAME_TAG = 'Decreto y Pedidos reales';
+const GAME_VERSION = '3.0.3', GAME_TAG = 'Trueque, contratos y subastas';
 /* ---------- 🗓️ EVENTOS: calendario REAL → flags que leen los sistemas existentes (Sec. 10.10) ---------- */
 const Events = {
   _force: null,   // DBG.weekday(n): simula el día de la semana real (0 = domingo … 6 = sábado)
@@ -11260,7 +11260,7 @@ const NetWorld = {
   layout(zone, o = {}) {
     const Z = NET_ZONES[zone], [w, d] = Z.size, hw = w / 2, hd = d / 2, W = NetEco.W, P = [...netFloorPieces(zone)];
     const real = this.real(), soon = (what) => showToast(`${what}: en la Red real llega con las secciones nuevas. Aquí, de momento, el Tablón, la Aduana, los puestos y las tiendas.`, 'text-white');
-    const A = { wake: () => this.wake(), tram: () => NetUI.tram(), tablon: () => real ? RealMarket.open('market') : NetUI.tablon(), subastas: () => real ? soon('🔨 Subastas') : NetUI.auctions(), aduana: () => real ? RealMarket.open('aduana') : NetUI.aduana(), contratos: () => real ? soon('📜 Contratos') : NetUI.contracts(), pedidos: () => real ? RealRequests.open() : NetUI.requests(), origen: () => NetUI.originCard(),
+    const A = { wake: () => this.wake(), tram: () => NetUI.tram(), tablon: () => real ? RealMarket.open('market') : NetUI.tablon(), subastas: () => real ? RealMarket.open('subastas') : NetUI.auctions(), aduana: () => real ? RealMarket.open('aduana') : NetUI.aduana(), contratos: () => real ? RealMarket.open('contratos') : NetUI.contracts(), pedidos: () => real ? RealRequests.open() : NetUI.requests(), origen: () => NetUI.originCard(),
       rstall: (obj) => RealWorld.openStall(obj.userData.netPlot),
       walk: (obj) => this.go(obj.userData.netTo), plot: (obj) => this.openPlot(zone, obj.userData.netPlot), bot: (obj) => { if (obj.userData.peerId) { PeerCard.openId(obj.userData.peerId); return; } const i = obj.userData.botIdx; if (i !== undefined && i !== null) NetUI.barter(i); }, gate: () => this.go('dorado') };
     if (zone === 'plaza') {
@@ -11927,7 +11927,7 @@ const Online = (() => {
   api.boot = async () => {
     const fromEmail = /access_token=|[?&]code=|cuenta=ok/.test(location.hash + location.search);   // vuelves del enlace de confirmación del email
     try { if (!fromEmail && !localStorage.getItem('crossia.auth')) return; } catch (e) { if (!fromEmail) return; }
-    try { await lib(); const { data } = await sb.auth.getSession(); session = data.session; if (session) await refreshMe(); if (me) { api.syncCheck(); setTimeout(() => RealShops.notices().catch(() => {}), 5000); setTimeout(() => RealMarket.load().catch(() => {}), 8000); }   // v2.9.3: ¿la nube tiene esta partida? · v3.0: avisos de tu tienda real
+    try { await lib(); const { data } = await sb.auth.getSession(); session = data.session; if (session) await refreshMe(); if (me) { api.syncCheck(); setTimeout(() => RealShops.notices().catch(() => {}), 5000); setTimeout(() => RealMarket.load().catch(() => {}), 8000); setTimeout(() => RealTrade.notices().catch(() => {}), 11000); setInterval(() => { if (Online.me) RealTrade.notices().catch(() => {}); }, 15 * 60000); }   // v2.9.3: ¿la nube tiene esta partida? · v3.0: avisos de tu tienda real
       if (fromEmail) { try { history.replaceState(null, '', location.pathname); } catch (e) {}
         if (session) { api.pendingWelcome = true; showToast(me ? `✅ Cuenta confirmada · hola, ${me.name}` : '✅ Cuenta confirmada: elige tu nombre en el online', 'text-white'); } }
     } catch (e) { console.warn('[online]', e.message); } };
@@ -12091,10 +12091,11 @@ const RealMarket = {
       const render = async (msg = '') => {
         body.innerHTML = `<div class="app-card p-3 text-sm text-slate-500">Cargando el mercado…</div>`;
         let D; try { D = await this.load(); } catch (e) { body.innerHTML = `<div class="app-card p-3 text-sm">❌ ${esc(e.message)}</div>`; return; }
-        const me = Online.me, mine = NET_ORIGINS[me.profile], tabs = [['market', '📈 Mercado'], ['aduana', '🛃 Aduana'], ['orders', `📋 Órdenes (${D.mine.length})`], ['stall', '🧺 Mi puesto'], ['shops', '🏪 Tiendas'], ['myshop', '🏬 Mi tienda'], ['pedidos', '📦 Pedidos']];
+        const me = Online.me, mine = NET_ORIGINS[me.profile], tabRows = [[['market', '📈 Mercado'], ['orders', `📋 Órdenes (${D.mine.length})`], ['subastas', '🔨 Subastas'], ['contratos', '📜 Contratos'], ['trueques', '🤝 Trueques']],
+          [['aduana', '🛃 Aduana'], ['stall', '🧺 Mi puesto'], ['myshop', '🏬 Mi tienda'], ['shops', '🏪 Tiendas'], ['pedidos', '📦 Pedidos']]];   // v3.0.3: comprar y vender · lo tuyo
         let html = (msg ? `<div class="app-card p-2 mb-2 text-xs ${/^❌/.test(msg) ? 'bg-red-50' : 'bg-emerald-50'}">${msg}</div>` : '') +
           `<div class="app-card p-2.5 mb-2 flex items-center gap-3 text-xs"><span class="text-2xl">${mine.icon}</span><div class="flex-1"><b class="text-sm">${esc(me.name)}</b> · ${D.players} jugador(es) en la Red<br>Aduana: <b>${fmt(D.coins)} $T</b> · ${Object.values(D.stock).reduce((a, b) => a + b, 0)} objeto(s) · en tu partida: ${fmt(GS.economy.money)} $T</div></div>
-          <div class="flex flex-wrap gap-1 mb-2">${tabs.map(([k, l]) => `<button data-tab="${k}" class="btn-game px-3 py-1.5 text-xs ${this.tab === k ? 'bg-[#fff6c2]' : 'bg-white'}">${l}</button>`).join('')}</div>`;
+          ${tabRows.map((row, ri) => `<div class="flex flex-wrap gap-1 ${ri ? 'mb-2' : 'mb-1'}">${row.map(([k, l]) => `<button data-tab="${k}" class="btn-game px-3 py-1.5 text-xs ${this.tab === k ? 'bg-[#fff6c2]' : 'bg-white'}">${l}</button>`).join('')}</div>`).join('')}`;
         if (this.tab === 'market') {
           html += `<div class="flex flex-wrap gap-1 mb-2"><button data-f="-1" class="btn-game px-2 py-0.5 text-[11px] ${this.filter < 0 ? 'bg-[#fff6c2]' : 'bg-white'}">Todos</button>${NET_ORIGINS.map((o, i) => `<button data-f="${i}" class="btn-game px-2 py-0.5 text-[11px] ${this.filter === i ? 'bg-[#fff6c2]' : 'bg-white'}">${o.icon}</button>`).join('')}<button data-f="8" title="Objetos de la isla" class="btn-game px-2 py-0.5 text-[11px] ${this.filter === 8 ? 'bg-[#fff6c2]' : 'bg-white'}">🏝️ Isla</button></div>
             ${this.decreeHTML(D.decree)}<div class="text-[11px] text-slate-500 mb-1">Comprar = pagas al mejor vendedor. Vender = cobras del mejor comprador (−${pctTxt(this.fee())}). Si nadie cruza, tu orden queda en el Tablón. «Media 7 d» = precio medio de lo vendido esta semana.</div>` +
@@ -12119,6 +12120,12 @@ const RealMarket = {
           html += await RealShops.mineHTML(D);
         } else if (this.tab === 'pedidos') {   // v3.0.2 · 📦 Pedidos de Ultramar con la Aduana
           html += await RealRequests.html(D);
+        } else if (this.tab === 'trueques') {   // v3.0.3 · 🤝 trueque entre jugadores
+          html += await RealTrade.barterHTML(D);
+        } else if (this.tab === 'contratos') {   // v3.0.3 · 📜 contratos
+          html += await RealTrade.contractsHTML(D);
+        } else if (this.tab === 'subastas') {   // v3.0.3 · 🔨 subastas
+          html += await RealTrade.auctionsHTML(D);
         } else {
           html += `<div class="sec-h">Abiertas</div>` + (D.mine.map(o => `<div class="app-card p-2 mb-1.5 flex items-center gap-2 text-xs"><div class="flex-1">${o.side === 'buy' ? '🟢 Compra' : '🔵 Venta'} <b>${this.name(o.item)}</b> · ${o.rem}/${o.qty} a ${fmt(o.price)} $T</div><button data-cancel="${o.id}" class="btn-game px-2 py-1 text-[11px] bg-rose-200">Cancelar</button></div>`).join('') || '<div class="text-xs text-slate-400">Ninguna.</div>') +
             `<div class="sec-h">Tus últimas operaciones</div>` + (D.trades.map(t => `<div class="text-xs py-1 border-b border-slate-100">${t.side === 'buy' ? '🟢 Compraste' : '🔵 Vendiste'} ${t.qty}× ${this.name(t.item)} a ${fmt(t.price)} $T · ${new Date(t.at).toLocaleString('es-ES')}</div>`).join('') || '<div class="text-xs text-slate-400">Todavía ninguna.</div>');
@@ -12129,6 +12136,9 @@ const RealMarket = {
         q$('[data-visit]').forEach(b => b.onclick = () => { closeApp(); setTimeout(() => RealShops.visit(b.dataset.visit), 30); });
         if (this.tab === 'myshop') RealShops.bindMine(body, run);
         if (this.tab === 'pedidos') RealRequests.bind(body, run, render);
+        if (this.tab === 'trueques') RealTrade.barterBind(body, run, render);
+        if (this.tab === 'contratos') RealTrade.contractsBind(body, run, render);
+        if (this.tab === 'subastas') RealTrade.auctionsBind(body, run, render);
         q$('[data-stk]').forEach(b => b.onclick = () => run(async () => { await this.rpc('crossia_stall_take', { p_item: b.dataset.stk, p_qty: +b.dataset.q }); return '✓ Retirado a tu Aduana'; }));
         const sput = body.querySelector('[data-sput]'); if (sput) sput.onclick = () => run(async () => { const v = (s) => body.querySelector(s)?.value; await this.rpc('crossia_stall_put', { p_item: v('[data-spi]'), p_qty: Math.floor(+v('[data-spq]') || 0), p_price: Math.floor(+v('[data-spr]') || 0) }); RealWorld.prefetch().catch(() => {}); return '✓ A la venta en tu puesto de la Plaza'; });
         q$('[data-tab]').forEach(b => b.onclick = () => { this.tab = b.dataset.tab; render(); });
@@ -12238,6 +12248,165 @@ const RealRequests = {
     return `📦 ¡Pedido entregado a ${who}! +${fmt(got)} $T${q.kind === 'diario' ? ` · +${CFG.net.realReq.d.trust} confianza` : ''}`;
   },
   open() { if (!Online.me) { Account.open(); return; } RealMarket.open('pedidos'); },
+};
+
+/* ===== v3.0.3 · 🤝📜🔨 TRATOS ENTRE JUGADORES REALES (H6, 2/2): trueque, contratos y subastas. Todo sale de la Aduana y queda
+   apartado hasta que se cierra el trato; si se cancela, se rechaza o caduca, el servidor lo devuelve. Comisiones como en la demo:
+   trueque 1 % (quien propone), contrato 2 % (quien encarga), subasta 5 % (quien vende). ===== */
+const RealTrade = {
+  draft: null, cItem: null, cQty: 5, B: null, C: null, A: null,
+  rpc: (fn, args) => RealMarket.rpc(fn, args),
+  name: (id) => ITEMS[id] ? `${ITEMS[id].icon} ${ITEMS[id].name}` : id,
+  blank(to = null, who = '') { return { to, who, give: {}, gc: 0, want: [], wc: 0 }; },
+  /** precio de referencia aproximado (el del servidor: mediana de las últimas ventas o la base del nivel ×5; la isla, ×1,15 lo que paga) */
+  estRef(id) {
+    const x = (RealMarket.data?.items || []).find(i => i.id === id);
+    if (x?.avg7 || x?.last) return x.avg7 || x.last;
+    if (x?.p === 8 || (ITEMS[id] && !ITEMS[id].net)) return Math.round((ITEMS[id]?.sell || 0) * 1.15);
+    return [12, 18, 30, 45, 400][((x?.t || (ITEMS[id]?.jewel ? 5 : ((ITEMS[id]?.net?.m ?? 0) & 3) + 1)) - 1)] * 5;
+  },
+  sideVal(items, coins) { return Object.entries(items || {}).reduce((a, [id, q]) => a + this.estRef(id) * q, 0) + (+coins || 0); },
+  sideTxt(sd) { const it = Object.entries(sd?.items || {}).map(([id, q]) => `${q}× ${this.name(id)}`); if (+sd?.coins) it.push(`${fmt(+sd.coins)} $T`); return it.join(' + ') || '—'; },
+  left(ts) { const ms = (typeof ts === 'number' ? ts : Date.parse(ts)) - Date.now(); return ms <= 0 ? 'cerrando…' : fmtCountdown(ms).replace(/ \d+s$/, ''); },
+  opts(sel) { return (RealMarket.data?.items || []).map(x => `<option value="${x.id}" ${x.id === sel ? 'selected' : ''}>${this.name(x.id)}${x.p === 8 ? ' · isla' : ''}</option>`).join(''); },
+  firstItem() { return (RealMarket.data?.items || [])[0]?.id || NET_MATS[0]; },
+  none: (t) => `<div class="text-xs text-slate-400 mb-2">${t}</div>`,
+  /* ---------- 🤝 trueque ---------- */
+  compose(p) { if (!Online.me) { Account.open(); return; } this.draft = this.blank(p.id, p.name); RealMarket.open('trueques'); },
+  wantObj(dr) { const o = {}; (dr.want || []).forEach(([id, q]) => { if (id && q > 0) o[id] = (o[id] || 0) + q; }); return o; },
+  fee(dr) { return Math.ceil(Math.max(this.sideVal(dr.give, dr.gc), this.sideVal(this.wantObj(dr), dr.wc)) * 0.01); },
+  readDraft(body) {
+    const dr = this.draft; if (!dr) return; const q = (sel) => body.querySelector(sel);
+    const to = q('[data-bto]'); if (to) { dr.to = to.value; dr.who = to.options?.[to.selectedIndex]?.text || dr.who; }
+    dr.give = {}; body.querySelectorAll('[data-bg]').forEach(el => { const n = Math.floor(+el.value || 0); if (n > 0) dr.give[el.dataset.bg] = n; });
+    dr.gc = Math.max(0, Math.floor(+(q('[data-bgc]')?.value || 0)));
+    dr.want = [...body.querySelectorAll('[data-bwi]')].map(el => [el.value, Math.max(1, Math.floor(+(q(`[data-bwq="${el.dataset.bwi}"]`)?.value || 1)))]);
+    dr.wc = Math.max(0, Math.floor(+(q('[data-bwc]')?.value || 0)));
+  },
+  incomingCard(b, B) {
+    const short = Object.entries(b.want?.items || {}).filter(([id, q]) => ((B.stock || {})[id] || 0) < q).map(([id, q]) => `${q - ((B.stock || {})[id] || 0)}× ${this.name(id)}`);
+    if ((+b.want?.coins || 0) > (+B.coins || 0)) short.push(`${fmt(+b.want.coins - (+B.coins || 0))} $T`);
+    return `<div class="app-card p-3 mb-2 text-xs"><div class="font-bold">${NET_ORIGINS[b.profile]?.icon || ''} ${esc(b.who)} te propone</div><div class="mt-1">Te da: <b>${this.sideTxt(b.give)}</b></div><div>A cambio de: <b>${this.sideTxt(b.want)}</b></div>` +
+      (short.length ? `<div class="text-red-600 mt-1">Te falta en la Aduana: ${short.join(', ')}</div>` : '') +
+      `<div class="flex flex-wrap gap-2 mt-1.5 items-center"><button data-bacc="${b.id}" class="btn-game px-2 py-1 text-[11px] ${short.length ? 'bg-slate-200 opacity-60' : 'bg-emerald-300'}" ${short.length ? 'disabled' : ''}>Aceptar</button><button data-brej="${b.id}" class="btn-game px-2 py-1 text-[11px] bg-rose-200">Rechazar</button><span class="text-[10px] text-slate-400">caduca en ${this.left(Date.parse(b.at) + 48 * 3600e3)}</span></div></div>`;
+  },
+  composeHTML(B) {
+    const dr = this.draft || (this.draft = this.blank()), friends = (Online.friends || []).filter(f => f.id !== dr.to);
+    const targets = [...(dr.to ? [{ id: dr.to, name: dr.who }] : []), ...friends.map(f => ({ id: f.id, name: f.name }))];
+    if (!targets.length) return `<div class="app-card p-3 mb-2 text-xs text-slate-500">Toca a un jugador en la Red o en el chat y pulsa <b>🤝 Proponer trueque</b>. Tus amigos también salen aquí.</div>`;
+    if (!dr.to) { dr.to = targets[0].id; dr.who = targets[0].name; }
+    const ids = Object.keys(B.stock || {});
+    return `<div class="app-card p-3 mb-2 text-xs"><label class="block mb-1.5">Con <select data-bto class="game text-xs px-1 py-1">${targets.map(t => `<option value="${t.id}" ${t.id === dr.to ? 'selected' : ''}>${esc(t.name)}</option>`).join('')}</select></label>
+      <div class="font-bold mt-1">Das (sale de tu Aduana)</div>${ids.length ? ids.map(id => `<div class="flex items-center justify-between gap-2 py-0.5"><span>${this.name(id)} <span class="text-slate-400">(${B.stock[id]})</span></span><input data-bg="${id}" type="number" min="0" max="${B.stock[id]}" value="${dr.give[id] || 0}" class="game w-14 text-xs px-1 py-0.5"></div>`).join('') : '<div class="text-slate-400">Tu Aduana no tiene objetos.</div>'}
+      <label class="block mt-1">+ $T de la Aduana (tienes ${fmt(+B.coins || 0)}) <input data-bgc type="number" min="0" value="${dr.gc || 0}" class="game w-24 text-xs px-1 py-0.5"></label>
+      <div class="font-bold mt-2">Pides</div>${dr.want.map(([id, q], i) => `<div class="flex items-center gap-1 py-0.5"><select data-bwi="${i}" class="game text-xs px-1 py-0.5 flex-1 min-w-0">${this.opts(id)}</select><input data-bwq="${i}" type="number" min="1" value="${q}" class="game w-14 text-xs px-1 py-0.5"><button data-bwx="${i}" class="btn-game px-1.5 py-0.5 text-[11px] bg-white">✕</button></div>`).join('')}
+      ${dr.want.length < 6 ? `<button data-bwadd class="btn-game px-2 py-0.5 text-[11px] bg-white mt-1">+ Pedir un objeto</button>` : ''}
+      <label class="block mt-1">+ $T <input data-bwc type="number" min="0" value="${dr.wc || 0}" class="game w-24 text-xs px-1 py-0.5"></label>
+      <div class="text-[10px] text-slate-500 mt-1">Comisión aproximada: <b data-bfee>${fmt(this.fee(dr))}</b> $T (1 % del lado que más vale, a precio de referencia).</div>
+      <button data-boffer class="btn-game px-3 py-1.5 text-xs bg-emerald-300 w-full mt-2">Proponer trueque</button></div>`;
+  },
+  async barterHTML() {
+    const B = this.B = await this.rpc('crossia_barters', {}), st = { done: '✅ aceptado', rejected: '❌ rechazado', cancelled: '↩️ retirado', expired: '⌛ caducado', open: '⏳ esperando' };
+    let h = `<div class="app-card p-2.5 mb-2 text-[11px] text-slate-600">🤝 <b>Trueque entre jugadores</b>: eliges lo que das (sale de tu Aduana y queda apartado) y lo que pides. Si la otra persona acepta, se cambia todo a la vez. Comisión del 1 % del valor, la paga quien propone. Si no contesta en 48 h, todo vuelve a tu Aduana.</div>`;
+    h += `<div class="sec-h">Te proponen (${(B.incoming || []).length})</div>` + ((B.incoming || []).map(b => this.incomingCard(b, B)).join('') || this.none('Nadie te ha propuesto nada.'));
+    h += `<div class="sec-h">Proponer un trueque</div>` + this.composeHTML(B);
+    h += `<div class="sec-h">Tus propuestas</div>` + ((B.outgoing || []).map(b => `<div class="app-card p-2 mb-1.5 text-xs"><div><b>${esc(b.who)}</b> · ${st[b.status] || b.status}${b.status === 'open' ? ` · caduca en ${this.left(Date.parse(b.at) + 48 * 3600e3)}` : ''}</div><div class="text-slate-600">Das ${this.sideTxt(b.give)} · pides ${this.sideTxt(b.want)}</div>${b.status === 'open' ? `<button data-bcan="${b.id}" class="btn-game px-2 py-0.5 text-[11px] bg-white mt-1">Retirar</button>` : ''}</div>`).join('') || this.none('Ninguna.'));
+    if ((B.answered || []).length) h += `<div class="sec-h">Las que respondiste (7 días)</div>` + B.answered.map(b => `<div class="text-xs py-1 border-b border-slate-100">${esc(b.who)}: ${st[b.status] || b.status} · te daba ${this.sideTxt(b.give)} por ${this.sideTxt(b.want)}</div>`).join('');
+    return h;
+  },
+  barterBind(body, run, render) {
+    const q$ = (sel) => body.querySelectorAll(sel);
+    q$('[data-bacc]').forEach(b => b.onclick = () => run(async () => { const r = await this.rpc('crossia_barter_answer', { p_id: +b.dataset.bacc, p_accept: true }); return r?.status === 'done' ? '🤝 ¡Trato hecho! Lo que te daban ya está en tu Aduana' : '⌛ Ese trueque ya había caducado'; }));
+    q$('[data-brej]').forEach(b => b.onclick = () => run(async () => { await this.rpc('crossia_barter_answer', { p_id: +b.dataset.brej, p_accept: false }); return '✓ Trueque rechazado: a quien te lo propuso le vuelve todo'; }));
+    q$('[data-bcan]').forEach(b => b.onclick = () => run(async () => { await this.rpc('crossia_barter_cancel', { p_id: +b.dataset.bcan }); return '✓ Propuesta retirada: lo apartado vuelve a tu Aduana'; }));
+    q$('[data-bwadd]').forEach(b => b.onclick = () => { this.readDraft(body); this.draft.want.push([this.firstItem(), 1]); render(); });
+    q$('[data-bwx]').forEach(b => b.onclick = () => { this.readDraft(body); this.draft.want.splice(+b.dataset.bwx, 1); render(); });
+    q$('[data-bg], [data-bgc], [data-bwq], [data-bwc], [data-bwi], [data-bto]').forEach(el => el.onchange = () => { this.readDraft(body); const f = body.querySelector('[data-bfee]'); if (f) f.textContent = fmt(this.fee(this.draft)); });
+    const off = body.querySelector('[data-boffer]');
+    if (off) off.onclick = () => run(async () => { this.readDraft(body); return this.offer(); });
+  },
+  /** lo que se envía al servidor (lanza un error legible si falta algo) */
+  offerArgs(dr = this.draft) {
+    if (!dr?.to) throw new Error('Elige con quién');
+    const give = { items: { ...dr.give }, coins: dr.gc | 0 }, want = { items: this.wantObj(dr), coins: dr.wc | 0 };
+    if (!Object.keys(give.items).length && !give.coins) throw new Error('Pon algo de lo que das');
+    if (!Object.keys(want.items).length && !want.coins) throw new Error('Pon algo de lo que pides');
+    return { p_to: dr.to, p_give: give, p_want: want };
+  },
+  async offer() {
+    const dr = this.draft, a = this.offerArgs(dr), r = await this.rpc('crossia_barter_offer', a); this.draft = this.blank(dr.to, dr.who);
+    return `🤝 Propuesta enviada a ${esc(dr.who)} (comisión de ${fmt(r.fee)} $T apartada; si no acepta, te la devolvemos)`;
+  },
+  /* ---------- 📜 contratos ---------- */
+  contractCard(c, mine) {
+    const unit = Math.round(c.pay / c.qty), ok = c.have >= c.qty;
+    return `<div class="app-card p-2.5 mb-1.5 text-xs"><div>${mine ? '' : `${NET_ORIGINS[c.profile]?.icon || ''} <b>${esc(c.who)}</b> pide `}<b>${c.qty}× ${this.name(c.item)}</b> → <b>${fmt(c.pay)} $T</b> <span class="text-slate-400">(${fmt(unit)}/u · vence en ${this.left(c.deadline)})</span></div>` +
+      (mine ? `<button data-ccan="${c.id}" class="btn-game px-2 py-0.5 text-[11px] bg-white mt-1">Retirar (te devolvemos ${fmt(c.pay + c.fee)} $T)</button>` : `<button data-cfill="${c.id}" class="btn-game px-2 py-1 text-[11px] mt-1 ${ok ? 'bg-amber-300' : 'bg-slate-200 opacity-60'}" ${ok ? '' : 'disabled'}>Cumplir (tienes ${c.have})</button>`) + `</div>`;
+  },
+  async contractsHTML() {
+    const C = this.C = await this.rpc('crossia_contracts', {}), open = C.open || [], mine = open.filter(c => c.mine), others = open.filter(c => !c.mine);
+    const st = { done: '✅ cumplido', expired: '⌛ vencido', cancelled: '↩️ retirado' };
+    let h = `<div class="app-card p-2.5 mb-2 text-[11px] text-slate-600">📜 <b>Contratos</b>: pides una cantidad de un objeto por un pago total y un plazo de 1 a 7 días. El pago y un 2 % quedan apartados; quien te lo traiga cobra el pago entero. Si vence sin cumplirse o lo retiras, te devolvemos todo. Un Comerciante del Sueño puede cumplirlo si pagas al menos un 15 % sobre el precio de referencia (objetos de nivel 1 a 3, hasta 10 unidades).</div>`;
+    h += `<div class="sec-h">Encargar</div><div class="app-card p-3 mb-2 text-xs"><div class="flex flex-wrap gap-1 items-center"><select data-ci class="game text-xs px-1 py-1 min-w-0">${this.opts(this.cItem || this.firstItem())}</select><label>Cant. <input data-cq type="number" min="1" max="999" value="${this.cQty || 5}" class="game w-14 text-xs px-1 py-1"></label><label>Pago total <input data-cp type="number" min="1" class="game w-24 text-xs px-1 py-1"></label><label>Días <input data-cd type="number" min="1" max="7" value="3" class="game w-12 text-xs px-1 py-1"></label><button data-cpost class="btn-game px-2 py-1 text-[11px] bg-emerald-300">Firmar</button></div><div class="text-[10px] text-slate-500 mt-1">Tienes ${fmt(+C.coins || 0)} $T en la Aduana · referencia: <span data-cref></span></div></div>`;
+    h += `<div class="sec-h">Contratos abiertos (${others.length})</div>` + (others.map(c => this.contractCard(c, false)).join('') || this.none('Ahora mismo nadie encarga nada.'));
+    h += `<div class="sec-h">Los tuyos (${mine.length}/4)</div>` + (mine.map(c => this.contractCard(c, true)).join('') || this.none('Ninguno abierto.'));
+    if ((C.closed || []).length) h += `<div class="sec-h">Cerrados (7 días)</div>` + C.closed.map(c => `<div class="text-xs py-1 border-b border-slate-100">${c.mine ? 'Tu contrato' : 'Cumpliste el contrato'} de ${c.qty}× ${this.name(c.item)} (${fmt(c.pay)} $T): ${st[c.status] || c.status}${c.status === 'done' && c.mine && c.who ? ` por ${esc(c.who)}${c.bot ? ' (Comerciante del Sueño)' : ''}` : ''}</div>`).join('');
+    return h;
+  },
+  contractsBind(body, run) {
+    const v = (sel) => body.querySelector(sel)?.value;
+    const upd = () => { const id = v('[data-ci]'), q = Math.max(1, Math.floor(+v('[data-cq]') || 1)), r = this.estRef(id), el = body.querySelector('[data-cref]'); this.cItem = id; this.cQty = q;
+      if (el) el.textContent = `${fmt(r)} $T/u · ${q} u ≈ ${fmt(r * q)} $T · con un 15 % más (${fmt(Math.ceil(r * q * 1.15))} $T) puede cumplirlo un Comerciante del Sueño`; };
+    ['[data-ci]', '[data-cq]'].forEach(sel => { const el = body.querySelector(sel); if (el) el.onchange = upd; }); upd();
+    const post = body.querySelector('[data-cpost]');
+    if (post) post.onclick = () => run(async () => { const id = v('[data-ci]'), q = Math.floor(+v('[data-cq]') || 0), p = Math.floor(+v('[data-cp]') || 0), d = Math.floor(+v('[data-cd]') || 3);
+      if (p < 1) throw new Error('Pon el pago total'); const r = await this.rpc('crossia_contract_post', { p_item: id, p_qty: q, p_pay: p, p_days: d });
+      return `📜 Contrato firmado: ${q}× ${this.name(id)} por ${fmt(p)} $T (+${fmt(r.fee)} $T de comisión, apartados)`; });
+    body.querySelectorAll('[data-cfill]').forEach(b => b.onclick = () => run(async () => { const r = await this.rpc('crossia_contract_fill', { p_id: +b.dataset.cfill }); return r?.status === 'done' ? `📜 ¡Contrato cumplido! +${fmt(r.pay)} $T en tu Aduana` : '⌛ Ese contrato acababa de vencer'; }));
+    body.querySelectorAll('[data-ccan]').forEach(b => b.onclick = () => run(async () => { const r = await this.rpc('crossia_contract_cancel', { p_id: +b.dataset.ccan }); return `✓ Contrato retirado: te devolvemos ${fmt(r.back)} $T`; }));
+  },
+  /* ---------- 🔨 subastas ---------- */
+  lotCard(a) {
+    const minb = a.leading ? (a.mymax || 0) + 1 : a.minbid;
+    return `<div class="app-card p-3 mb-2 text-xs"><div class="flex items-center gap-2"><span class="shrink-0">${itemIcon(a.item, 28)}</span><div class="flex-1 min-w-0"><b>${a.qty > 1 ? a.qty + '× ' : ''}${this.name(a.item)}</b><div class="text-[11px] text-slate-500">${a.mine ? 'Tu lote' : `de ${NET_ORIGINS[a.profile]?.icon || ''} ${esc(a.who)}`} · salida ${fmt(a.reserve)} · ${a.bids ? `${a.bids} puja(s) · va por <b>${fmt(a.price)} $T</b>` : 'sin pujas'} · cierra en ${this.left(a.ends)}</div>${a.mymax ? `<div class="text-[11px] ${a.leading ? 'text-emerald-700' : 'text-red-600'}">${a.leading ? '🏆 Vas ganando' : '⚠️ Te han superado'} · tu máximo ${fmt(a.mymax)} $T</div>` : ''}</div></div>` +
+      (a.mine ? (a.bids ? '' : `<button data-acan="${a.id}" class="btn-game px-2 py-0.5 text-[11px] bg-white mt-1">Retirar el lote</button>`) : `<div class="flex flex-wrap gap-1 mt-1.5 items-center"><input data-abv="${a.id}" type="number" min="${minb}" value="${minb}" class="game w-28 text-xs px-1 py-1"><button data-abid="${a.id}" class="btn-game px-2 py-1 text-[11px] bg-amber-200">${a.mymax ? 'Subir mi máximo' : 'Pujar (tu máximo)'}</button><span class="text-[10px] text-slate-400">mínimo ${fmt(minb)}</span></div>`) + `</div>`;
+  },
+  async auctionsHTML() {
+    const A = this.A = await this.rpc('crossia_auctions', {}), tier = (id) => (RealMarket.data?.items || []).find(x => x.id === id)?.t || (ITEMS[id]?.jewel ? 5 : 0);
+    const elig = Object.keys(A.stock || {}).filter(id => tier(id) >= 4), st = { sold: '✅ vendido', unsold: '↩️ sin pujas', cancelled: '↩️ retirado' };
+    let h = `<div class="app-card p-2.5 mb-2 text-[11px] text-slate-600">🔨 <b>Casa de Subastas</b>: joyas y objetos de nivel 4, durante 24 h. Pones tu máximo y el sistema puja por ti lo justo para ir ganando (un 5 % sobre el segundo). Tu máximo queda apartado; si no ganas, vuelve a tu Aduana. Comisión del 5 % al vendedor.</div>`;
+    h += `<div class="sec-h">En subasta (${(A.open || []).length})</div>` + ((A.open || []).map(a => this.lotCard(a)).join('') || this.none('No hay lotes abiertos.'));
+    h += `<div class="sec-h">Subastar</div>` + (elig.length ? `<div class="app-card p-3 mb-2 text-xs flex flex-wrap gap-1 items-center"><select data-ali class="game text-xs px-1 py-1 min-w-0">${elig.map(id => `<option value="${id}">${this.name(id)} (${A.stock[id]})</option>`).join('')}</select><label>Cant. <input data-alq type="number" min="1" max="5" value="1" class="game w-12 text-xs px-1 py-1"></label><label>Salida <input data-alr type="number" min="1" value="${Math.max(1, Math.round(this.estRef(elig[0]) * 0.9))}" class="game w-24 text-xs px-1 py-1"></label><button data-alist class="btn-game px-2 py-1 text-[11px] bg-emerald-300">Subastar 24 h</button></div>` : `<div class="app-card p-3 mb-2 text-xs text-slate-500">Para subastar necesitas en la Aduana una joya o un objeto de nivel 4 (de tu perfil o de la isla).</div>`);
+    if ((A.closed || []).length) h += `<div class="sec-h">Cerradas (7 días)</div>` + A.closed.map(a => `<div class="text-xs py-1 border-b border-slate-100">${a.role === 'lot' ? 'Tu lote' : 'Tu puja'}: ${a.qty > 1 ? a.qty + '× ' : ''}${this.name(a.item)} · ${a.role === 'lot' ? (st[a.status] || a.status) + (a.status === 'sold' ? ` por ${fmt(a.price)} $T` : '') : a.won ? `🏆 ganada por ${fmt(a.price)} $T` : 'superada (depósito devuelto)'}</div>`).join('');
+    return h;
+  },
+  auctionsBind(body, run) {
+    const v = (sel) => body.querySelector(sel)?.value;
+    body.querySelectorAll('[data-abid]').forEach(b => b.onclick = () => run(async () => { const id = +b.dataset.abid, m = Math.floor(+v(`[data-abv="${id}"]`) || 0); const r = await this.rpc('crossia_auction_bid', { p_id: id, p_max: m });
+      return r.leader ? `🔨 ¡Vas ganando! Va por ${fmt(r.price)} $T (tu máximo de ${fmt(m)} $T queda apartado)` : `🔨 Puja registrada, pero alguien tiene un máximo mayor: va por ${fmt(r.price)} $T`; }));
+    body.querySelectorAll('[data-acan]').forEach(b => b.onclick = () => run(async () => { await this.rpc('crossia_auction_cancel', { p_id: +b.dataset.acan }); return '✓ Lote retirado: vuelve a tu Aduana'; }));
+    const sel = body.querySelector('[data-ali]'); if (sel) sel.onchange = () => { const r = body.querySelector('[data-alr]'); if (r) r.value = Math.max(1, Math.round(this.estRef(sel.value) * 0.9)); };
+    const li = body.querySelector('[data-alist]');
+    if (li) li.onclick = () => run(async () => { const id = v('[data-ali]'), q = Math.floor(+v('[data-alq]') || 1), res = Math.floor(+v('[data-alr]') || 0);
+      await this.rpc('crossia_auction_list', { p_item: id, p_qty: q, p_reserve: res }); return `🔨 ${q > 1 ? q + '× ' : ''}${this.name(id)} en subasta durante 24 h (salida ${fmt(res)} $T)`; });
+  },
+  /* ---------- 📨 avisos al entrar (y cada 15 min): lo que pasó con tus tratos mientras no estabas ---------- */
+  newsLines(r) {
+    const L = [], nm = (id) => ITEMS[id]?.name || id;
+    (r.barterIn || []).forEach(b => L.push(`🤝 ${b.who} te propone un trueque (Mercado real → Trueques).`));
+    (r.barters || []).forEach(b => L.push(b.status === 'done' ? `🤝 ${b.who} aceptó tu trueque: lo que pediste está en tu Aduana.` : b.status === 'rejected' ? `🤝 ${b.who} rechazó tu trueque: lo apartado volvió a tu Aduana.` : `⌛ Tu trueque con ${b.who} caducó: lo apartado volvió a tu Aduana.`));
+    (r.contracts || []).forEach(c => L.push(c.status === 'done' ? `📜 Cumplieron tu contrato: ${c.qty}× ${nm(c.item)} ya están en tu Aduana.` : `📜 Tu contrato de ${c.qty}× ${nm(c.item)} venció sin cumplirse: te devolvimos ${fmt(c.pay)} $T y la comisión.`));
+    (r.lots || []).forEach(a => L.push(a.status === 'sold' ? `🔨 Vendiste ${a.qty}× ${nm(a.item)} en subasta por ${fmt(a.price)} $T (−5 %).` : `🔨 Tu lote de ${a.qty}× ${nm(a.item)} no tuvo pujas: vuelve a tu Aduana.`));
+    (r.bids || []).forEach(a => L.push(a.status === 'won' ? `🔨 ¡Ganaste la subasta de ${a.qty}× ${nm(a.item)} por ${fmt(a.price)} $T! Está en tu Aduana.` : `🔨 Te superaron en la subasta de ${nm(a.item)}: tu depósito volvió a la Aduana.`));
+    return L;
+  },
+  async notices() {
+    if (!Online.me) return 0;
+    const r = await this.rpc('crossia_trade_news', { p_since: GS.realTradeSeen || null }), L = this.newsLines(r || {});
+    GS.realTradeSeen = r?.now || new Date().toISOString();
+    if (L.length) { addLetter('📨 Correo de la Red', L.join('\n')); showToast(`📨 ${L.length === 1 ? 'Una novedad' : L.length + ' novedades'} de tus tratos en la Red (mira el buzón)`, 'text-white'); }
+    SaveSystem.save('real-trade-seen'); return L.length;
+  },
 };
 
 /* ===== v1.9 · 🏪 TIENDAS DE JUGADORES (F3): se compran con $T de la Aduana (puesto 5.000 · local 50.000 · boutique 500.000), viven en su barrio
@@ -12460,6 +12629,7 @@ const PeerCard = {
           <div class="hub-grid">
             <button class="hub-t" data-shop>${uiChip('🏪')}<div class="tx"><div class="ti">Ir a su tienda</div><div class="de">Si tiene puesto o tienda en la Red</div></div></button>
             ${p.bot ? '' : (() => { const f = Online.friends.find(x => x.id === p.id); return `<button class="hub-t" data-friend>${uiChip(f ? '⭐' : '➕')}<div class="tx"><div class="ti">${f ? 'Quitar de amigos' : 'Añadir a amigos'}</div><div class="de">${f ? (f.mutual ? 'Sois amigos: veis si el otro está conectado' : 'Le tienes en tu lista; cuando te añada, veréis si estáis conectados') : 'Sale en tu lista de amigos y te avisa cuando coincidáis'}</div></div></button>`; })()}
+            ${p.bot ? '' : `<button class="hub-t" data-barter>${uiChip('🤝')}<div class="tx"><div class="ti">Proponer trueque</div><div class="de">Le ofreces algo de tu Aduana a cambio de lo que pidas</div></div></button>`}
             <button class="hub-t" data-mute>${uiChip(mut ? '💬' : '🔕')}<div class="tx"><div class="ti">${mut ? 'Quitar silencio' : 'Silenciar'}</div><div class="de">${mut ? 'Vuelves a ver sus mensajes' : 'Dejas de ver sus mensajes; solo en tu pantalla'}</div></div></button>
             <button class="hub-t" data-block>${uiChip('🚫')}<div class="tx"><div class="ti">${blk ? 'Desbloquear' : 'Bloquear'}</div><div class="de">${blk ? 'Vuelve a aparecer en tu Red' : 'No ves su chat ni su avatar y no compra en tu tienda'}</div></div></button>
           </div>
@@ -12468,6 +12638,7 @@ const PeerCard = {
         const run = async (fn, ok) => { try { await fn(); render(ok); } catch (e) { render('❌ ' + e.message); } };
         body.querySelector('[data-mute]').onclick = () => { Online.setMuted(p.id, !mut); render(!mut ? '✓ Silenciado: ya no ves sus mensajes' : '✓ Silencio quitado'); };
         body.querySelector('[data-block]').onclick = () => run(() => Online.setBlocked(p.id, !blk), !blk ? '✓ Bloqueado' : '✓ Desbloqueado');
+        { const bb = body.querySelector('[data-barter]'); if (bb) bb.onclick = () => { closeApp(); setTimeout(() => RealTrade.compose(p), 30); }; }   // v3.0.3 · H6
         { const fb = body.querySelector('[data-friend]'); if (fb) fb.onclick = () => { const on = !Online.isFriend(p.id); run(() => Online.setFriend(p.id, on), on ? `✓ ${p.name} está en tus amigos` : '✓ Quitado de tus amigos'); }; }   // v3.0.1 · H7
         body.querySelector('[data-shop]').onclick = async () => { closeApp(); if (RealWorld.openStallOf(p.id)) return; try { await RealShops.visit(p.id); } catch (e) { showToast('🏪 ' + (e.message || 'No tiene tienda'), 'text-white'); } };
         body.querySelectorAll('[data-rep]').forEach(b => b.onclick = () => run(() => Online.report(p.id, b.dataset.rep), '✓ Reporte enviado. Gracias por cuidar la Red.'));
@@ -13411,7 +13582,7 @@ DBG.refs = DBG_REFS;
 if (/[?&]debug=1\b/.test(location.search)) window._dbg = DBG_REFS;   // v1.0: ya no es global por defecto
 /* v1.1 · Interior caminable de la casa (Sec. 6.9 Fase 2) */
 /** v1.5 · capturas: DBG.tp(x, z) lleva al jugador a (x, z) del pueblo · DBG.view(dist, pitch, yaw) fija la cámara · DBG.shot('B'|'C'|'D'|'G'|'H') prepara la escena del protocolo */
-DBG.g = { World, WGEO, WorldFX, TRAVEL_POSTS, Island, Voyage, TRIBE, ship, state, IconStudio, ItemArt, itemIcon, PhGlyph, startDialog, openInventory, openHousePanel, addLetter, endDialog, openShop, openGiftPicker, openEncargo, acceptCourier, refreshMissionUI, SeasonDecor, Snow, claimSeasonGift, seasonNow, openWeeklyPanel, openRoulette, Weather, Decorate, SyncGuard, Online, RealShops, RealMarket, RealRequests, Metrics, Presence, Emotes, NetStatus, PeerCard, NetChat, Gather, Mining, npcObjs, interactables, colliders, SITES, NPCS, CFG, get house() { return house; }, scene, renderer, camera, cam, sky, water, atmo, clouds, PostFX, SkyEnv, PlanetAO, WATER_U, POST_U, Gather, Studio, ToolAnim, Profiles, Hub, Decor, Fitting, player, Interiors };   // v1.5: referencias gráficas para depurar
+DBG.g = { World, WGEO, WorldFX, TRAVEL_POSTS, Island, Voyage, TRIBE, ship, state, IconStudio, ItemArt, itemIcon, PhGlyph, startDialog, openInventory, openHousePanel, addLetter, endDialog, openShop, openGiftPicker, openEncargo, acceptCourier, refreshMissionUI, SeasonDecor, Snow, claimSeasonGift, seasonNow, openWeeklyPanel, openRoulette, Weather, Decorate, SyncGuard, Online, RealShops, RealMarket, RealRequests, RealTrade, Metrics, Presence, Emotes, NetStatus, PeerCard, NetChat, Gather, Mining, npcObjs, interactables, colliders, SITES, NPCS, CFG, get house() { return house; }, scene, renderer, camera, cam, sky, water, atmo, clouds, PostFX, SkyEnv, PlanetAO, WATER_U, POST_U, Gather, Studio, ToolAnim, Profiles, Hub, Decor, Fitting, player, Interiors };   // v1.5: referencias gráficas para depurar
 DBG.post = (v = !PostFX.active) => { PostFX.active = !!v; POST_U.uPost.value = v ? 1 : 0; return PostFX.active; };
 DBG.env = (v = !SkyEnv.enabled) => SkyEnv.setEnabled(v);
 DBG.ao = (v = true) => { if (!PlanetAO.on) return false; if (v) PlanetAO.bake(); else { const c = planet.geometry.attributes.color; PlanetAO.reset(); c.needsUpdate = true; } return v; };
