@@ -3206,7 +3206,7 @@ function collectPickup(g) {
   if (!g.userData.ready) return;
   let id = g.userData.itemId; if (id === 'seashell' && Math.random() < 0.15 * (typeof AuraFX !== 'undefined' ? AuraFX.rareLootBoost() : 1) * Weather.pearlMult()) id = 'pearl'; // sorpresa ocasional (el Vacío la mejora)
   if (!Inventory.add(id, 1)) return; // inventario lleno: el objeto se queda en el mundo
-  if (typeof trackMunicipalJob === 'function') trackMunicipalJob(g.userData.itemId);
+  if (typeof trackMunicipalJob === 'function') trackMunicipalJob(g.userData.itemId); taskTick('gather');
   Net.grant('pickup');   // v1.3: tu Origen Onírico brota también en el suelo   // v0.3: cuenta para el Empleo Municipal (el objeto ORIGINAL del pickup: una concha-perla también limpia la playa)
   g.userData.ready = false; g.visible = false; g.userData.respawnAt = Date.now() + (CFG.pickupRespawnMin[g.userData.itemId] || 3) * 60000 * (typeof AuraFX !== 'undefined' ? AuraFX.cooldownMult() : 1);
   GS.world.pickups[g.userData.idx] = g.userData.respawnAt; playBeep(988, 0.08, 'triangle'); SaveSystem.save('pickup');
@@ -3676,7 +3676,7 @@ function harvest(f) {
   if (!f.userData.ready) return;
   if (!Inventory.add('golden_fruit', Weather.fruitMult())) return; // inventario lleno: la fruta sigue en el árbol · v0.8: lluvia + Climatizador ×2
   f.userData.ready = false; f.visible = false; f.userData.respawnAt = Date.now() + CFG.fruitCooldown * (typeof AuraFX !== 'undefined' ? AuraFX.cooldownMult() : 1);
-  GS.farm.fruits[fruits.indexOf(f)] = f.userData.respawnAt; GS.stats.fruitsHarvested++;
+  GS.farm.fruits[fruits.indexOf(f)] = f.userData.respawnAt; GS.stats.fruitsHarvested++; taskTick('gather');
   playBeep(1046, 0.1, 'triangle'); const wp = new THREE.Vector3(); f.getWorldPosition(wp); spawnConfetti(wp, 18); SaveSystem.save('harvest');
 }
 
@@ -3993,8 +3993,8 @@ function refreshMissionUI() {
       return `<div class="flex items-center gap-2 text-xs font-semibold p-1.5 rounded-lg ${st === 2 ? 'bg-emerald-100' : st === 1 ? 'bg-amber-100' : 'bg-slate-100'}">${npcFace(n.id, 22, n.emoji)}<div class="flex-1 min-w-0"><div class="truncate">${def.short}</div><div class="text-[10px] text-slate-500 truncate">${sub}</div></div><span>${st === 2 ? '✅' : st === 1 ? '⏳' : ready ? '❗' : '🔒'}</span><button data-go="${n.id}" class="btn-game px-2 py-0.5 bg-sky-200 text-[10px]">Ir</button></div>`; }).join('');
     html += `<div class="text-[10px] text-slate-500 mt-1 leading-snug">Requisitos (Sec. 7.4): su misión principal + confianza ${TL.heart} ${TL.name}. Se generan en la laptop 💻 y cada uno deja un sistema económico permanente.</div>`;
   } else if (tab === 'enc') {
-    const rows = NPCS.map(n => { const cur = currentEncargo(n.id); const it = cur && cur.q && ITEMS[cur.q.item]; if (!it) return '';
-      return `<div class="flex items-center gap-2 text-xs font-semibold p-1.5 rounded-lg ${cur.done ? 'bg-emerald-100' : 'bg-slate-100'}">${npcFace(n.id, 22, n.emoji)}<div class="flex-1 min-w-0"><div class="truncate">${itemIcon(it.id, 18)} ${cur.q.qty}× ${esc(it.name)} <span class="text-slate-400">(${Inventory.count(cur.q.item)}/${cur.q.qty})</span></div><div class="text-[10px] text-slate-500">${n.name} · +${cur.q.tokens} $TOKEN · +${cur.q.trust} confianza${!cur.tutorial && !cur.done && Trust.level(n.id) >= 3 ? ' · 💼 premium ×3' : cur.enc?.premium ? ' · 💼 premium' : ''}</div></div><span>${cur.done ? '✅' : '📋'}</span>${cur.done ? '' : `<button data-go="${n.id}" class="btn-game px-2 py-0.5 bg-sky-200 text-[10px]">Ir</button>`}</div>`; }).join('');
+    const rows = NPCS.map(n => { const cur = currentEncargo(n.id); if (!cur || !cur.q || (!cur.q.type && !ITEMS[cur.q.item])) return '';
+      return `<div class="flex items-center gap-2 text-xs font-semibold p-1.5 rounded-lg ${cur.done ? 'bg-emerald-100' : 'bg-slate-100'}">${npcFace(n.id, 22, n.emoji)}<div class="flex-1 min-w-0"><div class="truncate">${encargoLine(n.id, cur)}</div><div class="text-[10px] text-slate-500">${n.name} · +${cur.q.tokens} $TOKEN · +${cur.q.trust} confianza${!cur.tutorial && !cur.done && !cur.q.type && Trust.level(n.id) >= 3 ? ' · 💼 premium ×3' : cur.enc?.premium ? ' · 💼 premium' : ''}</div></div><span>${cur.done ? '✅' : '📋'}</span>${cur.done ? '' : `<button data-go="${n.id}" class="btn-game px-2 py-0.5 bg-sky-200 text-[10px]">Ir</button>`}</div>`; }).join('');
     const oso = bigJobDone('bear') ? BakeryOrders.today() : null;   // v0.8 · Pedido del Horno
     if (oso) html += `<div class="flex items-center gap-2 text-xs font-semibold p-1.5 rounded-lg ${oso.done ? 'bg-emerald-100' : 'bg-orange-100'}"><span class="text-base">📦</span><div class="flex-1 min-w-0"><div class="truncate">OsoExpress: ${oso.items.map(([id, q]) => `${q}× ${itemIcon(id, 18)}`).join(' + ')}</div><div class="text-[10px] text-slate-500">Pedido del Horno · +${fmt(oso.pay)} $TOKEN</div></div><span>${oso.done ? '✅' : '📦'}</span>${oso.done ? '' : `<button data-go="bear" class="btn-game px-2 py-0.5 bg-sky-200 text-[10px]">Ir</button>`}</div>`;
     html += rows || (oso ? '' : `<div class="text-[11px] text-slate-500 p-1.5">Aún nadie te hace encargos. Los vecinos te los piden desde ${TRUST_LEVELS[2].heart} ${TRUST_LEVELS[2].name} (y el Oso tiene uno de bienvenida).</div>`);
@@ -4037,16 +4037,18 @@ function currentEncargo(npcId) {
 }
 /** Botón 📋 de los diálogos (vacío si el NPC aún no ofrece encargos). La llama encBtns() desde startDialog. */
 function encargoBtns(npcId) {
-  const cur = currentEncargo(npcId); if (!cur) return [];
-  return [dialogButton(cur.done ? '📋 Encargo ✓' : cur.tutorial ? '📋 Encargo: 3 conchas' : Trust.level(npcId) >= 3 ? '📋 Encargo del día (💼 premium)' : '📋 Encargo del día', 'bg-emerald-200 text-[#2b2b3d]', () => openEncargo(npcId))];
+  const cur = currentEncargo(npcId), cb = courierBtns(npcId); if (!cur) return cb;   // v2.9.1: + entregar paquetes de mensajería
+  return [...cb, dialogButton(cur.done ? '📋 Encargo ✓' : cur.tutorial ? '📋 Encargo: 3 conchas' : Trust.level(npcId) >= 3 && !cur.q.type ? '📋 Encargo del día (💼 premium)' : '📋 Encargo del día', 'bg-emerald-200 text-[#2b2b3d]', () => openEncargo(npcId))];
 }
 /** Entrega: quita los objetos, paga $TOKEN y confianza, marca hecho. Devuelve true si se entregó. */
 function deliverEncargo(npcId, premium = false) {
-  const cur = currentEncargo(npcId); if (!cur || cur.done) return false; const q = cur.q;
-  premium = !!premium && !cur.tutorial && Trust.level(npcId) >= 3;   // v0.8 · encargo premium (Sec. 7.6): ×3 cantidad, ×3 $TOKEN, +8 confianza, +1 rumor
+  const cur = currentEncargo(npcId); if (!cur || cur.done) return false; const q = cur.q, kind = q.type || 'item';
+  if (kind === 'courier') return false;   // v2.9.1: la mensajería se entrega al destinatario (deliverCourier)
+  premium = !!premium && kind === 'item' && !cur.tutorial && Trust.level(npcId) >= 3;   // v0.8 · encargo premium (Sec. 7.6): ×3 cantidad, ×3 $TOKEN, +8 confianza, +1 rumor
   const qty = q.qty * (premium ? CFG.premiumMult : 1), tokens = q.tokens * (premium ? CFG.premiumMult : 1), trust = premium ? CFG.premiumTrust : q.trust;
-  if (!Inventory.has(q.item, qty)) { showToast(`❌ Te faltan ${qty - Inventory.count(q.item)} × ${ITEMS[q.item].name}`, 'text-red-200'); return false; }
-  Inventory.remove(q.item, qty);
+  if (kind === 'task') { const p = taskProgress(q.task); if (p < q.n) { showToast(`❌ Aún no: ${p}/${q.n} ${TASK_INFO[q.task][1]}`, 'text-red-200'); return false; } }   // v2.9.1: encargo de tarea
+  else { if (!Inventory.has(q.item, qty)) { showToast(`❌ Te faltan ${qty - Inventory.count(q.item)} × ${ITEMS[q.item].name}`, 'text-red-200'); return false; }
+    Inventory.remove(q.item, qty); }
   if (cur.tutorial) GS.encargos[npcId] = { id: 'tutorial', day: GS.daily.dayCount, done: true };
   else { GS.encargos[npcId].done = true; GS.encargos[npcId].premium = premium; }
   GS.stats.encargosDone = (GS.stats.encargosDone || 0) + 1;   // v1.0: logro «Mano amiga»
@@ -4065,6 +4067,11 @@ function openEncargo(npcId) {
   openApp(`📋 Encargo de ${n.name}`, '', (body) => {
     const render = () => {
       if (cur.done) { body.innerHTML = `<div class="app-card p-5 text-center"><div class="text-4xl mb-2">✅</div><div class="font-bold text-[#2b2b3d]">¡Encargo completado!</div><div class="text-sm text-slate-600 mt-1">${n.name} está encantado contigo. Vuelve mañana 🌙</div></div>`; return; }
+      if (cur.q.type === 'task' || cur.q.type === 'courier') {   // v2.9.1: tareas y mensajería
+        body.innerHTML = encargoSpecialHTML(npcId, cur);
+        const d2 = body.querySelector('[data-deliver]'); if (d2) d2.onclick = () => { if (deliverEncargo(npcId)) { cur.done = true; render(); } };
+        const a2 = body.querySelector('[data-accept]'); if (a2) a2.onclick = () => { if (acceptCourier(npcId)) render(); };
+        return; }
       const it = ITEMS[cur.q.item], have = Inventory.count(cur.q.item), ok = have >= cur.q.qty, prem = !cur.tutorial && Trust.level(npcId) >= 3, pq = cur.q.qty * CFG.premiumMult, pok = have >= pq;
       body.innerHTML = `<div class="app-card p-4"><div class="flex items-start gap-3"><div class="text-4xl leading-none item-big">${itemIcon(it.id, 44)}</div><div class="flex-1 min-w-0">
         <div class="font-bold text-[#2b2b3d]">${n.emoji} ${n.name} pide:</div>
@@ -4158,7 +4165,7 @@ const UI_ICONS = {
   '☀': ['sun', 'gold'], '🌧': ['cloud-rain', 'sky'], '🌫': ['cloud-fog', 'ink'], '🔆': ['sun-dim', 'orange'], '⛈': ['cloud-lightning', 'lilac'], '❄': ['snowflake', 'sky'],   // v2.9: el tiempo
   '💟': ['heart', 'ink'], '💛': ['heart', 'gold'], '🧡': ['heart', 'orange'], '❤': ['heart', 'coral'], '💜': ['heart', 'lilac'], '🙅': ['hand-palm', 'coral'], '🚫': ['prohibit', 'coral'], '❗': ['exclamation-mark', 'gold'],   // v2.9
   '✕': ['x', 'ink'], '✖': ['x', 'ink'], '☰': ['squares-four', 'lilac'], '←': ['arrow-left', 'ink'], '✓': ['check', 'mint'], '✔': ['check', 'mint'], '✅': ['check-circle', 'mint'], '❌': ['x-circle', 'coral'], '⚠': ['warning', 'gold'],
-  '🏛': ['bank', 'gold'], '🔮': ['crystal-ball', 'lilac'], '🎲': ['dice-five', 'gold'], '🌍': ['globe-hemisphere-west', 'sky'], '🌐': ['planet', 'lilac'], '📦': ['package', 'gold'], '🏗': ['crane-tower', 'gold'],
+  '🏛': ['bank', 'gold'], '🔮': ['sphere', 'lilac'], '🎲': ['dice-five', 'gold'], '🌍': ['globe-hemisphere-west', 'sky'], '🌐': ['planet', 'lilac'], '📦': ['package', 'gold'], '🏗': ['crane-tower', 'gold'],
   '📜': ['scroll', 'gold'], '🛏': ['bed', 'lilac'], '🎫': ['ticket', 'gold'], '🏆': ['trophy', 'gold'], '⚙': ['gear-six', 'ink'], '⬇': ['download-simple', 'sky'], '⬆': ['upload-simple', 'sky'], '✨': ['sparkle', 'lilac'],
   '🛒': ['shopping-cart', 'mint'], '📈': ['trend-up', 'mint'], '📉': ['trend-down', 'coral'], '💸': ['money-wavy', 'gold'], '🍳': ['cooking-pot', 'mint'], '👗': ['dress', 'rose'], '☁': ['cloud-arrow-up', 'sky'],
   '🎁': ['gift', 'rose'], '📋': ['clipboard-text', 'sky'], '🎒': ['backpack', 'gold'], '🔒': ['lock-simple', 'ink'], '🔐': ['lock-key', 'ink'], '🎰': ['poker-chip', 'gold'], '🖼': ['image', 'rose'], '🛋': ['armchair', 'mint'],
@@ -4169,8 +4176,8 @@ const UI_ICONS = {
   '🏠': ['house', 'mint'], '🏡': ['house-line', 'mint'], '📬': ['envelope-simple', 'rose'], '📖': ['book-open-text', 'sky'], '👤': ['user', 'lilac'], '🗑': ['trash', 'coral'], '🎨': ['palette', 'rose'], '⏳': ['hourglass-medium', 'ink'],
   '🔍': ['magnifying-glass', 'ink'], '📍': ['map-pin', 'coral'], '🔔': ['bell', 'gold'], '❓': ['question', 'sky'], '🗺': ['map-trifold', 'sky'], '🧾': ['receipt', 'ink'], '💳': ['credit-card', 'ink'], '🪪': ['identification-card', 'ink'],
   '🎯': ['target', 'coral'], '🧠': ['brain', 'rose'], '👁': ['eye', 'ink'], '📄': ['file-code', 'sky'], '🔨': ['hammer', 'coral'], '🏅': ['medal', 'gold'], '📣': ['megaphone', 'rose'], '🎟': ['ticket', 'gold'], '🛍': ['shopping-bag', 'rose'],
-  '📸': ['camera', 'sky'], '📷': ['camera', 'sky'], '🏦': ['bank', 'gold'], '⚖': ['scales', 'ink'], '🧪': ['flask', 'lilac'], '🌱': ['plant', 'mint'], '🌾': ['grains', 'mint'], '⛏': ['pick', 'coral'], '🎣': ['fish-simple', 'sky'], '🪓': ['axe', 'coral'],
-  '🦋': ['butterfly', 'rose'], '🧲': ['magnet', 'coral'], '📨': ['envelope-open', 'rose'], '🚀': ['rocket-launch', 'lilac'], '🔑': ['key', 'gold'], '🏁': ['flag-checkered', 'ink'], '▶': ['play', 'mint'], '⏸': ['pause', 'ink'], '💡': ['lightbulb', 'gold'], '🔕': ['bell-slash', 'ink'], '👥': ['users', 'lilac'], '💺': ['armchair', 'mint'], '🪞': ['user-focus', 'rose'], '👕': ['t-shirt', 'rose'], '🥣': ['bowl-food', 'mint'], '💎': ['diamond', 'sky'], '🍹': ['cookie', 'rose'], '🏭': ['factory', 'coral'], '🌾': ['grains', 'mint'], '🥖': ['bread', 'gold'], '🎉': ['confetti', 'rose'], '📮': ['mailbox', 'rose'], '🪑': ['chair', 'mint'], '🎵': ['music-notes', 'lilac'], '🧳': ['suitcase', 'gold'], '🗓': ['calendar', 'rose'], '🧑‍🍳': ['chef-hat', 'mint'], '🎓': ['graduation-cap', 'sky'], '🔭': ['binoculars', 'lilac'], '🛡': ['shield-check', 'mint'], '🚫': ['prohibit', 'coral'], '➕': ['plus', 'mint'], '➖': ['minus', 'coral'], '🔁': ['repeat', 'sky'], '♻': ['recycle', 'mint'], '🪄': ['magic-wand', 'lilac'], '🌈': ['rainbow', 'rose'], '❤': ['heart', 'rose'], '💖': ['heart', 'rose'], '🗳': ['archive-box', 'ink'],
+  '📸': ['camera', 'sky'], '📷': ['camera', 'sky'], '🏦': ['bank', 'gold'], '⚖': ['scales', 'ink'], '🧪': ['flask', 'lilac'], '🌱': ['plant', 'mint'], '🌾': ['grains', 'mint'], '⛏': ['hammer', 'coral'], '🎣': ['fish-simple', 'sky'], '🪓': ['axe', 'coral'],
+  '🦋': ['butterfly', 'rose'], '🧲': ['magnet', 'coral'], '📨': ['envelope-open', 'rose'], '🚀': ['rocket-launch', 'lilac'], '🔑': ['key', 'gold'], '🏁': ['flag-checkered', 'ink'], '▶': ['play', 'mint'], '⏸': ['pause', 'ink'], '💡': ['lightbulb', 'gold'], '🔕': ['bell-slash', 'ink'], '👥': ['users', 'lilac'], '💺': ['armchair', 'mint'], '🪞': ['user-focus', 'rose'], '👕': ['t-shirt', 'rose'], '🥣': ['bowl-food', 'mint'], '💎': ['diamond', 'sky'], '🍹': ['cookie', 'rose'], '🏭': ['factory', 'coral'], '🌾': ['grains', 'mint'], '🥖': ['bread', 'gold'], '🎉': ['confetti', 'rose'], '📮': ['mailbox', 'rose'], '🪑': ['chair', 'mint'], '🎵': ['music-notes', 'lilac'], '🧳': ['suitcase', 'gold'], '🗓': ['calendar', 'rose'], '🧑‍🍳': ['chef-hat', 'mint'], '🎓': ['graduation-cap', 'sky'], '🔭': ['binoculars', 'lilac'], '🛡': ['shield-check', 'mint'], '🚫': ['prohibit', 'coral'], '➕': ['plus', 'mint'], '➖': ['minus', 'coral'], '🔁': ['repeat', 'sky'], '♻': ['recycle', 'mint'], '🪄': ['magic-wand', 'lilac'], '🌈': ['rainbow', 'rose'], '❤': ['heart', 'rose'], '💖': ['heart', 'rose'], '🗳': ['archive', 'ink'],
 };
 const UI_EMO_RE = new RegExp('^\\s*(' + Object.keys(UI_ICONS).sort((a, b) => b.length - a.length).map(k => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|') + ')\\uFE0F?\\s*');
 /** Icono suelto (en línea con el texto) */
@@ -4502,6 +4509,10 @@ const ItemArt = (() => {
     globe() { const g = G(); put(g, SG(0.42, 22, 16), M(0x42a5f5, { smooth: true, r: 0.35 }), [0, 0.6, 0]); [[0.3, 0.75, 0.2, 1.4], [-0.25, 0.5, 0.28, 1.1], [0.05, 0.38, 0.38, 0.9], [-0.1, 0.92, 0.12, 0.8]].forEach(([x, y, z, s]) => {
         const p = put(g, SG(0.16 * s, 10, 8), M(0x66bb6a), [x, y, z], [0, 0, 0], [1, 0.8, 0.45]); p.lookAt(x * 3, 0.6 + (y - 0.6) * 3, z * 3); });
       put(g, TG(0.5, 0.025, 6, 30, PI * 1.2), GOLD(), [0, 0.6, 0], [0, 0.4, PI * 0.9]); put(g, CG(0.04, 0.05, 0.16, 8), GOLD(), [0, 0.1, 0]); put(g, CG(0.22, 0.26, 0.06, 18), M(0x5d4037), [0, 0.03, 0]); return g; },
+    parcel(c = 0xc69c6d, tw = 0xf5e6c8) { const g = G(); put(g, BG(0.82, 0.56, 0.7), M(c), [0, 0.28, 0], [0, 0.25, 0]); const s = sub(g, [0, 0.25, 0]);
+      put(s, BG(0.84, 0.04, 0.06), M(tw), [0, 0.57, 0]); put(s, BG(0.06, 0.04, 0.72), M(tw), [0, 0.57, 0]); put(s, BG(0.06, 0.58, 0.72), M(tw), [0, 0.28, 0], [0, 0, 0], [1, 1, 1.01]); put(s, BG(0.84, 0.58, 0.06), M(tw), [0, 0.28, 0], [0, 0, 0], [1.01, 1, 1]);
+      [-1, 1].forEach(k => put(s, TG(0.08, 0.025, 6, 12), M(tw), [k * 0.08, 0.63, 0], [PI / 2, 0, k * 0.6])); put(s, BG(0.3, 0.2, 0.02), WHITE(), [0.18, 0.36, 0.36]); put(s, BG(0.2, 0.025, 0.01), M(0x90a4ae), [0.18, 0.39, 0.372]);
+      put(s, CG(0.06, 0.06, 0.02, 12), M(0xe53935), [-0.22, 0.42, 0.36], [PI / 2, 0, 0]); return g; },
     token(c = 0x8888aa) { const g = G(), s = sub(g, [1.1, 0, 0], [0, 0.45, 0]); put(s, CG(0.48, 0.48, 0.12, 28), M(c, { m: 0.3, r: 0.35 }), [0, 0, 0]); put(s, TG(0.42, 0.03, 6, 28), GOLD(), [0, 0.065, 0], [PI / 2, 0, 0]);
       put(s, XG(starShape(0.22, 0.1), 0.05, 0.015), M(0xffffff), [0, 0.09, 0], [-PI / 2, 0, 0]); return g; },
   };
@@ -4526,6 +4537,7 @@ const ItemArt = (() => {
     nimbus_cotton: ['note'], floating_drop: ['notes'], wind_feather: ['disc'], air_seed: ['disc', 0xffc53d, 0xec407a], sleeping_bolt: ['mic'],
     echo_mud: ['screen'], whisper_reed: ['film'], purple_peat: ['rings'], slow_firefly: ['flame'], bottled_secret: ['plaque'],
     living_papyrus: ['tube'], wandering_ink: ['pencil'], origami_card: ['easel'], ancient_seal: ['painting'], blank_page: ['bottle', 0xff8f00],
+    parcel: ['parcel'], sealed_doc: ['scroll', 0xc62828], lottery_ticket: ['ticket', 0x80deea, 0x1565c0],
     lunar_glass: ['pan'], volt_gear: ['tv'], nimbus_cloth: ['synth'], lava_ink: ['genart'], neon_bait: ['ramen'], ash_brick: ['robot'], prism_paper: ['plate'], edge_compass: ['globe'],
   };
   /** Color del oficio (objetos de perfil): sustituye el color por defecto de la plantilla */
@@ -4850,7 +4862,7 @@ const MEME_IDEAS = [['CUANDO EL OSO ACEPTA $TOKEN', 'PASTELES TO THE MOON'], ['E
 function mountMemeTool(b) {
   b.innerHTML = `<div class="grid grid-cols-1 md:grid-cols-2 gap-4"><div class="space-y-3"><label class="block text-xs font-bold text-slate-500">PLANTILLA</label><select id="mTpl" class="game w-full">${MEME_TPL.map(t => `<option value="${t.id}">${t.name}</option>`).join('')}</select>
     <label class="block text-xs font-bold text-slate-500">TEXTO ARRIBA</label><input id="mTop" class="game w-full" maxlength="60" value="${MEME_IDEAS[0][0]}"><label class="block text-xs font-bold text-slate-500">TEXTO ABAJO</label><input id="mBot" class="game w-full" maxlength="60" value="${MEME_IDEAS[0][1]}">
-    <div class="flex flex-wrap gap-2 pt-1"><button id="mRand" class="btn-game px-3 py-2 bg-fuchsia-300 text-sm">🎲 Idea IA</button><button id="mDown" class="btn-game px-3 py-2 bg-emerald-300 text-sm">⬇️ Descargar PNG</button><button id="mTweet" class="btn-game px-3 py-2 bg-sky-300 text-sm">🐦 Tuitear</button></div>
+    <div class="flex flex-wrap gap-2 pt-1"><button id="mRand" class="btn-game px-3 py-2 bg-fuchsia-300 text-sm">🎲 Idea IA</button><button id="mPub" class="btn-game px-3 py-2 bg-amber-300 text-sm">📣 Publicar</button><button id="mDown" class="btn-game px-3 py-2 bg-emerald-300 text-sm">⬇️ Descargar PNG</button><button id="mTweet" class="btn-game px-3 py-2 bg-sky-300 text-sm">🐦 Tuitear</button></div>
     <p class="text-xs text-slate-500">Descarga la imagen y adjúntala al tuit. #MicroWorld #TOKEN</p></div><canvas id="mCanvas" width="600" height="600" class="w-full rounded-xl border-[3px] border-[#2b2b3d] shadow"></canvas></div>`;
   const c = b.querySelector('#mCanvas'), ctx = c.getContext('2d'), tpl = b.querySelector('#mTpl'), top = b.querySelector('#mTop'), bot = b.querySelector('#mBot');
   const drawText = (text, y, base) => { ctx.font = 'bold 44px Impact, "Arial Black", Fredoka, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = base; ctx.lineWidth = 8; ctx.strokeStyle = '#000'; ctx.fillStyle = '#fff'; const words = text.toUpperCase().split(' '); const lines = []; let cur = ''; words.forEach(w => { if (ctx.measureText(cur + ' ' + w).width > 560 && cur) { lines.push(cur); cur = w; } else cur = cur ? cur + ' ' + w : w; }); if (cur) lines.push(cur); lines.forEach((l, i) => { const yy = base === 'top' ? y + i * 52 : y - (lines.length - 1 - i) * 52; ctx.strokeText(l, 300, yy); ctx.fillText(l, 300, yy); }); };
@@ -4861,6 +4873,7 @@ function mountMemeTool(b) {
     if (top.value.trim()) drawText(top.value, 20, 'top'); if (bot.value.trim()) drawText(bot.value, 580, 'bottom'); };
   [tpl, top, bot].forEach(el => el.addEventListener('input', draw));
   b.querySelector('#mRand').onclick = () => { const idea = MEME_IDEAS[Math.floor(Math.random() * MEME_IDEAS.length)]; top.value = idea[0]; bot.value = idea[1]; tpl.value = MEME_TPL[Math.floor(Math.random() * MEME_TPL.length)].id; draw(); playBeep(880, 0.06); };
+  b.querySelector('#mPub').onclick = () => { taskTick('meme'); GS.stats.memesCreated = (GS.stats.memesCreated || 0) + 1; playChime(); showToast('📣 ¡Meme publicado! Barnaby Jr. y Pip ya lo están compartiendo, bro', 'text-white'); SaveSystem.save('meme'); };   // v2.9.1: cuenta para el encargo de los erizos
   b.querySelector('#mDown').onclick = () => { const a = document.createElement('a'); a.download = 'meme-token.png'; a.href = c.toDataURL('image/png'); a.click(); };
   b.querySelector('#mTweet').onclick = () => window.open('https://twitter.com/intent/tweet?text=' + encodeURIComponent(`${top.value} — ${bot.value} 💰 #MicroWorld #TOKEN`), '_blank');
   draw();
@@ -5594,7 +5607,7 @@ function runLotteryDraw() {
     addLetter('🏛️ Lotería Municipal', `Sorteo semanal celebrado. Número ganador: ${numTxt}. ${myTickets.length ? `Sus boletos (${myTickets.map(t => String(t.num).padStart(3, '0')).join(', ')}) no resultaron premiados. ` : 'Sin ganador esta semana. '}El pozo crece a ${fmt(Math.floor(L.pool))} $TOKEN para el próximo sorteo. ¡Ejem!`);
   }
   L.lastDraw = { num, at: Date.now(), winner: !!winTicket && prize > 0, prize, myCount: myTickets.length };
-  L.tickets = [];
+  L.tickets = []; syncLotteryTickets();   // v2.9.1: los boletos de la mochila se canjean en el sorteo
   L.nextDrawAt = nextSunday20();
   SaveSystem.saveNow('lottery-draw');
 }
@@ -5602,11 +5615,13 @@ function runLotteryDraw() {
 function buyLotteryTicket(num = null) {
   const L = GS.lottery; L.tickets ||= [];
   if (L.tickets.length >= CFG.lotteryMaxPerDay) { showToast(`🎫 Máximo ${CFG.lotteryMaxPerDay} boletos por sorteo`, 'text-red-200'); return false; }
+  if (!Inventory.has('lottery_ticket', 1) && !Inventory.canAdd('lottery_ticket', 1)) { showToast('🎒 Haz hueco en la mochila para el boleto', 'text-red-200'); return false; }   // v2.9.1: el boleto va a la mochila
   if (!Wallet.spend(CFG.lotteryTicketPrice, 'Boleto de lotería')) return false;
   if (num == null || isNaN(num)) num = Math.floor(Math.random() * 1000);
   num = clamp(Math.floor(num), 0, 999);
   L.tickets.push({ num, day: GS.daily.dayCount });
   L.pool += CFG.lotteryTicketPrice;   // recirculación total: tasas + boletos (Sec. 4.7)
+  syncLotteryTickets();
   showToast(`🎫 Boleto nº ${String(num).padStart(3, '0')} · ¡suerte, soñador!`, 'text-white');
   playBeep(1046, 0.08, 'triangle'); SaveSystem.saveNow('lottery-ticket'); return true;
 }
@@ -6137,7 +6152,7 @@ const Fishing = (() => {
     if (!SaveSystem.started) return;
     const id = rollCatch();
     if (!Inventory.canAdd(id, 1)) { showToast('🎒 Inventario lleno: devuelves la captura al agua', 'text-red-200'); return; }
-    if (NetUp.wears('fishing_rod')) Tools.wear('fishing_rod'); Inventory.add(id, 1, { silent: true }); Net.grant('fish');   // v1.3: Caña de Coral (dura el doble) · brotes del origen al pescar
+    if (NetUp.wears('fishing_rod')) Tools.wear('fishing_rod'); Inventory.add(id, 1, { silent: true }); Net.grant('fish'); taskTick('gather');   // v1.3: Caña de Coral (dura el doble) · brotes del origen al pescar
     GS.stats.fishCaught = (GS.stats.fishCaught || 0) + 1;
     const it = ITEMS[id];
     showToast(id === 'old_boot' ? '🥾 ¡Una Bota Vieja! Arrr, un clásico' : `${it.icon} ¡Has pescado ${it.name}!`, 'text-white');
@@ -6190,7 +6205,7 @@ const Mining = (() => {
     if (!Inventory.canAddMany(loot)) { showToast('🎒 Inventario lleno: haz hueco antes de minar', 'text-red-200'); return; }
     if (NetUp.wears('pickaxe')) Tools.wear('pickaxe');   // v1.3: Pico Voltaico (no se gasta con niebla)
     loot.forEach(([id, q]) => Inventory.add(id, q, { silent: true })); Net.grant('mine');   // v1.3: materiales de tu origen al minar
-    GS.stats.nodesMined = (GS.stats.nodesMined || 0) + 1; if (gem) GS.stats.gemsMined = (GS.stats.gemsMined || 0) + 1;   // v1.0: logro «Pico de plata»
+    GS.stats.nodesMined = (GS.stats.nodesMined || 0) + 1; taskTick('pick'); taskTick('gather'); if (gem) GS.stats.gemsMined = (GS.stats.gemsMined || 0) + 1;   // v1.0: logro «Pico de plata»
     showToast(gem ? `💎 ¡Gema en Bruto! + ⛰️ ×${stones}` : `⛏️ +${stones} ⛰️ Piedra`, 'text-white');
     if (gem) playChime(); else playBeep(330, 0.08, 'square');
     setReady(g, false);
@@ -6732,7 +6747,7 @@ const Gather = (() => {
   /** v2.6 · E4: montículos y señales por zonas: unos en el desierto (más fósiles, monedas y cofres) y otros cerca del pueblo */
   const spawnAt = (r, where) => { for (let i = 0; i < 40; i++) { const d = WGEO.v3(where === 'desert' ? World.around('desert', r, 12.5) : World.around('town', r, G.nearM, 7)); if (isLand(d) && !nearAnySite(d, 0) && !reserved(d) && World.slopeAt(d) < 0.5 && !colliders.some(c => c.pos.distanceTo(_v.copy(d).multiplyScalar(heightAt(d))) < c.r + 0.8)) return d; } return null; };
   const roll = (tbl) => { let s = Math.random() * tbl.reduce((a, x) => a + x[1], 0); for (const [id, w, q] of tbl) if ((s -= w) < 0) return [id, typeof q === 'number' ? q : q[0] + Math.floor(Math.random() * (q[1] - q[0] + 1))]; return null; };
-  const give = (list, label) => { const ok = list.filter(Boolean); if (!Inventory.canAddMany(ok, null)) { showToast('🎒 Inventario lleno', 'text-red-200'); return false; } ok.forEach(([id, q]) => Inventory.add(id, q, { silent: true })); if (ok.length) showToast(`${label} → ${ok.map(([id, q]) => `${ITEMS[id].icon} ${ITEMS[id].name} ×${q}`).join(' · ')}`, 'text-white'); return true; };
+  const give = (list, label) => { const ok = list.filter(Boolean); if (!Inventory.canAddMany(ok, null)) { showToast('🎒 Inventario lleno', 'text-red-200'); return false; } ok.forEach(([id, q]) => Inventory.add(id, q, { silent: true })); if (ok.length) taskTick('gather'); if (ok.length) showToast(`${label} → ${ok.map(([id, q]) => `${ITEMS[id].icon} ${ITEMS[id].name} ×${q}`).join(' · ')}`, 'text-white'); return true; };
   const needTool = (id) => { if (Tools.usable(id)) return true; showToast(Tools.needMsg(id), 'text-red-200'); return false; };
   const sfx = () => { playBeep(320 + Math.random() * 80, 0.06, 'square'); };
 
@@ -8345,7 +8360,7 @@ function awakeningChainHTML() {
    Nota: la 🎪 Feria del Sábado (puestos de los vecinos, ofertas de tienda) NO es la
    📈 Feria del Tablón de la v0.8 (especulación por categorías): conviven sin tocarse.
    ========================================================= */
-const GAME_VERSION = '2.9', GAME_TAG = 'Iconos y retratos';
+const GAME_VERSION = '2.9.1', GAME_TAG = 'Encargos y mensajería';
 /* ---------- 🗓️ EVENTOS: calendario REAL → flags que leen los sistemas existentes (Sec. 10.10) ---------- */
 const Events = {
   _force: null,   // DBG.weekday(n): simula el día de la semana real (0 = domingo … 6 = sábado)
@@ -8459,7 +8474,7 @@ const Museum = {
     if (this.has(id)) { showToast('🏛️ Esa pieza ya está expuesta', 'text-white'); return false; }
     if (this.owned(id) < 1) { showToast(`❌ No tienes ${museumPieceInfo(id).name}`, 'text-red-200'); return false; }
     let num = null;
-    if (id === 'lottery_ticket') { const t = GS.lottery.tickets.pop(); num = t?.num ?? null; }   // el boleto deja de participar (el pozo no cambia)
+    if (id === 'lottery_ticket') { const t = GS.lottery.tickets.pop(); num = t?.num ?? null; syncLotteryTickets(); }   // el boleto deja de participar (el pozo no cambia)
     else if (!Inventory.remove(id, 1)) return false;
     const m = this.st(); m.donated.push({ id, at: Date.now(), day: GS.daily.dayCount, by: this.donorName(), ...(num != null ? { num } : {}) });
     GS.stats.museumDonations = (GS.stats.museumDonations || 0) + 1;
@@ -10260,6 +10275,94 @@ const Util = {
   },
   usesOf(id) { return [...(this.uses()[id] || [])]; },
 };
+/* ===== v2.9.1 · 📋 ENCARGOS NUEVOS, MENSAJERÍA Y BOLETO EN LA MOCHILA (Guía Maestra 2, Bloque I · Guía 1, Sec. 3.4, 4.7 y 7.6) =====
+   - La tabla de encargos de la Guía 1 completa: harina, mermelada, pescado, café, gema, fragmento de estrella y encargos de tarea
+     (publicar un meme, 3 golpes de pico, 5 recursos, la tasa 3 días seguidos).
+   - Mensajería: Sam y el Mayor te dan un paquete (sin valor de venta) para otro vecino. Al entregarlo, +1 de confianza con los dos.
+     Si se queda en la mochila a medianoche, caduca.
+   - Los boletos de lotería se ven en la mochila (Boleto de Lotería): se canjean solos en el sorteo del domingo. */
+Object.assign(ITEMS, {
+  parcel:         defItem({ id: 'parcel',         name: 'Paquete de Sam',    icon: '📦', cat: 'special', rarity: 'uncommon', sell: 0, desc: 'Atado con cuerda de barco. Es para Madame Sombra: no lo agites. Caduca a medianoche.' }),
+  sealed_doc:     defItem({ id: 'sealed_doc',     name: 'Documento Sellado', icon: '📜', cat: 'special', rarity: 'uncommon', sell: 0, desc: 'Formulario 9-C con el lacre del Mayor: un permiso de obra para Glover, en mano. Caduca a medianoche.' }),
+  lottery_ticket: defItem({ id: 'lottery_ticket', name: 'Boleto de Lotería', icon: '🎟️', cat: 'special', rarity: 'uncommon', sell: 0, usable: true, desc: 'Tus boletos para el sorteo del domingo a las 20:00. Se canjean solos en el sorteo. Usar: ver tus números.' }),
+});
+NO_GIFT.push('parcel', 'sealed_doc', 'lottery_ticket');
+ITEM_EFFECTS.lottery_ticket = () => { openLottery(); return false; };   // no se gasta: abre la lotería
+const COURIER_ITEMS = ['parcel', 'sealed_doc'];
+[['bear', [{ id: 'b4', item: 'flour', qty: 2, tokens: 70, trust: 3, text: '¡2 Harinas para el horno! Hoy hay hornada doble y el molino no da abasto.' },
+           { id: 'b5', item: 'golden_jam', qty: 1, tokens: 100, trust: 4, text: 'Una Mermelada Dorada… quiero probar la competencia. Por ciencia repostera, ¿eh?' }]],
+ ['hedgehogs', [{ id: 'h4', type: 'task', task: 'meme', n: 1, tokens: 60, trust: 2, text: '¡BRO! Crea 1 meme en el estudio y publícalo. El algoritmo tiene hambre.' },
+                { id: 'h5', item: 'coffee', qty: 1, tokens: 80, trust: 3, text: '1 Café, bro, que no dormimos. Literalmente: esto es un sueño.' }]],
+ ['dax', [{ id: 'd4', item: 'fish', qty: 1, tokens: 50, trust: 3, text: '¡1 Pescado! ¡Para ciencia! No preguntes qué ciencia.' },
+          { id: 'd5', item: 'raw_gem', qty: 1, tokens: 130, trust: 5, text: '1 Gema en Bruto. No preguntes. En serio, no preguntes.' }]],
+ ['glover', [{ id: 'g4', type: 'task', task: 'pick', n: 3, tokens: 70, trust: 3, text: 'Repara algo hoy: usa tu pico 3 veces. La obra no se hace sola, y las piedras tampoco.' }]],
+ ['sam', [{ id: 's_par', type: 'courier', to: 'sombra', item: 'parcel', tokens: 80, trust: 3, text: 'Llévale este paquete a Madame Sombra. No lo agites. Ni lo abras. Ni lo mires mucho, arrr.' }]],
+ ['mayor', [{ id: 'm4', type: 'task', task: 'gather', n: 5, tokens: 60, trust: 2, text: '¡Ejem! Recoge 5 recursos para el municipio: conchas, troncos, piedras, frutas… lo que el sueño dé.' },
+            { id: 'm5', type: 'task', task: 'fee', n: 3, tokens: 100, trust: 4, text: 'Paga tu tasa municipal 3 días seguidos. Un ciudadano ejemplar no se retrasa. Formulario 3-T.' },
+            { id: 'm6', type: 'courier', to: 'glover', item: 'sealed_doc', tokens: 70, trust: 3, text: 'Lleva este documento sellado a Glover: permiso de obra 9-C. ¡En mano, que va lacrado!' }]],
+ ['sombra', [{ id: 'o4', item: 'star_shard', qty: 1, tokens: 150, trust: 5, text: '1 Fragmento de Estrella. No preguntes para qué.' }]],
+].forEach(([npc, list]) => NPC_SOCIAL[npc].encargos.push(...list));
+/* --- 📊 tareas del día: lo que cuentan los encargos de tarea (se reinicia cada día; la racha de la tasa no) --- */
+const TASK_INFO = { meme: ['📣', 'memes publicados hoy'], pick: ['⛏', 'golpes de pico hoy'], gather: ['🧺', 'recursos recogidos hoy'], fee: ['🏛', 'días seguidos con la tasa pagada'] };
+DailySystem.onSettle(() => {
+  const t = taskSt(), paid = (GS.daily.lastCharges || []).some(c => /Tasa municipal/.test(c.label || '') && c.amount < 0); t.taxStreak = paid ? (t.taxStreak | 0) + 1 : 0;
+  let lost = []; COURIER_ITEMS.forEach(id => { const n = Inventory.count(id); if (n) { Inventory._removeRaw(id, n); lost.push(ITEMS[id].name); } });   // el paquete caduca a medianoche
+  if (lost.length) { refreshInvBadge(); addLetter('🐶 Mayor Reginald', `¡Ejem! Consta en el registro que ${lost.join(' y ')} no llegó a su destino antes de medianoche. Ha sido devuelto a origen. Mañana habrá más recados.`); }
+});
+/* --- 📦 mensajería: aceptar, entregar al destinatario y el botón en su diálogo --- */
+function acceptCourier(npcId) {
+  const cur = currentEncargo(npcId), q = cur?.q; if (!q || q.type !== 'courier' || cur.done) return false;
+  if (Inventory.has(q.item, 1)) { cur.enc.accepted = true; return true; }
+  if (!Inventory.canAdd(q.item, 1)) { showToast('🎒 Haz hueco en la mochila para el paquete', 'text-red-200'); return false; }
+  Inventory._addRaw(q.item, 1); refreshInvBadge(); cur.enc.accepted = true; playBeep(880, 0.06, 'triangle');
+  showToast(`${ITEMS[q.item].icon} ${ITEMS[q.item].name} en la mochila · llévaselo a ${npcById[q.to].name} antes de medianoche`, 'text-white'); SaveSystem.saveNow('courier-accept:' + npcId); return true;
+}
+function deliverCourier(senderId) {
+  const e = GS.encargos[senderId], q = e && encargoDef(senderId, e); if (!q || q.type !== 'courier' || e.done || e.day !== GS.daily.dayCount) return false;
+  if (!Inventory.has(q.item, 1)) { showToast(`❌ No llevas ${ITEMS[q.item].name}`, 'text-red-200'); return false; }
+  Inventory.remove(q.item, 1); e.done = true; GS.stats.encargosDone = (GS.stats.encargosDone || 0) + 1; GS.stats.couriers = (GS.stats.couriers || 0) + 1;
+  Wallet.add(q.tokens, `Encargo: ${npcById[senderId].name} (mensajería)`); Merchant.payContract('encargos');
+  Trust.add(senderId, q.trust + 1, 'encargo:mensajeria'); Trust.add(q.to, 1, 'mensajeria');   // +1 con los dos (Guía 1, 7.6)
+  playChime(); const o = npcObjs[q.to]; if (o) spawnConfetti(o.position.clone().addScaledVector(o.userData.up, 2), 12);
+  showToast(`${npcById[q.to].emoji} ${npcById[q.to].name} recibe ${ITEMS[q.item].name}: +${q.tokens} $T y +1 de confianza con los dos`, 'text-white'); SaveSystem.saveNow('courier:' + senderId); return true;
+}
+/** Botones de mensajería en el diálogo del destinatario */
+function courierBtns(npcId) {
+  const out = [];
+  Object.keys(GS.encargos || {}).forEach(s => { const e = GS.encargos[s]; if (!e || e.done || e.day !== GS.daily.dayCount || !npcById[s]) return; const q = encargoDef(s, e);
+    if (q?.type === 'courier' && q.to === npcId && Inventory.has(q.item, 1)) out.push(dialogButton(`📦 Entregar ${ITEMS[q.item].name}`, 'bg-amber-200 text-[#2b2b3d]', (ev) => { if (deliverCourier(s)) ev?.currentTarget?.remove?.(); })); });
+  return out;
+}
+/** Línea de un encargo (lista de encargos de hoy y paneles) */
+function encargoLine(npcId, cur) {
+  const q = cur.q;
+  if (q.type === 'task') { const [ic, lb] = TASK_INFO[q.task]; return `${uiIco(ic)} ${esc(lb)}: <b>${Math.min(taskProgress(q.task), q.n)}/${q.n}</b>`; }
+  if (q.type === 'courier') return `${itemIcon(q.item, 18)} Llevar a ${npcFace(q.to, 18, npcById[q.to].emoji)} ${esc(npcById[q.to].name)}${cur.done ? '' : Inventory.has(q.item, 1) ? ' <span class="text-emerald-600">(en la mochila)</span>' : ''}`;
+  const it = ITEMS[q.item]; return `${itemIcon(it.id, 18)} ${q.qty}× ${esc(it.name)} <span class="text-slate-400">(${Inventory.count(q.item)}/${q.qty})</span>`;
+}
+/** Panel de un encargo de tarea o de mensajería (los de objeto siguen con su panel de siempre) */
+function encargoSpecialHTML(npcId, cur) {
+  const n = npcById[npcId], q = cur.q, rew = `<div class="text-xs text-slate-500 mt-2">Recompensa: <b class="text-amber-600">${COIN} ${q.tokens} $TOKEN</b> + <b>🤝 ${q.trust}${q.type === 'courier' ? ' (+1 con los dos)' : ''} de confianza</b></div>`;
+  if (q.type === 'task') { const [ic, lb] = TASK_INFO[q.task], p = Math.min(taskProgress(q.task), q.n), ok = p >= q.n;
+    return `<div class="app-card p-4"><div class="flex items-start gap-3">${uiChip(ic, 'lg')}<div class="flex-1 min-w-0"><div class="font-bold text-[#2b2b3d]">${npcFace(npcId, 22, n.emoji)} ${n.name} pide:</div><p class="text-sm text-slate-600 mt-1">“${q.text}”</p>
+      <div class="h-2.5 rounded-full bg-slate-200 overflow-hidden mt-3"><div class="h-full bg-emerald-400" style="width:${Math.round(p / q.n * 100)}%"></div></div><div class="text-sm font-bold mt-1 ${ok ? 'text-emerald-600' : 'text-slate-600'}">${p}/${q.n} ${esc(lb)}</div>${rew}</div></div>
+      <div class="flex justify-end mt-3"><button data-deliver class="btn-game px-4 py-2 text-sm bg-emerald-300" ${ok ? '' : 'disabled'}>✅ Entregar encargo</button></div></div>`; }
+  const to = npcById[q.to], has = Inventory.has(q.item, 1);
+  return `<div class="app-card p-4"><div class="flex items-start gap-3"><div class="leading-none item-big">${itemIcon(q.item, 44)}</div><div class="flex-1 min-w-0"><div class="font-bold text-[#2b2b3d]">${npcFace(npcId, 22, n.emoji)} ${n.name} pide:</div><p class="text-sm text-slate-600 mt-1">“${q.text}”</p>
+    <div class="text-sm font-bold mt-2">${has ? `<span class="text-emerald-600">Lo llevas en la mochila: habla con ${npcFace(q.to, 20, to.emoji)} ${to.name}</span>` : `Destino: ${npcFace(q.to, 20, to.emoji)} ${to.name}`}</div>
+    <div class="text-[11px] text-slate-500 mt-1">Sin valor de venta. Si se queda en la mochila a medianoche, caduca.</div>${rew}</div></div>
+    ${has ? '' : `<div class="flex justify-end mt-3"><button data-accept class="btn-game px-4 py-2 text-sm bg-amber-300">📦 Coger el paquete</button></div>`}</div>`;
+}
+/* --- 🎟️ los boletos de la lotería también en la mochila (el número de boletos manda: GS.lottery.tickets) --- */
+function syncLotteryTickets() {
+  try { const want = (GS.lottery?.tickets || []).length, have = Inventory.count('lottery_ticket');
+    if (want > have && Inventory.canAdd('lottery_ticket', want - have)) Inventory._addRaw('lottery_ticket', want - have); else if (have > want) Inventory._removeRaw('lottery_ticket', have - want);
+    refreshInvBadge(); } catch (e) {}
+}
+/** v2.9.1 · tareas del día (funciones sueltas: se pueden llamar desde cualquier parte del juego) */
+function taskSt() { const t = (GS.tasks ||= {}), d = GS.daily.dayCount | 0; if (t.day !== d) { t.day = d; t.meme = 0; t.pick = 0; t.gather = 0; } t.taxStreak ??= 0; return t; }
+function taskTick(k, n = 1) { try { const t = taskSt(); t[k] = (t[k] || 0) + n; } catch (e) {} }
+function taskProgress(task) { const t = taskSt(); return task === 'fee' ? t.taxStreak | 0 : t[task] | 0; }
 /* recetas de cocina nuevas */
 RECIPES.push(
   { id: 'golden_fish_grill', out: 'golden_fish_grill', qty: 1, in: [['golden_fish', 1]], gourmet: true },
@@ -12127,6 +12230,7 @@ function applyGameStateToWorld() {
   Net.apply();         // v1.3
   Util.placeBench();   // v2.5: banco de trabajo junto a casa
   WorldFX.build();     // v2.6: postes de viaje, telescopio y estrella de la cima
+  syncLotteryTickets();   // v2.9.1: los boletos que ya tenías aparecen en la mochila
   Island.build(); Island.restore(); Voyage.placeShip();   // v2.8: la isla (con niebla hasta descubrirla) y el barco si te quedaste allí
   Studio.place();      // v1.6: estudio del perfil junto a casa (si ya tienes perfil): Red del Sueño (re-engancha el mundo de bots; si recargaste dentro, despiertas en casa)
   state.tokensShown = GS.economy.money; ui.tokenValue.textContent = state.tokensShown.toLocaleString('es-ES');
@@ -12586,7 +12690,7 @@ DBG.refs = DBG_REFS;
 if (/[?&]debug=1\b/.test(location.search)) window._dbg = DBG_REFS;   // v1.0: ya no es global por defecto
 /* v1.1 · Interior caminable de la casa (Sec. 6.9 Fase 2) */
 /** v1.5 · capturas: DBG.tp(x, z) lleva al jugador a (x, z) del pueblo · DBG.view(dist, pitch, yaw) fija la cámara · DBG.shot('B'|'C'|'D'|'G'|'H') prepara la escena del protocolo */
-DBG.g = { World, WGEO, WorldFX, TRAVEL_POSTS, Island, Voyage, TRIBE, ship, state, IconStudio, ItemArt, itemIcon, PhGlyph, startDialog, openInventory, openHousePanel, addLetter, endDialog, openShop, openGiftPicker, Gather, Mining, npcObjs, interactables, colliders, SITES, NPCS, CFG, get house() { return house; }, scene, renderer, camera, cam, sky, water, atmo, clouds, PostFX, SkyEnv, PlanetAO, WATER_U, POST_U, Gather, Studio, ToolAnim, Profiles, Hub, Decor, Fitting, player, Interiors };   // v1.5: referencias gráficas para depurar
+DBG.g = { World, WGEO, WorldFX, TRAVEL_POSTS, Island, Voyage, TRIBE, ship, state, IconStudio, ItemArt, itemIcon, PhGlyph, startDialog, openInventory, openHousePanel, addLetter, endDialog, openShop, openGiftPicker, openEncargo, acceptCourier, refreshMissionUI, Gather, Mining, npcObjs, interactables, colliders, SITES, NPCS, CFG, get house() { return house; }, scene, renderer, camera, cam, sky, water, atmo, clouds, PostFX, SkyEnv, PlanetAO, WATER_U, POST_U, Gather, Studio, ToolAnim, Profiles, Hub, Decor, Fitting, player, Interiors };   // v1.5: referencias gráficas para depurar
 DBG.post = (v = !PostFX.active) => { PostFX.active = !!v; POST_U.uPost.value = v ? 1 : 0; return PostFX.active; };
 DBG.env = (v = !SkyEnv.enabled) => SkyEnv.setEnabled(v);
 DBG.ao = (v = true) => { if (!PlanetAO.on) return false; if (v) PlanetAO.bake(); else { const c = planet.geometry.attributes.color; PlanetAO.reset(); c.needsUpdate = true; } return v; };
