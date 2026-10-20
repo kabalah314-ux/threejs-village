@@ -139,6 +139,9 @@
   .hub-t[disabled] { opacity: .5; cursor: not-allowed; }
   .app-card.owned { background: #e8ffe9; }
   input.game, select.game { border:1px solid rgba(35,36,74,.12); border-radius: 12px; padding: 8px 10px; font-family: 'Fredoka'; font-weight: 600; background: #fff; }
+.zone-banner { position: fixed; left: 50%; top: 84px; transform: translate(-50%, -8px); opacity: 0; pointer-events: none; z-index: 40; display: flex; align-items: center; gap: 8px; padding: 7px 18px; border-radius: 999px; background: rgba(32,29,78,.84); color: #fff; font-family: var(--f-disp, Fredoka, sans-serif); font-size: 15px; letter-spacing: .02em; border: 1px solid rgba(255,255,255,.18); box-shadow: 0 6px 20px rgba(13,11,34,.25); transition: opacity .35s, transform .35s; }
+.zone-banner.on { opacity: 1; transform: translate(-50%, 0); }
+body.mobile .zone-banner { top: 70px; font-size: 13px; padding: 6px 14px; }
 </style>
 </head>
 <body class="menu-open">
@@ -519,7 +522,7 @@ import * as THREE from 'three';
 /* =========================================================
    1. CONFIGURACIÓN Y ESTADO
    ========================================================= */
-const R = 16, SEA = R + 0.55;
+const R = 22, SEA = R + 0.55, R16 = R / 16;   // v2.6 · Bloque E1: planeta más grande (antes 16) · R16 = escala respecto al radio antiguo
 const CFG = {
   playerSpeed: 5.4, swimFactor: 0.5, interactDist: 3.2, fruitCooldown: 300000 /* 5 min (antes 60 s, ver informe de balance) */, pickupRespawnMin: { seashell: 3, wood_log: 3, stone: 3, mystic_crystal: 10 },
   /* ===== v0.1 · DÍA ONÍRICO (Guía Maestra Sec. 4.2) ===== */
@@ -591,12 +594,41 @@ const CFG = {
   },
   /* ===== v1.6 · ANIMACIÓN DE HERRAMIENTAS (s) · momento del «impacto» (0–1) ===== */
   toolAnim: { dur: { pickaxe: 0.9, axe: 0.9, shovel: 1.0, bug_net: 0.55, fishing_rod: 0.6, detector: 0.8, studio: 2.4 }, hitAt: { pickaxe: 0.8, axe: 0.8, shovel: 0.85, bug_net: 0.6, fishing_rod: 0.7, detector: 0.9, studio: 0.95 } },
+  /* ===== v2.6 · Bloque E · ZONAS DEL PLANETA (radio 22). Rumbo desde el pueblo: 0 = norte, 90 = este · distancias y radios en metros ===== */
+  world: {
+    zones: {
+      town:     { brg: 0,   m: 0,  rIn: 9,   rOut: 15, name: 'Pueblo',                icon: '🏘️' },
+      south:    { brg: 180, m: 20, rIn: 7,   rOut: 12, name: 'Pueblo',                icon: '🏘️' },   // prado de la futura Calle Mayor (v2.7)
+      fields:   { brg: 4,   m: 21, rIn: 6,   rOut: 11, name: 'Campos de Dax',         icon: '🌾' },
+      forest:   { brg: 47,  m: 30, rIn: 10,  rOut: 15, name: 'Bosque',                icon: '🌲' },
+      pond:     { brg: 69,  m: 21, rIn: 2.2, rOut: 4,  name: 'Charca del Bosque',     icon: '🪷' },
+      hill:     { brg: 100, m: 32, rIn: 3,   rOut: 11, name: 'Colina de las Piedras', icon: '🪨' },
+      desert:   { brg: 139, m: 38, rIn: 9,   rOut: 14, name: 'Desierto',              icon: '🏜️' },
+      mountain: { brg: 333, m: 39, rIn: 8.6, rOut: 12, name: 'Montaña',               icon: '⛰️' },
+      sea:      { port: 22,          rIn: 12,  rOut: 19, name: 'Mar del Borde',         icon: '🌊' },   // a 22 m del muelle de Sam, mar adentro
+    },
+    sites: { workshop: [47, 15], lab: [14, 21], studio: [185, 15], sombra: [100, 32] },   // [rumbo, metros] desde el pueblo
+    base: 1.2, noise: 0.28, townH: 1.02, hillH: 1.1, dunes: 0.75, seaDepth: 2.0, pondDepth: 0.75,
+    mountain: { H: 6.2, top: 1.9, start: 7.9, turns: 1.3, w: 1.15, edge: 0.45 },   // campana de 6,2 m · sendero de 2,3 m de ancho y 1,3 vueltas
+    colors: { sand: 0xf0e2ad, sand2: 0xe8d6a0, rock: 0x8e8f99, rock2: 0x7c7e8a, foot: 0x6aa84f, snow: 0xf6f8fb, snowTint: 0xe6defa, path: 0xd9b98a,
+      forest: 0x4f9a3e, forest2: 0x5aa646, field: 0xa5d867, field2: 0x9ccf5c, hill: 0x8fb37a, dune: 0xf7dfa0, dune2: 0xe9c47e },
+    loot: {   // E4 · el desierto da más fósiles, monedas antiguas y cofres
+      digDesert: [['old_coin', 30, [1, 3]], ['fossil', 22, 1], ['stone', 20, [1, 2]], ['buried_chest', 6, 1], ['raw_gem', 6, 1], ['seashell', 4, 1]],
+      detectDesert: [['old_coin', 30, [3, 5]], ['fossil', 26, 1], ['buried_chest', 24, 1], ['raw_gem', 12, 1], ['star_shard', 8, 1]],
+    },
+    pondFish: { fish: 80, tropical_fish: 6, golden_fish: 2, old_boot: 12 },   // la charca: peces de río y alguna bota
+    forestBugs: 3, forestRare: 2.5, mountainGem: 1.6,   // más bichos (y más arcoíris) en el bosque · más gemas en la montaña
+    slopeMax: 0.84,      // tan 40°: las laderas más empinadas no se suben
+    travelFee: 30,       // $T por viaje entre postes
+    planetDist: 96, seed: 2026,
+  },
   /* ===== v1.6 · RECOLECCIÓN NUEVA ===== */
   gather: {
     chop: { fruit: 0.05, sap: 0.12 },
-    dig: { perDay: 8, ang: 0.55, loot: [['stone', 30, [1, 2]], ['seashell', 18, 1], ['old_coin', 22, [1, 2]], ['dream_sap', 10, 1], ['fossil', 6, 1], ['pearl', 4, 1], ['raw_gem', 3, 1]] },
-    detect: { perDay: 3, ang: 0.9, range: 7, loot: [['old_coin', 30, [2, 4]], ['fossil', 22, 1], ['buried_chest', 18, 1], ['raw_gem', 14, 1], ['pearl', 10, 1], ['star_shard', 6, 1]] },
+    dig: { perDay: 8, desert: 4, loot: [['stone', 30, [1, 2]], ['seashell', 18, 1], ['old_coin', 22, [1, 2]], ['dream_sap', 10, 1], ['fossil', 6, 1], ['pearl', 4, 1], ['raw_gem', 3, 1]] },
+    detect: { perDay: 3, desert: 2, range: 7, loot: [['old_coin', 30, [2, 4]], ['fossil', 22, 1], ['buried_chest', 18, 1], ['raw_gem', 14, 1], ['pearl', 10, 1], ['star_shard', 6, 1]] },
     bug: { day: 5, night: 7, perDay: 10, rare: 0.06, escape: 0.15, lifeS: 60 },
+    nearM: 24,   // v2.6: radio (m) de los montículos y señales «cerca del pueblo»; el resto sale en el desierto
   },
   /* ===== v1.7 · ONLINE REAL (F1) · Supabase compartido con NEURON (esquema crossia) · la clave publicable es pública por diseño ===== */
   online: { url: 'https://glsmahzpvzabeeucyqif.supabase.co', key: 'sb_publishable_SmbXr1nXApZ8HRF1ezbXcg_lqtr2yaZ', lib: 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm', autosaveMin: 5, posEvery: 0.25 },
@@ -610,7 +642,7 @@ const CFG = {
   fishDepthRareBonus: 0.5,        // diseño propio: hasta +50% de raros en agua profunda (la guía solo dice "mejoran la tabla")
   nightStartHour: 20, nightEndHour: 6,   // diseño propio: franja nocturna para botín
   /* ===== v0.4 · MINERÍA (Sec. 5.6) ===== */
-  mineNodes: 4, mineRespawnMin: 10, mineStoneMin: 2, mineStoneMax: 3, mineGemChance: 0.08,
+  mineNodes: 6, mineRespawnMin: 10, mineStoneMin: 2, mineStoneMax: 3, mineGemChance: 0.08,
   /* ===== v0.5 · DORMIR Y COCINA (Sec. 4.2, 6.5) ===== */
   sleepFromHour: 18,
   cookSecs: { dream_bread: 20, grilled_fish: 15, golden_jam: 40, golden_cake: 60 },   // Sec. 6.6 (tiempos de la guía)
@@ -762,7 +794,7 @@ const CFG = {
     // QW9 · agua sin shader
     water: { color: 0x46c2e8, roughness: 0.15, metalness: 0, opacity: 0.8, deep: 0x2a8fd6, shallow: 0x5fd6d8, foam: 0xfffdf5, shoreDepth: 1.1, edgeRings: [[0.03, 1], [0.065, 0.55]], opacityShoreDeep: [0.86, 0.94] },   // v1.5 · Etapa 4: degradado de profundidad + espuma
     // QW10 · halo atmosférico del planeta (opacidad de cerca → en Modo Planeta/menú)
-    halo: { scale: 1.09, pow: 3, near: 0.35, far: 0.8, nearDist: 14, farDist: 30 },
+    halo: { scale: 1.09, pow: 3, near: 0.35, far: 0.8, nearDist: 19, farDist: 41 },
     // QW11 · viñeta CSS (opacidad en menú / en juego)
     vignette: { menu: 1, game: 0.5 },
     // Etapa 1 · entorno PMREM del cielo (med/alta): reflejo suave del cielo en todo · con él la hemisférica y el ambiente bajan (el entorno ya rellena)
@@ -771,7 +803,7 @@ const CFG = {
     // Etapa 1 · AO horneado en el color del planeta bajo árboles, casas y construcciones (med/alta, coste 0 en juego)
     ao: { strength: 0.28, reach: 1.25, inner: 0.55, rebakeAng: 0.16 },
     // Etapa 1 · caja de sombra del sol según la distancia de cámara (cerca / media / Modo Planeta = todo el planeta)
-    shadowBox: { near: 14, mid: 24, nearDist: 14, midDist: 30, planet: 21 },
+    shadowBox: { near: 14, mid: 24, nearDist: 14, midDist: 41, planet: 29 },
     // Etapa 2 · post-procesado (med/alta): bloom HDR + gradación cálida · el umbral sube de día (paredes al sol ≈ 2–3 en HDR) para que solo brillen sol, neón y luces
     post: { bloomDay: 0.22, bloomNight: 0.85, thrDay: 3.2, thrNight: 0.9, radius: 0.55, tierBloom: { med: 0.85, high: 1 }, samples: { med: 2, high: 4 }, dreamBloom: 0.7, dreamThr: 1.1,
       sat: 1.08, lift: [0.035, 0.025, 0.06], gain: [1.03, 1.0, 0.96], dusk: 0.6, dream: 1 },
@@ -780,9 +812,9 @@ const CFG = {
     aerial: { density: 0.012, near: 14, far: 26 },
     shooting: { every: [18, 38], dur: 0.9, len: 26 },
     // Etapa 5 · personajes: contorno (grosor en u de objeto, radio mínimo de malla), rim, squash & stretch (muelle k/amortiguación)
-    chars: { ink: 0x2b2b3d, outline: 0.022, minR: 0.075, rim: 0.16, rimNight: 0x9fb5ff, sqStart: -0.08, sqStop: 0.05, sqSplash: -0.15, sqK: 180, sqD: 14, sqWalk: 0.035, hideDist: 30 },
+    chars: { ink: 0x2b2b3d, outline: 0.022, minR: 0.075, rim: 0.16, rimNight: 0x9fb5ff, sqStart: -0.08, sqStop: 0.05, sqSplash: -0.15, sqK: 180, sqD: 14, sqWalk: 0.035, hideDist: 41 },
     // Etapa 7 · menú: cámara más cerca y desplazada a la derecha (escritorio), hora visual de mañana dorada mientras se lee
-    menu: { dist: 62, distNarrow: 92, pitch: 0.25, dayT: 0.30, offset: 0.17, offsetY: 0.2, minW: 900, blendS: 1.2 },
+    menu: { dist: 85, distNarrow: 126, pitch: 0.25, dayT: 0.30, offset: 0.17, offsetY: 0.2, minW: 900, blendS: 1.2 },
     // QW13 · exposición según la hora
     exposure: { night: 0.95, day: 1.08, dusk: 0.05 },
     // Lluvia: gota con textura de trazo suave (antes cuadrados blancos)
@@ -940,7 +972,7 @@ const state = {
 const SAVE_KEY = 'crossia.save';         // clave en localStorage
 // El proyecto se llamaba «usainbot»: la partida guardada con la clave antigua se mueve a la nueva una sola vez.
 try { const old = localStorage.getItem('usainbot.save'); if (old && !localStorage.getItem(SAVE_KEY)) localStorage.setItem(SAVE_KEY, old); if (old) localStorage.removeItem('usainbot.save'); } catch {}
-const SAVE_VERSION = 3;                   // súbela y añade un paso en migrate() si cambia el formato
+const SAVE_VERSION = 4;                   // súbela y añade un paso en migrate() si cambia el formato
 const PROFILE = { GUEST: 'GUEST', ACCOUNT: 'ACCOUNT' };
 const uid = () => (crypto.randomUUID ? crypto.randomUUID() : 'g-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 10));
 
@@ -1023,6 +1055,14 @@ function migrate(save) {
       save.housing.mailboxUnread = (save.housing.mailboxUnread || 0) + 1;
     }
     // 4) Avatar (Sec. 8.8): deepMerge ya rellena el look "clásico" del prototipo; nadie amanece convertido en otro.
+  }
+  // v3 → v4 (v2.6 · planeta de radio 22, Bloque E): tus construcciones pasan de ángulos (radio 16) a los mismos metros alrededor del pueblo
+  if ((save.version || 1) < 4) {
+    const V0 = [0.15, 0.55, 0.82], lv = Math.hypot(...V0), Vn = V0.map(x => x / lv), le = Math.hypot(Vn[2], Vn[0]), E0 = [Vn[2] / le, 0, -Vn[0] / le];
+    const N0 = [Vn[1] * E0[2] - Vn[2] * E0[1], Vn[2] * E0[0] - Vn[0] * E0[2], Vn[0] * E0[1] - Vn[1] * E0[0]], d3 = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+    const move = (d) => { const c = d3(d, Vn); if (!(c > 0.35)) return null; const x = d3(d, E0) * 16 / c, y = d3(d, N0) * 16 / c, p = Vn.map((v, i) => v * R + E0[i] * x + N0[i] * y), k = Math.hypot(...p); return p.map(v => v / k); };
+    (save.world?.buildings || []).forEach(b => { if (Array.isArray(b.dir) && b.dir.length === 3) { const m = move(b.dir); if (m) b.dir = m; } });
+    if (Array.isArray(save.player?.dir) && save.player.dir.length === 3) { const m = move(save.player.dir); save.player.dir = m; if (!m) save.player.fwd = null; }   // lejos del pueblo → amaneces en casa
   }
   save.version = SAVE_VERSION; return save;
 }
@@ -1376,7 +1416,7 @@ const BUILDABLES = [
   { id: 'statue',   name: 'Estatua $TOKEN',   icon: '🏆', cost: 1000, mats: { stone: 2, mystic_crystal: 1 }, r: 1.2, desc: 'Monumento dorado giratorio. Requiere casa nivel 2.', unlock: () => GS.house.level >= 2, unlockText: 'Casa nivel 2 (Villa)' },
 ];
 const buildableById = Object.fromEntries(BUILDABLES.map(b => [b.id, b]));
-const BUILD_ZONE = { site: 'village', radius: 0.5 };   // zona de construcción: la meseta de la aldea (alrededor de la casa del jugador)
+const BUILD_ZONE = { site: 'village', radius: 0.5 / R16 };   // v2.6: los mismos 8 m de siempre   // zona de construcción: la meseta de la aldea (alrededor de la casa del jugador)
 /** Estado persistente de una tienda; repone el stock cuando vence restockAt */
 function shopState(id) {
   const def = SHOPS[id]; GS.shops[id] ||= { stock: {}, restockAt: 0 }; const s = GS.shops[id];
@@ -1491,26 +1531,44 @@ const angleBetween = (a, b) => Math.acos(clamp(a.dot(b), -1, 1));
 const n3 = (x, y, z) => new THREE.Vector3(x, y, z).normalize();
 const lerp = THREE.MathUtils.lerp;
 
-/** Un "sitio" es una meseta plana con su propio marco local (E = este, S = sur) */
+/** v2.6 · Geometría en metros alrededor del pueblo (rumbo 0 = norte, 90 = este). Matemáticas simples sobre {x, y, z}. */
+const WGEO = (() => {
+  const dot = (a, b) => a.x * b.x + a.y * b.y + a.z * b.z;
+  const nrm = (a) => { const l = Math.hypot(a.x, a.y, a.z) || 1; return { x: a.x / l, y: a.y / l, z: a.z / l }; };
+  const crs = (a, b) => ({ x: a.y * b.z - a.z * b.y, y: a.z * b.x - a.x * b.z, z: a.x * b.y - a.y * b.x });
+  const mix = (a, ka, b, kb) => ({ x: a.x * ka + b.x * kb, y: a.y * ka + b.y * kb, z: a.z * ka + b.z * kb });
+  const ang = (a, b) => Math.acos(Math.max(-1, Math.min(1, dot(a, b))));
+  const frame = (d) => { const E = nrm(crs({ x: 0, y: 1, z: 0 }, d)); return { E, N: nrm(crs(d, E)) }; };
+  const V = nrm({ x: 0.15, y: 0.55, z: 0.82 }), VF = frame(V);
+  /** Dirección a m metros del pueblo con rumbo brg */
+  const fromV = (brg, m) => { const a = m / R, b = brg * Math.PI / 180, t = mix(VF.N, Math.cos(b), VF.E, Math.sin(b)); return nrm(mix(V, Math.cos(a), t, Math.sin(a))); };
+  /** = siteDir: x metros al este y z metros al sur de d */
+  const offset = (d, x, z) => { const f = frame(d); return nrm({ x: d.x * R + f.E.x * x - f.N.x * z, y: d.y * R + f.E.y * x - f.N.y * z, z: d.z * R + f.E.z * x - f.N.z * z }); };
+  /** Inversa de offset (proyección gnomónica): metros {x, z} de d alrededor de c, como si el planeta tuviera radio r */
+  const toLocal = (c, d, r = R) => { const f = frame(c), k = r / Math.max(1e-6, dot(d, c)); return { x: dot(d, f.E) * k, z: -dot(d, f.N) * k }; };
+  /** Dirección a r metros de c con ángulo th (0 = norte local, π/2 = este) */
+  const polar = (c, r, th) => { const f = frame(c), a = r / R, t = mix(f.N, Math.cos(th), f.E, Math.sin(th)); return nrm(mix(c, Math.cos(a), t, Math.sin(a))); };
+  return { dot, nrm, crs, mix, ang, frame, V, fromV, offset, toLocal, polar, v3: (p) => new THREE.Vector3(p.x, p.y, p.z) };
+})();
+/** Un "sitio" es una meseta plana con su propio marco local (E = este, S = sur). r0/r1 se dan como ángulos del planeta antiguo (radio 16) = metros / 16 */
 function makeSite(dir, h, r0, r1) {
   const E = new THREE.Vector3().crossVectors(UP_Y, dir).normalize();
   const N = new THREE.Vector3().crossVectors(dir, E).normalize();
-  return { dir, h, r0, r1, E, N, S: N.clone().negate() };
+  return { dir, h, r0: r0 / R16, r1: r1 / R16, E, N, S: N.clone().negate() };
 }
+const siteFromV = (k) => WGEO.v3(WGEO.fromV(...CFG.world.sites[k]));   // v2.6: Glover, Dax, Sombra y los erizos ya viven donde dice la Guía (Bloque D1)
 const SITES = {
   village:  makeSite(n3(0.15, 0.55, 0.82), R + 1.0, 0.5, 0.8),
   townhall: makeSite(n3(-0.7, 0.3, 0.6), R + 1.1, 0.33, 0.6),
-  workshop: makeSite(n3(0.85, -0.2, 0.45), R + 0.95, 0.33, 0.6),
-  sombra:   makeSite(n3(-0.2, -0.85, 0.4), R + 1.35, 0.3, 0.55),
-  lab:      makeSite(n3(0.3, 0.6, -0.75), R + 1.0, 0.4, 0.65),
-  studio:   makeSite(n3(0.7, -0.6, -0.4), R + 1.0, 0.3, 0.55),
+  workshop: makeSite(siteFromV('workshop'), R + 0.95, 0.33, 0.6),   // a la salida del pueblo, hacia el bosque
+  sombra:   makeSite(siteFromV('sombra'), R + CFG.world.base + CFG.world.hillH, 0.3, 0.55),   // en lo alto de la colina de las piedras
+  lab:      makeSite(siteFromV('lab'), R + 1.0, 0.4, 0.65),   // en los campos, camino de la montaña
+  studio:   makeSite(siteFromV('studio'), R + 1.0, 0.3, 0.55),   // en el prado sur, donde irá la Calle Mayor
   port:     makeSite(n3(-0.8, -0.1, -0.55), SEA + 0.4, 0.18, 0.34),
 };
 const V = SITES.village.dir, V_N = SITES.village.N, V_S = SITES.village.S;
-// Canal marítimo frente al puerto para que el barco llegue sin chocar con tierra
-const chanDir = (k) => SITES.port.dir.clone().multiplyScalar(R).addScaledVector(SITES.port.S, k).normalize();
-const CHANNELS = [makeSite(chanDir(8), SEA - 0.9, 0.3, 0.5), makeSite(chanDir(16), SEA - 0.9, 0.3, 0.5), makeSite(chanDir(24), SEA - 0.9, 0.3, 0.5)];
-const TERRAIN_SITES = [SITES.village, SITES.townhall, SITES.workshop, SITES.sombra, SITES.lab, SITES.studio, ...CHANNELS, SITES.port];
+const CHANNELS = [];   // v2.6: el Mar del Borde ya abre el paso del barco frente al muelle
+const TERRAIN_SITES = [SITES.village, SITES.townhall, SITES.workshop, SITES.sombra, SITES.lab, SITES.studio, SITES.port];
 
 function terrainNoise(x, y, z) {
   let n = Math.sin(x * 3.1 + y * 1.7) * Math.cos(z * 2.3 - x * 1.1);
@@ -1518,9 +1576,113 @@ function terrainNoise(x, y, z) {
   n += 0.25 * Math.sin(x * 11 + y * 9 - z * 7) * Math.cos(z * 10 - x * 4);
   return n;
 }
+/* ===== v2.6 · 🗺️ ZONAS DEL PLANETA (Guía Maestra 2, Bloque E) =====
+   Radio 22 (antes 16). El relieve sale de las zonas: pueblo y campos llanos, bosque con charca, colina de las piedras,
+   desierto con dunas, montaña con sendero en espiral y el Mar del Borde tras el muelle de Sam.
+   Matemáticas simples sobre {x, y, z}: este bloque se prueba también fuera del navegador (caminos por tierra, pendientes, mapa). */
+const World = (() => {
+  const C = CFG.world, TAU = Math.PI * 2, { dot, nrm, mix, ang, frame, fromV, offset } = WGEO;
+  const sst = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+  const Z = {};
+  for (const [id, z] of Object.entries(C.zones)) { const c = z.port != null ? offset(SITES.port.dir, 0, z.port) : z.m ? fromV(z.brg, z.m) : WGEO.V; Z[id] = { id, ...z, c, f: frame(c) }; }
+  const meters = (id, d) => ang(Z[id].c, d) * R;
+  /** Peso de una zona en d: 1 dentro de rIn, 0 fuera de rOut, suave entre medias */
+  const w = (id, d) => { const z = Z[id], m = ang(z.c, d) * R; return m <= z.rIn ? 1 : m >= z.rOut ? 0 : 1 - sst(z.rIn, z.rOut, m); };
+  /** Coordenadas locales (metros) alrededor del centro de una zona */
+  const local = (id, d) => { const z = Z[id], t = mix(d, 1, z.c, -dot(d, z.c)); return { x: dot(t, z.f.E) * R, y: dot(t, z.f.N) * R }; };
+
+  /* --- ⛰️ Montaña: campana con laderas de más de 40° y un sendero en espiral (terraza) del pie a la cima --- */
+  const M = C.mountain, MZ = Z.mountain, RB = MZ.rIn, PHI = M.turns * TAU;
+  const bell = (r) => r >= RB ? 0 : M.H * (Math.cos(Math.PI * r / RB) + 1) / 2, HTOP = bell(M.top);
+  const TH0 = (() => { const t = mix(WGEO.V, 1, MZ.c, -dot(WGEO.V, MZ.c)); return Math.atan2(dot(t, MZ.f.E), dot(t, MZ.f.N)); })();   // el sendero arranca mirando al pueblo
+  const pathR = (phi) => M.start - (M.start - M.top) * Math.min(1, Math.max(0, phi / PHI));
+  function mountain(d) {
+    const r = ang(MZ.c, d) * R; if (r >= RB) return { h: 0, path: 0, r };
+    let h = r <= M.top ? HTOP : r < M.top + 0.6 ? HTOP + (bell(r) - HTOP) * sst(M.top, M.top + 0.6, r) : bell(r);
+    if (M.noPath) return { h, path: 0, r };
+    const t = mix(d, 1, MZ.c, -dot(d, MZ.c)); let th = Math.atan2(dot(t, MZ.f.E), dot(t, MZ.f.N)) - TH0; th = ((th % TAU) + TAU) % TAU;
+    let best = 99, bp = M.start;
+    for (let k = 0; k < 3; k++) { const phi = th + k * TAU; if (phi > PHI + 0.4) break; const rp = pathR(phi), dr = Math.abs(r - rp); if (dr < best) { best = dr; bp = rp; } }
+    let path = 0;
+    if (best < M.w + M.edge) { path = best <= M.w ? 1 : 1 - sst(M.w, M.w + M.edge, best); const hp = bp <= M.top ? HTOP : bell(bp); h += (hp - h) * path; }
+    return { h, path, r };
+  }
+  /** Punto del sendero a una fracción k (0 pie · 1 cima), a lo largo de su línea central */
+  function pathPoint(k) {
+    const phi = k * PHI, rp = pathR(phi), th = TH0 + phi, a = rp / R, tt = mix(MZ.f.N, Math.cos(th), MZ.f.E, Math.sin(th));
+    return nrm(mix(MZ.c, Math.cos(a), tt, Math.sin(a)));
+  }
+  /* --- 🏜️ Dunas: crestas alargadas --- */
+  function dunes(d) { const p = local('desert', d), s = 0.5 + 0.5 * Math.sin(p.x * 0.55 + Math.sin(p.y * 0.35) * 1.4 + p.y * 0.12); return C.dunes * s * s; }
+
+  /** Relieve sin las mesetas de los sitios (las pone heightAt después) */
+  function relief(d) {
+    let h = R + C.base + terrainNoise(d.x * R16, d.y * R16, d.z * R16) * C.noise;
+    const wt = Math.max(w('town', d), w('south', d)), wf = w('fields', d) * 0.7, flat = Math.max(wt, wf);
+    if (flat > 0) h += (R + C.townH + terrainNoise(d.x * 3, d.y * 3, d.z * 3) * 0.05 - h) * flat * 0.9;
+    const wd = w('desert', d); if (wd > 0) h += wd * dunes(d);
+    const wh = w('hill', d); if (wh > 0) h += wh * C.hillH;
+    h += mountain(d).h;
+    const ms = meters('sea', d), S = Z.sea;
+    if (ms < S.rOut) { const a = 1 - sst(S.rIn, S.rOut, ms), tgt = SEA - 0.25 - (C.seaDepth - 0.25) * (1 - sst(S.rIn * 0.35, S.rIn, ms)); h += (tgt - h) * a; }
+    const mp = meters('pond', d), P = Z.pond;
+    if (mp < P.rOut) { const a = 1 - sst(P.rIn, P.rOut, mp); h += (SEA - C.pondDepth - h) * a; }
+    return h;
+  }
+  /** Zona dominante en d: sea · pond · mountain · desert · forest · hill · fields · town · coast · wild */
+  function zoneAt(d, h = null) {
+    if (h == null) h = heightAt(d);
+    if (h <= SEA + 0.12) return meters('pond', d) < Z.pond.rOut + 1 ? 'pond' : 'sea';
+    if (meters('mountain', d) < MZ.rIn + 1) return 'mountain';
+    const ws = { desert: w('desert', d), forest: Math.max(w('forest', d), w('pond', d)), hill: w('hill', d), fields: w('fields', d), town: Math.max(w('town', d), w('south', d)) };
+    let best = 'wild', bw = 0.5; for (const k in ws) if (ws[k] > bw) { bw = ws[k]; best = k; }
+    if (best === 'wild' && meters('sea', d) < Z.sea.rOut + 5) return 'coast';
+    return best;
+  }
+  /* --- 🎨 Color por zona (sobre el color clásico por altura, en hex) --- */
+  const mixHex = (a, b, t) => { t = Math.max(0, Math.min(1, t)); const ar = a >> 16, ag = (a >> 8) & 255, ab = a & 255, br = b >> 16, bg = (b >> 8) & 255, bb = b & 255; return (Math.round(ar + (br - ar) * t) << 16) | (Math.round(ag + (bg - ag) * t) << 8) | Math.round(ab + (bb - ab) * t); };
+  const P8 = C.colors;
+  function tint(h, d, slope, base) {
+    const rel = h - SEA; if (rel < 0.12) return base;
+    const n = Math.sin(d.x * 9 + d.z * 4) * Math.sin(d.y * 7 - d.x * 5);   // variación suave
+    const ms = meters('sea', d); if (ms < Z.sea.rOut + 1.5 && rel < 1.0) return mixHex(n > 0 ? P8.sand : P8.sand2, base, sst(Z.sea.rOut - 0.5, Z.sea.rOut + 1.5, ms));
+    const mt = mountain(d);
+    if (mt.r < MZ.rIn + 0.8) {
+      const hr = mt.h; let c = slope > 0.55 || hr > 1.4 ? mixHex(P8.rock, P8.rock2, 0.5 + 0.5 * n) : mixHex(base, P8.foot, 0.6);
+      if (hr > HTOP - 1.15 && mt.path < 0.5) c = mixHex(P8.snow, P8.snowTint, 0.35 + 0.25 * n);
+      if (mt.path > 0.4) c = mixHex(c, P8.path, Math.min(1, mt.path * 1.4));
+      return mt.r > RB ? mixHex(c, base, sst(RB, RB + 0.8, mt.r)) : c;
+    }
+    let c = base;
+    const wf = Math.max(w('forest', d), w('pond', d) * 0.8); if (wf > 0) c = mixHex(c, n > 0 ? P8.forest : P8.forest2, wf * 0.85);
+    const wfi = w('fields', d); if (wfi > 0) c = mixHex(c, n > 0 ? P8.field : P8.field2, wfi * 0.75);
+    const wh = w('hill', d); if (wh > 0.15) c = mixHex(c, n > 0.45 ? P8.rock : P8.hill, Math.min(1, (wh - 0.15) * 1.3));   // colina: hierba con calvas de piedra
+    const wd = w('desert', d); if (wd > 0) { const du = dunes(d) / (C.dunes || 1); c = mixHex(c, mixHex(P8.dune2, P8.dune, du * 0.8 + 0.1 * n), sst(0.05, 0.6, wd)); }
+    return c;
+  }
+  /** Inclinación del suelo en d (tangente del ángulo con la horizontal) por diferencias centrales: así no se puede «zigzaguear» una ladera */
+  function slopeAt(d, e = 0.12) {
+    const f = frame(d), k = e / R, s = (u, a) => heightAt(nrm(mix(d, 1, u, a * k)));
+    return Math.hypot(s(f.E, 1) - s(f.E, -1), s(f.N, 1) - s(f.N, -1)) / (2 * e);
+  }
+  /** d desplazado m metros cuesta abajo (para «resbalar» al chocar con una ladera) */
+  function downhill(d, m, e = 0.12) {
+    const f = frame(d), k = e / R, s = (u, a) => heightAt(nrm(mix(d, 1, u, a * k))), gx = s(f.E, 1) - s(f.E, -1), gy = s(f.N, 1) - s(f.N, -1), l = Math.hypot(gx, gy);
+    return l < 1e-9 ? nrm(d) : nrm(mix(d, 1, mix(f.E, -gx / l, f.N, -gy / l), m / R));
+  }
+  const api = { Z, w, meters, local, zoneAt, mountain, pathPoint, relief, tint, slopeAt, downhill, HTOP, fromV, offset, cur: null,
+    name: (id) => id === 'coast' ? 'Costa' : id === 'wild' ? 'Campo abierto' : Z[id]?.name || id,
+    icon: (id) => id === 'coast' ? '🏖️' : id === 'wild' ? '🌿' : Z[id]?.icon || '📍',
+    /** Dirección aleatoria (con rnd) dentro de una zona, entre rMin y rMax metros de su centro */
+    around(id, rnd, rMax, rMin = 0) { const z = Z[id], a = Math.sqrt(rMin * rMin + rnd() * (rMax * rMax - rMin * rMin)) / R, th = rnd() * TAU, t = mix(z.f.N, Math.cos(th), z.f.E, Math.sin(th)); return nrm(mix(z.c, Math.cos(a), t, Math.sin(a))); },
+    summit: () => MZ.c,
+  };
+  return api;
+})();
+/** Altura del suelo en dir: relieve de las zonas + mesetas de los sitios (casas, talleres, muelle) */
 function heightAt(dir) {
-  let h = R + 0.7 + terrainNoise(dir.x, dir.y, dir.z) * 0.75;
-  for (const s of TERRAIN_SITES) { const t = 1 - smoothstep(s.r0, s.r1, angleBetween(dir, s.dir)); if (t > 0) h += (s.h - h) * t; }
+  let h = World.relief(dir);
+  for (const s of TERRAIN_SITES) { const t = 1 - smoothstep(s.r0, s.r1, Math.acos(clamp(dir.x * s.dir.x + dir.y * s.dir.y + dir.z * s.dir.z, -1, 1))); if (t > 0) h += (s.h - h) * t; }
   return h;
 }
 const isLand = (dir) => heightAt(dir) > SEA + 0.12;
@@ -1707,7 +1869,7 @@ const clouds = new THREE.Group();
 const cloudMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, emissive: 0xffffff, emissiveIntensity: CFG.gfx.clouds.emi });   // v1.5 · Etapa 3: algodón (sin facetas) con algo de luz propia · tinte por hora en updateSun
 cloudMat.userData.envI = 0.3;
 const CLOUD_SEG = GFX.id === 'high' ? [12, 9] : [9, 7];
-for (let i = 0; i < 18; i++) {
+for (let i = 0; i < 22; i++) {   // v2.6: algunas nubes más para un planeta más grande
   const pivot = new THREE.Object3D(); pivot.quaternion.setFromUnitVectors(UP_Y, randomDir()); pivot.rotateY(Math.random() * 6.28);
   const c = new THREE.Group(); const n = 3 + Math.floor(Math.random() * 3);
   for (let j = 0; j < n; j++) { const s = 0.8 + Math.random() * 1.2; const m = new THREE.Mesh(new THREE.SphereGeometry(s, ...CLOUD_SEG), cloudMat); m.position.set(j * 1.3 - n * 0.65, Math.random() * 0.4, (Math.random() - 0.5) * 1.2); m.scale.y = 0.6; m.castShadow = GFX.id !== 'low'; c.add(m); }
@@ -1720,7 +1882,7 @@ const hemi = new THREE.HemisphereLight(LOOK.hemiSkyDay, LOOK.hemiGround, LOOK.he
 scene.add(hemi, amb);   // v0.1: referenciadas para el ciclo día/noche
 const sun = new THREE.DirectionalLight(0xfff1d6, LOOK.sunDay);
 sun.castShadow = true; sun.shadow.mapSize.set(GFX.T.shadow, GFX.T.shadow);
-sun.shadow.camera.near = 1; sun.shadow.camera.far = 120; sun.shadow.camera.left = -24; sun.shadow.camera.right = 24; sun.shadow.camera.top = 24; sun.shadow.camera.bottom = -24;
+sun.shadow.camera.near = 1; sun.shadow.camera.far = 150; sun.shadow.camera.left = -24; sun.shadow.camera.right = 24; sun.shadow.camera.top = 24; sun.shadow.camera.bottom = -24;
 sun.shadow.bias = LOOK.shadowBias; sun.shadow.normalBias = LOOK.shadowNormalBias; sun.shadow.radius = LOOK.shadowRadius;   // v1.4 · QW2
 scene.add(sun, sun.target);
 GFX.init(renderer);
@@ -1897,15 +2059,18 @@ function colorForHeight(h, d = null, slope = 0) {
   if (slope > 0) c.lerp(_pcA.setHex(P.slopeCol), slope * 0.5).multiplyScalar(1 - P.slopeDark * slope);
   return c;
 }
+/** v2.6: color clásico por altura + el de cada zona (playa, bosque, campos, colina, desierto, montaña) */
+function colorAt(h, d, slope) { const c = colorForHeight(h, d, slope), hx = c.getHex(), t = World.tint(h, d.clone().normalize(), slope, hx); return t === hx ? c : c.setHex(t); }
 const planet = (() => {
-  const geo = new THREE.SphereGeometry(1, IS_MOBILE ? 120 : 160, IS_MOBILE ? 84 : 110).toNonIndexed();
+  const geo = new THREE.IcosahedronGeometry(1, IS_MOBILE || GFX.id === 'low' ? 40 : GFX.id === 'high' ? 58 : 50);   // v2.6: icosfera (triángulos iguales en todo el planeta)
+  const hCache = new Map(), hOf = (v) => { const k = Math.round(v.x * 1e5) + ',' + Math.round(v.y * 1e5) + ',' + Math.round(v.z * 1e5); let h = hCache.get(k); if (h === undefined) { h = heightAt(v); hCache.set(k, h); } return h; };
   const pos = geo.attributes.position, colors = new Float32Array(pos.count * 3), d = new THREE.Vector3(), dc = new THREE.Vector3(), va = new THREE.Vector3(), vb = new THREE.Vector3(), vc = new THREE.Vector3();
   for (let i = 0; i < pos.count; i += 3) {
     let hc = 0; dc.set(0, 0, 0);
-    for (let k = 0; k < 3; k++) { d.set(pos.getX(i + k), pos.getY(i + k), pos.getZ(i + k)).normalize(); dc.add(d); const h = heightAt(d); hc += h / 3; pos.setXYZ(i + k, d.x * h, d.y * h, d.z * h); }
+    for (let k = 0; k < 3; k++) { d.set(pos.getX(i + k), pos.getY(i + k), pos.getZ(i + k)).normalize(); dc.add(d); const h = hOf(d); hc += h / 3; pos.setXYZ(i + k, d.x * h, d.y * h, d.z * h); }
     va.fromBufferAttribute(pos, i); vb.fromBufferAttribute(pos, i + 1).sub(va); vc.fromBufferAttribute(pos, i + 2).sub(va); vb.cross(vc);   // normal de la cara
     const fl = vb.length(), slope = fl > 1e-9 ? clamp((1 - Math.abs(vb.dot(dc.normalize())) / fl) / 0.25, 0, 1) : 0;
-    const c = colorForHeight(hc + (Math.random() - 0.5) * 0.03, dc, slope);
+    const c = colorAt(hc + (Math.random() - 0.5) * 0.03, dc, slope);
     for (let k = 0; k < 3; k++) colors.set([c.r, c.g, c.b], (i + k) * 3);
   }
   geo.setAttribute('color', new THREE.BufferAttribute(colors, 3)); geo.computeVertexNormals();
@@ -1916,7 +2081,7 @@ scene.add(planet);
 /* v1.5 · Etapa 4 · AGUA EN GPU: el oleaje (misma fórmula de antes) se mueve en el vertex shader → fuera el bucle de CPU con computeVertexNormals.
    aShore (calculado al cargar: 1 en la orilla, 0 en lo hondo) da el degradado turquesa, la espuma que respira y la transparencia de la orilla.
    Fresnel con el cielo, destello del sol (HDR → bloom) y reflejo de la luna; anillos al nadar. Sin texturas de profundidad: vale también en Baja. */
-const WATER_SEG = GFX.id === 'high' ? [128, 96] : GFX.id === 'low' ? [72, 52] : [96, 70];
+const WATER_SEG = GFX.id === 'high' ? [160, 120] : GFX.id === 'low' ? [96, 70] : [128, 92];   // v2.6: mar más grande
 const waterGeo = new THREE.SphereGeometry(1, ...WATER_SEG);
 { const p = waterGeo.attributes.position, sh = new Float32Array(p.count), ed = new Float32Array(p.count), d = new THREE.Vector3(), q = new THREE.Vector3(), t1 = new THREE.Vector3(), t2 = new THREE.Vector3(), W = CFG.gfx.water;
   for (let i = 0; i < p.count; i++) {
@@ -2745,32 +2910,112 @@ const Decor = (() => {
   return api;
 })();
 const _decCol = new THREE.Color();
-const _treeProto = (color) => () => makeTree(1, color);
-const TREE_COLORS = [0x4caf50, 0x43a047, 0x66bb6a];
-function addTreeAt(dir, scale) {
+/* ===== v2.6 · 🌳 DECORACIÓN POR ZONAS (Guía Maestra 2, Bloque E2) · semilla fija: el mundo sale siempre igual (antes Math.random) ===== */
+const _wr = mulberry32(CFG.world.seed);
+const rndDir = () => { const u = _wr() * 2 - 1, th = _wr() * 6.2832, s = Math.sqrt(1 - u * u); return new THREE.Vector3(s * Math.cos(th), u, s * Math.sin(th)); };
+const inZone = (id, rMax, rMin = 0) => () => WGEO.v3(World.around(id, _wr, rMax, rMin));
+function scatter(count, tries, fn, gen = rndDir) { let placed = 0; for (let i = 0; i < tries && placed < count; i++) if (fn(gen())) placed++; return placed; }
+/** E5 · Postes de viaje (el módulo WorldFX les da vida) · y claros que la decoración respeta */
+const TRAVEL_POSTS = [
+  { id: 'plaza',  name: 'Plaza del pueblo',    icon: '🏘️', dir: WGEO.v3(WGEO.offset(SITES.village.dir, 3.2, 1.6)) },
+  { id: 'forest', name: 'Claro del bosque',    icon: '🌲', dir: WGEO.v3(WGEO.fromV(47, 24)) },
+  { id: 'coast',  name: 'Muelle de Sam',       icon: '⚓', dir: WGEO.v3(WGEO.offset(SITES.port.dir, 3.6, -3.4)) },
+  { id: 'desert', name: 'Ruinas del desierto', icon: '🏜️', dir: WGEO.v3(World.Z.desert.c) },
+  { id: 'summit', name: 'Cima de la montaña',  icon: '⛰️', dir: WGEO.v3(WGEO.offset(World.Z.mountain.c, 0.9, 0.5)) },
+];
+const RESERVED = [...TRAVEL_POSTS.map(p => ({ dir: p.dir, r: 2.4 })), { dir: WGEO.v3(World.Z.desert.c), r: 5.4 }, { dir: WGEO.v3(World.Z.mountain.c), r: 2.4 }];
+const reserved = (d) => RESERVED.some(o => angleBetween(o.dir, d) * R < o.r);
+const nearAnySite = (d, margin) => Object.values(SITES).some(s => angleBetween(d, s.dir) < s.r0 + margin);
+const okGround = (d, maxSlope = 0.45) => isLand(d) && !nearAnySite(d, 0.02) && !reserved(d) && World.mountain(d).path < 0.05 && World.slopeAt(d) < maxSlope;
+const freeAt = (d, pad) => { const p = d.clone().multiplyScalar(heightAt(d)); return !colliders.some(c => c.pos.distanceTo(p) < c.r + pad); };
+const polarDir = (c, r, th) => WGEO.v3(WGEO.polar(c, r, th));
+/** Pieza única con colisión (ruinas, menhires, troncos caídos) */
+function addSolid(g, dir, yaw, r, lift = 0) { placeOnPlanet(g, dir, yaw, lift); scene.add(g); if (r) colliders.push({ pos: g.position.clone(), r }); return g; }
+const TREE_COLORS = [0x4caf50, 0x43a047, 0x66bb6a], PINE_COLORS = [0x2e7d32, 0x33691e, 0x388e3c], BROAD_COLORS = [0x7cb342, 0x8bc34a, 0x689f38];
+// v2.6: un solo juego instanciado por forma (cono, copa, palmera) con el color de la hoja por instancia → menos llamadas de dibujo
+const LEAF_TINT = mat(0xffffff, { flatShading: true }); LEAF_TINT.userData.tint = true; LEAF_TINT.userData.shared = true;
+const _coneProto = () => { const g = new THREE.Group(); g.add(cyl(0.18, 0.26, 1.2, matC(0x8b5a2b), 0, 0.6, 0, 7)); g.add(cone(1.1, 1.6, LEAF_TINT, 0, 1.8, 0)); g.add(cone(0.85, 1.4, LEAF_TINT, 0, 2.7, 0)); g.add(cone(0.55, 1.1, LEAF_TINT, 0, 3.5, 0)); return g; };
+const _broadProto = () => { const g = new THREE.Group(); g.add(cyl(0.16, 0.24, 1.3, matC(0x8b5a2b), 0, 0.65, 0, 7));
+  [[0, 2.0, 0, 0.95], [0.55, 1.7, 0.2, 0.7], [-0.5, 1.75, -0.25, 0.72], [0.1, 2.55, -0.1, 0.62]].forEach(([x, y, z, s]) => g.add(mesh(new THREE.IcosahedronGeometry(s, 0), LEAF_TINT, x, y, z))); return g; };
+function addTreeAt(dir, scale, kind = null) {
   const p = dir.clone().multiplyScalar(heightAt(dir));
   if (colliders.some(c => c.pos.distanceTo(p) < c.r + 1.2)) return false;
-  const palm = heightAt(dir) - SEA < 0.45, yaw = Math.random() * 6.28;
+  const palm = kind ? kind === 'palm' : heightAt(dir) - SEA < 0.45, yaw = _wr() * 6.28, ci = Math.floor(_wr() * 3);
   if (palm) Decor.add('palm', makePalm, { amp: 0.08, H: 2.6, shadow: true }, dir, yaw, 1);
-  else { const ci = Math.floor(Math.random() * 3); Decor.add('tree' + ci, _treeProto(TREE_COLORS[ci]), { amp: 0.03, H: 4, shadow: true }, dir, yaw, scale); }   // v1.5 · Etapa 6: instanciado
+  else if (kind === 'broad') Decor.add('broad', _broadProto, { amp: 0.035, H: 3, shadow: true, colors: true }, dir, yaw, scale, 0, null, BROAD_COLORS[ci]);
+  else Decor.add('cone', _coneProto, { amp: 0.03, H: 4, shadow: true, colors: true }, dir, yaw, kind === 'pine' ? scale * 1.08 : scale, 0, null, (kind === 'pine' ? PINE_COLORS : TREE_COLORS)[ci]);   // v1.5 · Etapa 6: instanciado
   colliders.push({ pos: p.clone().setLength(heightAt(dir)), r: 0.6 * scale }); treeDirs.push(dir); return true;
 }
-function scatter(count, tries, fn) { let placed = 0; for (let i = 0; i < tries && placed < count; i++) if (fn(randomDir())) placed++; }
+/* --- Piezas únicas primero (sus colisiones apartan a los árboles) --- */
+{ // 🏛️ Ruinas del desierto: un círculo de columnas rotas alrededor del poste (instanciadas: 3 alturas + tambores caídos)
+  const SST = matC(0xd9c08f, true), SST2 = matC(0xc9a96e, true), c = World.Z.desert.c;
+  const column = (h) => () => { const g = new THREE.Group(); let y = 0, k = 0; while (y < h - 0.05) { const s = Math.min(0.6, h - y); g.add(cyl(0.3, 0.33, s, k++ % 2 ? SST : SST2, 0, y + s / 2, 0, 9)); y += s + 0.02; } if (h > 1.5) g.add(box(0.85, 0.22, 0.85, SST, 0, h + 0.1, 0)); return g; };
+  const drum = () => { const g = new THREE.Group(), d = cyl(0.3, 0.33, 1.4, SST2, 0, 0.3, 0, 9); d.rotation.z = Math.PI / 2; g.add(d); return g; };
+  const kinds = [['ruinTall', 2.3], ['ruinLow', 0.7], ['ruinMid', 1.7], ['ruinTall', 2.3], ['ruinLow', 0.7], ['ruinMid', 1.7], ['ruinMid', 1.7]];
+  kinds.forEach(([k, h], i) => { const d = polarDir(c, 4.1 + (i % 2) * 0.45, i / kinds.length * 6.283 + 0.35); Decor.add(k, column(h), { shadow: true }, d, i, 1); colliders.push({ pos: d.clone().multiplyScalar(heightAt(d)), r: 0.45 }); });
+  [[5.6, 1.1], [3.0, 3.7]].forEach(([r, th]) => { const d = polarDir(c, r, th); Decor.add('ruinDrum', drum, { shadow: true }, d, th, 1, -0.02); colliders.push({ pos: d.clone().multiplyScalar(heightAt(d)), r: 0.55 }); });
+}
+{ // 🪨 Colina de las Piedras: siete menhires en corro alrededor de la cima (la casa de Sombra, Bloque D1) · instanciados
+  const ST = matC(0x8f8c99, true), RUNE = glow(0xd1c4e9, 0xb388ff, 0.9);
+  const menhir = (h) => () => { const g = new THREE.Group(); g.add(box(0.62, h, 0.42, ST, 0, h / 2 - 0.1, 0)); g.add(box(0.12, 0.34, 0.02, RUNE, 0, h * 0.6, 0.22)); return g; };
+  for (let i = 0; i < 7; i++) { const tall = i % 2 === 0, d = polarDir(SITES.sombra.dir, 6.6, i / 7 * 6.283); Decor.add(tall ? 'menhirT' : 'menhirS', menhir(tall ? 2.3 : 1.8), { shadow: true }, d, i / 7 * 6.283 + Math.PI, 1, 0, ((i % 3) - 1) * 0.06); colliders.push({ pos: d.clone().multiplyScalar(heightAt(d)), r: 0.5 }); }
+}
+{ // 🪵 Troncos caídos en el bosque
+  const LOG = matC(0x795548, true);
+  scatter(4, 120, d => { if (!okGround(d, 0.35) || !freeAt(d, 1.6)) return false; const g = new THREE.Group(), l = cyl(0.26, 0.3, 2.2, LOG, 0, 0.22, 0, 8); l.rotation.z = Math.PI / 2; g.add(l); addSolid(g, d, _wr() * 6, 0.75); return true; }, inZone('forest', 12, 3));
+}
+{ // ⛰️ Mirador de la cima (tarima de madera)
+  const WOOD = matC(0xa1704a, true), deck = new THREE.Group(); deck.add(cyl(1.55, 1.6, 0.14, WOOD, 0, 0.02, 0, 14));
+  placeOnPlanet(deck, WGEO.v3(World.Z.mountain.c), 0, 0); scene.add(deck);
+}
+/* --- Árboles --- */
 [[-10, -6, 1.1], [-11.5, 1, 0.9], [-9, 7, 1.2], [-3, 10, 1], [4, 10.5, 0.9], [10, 6, 1.1], [11.5, -1, 1], [9, -8.5, 1.2], [2, -11, 1], [-5, -11, 0.9], [-1, -6.5, 0.8], [7.5, 4.5, 0.85]]
-  .forEach(([x, z, s]) => { const d = siteDir(S_V, x, z); if (isLand(d)) addTreeAt(d, s); });
-const nearAnySite = (d, margin) => Object.values(SITES).some(s => angleBetween(d, s.dir) < s.r0 + margin);
-scatter(110, 1200, d => isLand(d) && !nearAnySite(d, 0.05) && heightAt(d) - SEA < 1.7 && !treeDirs.some(t => angleBetween(t, d) < 0.08) && addTreeAt(d, 0.8 + Math.random() * 0.5));
-const rockMat = mat(0x9e9aa8, { flatShading: true });
-scatter(40, 300, d => { if (!isLand(d) || nearAnySite(d, 0)) return false; Decor.add('rock', () => { const g = new THREE.Group(); g.add(mesh(new THREE.DodecahedronGeometry(1, 0), rockMat)); return g; }, { shadow: true, clear: true }, d, Math.random() * 6, 0.35 + Math.random() * 0.45, -0.1, Math.random()); return true; });   // v1.5 · Etapa 6: instanciado
+  .forEach(([x, z, s]) => { const d = siteDir(S_V, x, z); if (isLand(d) && !reserved(d)) addTreeAt(d, s); });
+{ const spaced = (d, m) => !treeDirs.some(t => angleBetween(t, d) * R < m);
+  scatter(72, 1600, d => okGround(d, 0.5) && World.meters('pond', d) > 5.5 && spaced(d, 1.7) && addTreeAt(d, 0.85 + _wr() * 0.55, _wr() < 0.55 ? 'pine' : 'broad'), inZone('forest', 14.5));   // 🌲 bosque
+  scatter(16, 500, d => okGround(d, 0.55) && spaced(d, 1.8) && addTreeAt(d, 0.65 + _wr() * 0.3, 'pine'), inZone('mountain', 12.5, 7.4));   // pinos al pie de la montaña
+  scatter(16, 900, d => isLand(d) && !nearAnySite(d, 0.03) && !reserved(d) && heightAt(d) - SEA < 0.75 && spaced(d, 2.2) && addTreeAt(d, 1, 'palm'), inZone('sea', 21, 16));   // 🌴 playa
+  scatter(34, 2500, d => okGround(d) && ['wild', 'coast'].includes(World.zoneAt(d)) && spaced(d, 2.6) && addTreeAt(d, 0.8 + _wr() * 0.5, _wr() < 0.45 ? 'broad' : null));   // campo abierto
+  scatter(5, 300, d => okGround(d) && spaced(d, 3) && addTreeAt(d, 0.8 + _wr() * 0.3, 'broad'), inZone('fields', 10, 4));   // campos de Dax
+}
+/* --- Rocas --- */
+{ const rockMat = mat(0x9e9aa8, { flatShading: true }), rockProto = () => { const g = new THREE.Group(); g.add(mesh(new THREE.DodecahedronGeometry(1, 0), rockMat)); return g; };
+  const rock = (d, s) => { Decor.add('rock', rockProto, { shadow: true, clear: true }, d, _wr() * 6, s, -0.1, _wr()); return true; };
+  scatter(16, 500, d => isLand(d) && World.mountain(d).path < 0.05 && !reserved(d) && rock(d, 0.35 + _wr() * 0.55), inZone('mountain', 12, 3));
+  scatter(10, 400, d => isLand(d) && !nearAnySite(d, 0) && !reserved(d) && rock(d, 0.3 + _wr() * 0.4), inZone('sea', 22, 15));
+  scatter(16, 900, d => okGround(d) && ['wild', 'hill', 'fields'].includes(World.zoneAt(d)) && rock(d, 0.3 + _wr() * 0.45));
+}
+/* --- Desierto: cactus, huesos y matojos --- */
+{ const CG = matC(0x5d9b45, true), BONE = matC(0xf2ead8, true), DRY = matC(0x9c7b52, true);
+  const cactusProto = () => { const g = new THREE.Group(); g.add(cyl(0.2, 0.24, 1.7, CG, 0, 0.85, 0, 7)); g.add(mesh(new THREE.SphereGeometry(0.2, 7, 5), CG, 0, 1.7, 0));
+    [[-1, 0.8, 0.55], [1, 1.05, 0.45]].forEach(([s, y, h]) => { const a = cyl(0.11, 0.11, 0.36, CG, s * 0.36, y, 0, 6); a.rotation.z = Math.PI / 2; g.add(a); g.add(cyl(0.11, 0.11, h, CG, s * 0.54, y + h / 2, 0, 6)); g.add(mesh(new THREE.SphereGeometry(0.11, 6, 4), CG, s * 0.54, y + h, 0)); }); return g; };
+  const bonesProto = () => { const g = new THREE.Group(); for (let i = 0; i < 4; i++) { const t = mesh(new THREE.TorusGeometry(0.42 - i * 0.05, 0.045, 4, 10, Math.PI), BONE, 0, 0, -0.45 + i * 0.3); g.add(t); }
+    const sp = cyl(0.05, 0.05, 1.5, BONE, 0, 0.06, 0, 5); sp.rotation.x = Math.PI / 2; g.add(sp); g.add(mesh(new THREE.DodecahedronGeometry(0.2, 0), BONE, 0, 0.12, 0.95)); return g; };
+  const bushProto = () => { const g = new THREE.Group(); [[0, 0.3, 0], [0.18, 0.22, 0.1], [-0.15, 0.25, -0.12]].forEach(([x, h, z]) => g.add(cone(0.16, h * 1.6, DRY, x, h * 0.8, z, 5))); return g; };
+  scatter(26, 900, d => { if (!okGround(d, 0.5) || World.w('desert', d) < 0.6 || !freeAt(d, 0.9)) return false; Decor.add('cactus', cactusProto, { shadow: true, clear: true }, d, _wr() * 6, 0.7 + _wr() * 0.6); colliders.push({ pos: d.clone().multiplyScalar(heightAt(d)), r: 0.3, noAO: true }); return true; }, inZone('desert', 13));
+  scatter(5, 300, d => okGround(d, 0.4) && World.w('desert', d) > 0.7 && freeAt(d, 1.2) && (Decor.add('bones', bonesProto, { shadow: true, clear: true }, d, _wr() * 6, 0.9 + _wr() * 0.4), true), inZone('desert', 11));
+  scatter(16, 600, d => okGround(d, 0.5) && World.w('desert', d) > 0.3 && (Decor.add('drybush', bushProto, { amp: 0.04, H: 0.5, clear: true }, d, _wr() * 6, 0.8 + _wr() * 0.5), true), inZone('desert', 14.5));
+}
+/* --- Bosque: setas · Charca: nenúfares y juncos --- */
+{ const STEM = matC(0xfff8e1, true), CAPR = matC(0xe53935, true), CAPB = matC(0xa1665e, true), LILY = matC(0x66bb6a, true), PINK = matC(0xf8bbd0, true), REED = matC(0x7c8f3a, true);
+  const mush = (cap) => () => { const g = new THREE.Group(); g.add(cyl(0.05, 0.07, 0.24, STEM, 0, 0.12, 0, 6)); g.add(mesh(new THREE.SphereGeometry(0.16, 8, 5, 0, 6.29, 0, 1.6), cap, 0, 0.22, 0)); return g; };
+  scatter(26, 700, d => { if (!okGround(d, 0.5) || World.meters('pond', d) < 4.5) return false; const red = _wr() < 0.6; Decor.add(red ? 'mushR' : 'mushB', mush(red ? CAPR : CAPB), { clear: true }, d, _wr() * 6, 0.8 + _wr() * 0.7); return true; }, inZone('forest', 14));
+  const pond = World.Z.pond.c, lily = () => { const g = new THREE.Group(); g.add(cyl(0.34, 0.34, 0.03, LILY, 0, 0, 0, 10)); return g; }, lilyF = () => { const g = lily(); g.add(mesh(new THREE.SphereGeometry(0.09, 6, 4), PINK, 0.08, 0.06, 0)); return g; };
+  for (let i = 0; i < 9; i++) { const d = polarDir(pond, 0.5 + (i % 3) * 0.6, i * 2.4); if (isLand(d)) continue; Decor.add(i % 3 ? 'lily' : 'lilyF', i % 3 ? lily : lilyF, {}, d, i, 0.8 + (i % 4) * 0.12, SEA + 0.02 - heightAt(d)); }
+  const reed = () => { const g = new THREE.Group(); [[0, 0.9], [0.08, 1.1], [-0.07, 0.75]].forEach(([x, h]) => g.add(cyl(0.025, 0.03, h, REED, x, h / 2, 0, 4))); return g; };
+  for (let i = 0; i < 14; i++) { const d = polarDir(pond, 2.6 + (i % 3) * 0.35, i * 0.45 + 0.2); if (!isLand(d)) continue; Decor.add('reed', reed, { amp: 0.06, H: 1.1, clear: true }, d, i, 0.9 + (i % 3) * 0.15); }
+}
+/* --- Flores y hierba (solo donde hay prado) --- */
 const flowerColors = [0xff6b9d, 0xffd93d, 0xff8c42, 0xc77dff, 0xffffff];
 const FLOWER_HEAD = mat(0xffffff); FLOWER_HEAD.userData.tint = true;
 const flowerProto = () => { const f = new THREE.Group(); f.add(mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.35, 4), matC(0x3f8f3a), 0, 0.17, 0, false)); f.add(mesh(new THREE.SphereGeometry(0.11, 6, 6), FLOWER_HEAD, 0, 0.38, 0, false)); return f; };
-{ const total = Math.round(240 * GFX.T.decor), q = new THREE.Vector3(); let placed = 0;   // v1.5 · Etapa 6: flores en matas de 3–7 (aspecto de jardín) e instanciadas
-  for (let i = 0; i < 900 && placed < total; i++) { const d = randomDir(); if (!isLand(d) || heightAt(d) - SEA > 1.4) continue; const col = flowerColors[Math.floor(Math.random() * 5)], k = 3 + Math.floor(Math.random() * 5);
-    for (let j = 0; j < k && placed < total; j++) { q.copy(d).add(randomDir().multiplyScalar(0.025)).normalize(); if (!isLand(q) || heightAt(q) - SEA > 1.4) continue; Decor.add('flower', flowerProto, { amp: 0.05, H: 0.45, colors: true, clear: true }, q, Math.random() * 6, 0.8 + Math.random() * 0.4, 0, null, Math.random() < 0.8 ? col : flowerColors[Math.floor(Math.random() * 5)]); placed++; } } }
-{ const n = GFX.T.grass ?? 160, G = matC(0x5cbf4a, true);   // v1.5 · Etapa 6: matas de 3 hojas instanciadas (más densas en Alta)
+const MEADOW = ['town', 'fields', 'wild', 'hill', 'forest'];
+{ const total = Math.round(330 * GFX.T.decor), q = new THREE.Vector3(), okF = (d) => isLand(d) && heightAt(d) - SEA < 1.4 && MEADOW.includes(World.zoneAt(d)) && World.slopeAt(d) < 0.5; let placed = 0;   // v1.5 · Etapa 6: flores en matas de 3–7 e instanciadas
+  for (let i = 0; i < 1500 && placed < total; i++) { const d = i % 3 === 0 ? inZone('fields', 11)() : rndDir(); if (!okF(d)) continue; const col = flowerColors[Math.floor(_wr() * 5)], k = 3 + Math.floor(_wr() * 5);
+    for (let j = 0; j < k && placed < total; j++) { q.copy(d).add(rndDir().multiplyScalar(0.025 / R16)).normalize(); if (!okF(q)) continue; Decor.add('flower', flowerProto, { amp: 0.05, H: 0.45, colors: true, clear: true }, q, _wr() * 6, 0.8 + _wr() * 0.4, 0, null, _wr() < 0.8 ? col : flowerColors[Math.floor(_wr() * 5)]); placed++; } } }
+{ const n = Math.round((GFX.T.grass ?? 160) * 1.5), G = matC(0x5cbf4a, true);   // v1.5 · Etapa 6: matas de 3 hojas instanciadas
   const grassProto = () => { const g = new THREE.Group(); [[0, 0, 0], [0.09, 0.35, 2.1], [-0.08, -0.3, 4.2]].forEach(([x, tilt, ry]) => { const c = mesh(new THREE.ConeGeometry(0.07, 0.42, 3), G, x, 0.2, 0, false); c.rotation.set(tilt, ry, tilt * 0.5); g.add(c); }); return g; };
-  scatter(n, n * 3, d => { if (!isLand(d) || heightAt(d) - SEA > 1.6 || nearAnySite(d, 0.02)) return false; Decor.add('grass', grassProto, { amp: 0.06, H: 0.42, clear: true }, d, Math.random() * 6, 0.8 + Math.random() * 0.6); return true; }); }
+  scatter(n, n * 4, d => { if (!isLand(d) || heightAt(d) - SEA > 1.6 || nearAnySite(d, 0.02) || !MEADOW.includes(World.zoneAt(d))) return false; Decor.add('grass', grassProto, { amp: 0.06, H: 0.42, clear: true }, d, _wr() * 6, 0.8 + _wr() * 0.6); return true; }); }
 Decor.build();
 /* ===== v1.5 · Etapa 1 · AO horneado en el color del planeta (med/alta) =====
    Por cara: oscurece el suelo cerca de árboles, casas, puestos y construcciones (colliders sin noAO). Se hornea al aplicar la partida
@@ -3121,7 +3366,7 @@ function updateShip(dt) {
   if (!GS.unlocks.ship) return;
   const s = SITES.port; const C = SHIP_CYCLE; const T = C.approach + C.dock + C.depart + C.wait;
   state.shipTime = (state.shipTime + dt) % T; const t = state.shipTime;
-  const far = 1.15, near = 0.33; let th, moving = 0;
+  const far = 1.15 / R16, near = 0.33 / R16; let th, moving = 0;   // v2.6: los mismos metros de antes
   if (t < C.approach) { th = lerp(far, near, smoothstep(0, 1, t / C.approach)); moving = -1; }
   else if (t < C.approach + C.dock) th = near;
   else if (t < C.approach + C.dock + C.depart) { th = lerp(near, far, smoothstep(0, 1, (t - C.approach - C.dock) / C.depart)); moving = 1; }
@@ -3140,12 +3385,12 @@ function setDocked(v) { if (v === state.shipDocked) return; state.shipDocked = v
 /* =========================================================
    12. CÁMARA ORBITAL CONTINUA (jugador → planeta completo)
    ========================================================= */
-const cam = { yaw: 0, pitch: 0.42, dist: 9, tYaw: 0, tPitch: 0.42, tDist: 9, min: 4, max: 78, refF: V_N.clone() };
+const cam = { yaw: 0, pitch: 0.42, dist: 9, tYaw: 0, tPitch: 0.42, tDist: 9, min: 4, max: 106, refF: V_N.clone() };
 const currentLook = new THREE.Vector3(); const _q = new THREE.Quaternion();
 /** Pose deseada: al alejar el zoom, el objetivo se desliza del jugador al centro del planeta */
 function camPose() {
   if (Interiors.active) return Interiors.camPose();   // v1.1: cámara de interior (mismos controles de giro y zoom)
-  const up = player.userData.dir; const blend = smoothstep(13, 40, cam.dist);
+  const up = player.userData.dir; const blend = smoothstep(13, 55, cam.dist);
   const target = player.position.clone().addScaledVector(up, 1.4).lerp(new THREE.Vector3(), blend);
   const f = frameAt(up, cam.refF);
   const pitch = clamp(cam.pitch, lerp(0.08, -1.25, blend * blend), 1.4);
@@ -3181,7 +3426,7 @@ function updateCamera(dt) {
   if (state.menuOpen) cam.tYaw += dt * 0.12; // el planeta gira lentamente detrás del menú
   { const mEl = document.getElementById('menu'); menuViewOffset(state.menuOpen && !!mEl && !mEl.classList.contains('hide')); }   // v1.5 · Etapa 7
   const p = camPose(); applyLook(p.pos, p.target, p.up);
-  ui.btnPlanet.classList.toggle('active', cam.dist > 30); ui.btnPlayer.classList.toggle('active', cam.dist <= 30);
+  ui.btnPlanet.classList.toggle('active', cam.dist > 41); ui.btnPlayer.classList.toggle('active', cam.dist <= 41);
 }
 const pointers = new Map(); let pinchDist = 0, downPos = null;
 const canControl = () => !state.menuOpen && !state.modalOpen && state.mode !== 'dialog' && !state.camTween && !state.toolBusy;   // v1.6: quieto mientras usas una herramienta
@@ -3209,7 +3454,7 @@ canvas.addEventListener('pointermove', (e) => {
 const endPointer = (e) => { pointers.delete(e.pointerId); if (pointers.size === 0 && downPos) { if (Math.hypot(e.clientX - downPos.x, e.clientY - downPos.y) < 6) handleClick(e); downPos = null; } };
 canvas.addEventListener('pointerup', endPointer); canvas.addEventListener('pointercancel', endPointer);
 canvas.addEventListener('wheel', (e) => { e.preventDefault(); if (!canControl()) return; cam.tDist = clamp(cam.tDist * Math.exp(e.deltaY * 0.0012), cam.min, cam.max); }, { passive: false });
-ui_bind('btnPlanet', () => { if (canControl() && !Interiors.active) cam.tDist = 70; });
+ui_bind('btnPlanet', () => { if (canControl() && !Interiors.active) cam.tDist = CFG.world.planetDist; });
 ui_bind('btnInteriorExit', () => { if (canControl()) Interiors.hudExit(); });   // v1.3: en la Red = despertar · en una tienda de la Red = volver a la calle   // v1.1 · HUD del interior
 ui_bind('btnInteriorPanel', () => { if (canControl()) { if (houseSealed()) openSealedHousePanel(); else openHousePanel(); } });
 ui_bind('btnPlayer', () => { if (canControl()) cam.tDist = 9; });
@@ -4912,6 +5157,11 @@ function updatePlayer(dt) {
       const wp = newDir.clone().multiplyScalar(surfaceR(newDir));
       for (const c of colliders) { const d = wp.clone().sub(c.pos); const dist = d.length(), min = c.r + 0.4; if (dist < min && dist > 1e-4) wp.addScaledVector(d.normalize(), min - dist); }
       const finalDir = wp.normalize();
+      // v2.6 · E3: no se sube a un suelo de más de 40° (laderas de la montaña): el paso se anula y resbalas un poco hacia abajo
+      if (!state.swimming && isLand(finalDir) && heightAt(finalDir) > heightAt(up) + 1e-4 && World.slopeAt(finalDir) > CFG.world.slopeMax) {
+        const g = World.downhill(up, 0.04); finalDir.set(g.x, g.y, g.z); state.moveTarget = null; state.pendingInteract = null;
+        if (performance.now() - (state._steepT || 0) > 6000) { state._steepT = performance.now(); showToast('⛰️ Demasiado empinado: busca el sendero', 'text-white'); }
+      }
       if (Needs.hungry() && !isLand(finalDir) && isLand(up)) { finalDir.copy(up); weakSwimToast(false); state.moveTarget = null; state.pendingInteract = null; }   // v0.1 · Sec. 4.3: con hambre no se puede nadar
       if (state.moveTarget && angleBetween(finalDir, up) * R < 0.002) { state.moveTarget = null; state.pendingInteract = null; }
       pd.dir.copy(finalDir); pd.fwd.lerp(tangent(_move, pd.dir), Math.min(1, dt * 12));
@@ -5020,7 +5270,7 @@ function updateSun() {
   _shC.copy(far ? _zero3 : player.position);
   _shM.lookAt(_sunDir, _zero3, Math.abs(_sunDir.y) > 0.99 ? _xAxis : UP_Y); _shQ.setFromRotationMatrix(_shM); _shQi.copy(_shQ).invert();
   const tx = (2 * ext) / sun.shadow.mapSize.x; _shC.applyQuaternion(_shQi); _shC.x = Math.round(_shC.x / tx) * tx; _shC.y = Math.round(_shC.y / tx) * tx; _shC.applyQuaternion(_shQ);
-  sun.position.copy(_sunDir).multiplyScalar(50).add(_shC); sun.target.position.copy(_shC); sun.target.updateMatrixWorld();
+  sun.position.copy(_sunDir).multiplyScalar(64).add(_shC); sun.target.position.copy(_shC); sun.target.updateMatrixWorld();
   const dayAmt = smoothstep(-0.06, 0.28, elev);            // 0 noche → 1 día pleno
   const duskAmt = Math.max(0, 1 - Math.abs(elev) / 0.28);  // pico en amanecer/atardecer
   state.dayAmt = dayAmt; state.duskAmt = duskAmt;
@@ -5267,7 +5517,7 @@ const Fishing = (() => {
     spot.visible = !!(SaveSystem.started && !state.swimming && Tools.owned('fishing_rod') && findWater());
   }
   function rollCatch() {
-    const t = CFG.fishTable, night = isNightNow();
+    const t = World.zoneAt(spot.position.clone().normalize()) === 'pond' ? CFG.world.pondFish : CFG.fishTable, night = isNightNow();   // v2.6: la charca tiene su propia tabla
     const rare = Weather.fishRareMult() * (1 + clamp(_depth / 1.5, 0, 1) * CFG.fishDepthRareBonus) * (typeof AuraFX !== 'undefined' ? AuraFX.rareLootBoost() : 1) * NetUp.fishRareMult() * (typeof Util !== 'undefined' ? Util.luck() : 1);   // v1.3 · v2.5 luciérnagas: Caña de Coral ×1,5
     const w = { fish: t.fish, tropical_fish: t.tropical_fish * rare * Weather.tropicalMult(), golden_fish: t.golden_fish * rare * (night || Weather.goldenAlways() ? CFG.fishNightGoldenMult : 1), old_boot: t.old_boot };   // v0.8: ⛈️ Pez Dorado ×3 también de día · 🌧️ +tropical
     let r = Math.random() * Object.values(w).reduce((a, b) => a + b, 0);
@@ -5313,20 +5563,16 @@ const Mining = (() => {
     const rnd = mulberry32(5150);
     const rDir = () => { const u = rnd() * 2 - 1, th = rnd() * 6.2832, s = Math.sqrt(1 - u * u); return new THREE.Vector3(s * Math.cos(th), u, s * Math.sin(th)); };
     const nearTree = (d) => typeof treeDirs !== 'undefined' && Array.isArray(treeDirs) && treeDirs.some(t => t && t.isVector3 && angleBetween(t, d) < 0.07);
-    for (const [minRel, spacing] of [[1.5, 0.5], [1.0, 0.35], [0.6, 0.25]]) {
-      let tries = 0;
-      while (nodes.length < CFG.mineNodes && tries++ < 4000) {
-        const d = rDir();
-        if (!isLand(d) || nearAnySite(d, 0.02) || heightAt(d) - SEA < minRel || nearTree(d)) continue;
-        if (nodes.some(n => angleBetween(n.userData.dir, d) < spacing)) continue;
+    // v2.6 · E4: casi todos en las faldas de la montaña (más gemas), uno en la colina de las piedras y otro junto a las ruinas del desierto
+    const place = (gen, n) => { let k = 0; for (let tries = 0; tries < 400 && k < n; tries++) { const d = WGEO.v3(gen());
+        if (!isLand(d) || nearAnySite(d, 0.02) || World.mountain(d).path > 0.05 || World.slopeAt(d) > 0.6 || nearTree(d)) continue;
+        if (nodes.some(n2 => angleBetween(n2.userData.dir, d) * R < 3.2)) continue;
         if (pickups.some(p => p.userData.dir && angleBetween(p.userData.dir, d) < 0.08)) continue;
         const g = makeNode(); placeOnPlanet(g, d);
         g.userData.dir = g.userData.dir || d.clone(); g.userData.idx = nodes.length; g.userData.ready = true; g.userData.respawnAt = 0;
         registerInteractable(g, { type: 'mine', label: 'Minar ⛏️' }); scene.add(g);
-        colliders.push({ pos: g.position.clone(), r: 0.75 }); nodes.push(g);
-      }
-      if (nodes.length >= CFG.mineNodes) break;
-    }
+        colliders.push({ pos: g.position.clone(), r: 0.75 }); nodes.push(g); k++; } };
+    place(() => World.around('mountain', rnd, 11, 6.6), CFG.mineNodes - 2); place(() => World.around('hill', rnd, 10, 8), 1); place(() => World.around('desert', rnd, 11, 6), 1);
   }
   function setReady(g, ready) { g.userData.ready = ready; g.userData.body.scale.setScalar(ready ? 1 : 0.45); }
   function restore() { const st = GS.world.mineNodes || {}; nodes.forEach(g => { const at = st[g.userData.idx]; if (at && Date.now() < at) { setReady(g, false); g.userData.respawnAt = at; } else setReady(g, true); }); }
@@ -5339,7 +5585,7 @@ const Mining = (() => {
     if (!g.userData.ready) return;
     if (!Tools.usable('pickaxe')) { showToast(Tools.needMsg('pickaxe'), 'text-red-200'); return; }
     const stones = CFG.mineStoneMin + Math.floor(Math.random() * (CFG.mineStoneMax - CFG.mineStoneMin + 1));
-    const gem = Math.random() < CFG.mineGemChance * Weather.gemMult() * (typeof AuraFX !== 'undefined' ? AuraFX.rareLootBoost() : 1) * NetUp.gemMult();   // v1.3: Pico Voltaico ×2
+    const gem = Math.random() < CFG.mineGemChance * Weather.gemMult() * (typeof AuraFX !== 'undefined' ? AuraFX.rareLootBoost() : 1) * NetUp.gemMult() * (World.zoneAt(g.userData.dir) === 'mountain' ? CFG.world.mountainGem : 1);   // v1.3: Pico Voltaico ×2
     const loot = [['stone', stones]]; if (gem) loot.push(['raw_gem', 1]);
     if (!Inventory.canAddMany(loot)) { showToast('🎒 Inventario lleno: haz hueco antes de minar', 'text-red-200'); return; }
     if (NetUp.wears('pickaxe')) Tools.wear('pickaxe');   // v1.3: Pico Voltaico (no se gasta con niebla)
@@ -5880,10 +6126,11 @@ const ToolAnim = (() => {
    Todo es determinista por (partida, día): los montículos y señales se reparten cada día y lo cogido se guarda en GS.world.gather.
    Cada herramienta se gasta (durabilidad) y se repara en su tienda o a mano (mantenimiento). Y todo puede dar objetos de tu perfil (Net.grant). */
 const Gather = (() => {
-  const G = CFG.gather, _v = new THREE.Vector3(), _wp = new THREE.Vector3();
+  const G = CFG.gather, _v = new THREE.Vector3(), _wp = new THREE.Vector3(), _tp = [], _treeAt = (i) => (_tp[i] ||= treeDirs[i].clone().multiplyScalar(heightAt(treeDirs[i])));   // v2.6: posiciones de árbol en caché
   const st = () => { const w = GS.world; w.gather ||= {}; const g = w.gather; const d = GS.daily.dayCount | 0; if (g.day !== d) { g.day = d; g.dug = []; g.chopped = []; g.found = []; g.bugs = 0; } return g; };
   const rngDay = (tag) => mulberry32(_hashStr(GS.meta.saveId + ':' + tag + ':' + (GS.daily.dayCount | 0)));
-  const nearVillage = (r, maxAng) => { for (let i = 0; i < 40; i++) { const d = siteDir(S_V, (r() - 0.5) * 2 * maxAng * R, (r() - 0.5) * 2 * maxAng * R); if (isLand(d) && !colliders.some(c => c.pos.distanceTo(_v.copy(d).multiplyScalar(heightAt(d))) < c.r + 0.8)) return d; } return null; };
+  /** v2.6 · E4: montículos y señales por zonas: unos en el desierto (más fósiles, monedas y cofres) y otros cerca del pueblo */
+  const spawnAt = (r, where) => { for (let i = 0; i < 40; i++) { const d = WGEO.v3(where === 'desert' ? World.around('desert', r, 12.5) : World.around('town', r, G.nearM, 7)); if (isLand(d) && !nearAnySite(d, 0) && World.slopeAt(d) < 0.5 && !colliders.some(c => c.pos.distanceTo(_v.copy(d).multiplyScalar(heightAt(d))) < c.r + 0.8)) return d; } return null; };
   const roll = (tbl) => { let s = Math.random() * tbl.reduce((a, x) => a + x[1], 0); for (const [id, w, q] of tbl) if ((s -= w) < 0) return [id, typeof q === 'number' ? q : q[0] + Math.floor(Math.random() * (q[1] - q[0] + 1))]; return null; };
   const give = (list, label) => { const ok = list.filter(Boolean); if (!Inventory.canAddMany(ok, null)) { showToast('🎒 Inventario lleno', 'text-red-200'); return false; } ok.forEach(([id, q]) => Inventory.add(id, q, { silent: true })); if (ok.length) showToast(`${label} → ${ok.map(([id, q]) => `${ITEMS[id].icon} ${ITEMS[id].name} ×${q}`).join(' · ')}`, 'text-white'); return true; };
   const needTool = (id) => { if (Tools.usable(id)) return true; showToast(Tools.needMsg(id), 'text-red-200'); return false; };
@@ -5905,18 +6152,18 @@ const Gather = (() => {
   function clearAll() { [...mounds, ...signals].forEach(m => { scene.remove(m); const k = interactables.indexOf(m); if (k >= 0) interactables.splice(k, 1); }); mounds.length = 0; signals.length = 0; }
   function build() {
     clearAll(); const g = st(); builtDay = g.day;
-    const r = rngDay('mounds'); for (let i = 0; i < G.dig.perDay; i++) { const d = nearVillage(r, G.dig.ang); if (!d) continue; const key = 'm' + i; if (g.dug.includes(key)) continue;
+    const r = rngDay('mounds'); for (let i = 0; i < G.dig.perDay; i++) { const d = spawnAt(r, i < G.dig.desert ? 'desert' : 'near'); if (!d) continue; const key = 'm' + i; if (g.dug.includes(key)) continue;
       const m = new THREE.Group(); const hill = mesh(new THREE.SphereGeometry(0.42, 8, 5, 0, 6.29, 0, 1.5), moundMat, 0, -0.08, 0); hill.scale.y = 0.55; m.add(hill);
       const sp = new THREE.Sprite(sparkMat); sp.scale.setScalar(0.35); sp.position.y = 0.45; m.add(sp); m.userData.spark = sp;
       placeOnPlanet(m, d, r() * 6); m.userData.key = key; scene.add(m); registerInteractable(m, { type: 'gather', label: 'Excavar el montículo 🕳️', fn: (o) => dig(o, false) }); mounds.push(m); }
-    const r2 = rngDay('signals'); for (let i = 0; i < G.detect.perDay + (typeof Util !== 'undefined' ? Util.detectBonus() : 0); i++) { const d = nearVillage(r2, G.detect.ang); if (!d) continue; const key = 's' + i; if (g.dug.includes(key)) continue;
+    const r2 = rngDay('signals'); for (let i = 0; i < G.detect.perDay + (typeof Util !== 'undefined' ? Util.detectBonus() : 0); i++) { const d = spawnAt(r2, i < G.detect.desert + (typeof Util !== 'undefined' ? Util.detectBonus() : 0) ? 'desert' : 'near'); if (!d) continue; const key = 's' + i; if (g.dug.includes(key)) continue;
       const s = new THREE.Group(); const ring = new THREE.Mesh(new THREE.RingGeometry(0.35, 0.48, 24).rotateX(-Math.PI / 2), ringMat); ring.position.y = 0.04; ring.raycast = () => {}; s.add(ring); s.userData.ring = ring;
       placeOnPlanet(s, d, 0); s.userData.key = key; s.visible = false; scene.add(s); registerInteractable(s, { type: 'gather', label: 'Cavar la señal del detector 🧲', fn: (o) => dig(o, true) }); signals.push(s); }
   }
   function dig(o, treasure) {
     if (!needTool('shovel')) return; const g = st(), key = o.userData.key; if (g.dug.includes(key)) return;
     ToolAnim.play('shovel', () => { sfx(); g.dug.push(key); Tools.wear('shovel'); if (treasure) Tools.wear('detector');
-      const T = treasure ? G.detect.loot : G.dig.loot, got = [roll(T)]; if (Math.random() < (treasure ? 0.5 : 0.25) * (typeof Util !== 'undefined' ? Util.luck() : 1)) got.push(roll(T));
+      const desert = World.zoneAt(o.userData.dir) === 'desert', T = treasure ? (desert ? CFG.world.loot.detectDesert : G.detect.loot) : (desert ? CFG.world.loot.digDesert : G.dig.loot), got = [roll(T)]; if (Math.random() < (treasure ? 0.5 : 0.25) * (typeof Util !== 'undefined' ? Util.luck() : 1)) got.push(roll(T));
       give(got, treasure ? '🧲 ¡Tesoro enterrado!' : '🕳️ Excavas el montículo'); Net.grant(treasure ? 'detect' : 'dig');
       scene.remove(o); const k = interactables.indexOf(o); if (k >= 0) interactables.splice(k, 1); SaveSystem.save('dig'); if (treasure) playChime(); }, undefined, o.position.clone());
   }
@@ -5926,7 +6173,7 @@ const Gather = (() => {
   function spawnBug(night) {
     const up = player.userData.dir, a = Math.random() * 6.283, dist = (6 + Math.random() * 6) / R, t1 = _v.set(0, 1, 0).cross(up); if (t1.lengthSq() < 1e-4) t1.set(1, 0, 0); t1.normalize(); const t2 = new THREE.Vector3().crossVectors(up, t1);
     const d = up.clone().multiplyScalar(Math.cos(dist)).addScaledVector(t1, Math.sin(dist) * Math.cos(a)).addScaledVector(t2, Math.sin(dist) * Math.sin(a)).normalize(); if (!isLand(d)) return;
-    const rare = Math.random() < G.bug.rare;
+    const rare = Math.random() < G.bug.rare * (World.cur === 'forest' ? CFG.world.forestRare : 1);   // v2.6: en el bosque, más arcoíris
     const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex(night ? '🟡' : '🦋'), color: night ? 0xfff59d : rare ? 0xff80ab : 0xffffff, transparent: true, depthWrite: false, fog: false }));
     if (night) { s.material.map = DOT_TEX; s.material.blending = THREE.AdditiveBlending; }
     s.scale.setScalar(night ? 0.32 : 0.5); s.userData = { dir: d, ph: Math.random() * 6, rare, night, life: G.bug.lifeS };
@@ -5950,12 +6197,12 @@ const Gather = (() => {
     const hasDet = Tools.usable('detector');
     signals.forEach(s => { s.getWorldPosition(_wp); const near = hasDet && player.position.distanceTo(_wp) < G.detect.range; s.visible = near; if (near) { const k = (t * 1.5) % 1; s.userData.ring.scale.setScalar(0.6 + k * 1.2); ringMat.opacity = 0.8 * (1 - k); } });
     // mariposas / luciérnagas
-    const night = isNightNow(), want = Weather.id() === 'rain' || Weather.id() === 'storm' ? 0 : night ? G.bug.night : G.bug.day;
+    const night = isNightNow(), want = Weather.id() === 'rain' || Weather.id() === 'storm' ? 0 : (night ? G.bug.night : G.bug.day) + (World.cur === 'forest' ? CFG.world.forestBugs : 0);
     for (let i = bugs.length - 1; i >= 0; i--) { const b = bugs[i], u = b.userData; u.life -= dt; if (u.life <= 0 || u.night !== night || b.position.distanceTo(player.position) > 22) { removeBug(b); continue; }
       u.ph += dt; const lift = 1.1 + Math.sin(u.ph * 2.2) * 0.35; placeOnPlanet(b, u.dir, 0, lift); u.dir.applyAxisAngle(pos.set(Math.sin(u.ph * 0.7), Math.cos(u.ph * 0.5), Math.sin(u.ph * 0.3)).normalize(), dt * 0.02); u.sprite.material.rotation = Math.sin(u.ph * 8) * 0.25; }
     acc += dt; if (acc > 1.2) { acc = 0; if (bugs.length < want) spawnBug(night); }
     // hacha: árbol más cercano
-    let best = -1, bd = 2.6; if (Tools.owned('axe') && !state.swimming) for (let i = 0; i < treeDirs.length; i++) { _v.copy(treeDirs[i]).multiplyScalar(heightAt(treeDirs[i])); const d = _v.distanceTo(player.position); if (d < bd && !g.chopped.includes(i)) { bd = d; best = i; } }
+    let best = -1, bd = 2.6; if (Tools.owned('axe') && !state.swimming) for (let i = 0; i < treeDirs.length; i++) { _v.copy(_treeAt(i)); const d = _v.distanceTo(player.position); if (d < bd && !g.chopped.includes(i)) { bd = d; best = i; } }
     chopIdx = best; chopSpot.visible = best >= 0; if (best >= 0) chopSpot.position.copy(treeDirs[best]).multiplyScalar(heightAt(treeDirs[best]) + 0.5);
   }
   return { update, build, chop, dig, catchBug, bugs, mounds, signals };
@@ -6011,7 +6258,7 @@ let _chatIn = -1;
 function animate() {
   requestAnimationFrame(animate);
   const rawDt = clock.getDelta(), dt = Math.min(rawDt, 0.05), t = clock.elapsedTime; GFX.update(dt, rawDt);   // v1.4: gobernador de FPS + viñeta
-  updatePlayer(dt); ToolAnim.update(dt); Gather.update(dt, t); Studio.update(t); Online.update(dt); if ((NetWorld.inside() ? 1 : 0) !== _chatIn) { _chatIn = NetWorld.inside() ? 1 : 0; NetChat.render(); } if (!state.cinematic) Needs.update(dt); updateNPCs(dt, t); Awakening.update(dt, t); /* v0.9: el sueño se detiene durante la escena del puerto */ updateCamera(dt); updateSun(); updateNeon(dt, t); updateUnlocks(dt, t); updateShip(dt); updateConfetti(dt); updateWater(t); V10.update(dt, t); ShootingStars.update(dt, 1 - (state.dayAmt ?? 1)); WIND_U.uTime.value = t; { const w = Weather.id(), tw = (w === 'storm' ? 2.8 : w === 'rain' ? 2 : 1) * lerp(0.5, 1, state.dayAmt ?? 1); WIND_U.uWind.value += (tw - WIND_U.uWind.value) * Math.min(1, dt * 0.8); }
+  updatePlayer(dt); ToolAnim.update(dt); Gather.update(dt, t); WorldFX.update(dt, t); Studio.update(t); Online.update(dt); if ((NetWorld.inside() ? 1 : 0) !== _chatIn) { _chatIn = NetWorld.inside() ? 1 : 0; NetChat.render(); } if (!state.cinematic) Needs.update(dt); updateNPCs(dt, t); Awakening.update(dt, t); /* v0.9: el sueño se detiene durante la escena del puerto */ updateCamera(dt); updateSun(); updateNeon(dt, t); updateUnlocks(dt, t); updateShip(dt); updateConfetti(dt); updateWater(t); V10.update(dt, t); ShootingStars.update(dt, 1 - (state.dayAmt ?? 1)); WIND_U.uTime.value = t; { const w = Weather.id(), tw = (w === 'storm' ? 2.8 : w === 'rain' ? 2 : 1) * lerp(0.5, 1, state.dayAmt ?? 1); WIND_U.uWind.value += (tw - WIND_U.uWind.value) * Math.min(1, dt * 0.8); }
   clouds.children.forEach(p => { p.rotateY(p.userData.speed * dt); const c = p.userData.bob; if (c) c.position.z = c.userData.z0 + Math.sin(t * 0.3 + c.userData.ph) * 0.25; });   // v1.5: las nubes «respiran» arriba y abajo
   updateTokens(); updateGoalHUD(); updateClockHUD(); Weather.update(dt); Fishing.update(dt); Mining.update(dt); StarFall.update(dt); Net.update(dt);
   if (SaveSystem.started && !state.menuOpen && !state.cinematic) {
@@ -8967,6 +9214,104 @@ const NET_UPGRADES = [
   { id: 'crystal_showcase', icon: '🖼️', name: 'Escaparate de Cristal',  station: 'glover', in: [['lunar_glass', 2], ['prism_coral', 5], ['ash_brick', 2]], fx: '+4 huecos de escaparate en casa (Tienda o Villa)' },
   { id: 'net_antenna',      icon: '📡', name: 'Antena de la Red',       station: 'dax',    in: [['static_feather', 5], ['volt_gear', 2], ['whisper_reed', 5]], fx: 'Ves el Índice de la Red desde el PC de casa' },
 ];
+/* ===== v2.6 · 🧭 POSTES DE VIAJE, CIMA Y CARTEL DE ZONA (Guía Maestra 2, Bloque E3 y E5) =====
+   Los postes se descubren llegando a pie; luego se viaja entre ellos por CFG.world.travelFee $T con un fundido a negro.
+   En la cima: mirador, el telescopio de Dax (vista de todo el planeta) y, de noche, un fragmento de estrella al día. */
+const WorldFX = (() => {
+  const C = CFG.world, objs = {};
+  const st = () => { const w = GS.world; if (!Array.isArray(w.posts)) w.posts = ['plaza']; if (typeof w.summitDay !== 'number') w.summitDay = -1; return w; };
+  const has = (id) => st().posts.includes(id);
+  const arriveOf = (p) => p.id === 'summit' ? WGEO.v3(World.Z.mountain.c) : WGEO.v3(WGEO.offset(p.dir, -1.2, 1.1));
+  /* --- fundido a negro --- */
+  let fadeEl = null;
+  function fade(mid) {
+    if (!fadeEl) { fadeEl = document.createElement('div'); fadeEl.style.cssText = 'position:fixed;inset:0;background:#0d0b22;opacity:0;transition:opacity .35s;z-index:70;pointer-events:none'; document.body.append(fadeEl); }
+    fadeEl.style.pointerEvents = 'auto'; requestAnimationFrame(() => { fadeEl.style.opacity = '1'; });
+    setTimeout(() => { try { mid(); } catch (e) { console.warn('[viaje]', e); } setTimeout(() => { fadeEl.style.opacity = '0'; fadeEl.style.pointerEvents = 'none'; }, 160); }, 400);
+  }
+  /** Lleva al jugador a dir (mirando al «norte» del pueblo) */
+  function teleport(dir) {
+    const pd = player.userData; pd.dir.copy(dir).normalize(); pd.fwd.copy(frameAt(pd.dir, V_N).fwd);
+    state.moveTarget = null; state.pendingInteract = null; state.swimming = !isLand(pd.dir);
+    player.position.copy(pd.dir).multiplyScalar(surfaceR(pd.dir));
+  }
+  /* --- 🪧 postes --- */
+  const crystalOff = matC(0x9e9aa8, true), crystalOn = glow(0x80deea, 0x00e5ff, 1.1);
+  function makePost(p) {
+    const g = new THREE.Group(), wood = matC(0x8d6e63, true);
+    g.add(cyl(0.09, 0.13, 2.1, wood, 0, 1.05, 0, 6));
+    const sign = new THREE.Mesh(new THREE.PlaneGeometry(1.25, 0.36), new THREE.MeshBasicMaterial({ map: textTexture(`${p.icon} ${p.name}`, { w: 640, h: 184, font: 'bold 64px Fredoka, Arial', bg: '#fff8e7' }), side: THREE.DoubleSide }));
+    sign.position.set(0, 1.55, 0.1); g.add(sign);
+    const cr = mesh(new THREE.OctahedronGeometry(0.2, 0), crystalOff, 0, 2.38, 0); g.add(cr); g.userData.crystal = cr;
+    placeOnPlanet(g, p.dir, 0, 0); scene.add(g); colliders.push({ pos: g.position.clone(), r: 0.28, noAO: true });
+    registerInteractable(g, { type: 'gather', label: `🪧 Poste de viaje · ${p.name}`, fn: () => openPanel(p.id) });
+    return g;
+  }
+  function refresh() { TRAVEL_POSTS.forEach(p => { const g = objs[p.id]; if (g) g.userData.crystal.material = has(p.id) ? crystalOn : crystalOff; }); }
+  function unlock(id, quiet = false) {
+    const p = TRAVEL_POSTS.find(x => x.id === id); if (!p || has(id)) return false;
+    st().posts.push(id); refresh(); if (!quiet) { playChime(); showToast(`🪧 Poste de viaje descubierto: ${p.icon} ${p.name}. Ya puedes viajar hasta aquí desde cualquier poste.`, 'text-white'); }
+    SaveSystem.save('post:' + id); return true;
+  }
+  function openPanel(fromId) {
+    unlock(fromId);
+    openApp('🪧 Postes de viaje', '', (body) => {
+      const w = st();
+      body.innerHTML = `<div class="app-card p-3 mb-2 text-xs text-slate-600">Cada poste que alcanzas a pie queda en la red. Viajar a otro poste cuesta <b>${C.travelFee} $T</b>.</div>` +
+        TRAVEL_POSTS.map(p => { const on = w.posts.includes(p.id), here = p.id === fromId;
+          return `<div class="app-card p-2.5 mb-1.5 flex items-center gap-3 ${on ? '' : 'opacity-60'}"><div class="text-2xl w-9 text-center">${on ? p.icon : '❔'}</div><div class="flex-1 min-w-0 text-sm"><b class="text-[#2b2b3d]">${on ? p.name : 'Sin descubrir'}</b><div class="text-xs text-slate-500">${here ? 'Estás aquí' : on ? World.name(World.zoneAt(p.dir)) : 'Llega a pie una vez para activarlo'}</div></div>
+            ${on && !here ? `<button data-go="${p.id}" class="btn-game px-3 py-1.5 text-xs bg-sky-300">Viajar · ${C.travelFee} $T</button>` : ''}</div>`; }).join('');
+      body.querySelectorAll('[data-go]').forEach(b => b.onclick = () => go(b.dataset.go));
+    });
+  }
+  function go(id) {
+    const p = TRAVEL_POSTS.find(x => x.id === id); if (!p || !has(id) || Interiors.active) return false;
+    if (!Wallet.spend(C.travelFee, 'Poste de viaje')) return false;
+    closeApp(); fade(() => { teleport(arriveOf(p)); showToast(`${p.icon} ${p.name}`, 'text-white'); SaveSystem.save('travel'); });
+    return true;
+  }
+  /* --- ⛰️ cima: telescopio de Dax y fragmento de estrella nocturno --- */
+  let star = null;
+  function buildSummit() {
+    const c = World.Z.mountain.c, brass = glow(0xc9a227, 0x6d4c00, 0.2, { metalness: 0.6, roughness: 0.35 }), dark = matC(0x37474f, true), t = new THREE.Group();
+    [0, 2.09, 4.19].forEach(a => { const l = cyl(0.03, 0.03, 1.1, dark, Math.sin(a) * 0.22, 0.5, Math.cos(a) * 0.22, 4); l.rotation.set(Math.cos(a) * 0.2, 0, -Math.sin(a) * 0.2); t.add(l); });
+    const tube = cyl(0.08, 0.11, 0.9, brass, 0, 1.12, 0.05, 10); tube.rotation.x = -1.0; t.add(tube);
+    placeOnPlanet(t, WGEO.v3(WGEO.offset(c, -0.8, -0.7)), 0.6, 0.08); scene.add(t); colliders.push({ pos: t.position.clone(), r: 0.32, noAO: true });
+    registerInteractable(t, { type: 'gather', label: '🔭 Telescopio de Dax (mirar todo el planeta)', fn: () => { cam.tDist = C.planetDist; showToast('🔭 Desde la cima se ve el planeta entero. Rueda o pellizca para volver.', 'text-white'); } });
+    objs.telescope = t;
+    star = new THREE.Group(); const spr = new THREE.Sprite(new THREE.SpriteMaterial({ map: DOT_TEX, color: 0xfff59d, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })); spr.scale.setScalar(0.9); spr.position.y = 1.3; star.add(spr); star.userData.spr = spr;
+    placeOnPlanet(star, WGEO.v3(WGEO.offset(c, 0.6, -0.9)), 0, 0); star.visible = false; scene.add(star);
+    registerInteractable(star, { type: 'gather', label: '✨ Coger el fragmento de estrella', fn: () => takeStar() });
+  }
+  function takeStar() {
+    const w = st(), day = GS.daily.dayCount | 0; if (!star?.visible || w.summitDay === day) return;
+    if (!Inventory.add('star_shard', 1)) return; w.summitDay = day; star.visible = false; playChime(); showToast('✨ Un Fragmento de Estrella caído en la cima. Mañana por la noche habrá otro.', 'text-white'); SaveSystem.save('summit-star');
+  }
+  /* --- 🏷️ cartel de zona al entrar en otra --- */
+  let banner = null, bannerT = 0;
+  function showBanner(z) {
+    if (!banner) { banner = document.createElement('div'); banner.className = 'zone-banner'; document.body.append(banner); }
+    banner.innerHTML = `<span>${World.icon(z)}</span><b>${World.name(z)}</b>`; banner.classList.add('on'); bannerT = 2.4;
+  }
+  /* --- bucle --- */
+  let built = false, acc = 0, cur = null, pend = null;
+  function build() { if (built) return; built = true; TRAVEL_POSTS.forEach(p => { objs[p.id] = makePost(p); }); buildSummit(); }
+  function update(dt, t) {
+    if (!built || !SaveSystem.started) return;
+    if (bannerT > 0 && (bannerT -= dt) <= 0) banner?.classList.remove('on');
+    if (star) { const night = isNightNow(), w = st(), want = night && w.summitDay !== (GS.daily.dayCount | 0); if (star.visible !== want) star.visible = want; if (want) star.userData.spr.material.opacity = 0.75 + 0.25 * Math.sin(t * 3); }
+    if ((acc += dt) < 0.5) return; acc = 0;
+    if (Interiors.active || state.menuOpen) return;
+    refresh();
+    const pd = player.userData.dir, z = World.zoneAt(pd); World.cur = z;
+    if (z !== cur) { if (pend === z) { const first = cur == null; cur = z; pend = null; if (!first && z !== 'sea' && z !== 'pond') showBanner(z); } else pend = z; } else pend = null;
+    for (const p of TRAVEL_POSTS) if (!has(p.id) && angleBetween(pd, p.dir) * R < 5) unlock(p.id);
+  }
+  return { build, update, unlock, go, openPanel, teleport, has, arriveOf, get banner() { return banner; },
+    /** DBG: teletransporte gratis a un poste o al centro de una zona */
+    tp(id) { const p = TRAVEL_POSTS.find(x => x.id === id); if (p) return teleport(arriveOf(p)); const z = World.Z[id]; if (z) teleport(WGEO.v3(id === 'sea' ? WGEO.offset(SITES.port.dir, 0, -2) : z.c)); },
+  };
+})();
 /* ===== v2.5 · 🔨 UTILIDAD DE LOS OBJETOS (Guía Maestra 2, Bloque G e I-regalos): banco de trabajo, recetas nuevas, servicios de vecinos,
    sala del museo «Excavación y naturaleza», suerte de las luciérnagas, regalos detestados y la regla «todo objeto sirve para algo». ===== */
 const WORKBENCH = [
@@ -10924,6 +11269,7 @@ function applyGameStateToWorld() {
   if (typeof Online !== 'undefined') Online.boot();   // v1.7: reconecta la cuenta online si había sesión
   Net.apply();         // v1.3
   Util.placeBench();   // v2.5: banco de trabajo junto a casa
+  WorldFX.build();     // v2.6: postes de viaje, telescopio y estrella de la cima
   Studio.place();      // v1.6: estudio del perfil junto a casa (si ya tienes perfil): Red del Sueño (re-engancha el mundo de bots; si recargaste dentro, despiertas en casa)
   state.tokensShown = GS.economy.money; ui.tokenValue.textContent = state.tokensShown.toLocaleString('es-ES');
   refreshMissionUI();
@@ -11382,11 +11728,13 @@ DBG.refs = DBG_REFS;
 if (/[?&]debug=1\b/.test(location.search)) window._dbg = DBG_REFS;   // v1.0: ya no es global por defecto
 /* v1.1 · Interior caminable de la casa (Sec. 6.9 Fase 2) */
 /** v1.5 · capturas: DBG.tp(x, z) lleva al jugador a (x, z) del pueblo · DBG.view(dist, pitch, yaw) fija la cámara · DBG.shot('B'|'C'|'D'|'G'|'H') prepara la escena del protocolo */
-DBG.g = { scene, renderer, camera, cam, sky, water, atmo, clouds, PostFX, SkyEnv, PlanetAO, WATER_U, POST_U, Gather, Studio, ToolAnim, Profiles, Hub, Decor, Fitting, player, Interiors };   // v1.5: referencias gráficas para depurar
+DBG.g = { World, WGEO, WorldFX, TRAVEL_POSTS, state, Gather, Mining, scene, renderer, camera, cam, sky, water, atmo, clouds, PostFX, SkyEnv, PlanetAO, WATER_U, POST_U, Gather, Studio, ToolAnim, Profiles, Hub, Decor, Fitting, player, Interiors };   // v1.5: referencias gráficas para depurar
 DBG.post = (v = !PostFX.active) => { PostFX.active = !!v; POST_U.uPost.value = v ? 1 : 0; return PostFX.active; };
 DBG.env = (v = !SkyEnv.enabled) => SkyEnv.setEnabled(v);
 DBG.ao = (v = true) => { if (!PlanetAO.on) return false; if (v) PlanetAO.bake(); else { const c = planet.geometry.attributes.color; PlanetAO.reset(); c.needsUpdate = true; } return v; };
 DBG.tp = (x = 0, z = 0) => { const d = siteDir(S_V, x, z); player.userData.dir.copy(d); player.position.copy(d).multiplyScalar(surfaceR(d)); state.moveTarget = null; return true; };
+DBG.tp = (id) => { WorldFX.tp(id); console.log('[DBG] tp →', id, '· zona', World.zoneAt(player.userData.dir)); };   // v2.6: plaza, forest, coast, desert, summit o cualquier zona
+DBG.zone = () => ({ zone: World.zoneAt(player.userData.dir), h: +(heightAt(player.userData.dir) - SEA).toFixed(2), slope: +World.slopeAt(player.userData.dir).toFixed(2), posts: GS.world.posts });
 DBG.view = (dist, pitch, yaw) => { if (dist != null) cam.dist = cam.tDist = dist; if (pitch != null) cam.pitch = cam.tPitch = pitch; if (yaw != null) cam.yaw = cam.tYaw = yaw; return { dist: cam.tDist, pitch: cam.tPitch, yaw: cam.tYaw }; };
 DBG.shot = (id = 'B') => { const S = { B: [() => DBG.tp(-1, 2), 12, 'clear', 9, 0.42], C: [() => DBG.tp(-9.5, 9.5), 18.5, 'clear', 9, 0.32], D: [() => DBG.tp(3.5, -2.5), 23, 'clear', 10, 0.45], G: [() => {}, 0, 'clear', 60, 0.3], H: [() => DBG.tp(-1, 2), 12, 'storm', 9, 0.42] }[id]; if (!S) return false; S[0](); DBG.time(S[1]); DBG.weather(S[2]); DBG.view(S[3], S[4]); return id; };
 DBG.enterHouse = (lv) => { if (lv !== undefined) DBG.house(lv); const ok = Interiors.enter('house'); console.log(ok ? '[DBG] Entrando en casa (nivel ' + (GS.house.level | 0) + ')' : '[DBG] No se puede entrar ' + (houseSealed() ? '(casa sellada)' : Interiors.active ? '(ya estás dentro)' : '')); return ok; };
