@@ -358,7 +358,7 @@ const CFG = {
   diceHouseEdge: 0.02,            // comisión de la casa sobre el premio (esperanza −2%, visible en pantalla) · los avisos 20%/50% reutilizan los de la ruleta
   /* ===== v0.2 · CONFIANZA (Sec. 3) — definidos ya; se USAN desde v0.2 ===== */
   trustThresholds: [10, 30, 70, 150],   // puntos para nivel 1/2/3/4
-  tradePointsCapPerDay: 5,              // tope de puntos por comercio/NPC/día (Rocco tendrá 8)
+  tradePointsCapPerDay: 5,              // tope de puntos por comercio/NPC/día (Rocco: roccoTradeCapPerDay)
   giftCapPerDay: 3,                     // regalos por NPC/día
   giftDecay: [1, 0.5, 0.25],            // rendimiento del 1º/2º/3er regalo
   statueTrustBonus: 0.05,               // +5% a toda confianza ganada con la Estatua $TOKEN construida
@@ -429,8 +429,8 @@ const CFG = {
   bridgePhases: [{ wood_log: 10 }, { stone: 10 }, { wood_log: 8, stone: 8 }, { stone: 6, raw_gem: 1 }, { wood_log: 6, stone: 6, raw_gem: 1 }],   // 🦫 5 fases = 5 días oníricos (1 fase/día) · troncos, piedras, gemas
   bridgeBuildDiscount: 0.15,      // 🦫 −15% en costes de construcción para siempre (al terminar el puente)
   oracleAccuracy: 0.70,           // 🐈‍⬛ el Oráculo acierta ~70% (se muestra en la UI: Pilar P5)
-  feriaUpPct: 0.45, feriaDownPct: 0.40, feriaFlatPct: 0.04,   // 📈 Feria del Tablón (diseño propio): cada día 1 categoría sube, 1 baja, el resto ±4%
-  feriaCommission: 0.02, feriaStakeCapPct: 0.7, feriaMinStake: 100,   // comisión · tope de lotes por día (% del capital) · lote mínimo
+  feriaUpPct: 0.50, feriaDownPct: 0.40, feriaFlatPct: 0.04,   // 📈 Feria del Tablón (diseño propio): cada día 1 categoría sube, 1 baja, el resto ±4% · v1.0: subida 0.45 → 0.50 (ver PASE DE BALANCE)
+  feriaCommission: 0.02, feriaStakeCapPct: 0.75, feriaMinStake: 100,   // comisión · tope de lotes por día (% del capital) · lote mínimo · v1.0: tope 0.70 → 0.75 (ver PASE DE BALANCE)
   mayorRumorChance: 0.3,          // 🐶 prob. diaria de rumor de mercado del Mayor (❤️ 3, Sec. 2.3) · diseño propio
   climateChances: { clear: 35, rain: 25, fog: 12, sun: 15, storm: 8, stars: 5 },   // 🦎 % por franja con el Climatizador ('stars' solo de tarde-noche)
   climateRainGardenMult: 2, climateRainFruitMult: 2, climateRainTropicalMult: 2,      // 🌧️ cosechas y jardín ×2, pesca +tropical
@@ -461,7 +461,58 @@ const CFG = {
   dreamerTrustBonus: 0.10,        // …y +10% confianza ganada
   club100M: 100000000,            // Sec. 10.7: Club de los 100M (título del post-juego)
   houseMaxLevel: 3,               // 0 Casa · 1 Tienda · 2 Villa · 3 Mansión Onírica (solo post-juego, Final B)
-  mansionCost: 10000000,          // diseño propio (la Guía solo fija el alquiler): precio de la Mansión Onírica · calibrable en v1.0
+  mansionCost: 20000000,          // diseño propio (la Guía solo fija el alquiler): precio de la Mansión Onírica · v1.0: 10M → 20M (ver PASE DE BALANCE)
+  /* ===== v1.0 · CONSTANTES QUE ANTES ESTABAN EN LA LÓGICA (mismos valores, ahora calibrables) ===== */
+  charityThreshold: 50,           // Sec. 4.8: Pan del Pobre si tu capital < 50 $T (y confianza ≥ 1 con el Oso)
+  roccoTradeCapPerDay: 8,         // Sec. 3.3: Rocco admite más comercio al día que los demás (8 vs tradePointsCapPerDay)
+  auraPerks: { fireSell: 1.05, goldSell: 1.05, goldBuy: 0.95, iceCooldown: 0.9, voidLoot: 1.15 },   // Sec. 3.6: perks de los estilos de aura (requieren tier ≥ 1)
+  auraTierAvg: [1, 2, 3, 3.5],    // Sec. 3.6: media de niveles de confianza (7 vecinos) para el tier 1/2/3/4 del aura
+  weekendTrustBonus: 0.10,        // Sec. 10.3: premio de 5 sellos → +10% confianza el sábado y el domingo
+  municipalRewards: { collect5: 80, shells3: 60, wood4: 70 }, municipalTrust: 2,   // Sec. 4.8: Empleo Municipal (pago bajo pero garantizado) + confianza con el Mayor
+  weeklyRewards: { 3: [['gift_box', 1], ['coffee', 2]], 5: [['golden_gift_box', 1]], 7: [['golden_gift_box', 2]] },   // Sec. 10.3 (5 = + finde +10% confianza · 7 = + título + 1 prenda)
+  /* ===== v1.0 · EL JUEGO COMPLETO (Sec. 10 + 11.4) ===== */
+  museumAnnounceLetter: true,     // Sec. 10.5: el Mayor anuncia el museo por carta al desbloquearse (tras su misión)
+  achFaintFreeDays: 30,           // Sec. 10.4 «Rescate evitado»: 30 días oníricos sin desmayarte
+  achHonestLosses: 3,             // Sec. 10.4 «Jugador honrado» (secreto): dejar de apostar tras perder 3 seguidas…
+  achHonestDays: 1,               // …y no volver a apostar durante al menos 1 liquidación (diseño propio)
+  starNightWeekday: 5,            // Sec. 10.6: viernes (Date.getDay) = 🌠 Noche de Estrellas (cantidad: starFridayMin/Max)
+  fairWeekday: 6,                 // Sec. 10.6: sábado = 🎪 Feria del Sábado (puestos de los vecinos en la aldea)
+  welcomeBackDays: 7,            // Sec. 10.1 regla 4: quien vuelve tras ≥ 7 días reales recibe bienvenida (no factura)
+  lotteryWeekday: 0, lotteryHour: 20,   // Anexo B: sorteo domingo 20:00 (lo calcula nextSunday20; aquí solo para el calendario)
+  fairOffersPerSaturday: 4,       // ofertas sorteadas cada sábado (deterministas por semana + partida) además de las fijas
+  fairOffers: [                   // Sec. 10.6 «−20% en algo, stock raro, el Oso vende Harina en oferta…» · precios ≥ lo que paga cualquier NPC (Sec. 5.12: sin arbitraje)
+    { npc: 'bear',   id: 'flour',           disc: 0.15, stock: 16, always: true },   // Harina en oferta (−15%: a −20% Rocco la recompraría con beneficio)
+    { npc: 'bear',   id: 'strawberry_cake', disc: 0.20, stock: 4 },
+    { npc: 'rocco',  id: 'wood_log',        disc: 0.20, stock: 15 },
+    { npc: 'rocco',  id: 'dream_wheat',     disc: 0.20, stock: 12 },
+    { npc: 'glover', id: 'stone',           disc: 0.20, stock: 15 },
+    { npc: 'glover', id: 'pickaxe',         disc: 0.20, stock: 1 },
+    { npc: 'sam',    id: 'fishing_rod',     disc: 0.20, stock: 1 },
+    { npc: 'sombra', id: 'mystic_crystal',  disc: 0.20, stock: 1 },
+    { npc: 'sam',    id: 'dream_spice',     price: 200, stock: 1, rare: true },     // stock raro de Ultramar (también es pieza del museo)
+    { npc: 'sam',    id: 'sky_compass',     price: 520, stock: 1, rare: true },
+    { npc: 'sombra', id: 'timeless_clock',  price: 850, stock: 1, rare: true },
+  ],
+  fairStallSpots: [[-1.6, 2.3, 0.15], [1.1, 2.1, -0.1], [3.4, 1.7, -0.3]],   // aldea: x, z, giro de los 3 puestos (junto al camino de piedras)
+  museumIslands: [[-3.2, 3.0], [-1.65, 3.85], [0, 4.15], [1.65, 3.85], [3.2, 3.0]],   // jardines del ayuntamiento: centro de cada set (x, z)
+  museumSignSpot: [-1.5, 2.2],
+  maxPixelRatioMobile: 1.25,      // v1.0 · rendimiento: 1.5 → 1.25 en táctil (la mayor parte del coste es de relleno de píxeles)
+  starLightOnMobile: false,       // v1.0 · rendimiento: las estrellas caídas no crean PointLight en móvil (cada luz nueva recompila shaders)
+  /* ===== v1.0 · PASE DE BALANCE (Sec. 4.9 · 5.12 · 11.4) =====
+     Objetivo de la Guía: 10K → 40M en ~8 h (h2→h10) con gastos diarios. Un día onírico dura 20 min si no duermes y
+     ~10 min si duermes cada noche (18:00 → 06:00); jugador de referencia: duerme la mitad de las noches → ~15 min/día
+     → 8 h ≈ 32 días oníricos. Simulado en node con el código REAL (Feria, Oráculo, rumores, tasa 1%, alquiler Villa,
+     liquidación) y ~4.000 $T/día "de oficio" (pedidos, importaciones, encargos), 30 partidas por estrategia (mediana [min–max]):
+       antes (tope 0,70 · subida 0,45): dedicado 30 · mixto 34 [30–41] · solo Oráculo 55 [41–71] días
+       ahora (tope 0,75 · subida 0,50): dedicado 26 · mixto 30 [26–37] · solo Oráculo 49 [37–67] días
+     (dedicado = pista real cada día con el encargo premium de Glover; mixto = la mitad de los días; solo Oráculo = 70%).
+     Forma de la curva (mixto): 100K día 6 · 1M día 16 · 5M día 21 · 40M día 30 → 20% / 53% / 70% / 100% del tramo,
+     igual que las fases 2a/2b/2c/endgame de la Sec. 4.9. Gastos: tasa 1% (100 $T a 10K, 10K a 1M, 50K a 5M) + alquiler,
+     del orden de la tabla 4.9. La lotería (cap 2M = 5%) y las apuestas no se tocan: nunca son el camino óptimo.
+     Mansión Onírica (post-juego Final B, con los 40M devueltos): a ese capital el ritmo mixto crece ~23%/día (~9M/día),
+     así que 10M era ~1 día de juego (trámite). 20M = la mitad del billete devuelto: comprarla con 40M retrasa el Club de
+     los 100M ~3 días oníricos (ln 2 / 0,23) → decisión de orgullo real. El alquiler (5.000 $T/día) es de la Guía.
+     Herramienta: DBG.feriaSim / DBG.economy / DBG.balance() en consola. */
 };
 /** Detección de dispositivo táctil → controles y calidad adaptados */
 const IS_MOBILE = matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window;
@@ -508,13 +559,13 @@ function defaultGameState() {
     farm: { fruits: {} },                            // { [índice]: timestamp en que vuelve a madurar }
     player: { dir: null, fwd: null },                // última posición sobre el planeta
     stats: { missionsCompleted: 0, fruitsHarvested: 0, itemsBought: 0, itemsSold: 0, itemsCollected: 0, itemsUsed: 0, memesCreated: 0 },
-    achievements: {}, vehicles: {}, interiors: {}, zones: {},
+    achievements: { titles: [], equippedTitle: null, unlocked: {}, claimed: {}, track: {}, goldTitles: [], legendAura: false }, vehicles: {}, interiors: {}, zones: {},   // v1.0: logros (Sec. 10.4) · unlocked { id: { at, day } } · claimed { id: ts } · track: contadores internos
     furniture: { owned: [] },                        // v3: muebles comprados (Sec. 6.8) · antes reservado vacío
     /* ===== v3 · DÍA ONÍRICO Y NECESIDADES (Guía Maestra Sec. 4 y 6) =====
        Convención de tiempos: el DÍA ONÍRICO solo avanza JUGANDO (daily.clockMs suma ms reales de partida).
        Los cooldowns de recursos/tiendas/frutas siguen siendo tiempo REAL (Date.now), como en v2. */
      daily: { dayCount: 1, clockMs: 28800000 /* 08:00 */, lastSettleDay: 0, freeRescueUsed: false, restedUntil: 0, lastSettleAt: 0, charityDay: 0, lastCharges: [], today: { earned: 0, spent: 0 } },   // today: contabilidad del día en curso (resumen de la liquidación)
-    needs: { hunger: 100 },                          // saciedad 0–100 (Sec. 4.3)
+    needs: { hunger: 100, coffeeUntil: 0 },          // saciedad 0–100 (Sec. 4.3) · v1.0: coffeeUntil = fin del Café (timestamp real)
      housing: { rentDebt: 0, sealed: false, graceDaysLeft: 5, mailbox: [], mailboxUnread: 0, showcase: [], showcaseRevenue: 0, lastRentDay: 0, sealedBuildings: [], sealDebt: 0, unsealCount: 0 },
     debt: 0,                                         // Deuda Onírica de Sombra, interés diario (Sec. 4.7)
     /* ===== v3 · CONFIANZA (Sec. 3) — se puebla desde v0.2 ===== */
@@ -528,7 +579,8 @@ function defaultGameState() {
     awakening: { step: 0, planeFueled: false, permit: false, permitDay: 0, inspected: false, permitRequested: false, expressPaid: false, readingDone: false, refunded: false, roccoPearl: false, permitLetter: false },   // Cadena del Despertar (Sec. 7.5) · step 1 alas · 2 Formulario 99-Z · 3 última lectura · permitDay = día en que el 99-Z queda tramitado
     story: { prologueDone: false, revealed: false, farewellDone: false, ending: null, act1Done: false, creatorPending: false, endingAt: 0 },   // v0.9: ending 'A' (despertar) | 'B' (quedarse)   // v0.7: creatorPending = el creador inicial tras el prólogo sigue sin cerrarse
     weekly: { seals: [false, false, false, false, false, false, false], weekStart: null },  // Sello Semanal (Sec. 10.3)
-    museum: { donated: [] },                         // Museo del Sueño (Sec. 10.5)
+    museum: { donated: [], trophies: [], rewarded: [], announced: false },   // Museo del Sueño (Sec. 10.5) · donated: [{ id, at, day, by, num? }] · trophies/rewarded: ids de sala
+    events: { fair: { week: null, bought: {} } },    // v1.0 · Feria del Sábado (Sec. 10.6): compras por oferta de la semana real en curso
     // Avatar (Sec. 8.8): config "clásica" = el look actual del prototipo (piel #ffd5b3, camiseta cian, vaqueros, pelo marrón, mochila naranja). Lo usa v0.7.
     avatar: { skin: 0, hair: 0, hairColor: 0, eyes: 0, eyeColor: 0, top: 0, topColor: 2, pants: 0, pantsColor: 3, shoes: 0, shoesColor: 0, hat: null, hatColor: 5, glasses: null, glassesColor: 0, backpack: 0, backpackColor: 1, wardrobe: [] },   // v0.7: + hatColor/glassesColor · wardrobe: piezas desbloqueadas 'slot:id' (las base no se guardan: son de todos)
      lottery: { pool: 0, nextDrawAt: null, tickets: [], lastDraw: null },   // Lotería semanal real (Anexo B) · tickets: [{ num, day }] · lastDraw: { num, at, winner, prize, myCount }
@@ -781,7 +833,7 @@ const Inventory = {
   use(id) {
     const it = ITEMS[id]; if (!it || !this.has(id, 1)) return false;
     if (!it.usable) { showToast('Este objeto no se puede usar', 'text-white'); return false; }
-    const fx = ITEM_EFFECTS[id]; if (!fx) { showToast('Todavía no tiene uso… pronto lo tendrá', 'text-white'); return false; }
+    const fx = ITEM_EFFECTS[id]; if (!fx) { showToast('Este objeto no tiene un uso directo', 'text-white'); return false; }
     if (fx() === false) return false;
     this._removeRaw(id, 1); GS.stats.itemsUsed++; refreshInvBadge(); SaveSystem.saveNow('use:' + id); return true;
   },
@@ -895,11 +947,11 @@ const Trust = {
     }
     SaveSystem.save('trust:' + id); return pts;
   },
-  /** Comercio: 1 + 1 por cada 100 $T · tope diario (Rocco 8) · 1ª operación con cada NPC: +bonus "romper el hielo" */
+  /** Comercio: 1 + 1 por cada 100 $T · tope diario (Rocco: CFG.roccoTradeCapPerDay) · 1ª operación con cada NPC: +bonus "romper el hielo" */
   addTrade(id, amount) {
     const e = this.entry(id), today = GS.daily.dayCount;
     if (e.tradeDay !== today) { e.tradeDay = today; e.tradeToday = 0; }
-    const cap = id === 'rocco' ? 8 : CFG.tradePointsCapPerDay;
+    const cap = id === 'rocco' ? CFG.roccoTradeCapPerDay : CFG.tradePointsCapPerDay;
     if (e.tradeToday >= cap) return 0;
     let pts = 1 + Math.floor(amount / 100);
     if (!(e.trades > 0)) pts += (CFG.firstTradeBonus || 0);   // primera operación con este NPC ("romper el hielo")
@@ -918,7 +970,7 @@ const Trust = {
     return { pts: this.add(id, pts, 'gift:' + itemId), base, capped: false };
   },
   /** Media de niveles con los 7 vecinos → tier del aura: 0/1/2/3/4 (Sec. 3.6) */
-  auraTier() { const avg = TRUST_NPCS.reduce((a, id) => a + this.level(id), 0) / TRUST_NPCS.length; return avg >= 3.5 ? 4 : avg >= 3 ? 3 : avg >= 2 ? 2 : avg >= 1 ? 1 : 0; },
+  auraTier() { const avg = TRUST_NPCS.reduce((a, id) => a + this.level(id), 0) / TRUST_NPCS.length, th = CFG.auraTierAvg; return avg >= th[3] ? 4 : avg >= th[2] ? 3 : avg >= th[1] ? 2 : avg >= th[0] ? 1 : 0; },
   sellMult(id) { return id ? (TRUST_LEVELS[this.level(id)]?.sellMult ?? 1) : 1; },
   buyMult(id) { return id ? (TRUST_LEVELS[this.level(id)]?.buyMult ?? 1) : 1; },
 };
@@ -994,7 +1046,7 @@ const placeAtSite = (obj, site, x, z, yaw = 0, lift = 0, radius = null) => place
    ========================================================= */
 const canvas = document.getElementById('scene');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-renderer.setPixelRatio(Math.min(devicePixelRatio, IS_MOBILE ? 1.5 : 2)); renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio, IS_MOBILE ? CFG.maxPixelRatioMobile : 2)); renderer.setSize(innerWidth, innerHeight);
 renderer.shadowMap.enabled = true; renderer.shadowMap.type = IS_MOBILE ? THREE.PCFShadowMap : THREE.PCFSoftShadowMap;
 renderer.outputColorSpace = THREE.SRGBColorSpace; renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.05;
 const scene = new THREE.Scene();
@@ -1576,7 +1628,7 @@ function setAura(tier, styleId) {
 }
 /** Recalcula tier desde Trust y estilo desde GS, y repinta. La llama Trust.add() y la carga de partida. */
 function refreshAuraFromTrust() {
-  const tier = (typeof Trust !== 'undefined') ? Trust.auraTier() : 0;
+  const tier = Math.max((typeof Trust !== 'undefined') ? Trust.auraTier() : 0, GS.achievements?.legendAura ? 4 : 0);   // v1.0 · «Corazón del sueño»: aura legendaria asegurada (solo visual; los perks siguen a la reputación real)
   setAura(tier, GS.cosmetics.auraV3?.style || 'none');
   state.auraTier = tier;   // cache de ejecución (debug / futuro HUD)
 }
@@ -1593,11 +1645,11 @@ function equipAuraStyle(styleId) {
 const AuraFX = {
   style() { return GS.cosmetics.auraV3?.style || 'none'; },
   active() { return (typeof Trust !== 'undefined') && Trust.auraTier() >= 1; },
-  sellMult() { const s = this.style(); return this.active() && (s === 'fire' || s === 'gold') ? 1.05 : this.active() && s === 'dreamer' ? 1 + CFG.dreamerTradeBonus : 1; },
-  buyMult() { const s = this.style(); return this.active() && s === 'gold' ? 0.95 : this.active() && s === 'dreamer' ? 1 - CFG.dreamerTradeBonus : 1; },
+  sellMult() { const s = this.style(), k = CFG.auraPerks; return this.active() && s === 'fire' ? k.fireSell : this.active() && s === 'gold' ? k.goldSell : this.active() && s === 'dreamer' ? 1 + CFG.dreamerTradeBonus : 1; },
+  buyMult() { const s = this.style(); return this.active() && s === 'gold' ? CFG.auraPerks.goldBuy : this.active() && s === 'dreamer' ? 1 - CFG.dreamerTradeBonus : 1; },
   trustMult() { return this.active() && this.style() === 'dreamer' ? 1 + CFG.dreamerTrustBonus : 1; },   // v0.9 · Soñador Eterno (Sec. 3.6)
-  cooldownMult() { return this.active() && this.style() === 'ice' ? 0.9 : 1; },
-  rareLootBoost() { return this.active() && this.style() === 'void' ? 1.15 : 1; },
+  cooldownMult() { return this.active() && this.style() === 'ice' ? CFG.auraPerks.iceCooldown : 1; },
+  rareLootBoost() { return this.active() && this.style() === 'void' ? CFG.auraPerks.voidLoot : 1; },
 };
 const LAPTOP_SKINS = { default: { body: 0xcfd8dc, screen: 0x00e5a0 }, neon: { body: 0xff4fa3, screen: 0xff2d8f }, matrix: { body: 0x1b1b1b, screen: 0x00ff41 }, gold: { body: 0xd4af37, screen: 0xffd54f } };
 function setLaptopSkin(id) { if (GS.cosmetics.laptopSkin !== id) { GS.cosmetics.laptopSkin = id; SaveSystem.save('equip-laptop'); } const s = LAPTOP_SKINS[id]; laptopMats.body.color.setHex(s.body); laptopMats.disp.color.setHex(s.screen); laptopMats.disp.emissive.setHex(s.screen); laptopMats.light.color.setHex(s.screen); }
@@ -1757,7 +1809,7 @@ registerInteractable(laptop, { type: 'laptop', label: 'Usar Laptop de IA' });
 // Puerto de Sam
 { const s = SITES.port; const b = makeBuilding({ w: 3.6, h: 2.6, d: 3, wall: 0xcfd8dc, roof: 0x1e88e5, sign: 'PUERTO SAM', signColor: '#0d47a1' });
   addProp(b, s, -2.2, -2, 0.3, -0.1, 2.6); registerInteractable(b, { type: 'building', label: 'Capitanía del Puerto' }, 'sam'); buildings.sam = b;
-  const lh = new THREE.Group(); lh.add(cyl(0.5, 0.7, 4, mat(0xffffff), 0, 2, 0, 12)); lh.add(cyl(0.52, 0.52, 0.6, mat(0xe53935), 0, 1.2, 0, 12)); lh.add(cyl(0.52, 0.52, 0.6, mat(0xe53935), 0, 2.6, 0, 12)); lh.add(cyl(0.4, 0.4, 0.6, glow(0xfff59d, 0xffee58, 2), 0, 4.2, 0, 10)); lh.add(cone(0.6, 0.6, mat(0x37474f), 0, 4.8, 0, 12)); const ll = new THREE.PointLight(0xffee58, 3, 12, 2); ll.position.y = 4.2; lh.add(ll); ll.userData.base = 3; nightLights.push(ll);   // v0.1: faro nocturno
+  const lh = new THREE.Group(); lh.add(cyl(0.5, 0.7, 4, mat(0xffffff), 0, 2, 0, 12)); lh.add(cyl(0.52, 0.52, 0.6, mat(0xe53935), 0, 1.2, 0, 12)); lh.add(cyl(0.52, 0.52, 0.6, mat(0xe53935), 0, 2.6, 0, 12)); lh.add(cyl(0.4, 0.4, 0.6, glow(0xfff59d, 0xffee58, 2), 0, 4.2, 0, 10)); lh.add(cone(0.6, 0.6, mat(0x37474f), 0, 4.8, 0, 12)); const ll = new THREE.PointLight(0xffee58, 3, 12, 2); ll.position.y = 4.2; lh.add(ll); ll.userData.base = 3; nightLights.push(ll); addProp(lh, s, 3.4, 0.9, 0, 0, 0.75);   // v0.1: faro nocturno · v1.0: ahora sí se añade a la escena (antes se creaba y nunca se veía)
   // Muelle: tablones que salen hacia el mar (dirección S del sitio)
   for (let i = 0; i < 9; i++) { const z = 1.5 + i * 0.75; const p = box(1.8, 0.12, 0.7, mat(0xa1704a)); const d = siteDir(s, 0, z); placeOnPlanet(p, d, 0, 0, s.S, Math.max(heightAt(d) + 0.15, SEA + 0.3)); scene.add(p);
     if (i % 2 === 0) [-0.8, 0.8].forEach(x => { const post = cyl(0.08, 0.08, 1, mat(0x6d4c41), 0, 0, 0, 6); const dd = siteDir(s, x, z); placeOnPlanet(post, dd, 0, -0.35, s.S, Math.max(heightAt(dd) + 0.15, SEA + 0.3)); scene.add(post); }); }
@@ -2295,6 +2347,8 @@ function interactWith(obj) {
   else if (it.type === 'crate') { if (state.crateTaken) return; if (Inventory.add('merchant_crate', 1)) { state.crateTaken = true; crate.visible = false; playChime(); importsOnCrate(); } }   // v0.8: + 1 importación de Ultramar por atraque
   else if (it.type === 'vendor') startVendorDialog();
   else if (it.type === 'store') { if (!canControl()) return; openApp('🦝 Tienda de Rocco', '', (b) => mountItemShop(b, 'store')); }
+  else if (it.type === 'museum') Museum.open(it.set);   // v1.0 · Museo del Sueño (Sec. 10.5)
+  else if (it.type === 'fair') Fair.open();             // v1.0 · Feria del Sábado (Sec. 10.6)
 }
 /** RECOGER FRUTA → INVENTARIO (se vende después en las tiendas por 50 $TOKEN) */
 function harvest(f) {
@@ -2336,6 +2390,7 @@ function serviceBtns(npcId) {
   if (npcId === 'hedgehogs' && GS.missions?.hedgehogs?.status === 2) btns.push(dialogButton('🕶️ Boutique Viral', 'bg-fuchsia-200 text-[#2b2b3d]', () => Boutique.open()));   // v0.7 (Sec. 8.4 y 8.9): tras su misión
   if (npcId === 'sombra') btns.push(dialogButton('🎫 Billete del Despertar', 'bg-yellow-200 text-[#2b2b3d]', () => openDreamTicketPanel()));   // S2.5 (Sec. 5.10)
   btns.push(...awakeningBtns(npcId));     // v0.9: Cadena del Despertar + post-juego (Sec. 7.5, 10.7)
+  if (typeof v10ServiceBtns === 'function') btns.push(...v10ServiceBtns(npcId));   // v1.0: Museo del Sueño (Mayor) · Feria del Sábado
   btns.push(...act2ServiceBtns(npcId));   // v0.8: sistemas de los Trabajos Mayores (pedidos, censo, feria, obra, oráculo, clima, muelle, agencia)
   return btns;
 }
@@ -2476,7 +2531,7 @@ function startDialog(npcId) {
   ui.hint.classList.add('hidden'); ui.dialog.classList.remove('hidden'); ui.dialogButtons.innerHTML = '';
   ui.dialogAvatar.textContent = n.emoji;
   ui.dialogName.textContent = `${n.name.toUpperCase()} · ${trustLvIcon(npcId)} ${trustLvName(npcId)}`;   // v0.2: relación visible
-  const greet = dejaVuGreeting(npcId) || awakeningGreeting(npcId) || greetingFor(npcId);   // v0.9: déjà vu en NG+ (Sec. 10.7) · líneas de la cadena (Sec. 7.5)
+  const greet = (typeof welcomeBackGreeting === 'function' && welcomeBackGreeting(npcId)) || dejaVuGreeting(npcId) || awakeningGreeting(npcId) || greetingFor(npcId);   // v1.0: bienvenida del Oso tras semanas fuera (Sec. 10.1)   // v0.9: déjà vu en NG+ (Sec. 10.7) · líneas de la cadena (Sec. 7.5)
   const giftBtn = dialogButton('🎁 Regalar', 'bg-pink-200 text-[#2b2b3d]', () => openGiftPicker(npcId));
   const openBtn = dialogButton('💻 Abrir Laptop de IA', 'bg-cyan-300 text-[#2b2b3d]', () => { if (m.status === 0) setMissionStatus(npcId, 1); openLaptop(npcId); });
   const shopBtns = () => SHOPS[npcId] ? [dialogButton(`🛒 ${SHOPS[npcId].name}`, 'bg-amber-200 text-[#2b2b3d]', () => openShop(npcId))] : [];
@@ -2672,6 +2727,7 @@ function deliverEncargo(npcId, premium = false) {
   Inventory.remove(q.item, qty);
   if (cur.tutorial) GS.encargos[npcId] = { id: 'tutorial', day: GS.daily.dayCount, done: true };
   else { GS.encargos[npcId].done = true; GS.encargos[npcId].premium = premium; }
+  GS.stats.encargosDone = (GS.stats.encargosDone || 0) + 1;   // v1.0: logro «Mano amiga»
   Wallet.add(tokens, `Encargo${premium ? ' premium' : ''}: ${npcById[npcId].name}`);
   Trust.add(npcId, trust, premium ? 'encargo:premium' : 'encargo');
   if (premium) giveRumor(npcId);
@@ -3075,7 +3131,7 @@ function showDaySummary(dayNum, earned, spent) {
   playBeep(659, 0.15, 'triangle'); setTimeout(() => playBeep(523, 0.2, 'triangle'), 150);
   setTimeout(() => { el.style.transition = 'opacity .6s'; el.style.opacity = '0'; setTimeout(() => el.remove(), 650); }, 7000);
 }
-/** 📮 Cartas al buzón (Sec. 6.10). Se leen en el panel de la casa (Bloque 2). */
+/** 📮 Cartas al buzón (Sec. 6.10). Se leen en el panel Mi Casa (pestaña Buzón). */
 function addLetter(from, text) {
   const mb = GS.housing.mailbox ||= [];
   mb.unshift({ from, text, day: GS.daily.dayCount, read: false });
@@ -3124,7 +3180,7 @@ DailySystem.onSettle(() => {
     const interest = Math.ceil(GS.debt * CFG.debtInterestPct / 100);
     GS.debt += interest;
     charges.push({ label: '🔮 Deuda + intereses (3%)', note: `total ${fmt(GS.debt)}` });
-    if (typeof updateEmbargo === 'function') updateEmbargo();   // llega en el Bloque 2
+    if (typeof updateEmbargo === 'function') updateEmbargo();   // runas de embargo (17d)
   }
   GS.daily.lastCharges = charges;
 });
@@ -3134,7 +3190,7 @@ DailySystem.onSettle(() => {
      construcciones con runas (la Estatua pierde su bonus).
    - Al bajar la deuda del umbral → embargo levantado.
    - Panel "Mi Casa": estado del alquiler, pago de deudas (parcial o
-     total) y buzón de cartas. El sello de la casa por alquiler llega en v0.5.
+     total) y buzón de cartas. El sello de la casa por alquiler: S1.2 (Sec. 6.4).
    ========================================================= */
 const embargoRunes = {};   // recId → grupo de runas
 let _runeTex = null;
@@ -3752,7 +3808,7 @@ function openLottery() {
    ========================================================= */
 /* ---- 🥖 La Caridad del Oso ---- */
 function bearCharityAvailable() {
-  return Wallet.balance < 50 && Trust.level('bear') >= 1 && GS.daily.charityDay !== GS.daily.dayCount;
+  return Wallet.balance < CFG.charityThreshold && Trust.level('bear') >= 1 && GS.daily.charityDay !== GS.daily.dayCount;
 }
 function claimCharityBread() {
   if (!bearCharityAvailable()) { showToast('🐻 El pan de caridad es para cuando realmente lo necesitas (y una vez al día)', 'text-white'); return; }
@@ -3763,9 +3819,9 @@ function claimCharityBread() {
 }
 /* ---- 🏛️ Empleo Municipal ---- */
 const MUNICIPAL_JOBS = [
-  { id: 'collect5', item: null,       target: 5, reward: 80, trust: 2, text: 'Recoge 5 recursos por el mundo (conchas, troncos, piedras). El municipio los catalogará. ¡Ejem!' },
-  { id: 'shells3',  item: 'seashell', target: 3, reward: 60, trust: 2, text: 'Limpieza de playa: recoge 3 Conchas Marinas para el embellecimiento costero municipal.' },
-  { id: 'wood4',    item: 'wood_log', target: 4, reward: 70, trust: 2, text: 'Obras públicas: recoge 4 Troncos para el astillero municipal. Formulario 22-M.' },
+  { id: 'collect5', item: null,       target: 5, reward: CFG.municipalRewards.collect5, trust: CFG.municipalTrust, text: 'Recoge 5 recursos por el mundo (conchas, troncos, piedras). El municipio los catalogará. ¡Ejem!' },
+  { id: 'shells3',  item: 'seashell', target: 3, reward: CFG.municipalRewards.shells3, trust: CFG.municipalTrust, text: 'Limpieza de playa: recoge 3 Conchas Marinas para el embellecimiento costero municipal.' },
+  { id: 'wood4',    item: 'wood_log', target: 4, reward: CFG.municipalRewards.wood4, trust: CFG.municipalTrust, text: 'Obras públicas: recoge 4 Troncos para el astillero municipal. Formulario 22-M.' },
 ];
 /** Trabajo del día (rotativo, determinista por día onírico + saveId). Se regenera cada medianoche. */
 function municipalJob() {
@@ -3812,7 +3868,7 @@ function openMunicipalJob() {
               : `<div class="flex justify-end mt-3"><button data-accept class="btn-game px-4 py-2 text-sm bg-blue-300">✍️ Aceptar trabajo</button></div>`}
         </div>
       </div>
-      <div class="text-[11px] text-slate-500 leading-relaxed">Un trabajo al día (onírico). No es un estilo de vida: es el fondo desde el que remontar. Si además tienes confianza con el Oso y tu capital baja de 50 $T, él te guardará un pan diario. 🥖</div>`;
+      <div class="text-[11px] text-slate-500 leading-relaxed">Un trabajo al día (onírico). No es un estilo de vida: es el fondo desde el que remontar. Si además tienes confianza con el Oso y tu capital baja de ${CFG.charityThreshold} $T, él te guardará un pan diario. 🥖</div>`;
       body.innerHTML = html;
       const acc = body.querySelector('[data-accept]');
       if (acc) acc.onclick = () => { job.accepted = true; SaveSystem.save('municipal-accept'); showToast('🏛️ Trabajo aceptado. ¡A por ello, ciudadano!', 'text-white'); playBeep(784, 0.1, 'triangle'); render(); };
@@ -4226,7 +4282,7 @@ const Mining = (() => {
     if (!Inventory.canAddMany(loot)) { showToast('🎒 Inventario lleno: haz hueco antes de minar', 'text-red-200'); return; }
     Tools.wear('pickaxe');
     loot.forEach(([id, q]) => Inventory.add(id, q, { silent: true }));
-    GS.stats.nodesMined = (GS.stats.nodesMined || 0) + 1;
+    GS.stats.nodesMined = (GS.stats.nodesMined || 0) + 1; if (gem) GS.stats.gemsMined = (GS.stats.gemsMined || 0) + 1;   // v1.0: logro «Pico de plata»
     showToast(gem ? `💎 ¡Gema en Bruto! + 🪨 ×${stones}` : `⛏️ +${stones} 🪨 Piedra`, 'text-white');
     if (gem) playChime(); else playBeep(330, 0.08, 'square');
     setReady(g, false);
@@ -4290,7 +4346,7 @@ function homeActionsHTML() {
     <div class="text-sm text-slate-600">${Showcase.slots() ? `${Showcase.list.length}/${Showcase.slots()} huecos · 🐷 hucha: <b>${fmt(GS.housing.showcaseRevenue | 0)} $T</b>` : 'Llega con la mejora a Tienda (nivel 1).'}</div>
     <button data-showcase class="btn-game px-3 py-1.5 text-xs mt-2 bg-amber-200">🪟 Abrir escaparate</button></div>`;
   if (typeof FURNITURE !== 'undefined') { const own = FURNITURE.filter(f => hasFurniture(f.id)); h += `<div class="app-card p-3 mb-3"><div class="font-bold text-[#2b2b3d] mb-1">🛋️ Muebles</div>
-    <div class="text-sm text-slate-600">${own.length ? own.map(f => `${f.icon} ${esc(f.name)}`).join(' · ') : 'Aún no tienes muebles. Glover los vende cuando completas su misión.'}</div></div>`; }
+    <div class="text-sm text-slate-600">${own.length ? own.map(f => `${f.icon} ${esc(f.name)}`).join(' · ') : 'Aún no tienes muebles. Glover los vende cuando completas su misión.'}</div>${typeof museumTrophiesHTML === 'function' ? museumTrophiesHTML() : ''}</div>`; }
   return h;
 }
 setInterval(() => {
@@ -4498,7 +4554,7 @@ if (typeof Trust !== 'undefined' && typeof Trust.add === 'function' && !Trust.__
 function toolBarHTML(s) { const max = Tools.max(s.id), d = Tools.dur(s), pct = Math.round(d / max * 100); return `<span class="absolute top-0.5 right-1 pixel text-[8px] ${d <= 0 ? 'text-red-600' : 'text-[#2b2b3d]'}">${d <= 0 ? 'ROTA' : d + '/' + max}</span><span class="absolute left-1 right-1 bottom-1 h-1 rounded-full bg-slate-200 overflow-hidden"><span class="block h-full ${pct > 50 ? 'bg-emerald-400' : pct > 20 ? 'bg-amber-400' : 'bg-red-500'}" style="width:${pct}%"></span></span>`; }
 function toolSellPreview(shopId, id) { let worst = null; for (const s of GS.inventory.slots) { if (s.id !== id) continue; const d = Tools.dur(s); if (d > 0 && (!worst || d < Tools.dur(worst))) worst = s; } return worst ? Math.max(1, Math.round(shopSellPrice(shopId, id) * Tools.dur(worst) / Tools.max(id))) : 0; }
 /* ===== S2.5 · CAFÉ, RAMO, BILLETE Y REGALOS (Guía Sec. 5.5, 5.8, 5.10) ===== */
-const Coffee = { until: 0, active() { return Date.now() < this.until; } };
+const Coffee = { get until() { return GS.needs?.coffeeUntil || 0; }, set until(v) { GS.needs.coffeeUntil = Math.max(0, +v || 0); }, active() { return Date.now() < this.until; } };   // v1.0: vive en GS (antes se perdía al recargar)
 ITEM_EFFECTS.coffee = () => { Coffee.until = Date.now() + CFG.coffeeMs; showToast('☕ Café del Mundo Real: laptop ×2 y hambre en pausa 5 min', 'text-white'); };
 if (!Needs.__coffeeWrapped) {   // envuelve Needs una sola vez: el café pausa el hambre y acelera la laptop
   const _nu = Needs.update.bind(Needs), _nl = Needs.laptopMult.bind(Needs);
@@ -4549,7 +4605,7 @@ const StarFall = (() => {
   function nightKey() { const h = (GS.daily.clockMs / 3600000) % 24; return h >= CFG.nightStartHour ? GS.daily.dayCount : (h < CFG.nightEndHour ? GS.daily.dayCount - 1 : null); }
   function rollCount() {
     if (Weather.climateStars()) return CFG.climateStarsMin + Math.floor(Math.random() * (CFG.climateStarsMax - CFG.climateStarsMin + 1));   // v0.8 · 🌠 lluvia de estrellas del Climatizador
-    if (new Date().getDay() === 5) return CFG.starFridayMin + Math.floor(Math.random() * (CFG.starFridayMax - CFG.starFridayMin + 1));
+    if (Events.starNight()) return CFG.starFridayMin + Math.floor(Math.random() * (CFG.starFridayMax - CFG.starFridayMin + 1));
     return Math.round((CFG.starMin + Math.floor(Math.random() * (CFG.starMax - CFG.starMin + 1))) * Weather.starShardMult());
   }
   function despawn(g) { scene.remove(g); const i = interactables.indexOf(g); if (i >= 0) interactables.splice(i, 1); const j = live.indexOf(g); if (j >= 0) live.splice(j, 1); }
@@ -4562,7 +4618,7 @@ const StarFall = (() => {
       if (!isLand(d)) continue;
       const g = new THREE.Group();
       const spr = new THREE.Sprite(new THREE.SpriteMaterial({ map: iconTexture('🌠'), depthWrite: false })); spr.scale.setScalar(0.9); spr.position.y = 0.7; g.add(spr);
-      const l = new THREE.PointLight(0xfff3b0, 1.6, 4, 2); l.position.y = 0.9; g.add(l);
+      if (!IS_MOBILE || CFG.starLightOnMobile) { const l = new THREE.PointLight(0xfff3b0, 1.6, 4, 2); l.position.y = 0.9; g.add(l); }   // v1.0: sin luz en móvil (cada luz nueva recompila shaders)
       placeOnPlanet(g, d); g.userData.ready = false; g.userData.fallT = 0; g.userData.base = g.position.clone(); g.userData.spr = spr;
       registerInteractable(g, { type: 'star', label: 'Recoger Fragmento de Estrella' }); scene.add(g); live.push(g);
       playBeep(1400, 0.25, 'sine'); setTimeout(() => playBeep(700, 0.3, 'sine'), 180);
@@ -4602,8 +4658,26 @@ const Titles = {
   equip(name) { const a = this.st; a.equippedTitle = name && a.titles.includes(name) ? name : null; SaveSystem.save('title-equip'); },
 };
 const Weekly = {
-  rewards: { 3: [['gift_box', 1], ['coffee', 2]], 5: [['golden_gift_box', 1]], 7: [['golden_gift_box', 2]] },
-  roll() { const w = GS.weekly, ws = weekStartStr(); if (w.weekStart !== ws) { w.weekStart = ws; w.seals = [false, false, false, false, false, false, false]; w.claimed = {}; w.trustBoost = false; } return w; },
+  get rewards() { return CFG.weeklyRewards; },
+  roll() {
+    const w = GS.weekly, ws = weekStartStr();
+    if (w.weekStart !== ws) {
+      // v1.0 · «No perdiste nada: ganaste lo que ganaste» (Sec. 10.3): los premios ganados y sin recoger pasan a la carta nueva
+      if (w.weekStart && Array.isArray(w.seals)) { const n = w.seals.filter(Boolean).length; [3, 5, 7].forEach(k => { if (n >= k && !w.claimed?.[k]) (w.carry ||= []).push(k); }); }
+      w.weekStart = ws; w.seals = [false, false, false, false, false, false, false]; w.claimed = {}; w.trustBoost = false;
+    }
+    return w;
+  },
+  /** Premios de semanas anteriores pendientes (v1.0): se recogen cuando quieras, sin caducidad. El +10% de finde no se arrastra (era de esa semana). */
+  claimCarry() {
+    const w = this.roll(), list = Array.isArray(w.carry) ? w.carry : []; if (!list.length) return false;
+    const k = list[0], items = (CFG.weeklyRewards[k] || []);
+    if (!Inventory.canAddMany(items)) { showToast('🎒 Haz hueco en la mochila para el premio', 'text-red-200'); return false; }
+    items.forEach(([id, q]) => Inventory.add(id, q, { silent: true }));
+    if (k === 7) { Titles.grant('Vecino Ejemplar'); w.pendingFashion = (w.pendingFashion | 0) + 1; deliverPendingFashion(); }
+    list.shift(); showToast(`🎁 Premio pendiente de ${k} sellos recogido`, 'text-white'); playChime(); SaveSystem.saveNow('weekly-carry'); return true;
+  },
+  pendingCount() { const w = this.roll(), n = this.count(); return [3, 5, 7].filter(k => n >= k && !w.claimed?.[k]).length + (Array.isArray(w.carry) ? w.carry.length : 0); },
   count() { return this.roll().seals.filter(Boolean).length; },
   mark() {
     if (!SaveSystem.started) return;
@@ -4637,23 +4711,28 @@ if (!Wallet.__trackWrapped) {
 }
 if (!Trust.__weeklyWrapped) {   // premio de 5 sellos: +10% confianza el sábado y el domingo
   const _ta = Trust.add.bind(Trust);
-  Trust.add = function (id, pts, ...rest) { return _ta(id, (typeof pts === 'number' && pts > 0 && Weekly.weekendBoost()) ? pts * 1.1 : pts, ...rest); };
+  Trust.add = function (id, pts, ...rest) { return _ta(id, (typeof pts === 'number' && pts > 0 && Weekly.weekendBoost()) ? pts * (1 + CFG.weekendTrustBonus) : pts, ...rest); };
   Trust.__weeklyWrapped = true;
 }
 function openWeeklyPanel(tab = 'week') {
   openApp('📅 Carta de la Semana', '', (body) => {
     const render = () => {
-      const tabs = `<div class="flex gap-2 mb-3"><button data-tab="week" class="btn-game px-4 py-1.5 text-sm ${tab === 'week' ? 'active' : 'bg-white'}">📅 Semana</button>${typeof achievementsHTML === 'function' ? `<button data-tab="ach" class="btn-game px-4 py-1.5 text-sm ${tab === 'ach' ? 'active' : 'bg-white'}">🏆 Logros</button>` : ''}</div>`;
-      if (tab === 'ach' && typeof achievementsHTML === 'function') { body.innerHTML = tabs + achievementsHTML(); achievementsBind(body, render); }
+      const hasAch = typeof achievementsHTML === 'function', hasCal = typeof eventsCalendarHTML === 'function';
+      const tb = (id, label) => `<button data-tab="${id}" class="btn-game px-4 py-1.5 text-sm ${tab === id ? 'active' : 'bg-white'}">${label}</button>`;
+      const tabs = `<div class="flex flex-wrap gap-2 mb-3">${tb('week', '📅 Semana')}${hasAch ? tb('ach', `🏆 Logros${typeof Achievements !== 'undefined' && Achievements.pendingRewards() ? ' •' : ''}`) : ''}${hasCal ? tb('cal', '🗓️ Eventos') : ''}</div>`;
+      if (tab === 'ach' && hasAch) { body.innerHTML = tabs + achievementsHTML(); achievementsBind(body, render); }
+      else if (tab === 'cal' && hasCal) { body.innerHTML = tabs + eventsCalendarHTML(); eventsCalendarBind(body, render); }
       else {
         const w = Weekly.roll(), today = (new Date().getDay() + 6) % 7, n = Weekly.count();
         let html = tabs + `<div class="app-card p-3 mb-3"><div class="text-sm text-slate-600 mb-2">Cada día real con al menos 1 actividad económica (vender, cobrar, recoger, cosechar, pescar…) se sella solo. La semana termina el domingo: no se rompe nada.</div><div class="grid grid-cols-7 gap-1">` +
           WEEK_DAYS.map((d, i) => `<div class="rounded-lg border-2 ${i === today ? 'border-amber-400' : 'border-slate-200'} p-2 text-center"><div class="text-[10px] font-bold text-slate-500">${d}</div><div class="text-xl">${w.seals[i] ? '✅' : '▫️'}</div></div>`).join('') + `</div></div>`;
         const desc = { 3: 'Caja Regalo + 2 Cafés', 5: 'Caja Regalo Dorada + fin de semana con +10% confianza', 7: '2 Cajas Regalo Doradas + título «Vecino Ejemplar» + 1 prenda sorpresa de la Boutique Viral para tu armario 🪞' };
         html += [3, 5, 7].map(k => { const got = w.claimed?.[k], can = n >= k && !got; return `<div class="app-card p-3 mb-2 flex items-center gap-3"><div class="pixel text-xs">${k}✅</div><div class="flex-1 text-sm">${desc[k]}</div>${got ? '<span class="text-emerald-600 font-bold text-xs">✓ Recogido</span>' : `<button data-claim="${k}" class="btn-game px-3 py-1.5 text-xs ${can ? 'bg-emerald-300' : 'bg-slate-200 opacity-60'}">Recoger</button>`}</div>`; }).join('');
-        if (Weekly.weekendBoost()) html += `<div class="text-xs text-emerald-700 font-bold">💜 Fin de semana activo: +10% a la confianza que ganes.</div>`;
+        if (Array.isArray(w.carry) && w.carry.length) html += `<div class="app-card p-3 mb-2 flex items-center gap-3" style="background:#f0fdf4"><div class="text-2xl">🎁</div><div class="flex-1 text-sm">Premios de semanas anteriores sin recoger: <b>${w.carry.map(k => k + '✅').join(' · ')}</b>. No caducan.</div><button data-carry class="btn-game px-3 py-1.5 text-xs bg-emerald-300">Recoger</button></div>`;
+        if (Weekly.weekendBoost()) html += `<div class="text-xs text-emerald-700 font-bold">💜 Fin de semana activo: +${Math.round(CFG.weekendTrustBonus * 100)}% a la confianza que ganes.</div>`;
         body.innerHTML = html;
         body.querySelectorAll('[data-claim]').forEach(b => b.onclick = () => { Weekly.claim(+b.dataset.claim); render(); });
+        body.querySelector('[data-carry]')?.addEventListener('click', () => { Weekly.claimCarry(); render(); });
       }
       body.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => { tab = b.dataset.tab; render(); });
     };
@@ -4693,7 +4772,7 @@ function updateGoalHUD() {
 function animate() {
   requestAnimationFrame(animate);
   const dt = Math.min(clock.getDelta(), 0.05), t = clock.elapsedTime;
-  updatePlayer(dt); if (!state.cinematic) Needs.update(dt); updateNPCs(dt, t); Awakening.update(dt, t); /* v0.9: el sueño se detiene durante la escena del puerto */ updateCamera(dt); updateSun(); updateNeon(dt, t); updateUnlocks(dt, t); updateShip(dt); updateConfetti(dt); updateWater(t);
+  updatePlayer(dt); if (!state.cinematic) Needs.update(dt); updateNPCs(dt, t); Awakening.update(dt, t); /* v0.9: el sueño se detiene durante la escena del puerto */ updateCamera(dt); updateSun(); updateNeon(dt, t); updateUnlocks(dt, t); updateShip(dt); updateConfetti(dt); updateWater(t); V10.update(dt, t);
   clouds.children.forEach(p => p.rotateY(p.userData.speed * dt)); updateTokens(); updateGoalHUD(); updateClockHUD(); Weather.update(dt); Fishing.update(dt); Mining.update(dt); StarFall.update(dt);
   if (SaveSystem.started && !state.menuOpen && !state.cinematic) {
     GS.meta.playTimeSec += dt;
@@ -5244,7 +5323,7 @@ const Feria = {
   settle() {
     const f = act2State().feria, D = GS.daily.dayCount, lots = this.lots(), due = lots.filter(l => l.day < D); if (!due.length) return;
     let back = 0, staked = 0; const lines = [];
-    due.forEach(l => { const m = this.move(l.day + 1, l.cat), r = l.side === 'up' ? m : -m, pay = Math.max(0, Math.floor(l.stake * (1 + r) * (1 - CFG.feriaCommission))); back += pay; staked += l.stake; lines.push(`${catLabel(l.cat)} ${l.side === 'up' ? '📈' : '📉'} ${fmt(l.stake)} → ${fmt(pay)} (${v08pct(m)})`); });
+    due.forEach(l => { const m = this.move(l.day + 1, l.cat), r = l.side === 'up' ? m : -m, pay = Math.max(0, Math.floor(l.stake * (1 + r) * (1 - CFG.feriaCommission))); back += pay; staked += l.stake; if (pay > l.stake) GS.stats.feriaWins = (GS.stats.feriaWins || 0) + 1;   /* v1.0: logro «Tiburón de la feria» */ lines.push(`${catLabel(l.cat)} ${l.side === 'up' ? '📈' : '📉'} ${fmt(l.stake)} → ${fmt(pay)} (${v08pct(m)})`); });
     f.lots = lots.filter(l => l.day >= D);
     if (back) Wallet.add(back, 'Feria: liquidación de lotes', { silent: true, noMult: true });
     f.lastResult = { day: D, staked, back }; (f.log ||= []).unshift({ day: D, staked, back }); if (f.log.length > 10) f.log.length = 10;
@@ -5933,6 +6012,417 @@ function awakeningChainHTML() {
     <div class="text-[11px] text-slate-500">Nada caduca ni se pierde: si vendiste la gasolina, Sam, Rocco y las cajas del mercante tienen más.</div></div>`;
 }
 /* =========================================================
+   19d. v1.0 · EL JUEGO COMPLETO (Guía Maestra Sec. 10 + 11.4)
+   🏆 Logros (~30, listeners en Wallet / Inventory / Trust + liquidación) · 🏛️ Museo del Sueño
+   (pedestales + sets, jardines del ayuntamiento) · 🗓️ Eventos semanales de tiempo real
+   (🌠 Noche de Estrellas del viernes, 🎪 Feria del Sábado, 🎫 sorteo del domingo 20:00).
+   Reglas: ningún premio de constancia es capital (Sec. 10.1 regla 3) · todo se re-aplica
+   de forma idempotente al cargar (V10.apply) · todo número en CFG.
+   Nota: la 🎪 Feria del Sábado (puestos de los vecinos, ofertas de tienda) NO es la
+   📈 Feria del Tablón de la v0.8 (especulación por categorías): conviven sin tocarse.
+   ========================================================= */
+const GAME_VERSION = '1.0';
+/* ---------- 🗓️ EVENTOS: calendario REAL → flags que leen los sistemas existentes (Sec. 10.10) ---------- */
+const Events = {
+  _force: null,   // DBG.weekday(n): simula el día de la semana real (0 = domingo … 6 = sábado)
+  weekday() { return this._force ?? new Date().getDay(); },
+  starNight() { return this.weekday() === CFG.starNightWeekday; },   // StarFall.rollCount lo lee: 5–8 fragmentos
+  fairDay() { return this.weekday() === CFG.fairWeekday; },
+  lotteryDay() { return this.weekday() === CFG.lotteryWeekday; },
+  icon() { return this.starNight() ? '🌠' : this.fairDay() ? '🎪' : this.lotteryDay() && Date.now() < (GS.lottery?.nextDrawAt || 0) ? '🎫' : ''; },
+};
+/* ---------- 🎪 FERIA DEL SÁBADO (Sec. 10.6): puestos de los vecinos en la aldea con ofertas únicas ---------- */
+const FAIR_NPC = {   // tienda de referencia (precio base) · id de confianza · voz del puesto (Sec. 2)
+  bear:   { shop: 'bear',   trust: 'bear',   emoji: '🐻', name: 'Oso Panadero', line: '¡Harina de feria! Hoy el horno canta y tú pones la letra.' },
+  rocco:  { shop: 'store',  trust: 'rocco',  emoji: '🦝', name: 'Rocco',        line: 'Psst… precios de sábado. No se lo cuentes a mi yo de entre semana.' },
+  glover: { shop: 'glover', trust: 'glover', emoji: '🦫', name: 'Glover',       line: 'Material medido dos veces. Rebajado una.' },
+  sam:    { shop: 'sam',    trust: 'sam',    emoji: '🦤', name: 'Salty Sam',    line: '¡Arrr! Cosas del otro lado del mar, grumete. Pocas. Una, en realidad.' },
+  sombra: { shop: 'sombra', trust: 'sombra', emoji: '🐈‍⬛', name: 'M. Sombra',  line: 'Mmm… los sábados el destino hace descuento. Los demás días, no.' },
+};
+const Fair = {
+  stalls: [], _cols: [],
+  key() { return weekStartStr(); },   // una feria por semana real (el sábado de esa semana)
+  st() { const e = (GS.events ||= {}); e.fair ||= { week: null, bought: {} }; if (e.fair.week !== this.key()) { e.fair.week = this.key(); e.fair.bought = {}; } return e.fair; },
+  /** Ofertas de esta semana: las fijas (Harina del Oso) + CFG.fairOffersPerSaturday sorteadas (deterministas por semana y partida) */
+  offers() {
+    const all = CFG.fairOffers.map(o => ({ ...o, key: o.npc + ':' + o.id })), fixed = all.filter(o => o.always), pool = all.filter(o => !o.always);
+    const r = mulberry32(_hashStr(GS.meta.saveId + ':fair:' + this.key()));
+    for (let i = pool.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [pool[i], pool[j]] = [pool[j], pool[i]]; }
+    return [...fixed, ...pool.slice(0, CFG.fairOffersPerSaturday)].filter(o => ITEMS[o.id] && FAIR_NPC[o.npc]);
+  },
+  base(o) { const e = SHOPS[FAIR_NPC[o.npc].shop]?.sells.find(x => x.id === o.id); return (e?.price ?? ITEMS[o.id].buy) || 0; },
+  price(o) { return Math.max(1, Math.round(o.price ?? this.base(o) * (1 - (o.disc || 0)))); },
+  left(o) { return Math.max(0, o.stock - (this.st().bought[o.key] | 0)); },
+  buy(key, qty = 1) {
+    if (!Events.fairDay()) { showToast('🎪 La Feria del Sábado solo abre los sábados (calendario real)', 'text-white'); return false; }
+    const o = this.offers().find(x => x.key === key); qty = Math.max(1, qty | 0); if (!o) return false;
+    if (this.left(o) < qty) { showToast('❌ Agotado en la feria', 'text-red-200'); return false; }
+    if (!Inventory.canAdd(o.id, qty)) { showToast('🎒 Inventario lleno', 'text-red-200'); return false; }
+    const total = this.price(o) * qty;
+    if (!Wallet.spend(total, `Feria del Sábado: ${ITEMS[o.id].name} ×${qty}`)) return false;
+    Inventory.add(o.id, qty, { silent: true }); const st = this.st(); st.bought[o.key] = (st.bought[o.key] | 0) + qty;
+    GS.stats.itemsBought += qty; GS.stats.fairBuys = (GS.stats.fairBuys || 0) + qty;
+    Trust.addTrade(FAIR_NPC[o.npc].trust, total);   // cuenta como comercio con el vecino (Sec. 3.3)
+    showToast(`🎪 ${ITEMS[o.id].icon} ${ITEMS[o.id].name} ×${qty} a precio de feria`, 'text-white'); playBeep(880, 0.06); SaveSystem.saveNow('fair-buy'); return true;
+  },
+  open() {
+    openApp('🎪 Feria del Sábado', '', (body) => {
+      const render = () => {
+        if (!Events.fairDay()) { body.innerHTML = `<div class="app-card p-4 text-sm text-slate-600">Los puestos están recogidos. 🎪 La Feria del Sábado vuelve el próximo <b>sábado</b> (día real).<div class="text-[11px] text-slate-400 mt-1">La 📈 Feria del Tablón del Mayor (lotes por categoría) es otra cosa: abre cada día en el Acto 2.</div></div>`; return; }
+        const offers = this.offers(), by = {};
+        offers.forEach(o => (by[o.npc] ||= []).push(o));
+        let html = balanceBar() + `<div class="app-card p-3 mb-3 text-sm text-slate-600">Los vecinos han montado puestos en la aldea: ofertas que solo existen hoy, stock limitado y algo raro de Ultramar. <b>Precio de feria fijo</b> (cuenta como comercio para la confianza).</div>`;
+        html += Object.entries(by).map(([npc, list]) => { const v = FAIR_NPC[npc]; return `<div class="app-card p-3 mb-2"><div class="font-bold text-sm text-[#2b2b3d]">${v.emoji} ${v.name}</div><div class="text-xs text-slate-500 italic mb-2">“${v.line}”</div>` +
+          list.map(o => { const it = ITEMS[o.id], p = this.price(o), left = this.left(o), base = this.base(o); return `<div class="flex items-center gap-2 py-1"><span class="text-2xl">${it.icon}</span><div class="flex-1 min-w-0"><div class="text-sm font-semibold">${esc(it.name)} ${o.rare ? '<span class="text-[10px] text-purple-600 font-bold">✦ STOCK RARO</span>' : ''}</div><div class="text-[11px] text-slate-500">${o.disc && base ? `<s>${fmt(base)}</s> → ` : ''}<b class="text-emerald-700">${fmt(p)} $T</b>${o.disc ? ` (−${Math.round(o.disc * 100)}%)` : ''} · quedan ${left}</div></div><button data-fair="${o.key}" class="btn-game px-3 py-1.5 text-xs ${left > 0 && Wallet.canAfford(p) ? 'bg-emerald-300' : 'bg-slate-200 opacity-60'}" ${left > 0 ? '' : 'disabled'}>Comprar</button></div>`; }).join('') + `</div>`; }).join('');
+        body.innerHTML = html;
+        body.querySelectorAll('[data-fair]').forEach(b => b.onclick = () => { if (this.buy(b.dataset.fair)) render(); });
+      };
+      render();
+    });
+  },
+  /** Puestos 3D (primitivas): visibles solo los sábados; sus colisiones solo existen mientras están montados */
+  build() {
+    if (this.stalls.length) return;
+    const cols = [0xef5350, 0x42a5f5, 0xffca28];
+    CFG.fairStallSpots.forEach(([x, z, yaw], i) => {
+      const g = new THREE.Group();
+      g.add(box(1.5, 0.12, 0.8, mat(0xa1704a), 0, 0.85, 0));
+      [[-0.68, -0.34], [0.68, -0.34], [-0.68, 0.34], [0.68, 0.34]].forEach(([px, pz]) => g.add(cyl(0.05, 0.05, 1.8, mat(0x6d4c41), px, 0.9, pz, 5)));
+      const aw = box(1.75, 0.1, 1.05, mat(cols[i % cols.length]), 0, 1.85, 0); aw.rotation.x = 0.12; g.add(aw);
+      g.add(mesh(new THREE.PlaneGeometry(1.3, 0.32), new THREE.MeshBasicMaterial({ map: textTexture('🎪 FERIA', { w: 256, h: 64, bg: '#fff7e6', color: '#c62828', font: 'bold 36px Fredoka, Arial' }) }), 0, 1.55, -0.53, false));
+      placeAtSite(g, S_V, x, z, yaw);   // el cartel (−z local) mira al camino de piedras g.visible = false; scene.add(g);
+      registerInteractable(g, { type: 'fair', label: 'Puestos de la Feria del Sábado' });
+      this.stalls.push(g);
+    });
+  },
+  apply() {
+    this.build(); const on = Events.fairDay();
+    this.stalls.forEach(g => { g.visible = on; });
+    if (on && !this._cols.length) this.stalls.forEach(g => { const c = { pos: g.position.clone(), r: 0.9 }; colliders.push(c); this._cols.push(c); });
+    if (!on && this._cols.length) { this._cols.forEach(c => { const i = colliders.indexOf(c); if (i >= 0) colliders.splice(i, 1); }); this._cols = []; }
+  },
+};
+/* ---------- 🏛️ MUSEO DEL SUEÑO (Sec. 10.5): pedestales al aire libre en los jardines del ayuntamiento ---------- */
+const MUSEUM_EXTRA = { lottery_ticket: { name: 'Boleto de lotería', icon: '🎫' } };   // pieza que no vive en ITEMS (los boletos están en GS.lottery.tickets)
+const MUSEUM_SETS = [
+  { id: 'marine',   icon: '🎣', name: 'Vida Marina',         color: 0x4fc3f7, pieces: ['fish', 'tropical_fish', 'golden_fish', 'old_boot'], title: 'Lobo de Mar Onírico', trophy: { icon: '🏆', name: 'Trofeo de Pesca' },
+    letter: ['🏛️ Ayuntamiento', '¡Ejem! El Museo del Sueño le entrega el TROFEO DE PESCA por completar la sala «Vida Marina». La Bota Vieja ha sido, sin duda, la pieza más comentada. Formulario 12-P (pesca honorífica).'] },
+  { id: 'treasure', icon: '💎', name: 'Tesoros',             color: 0xb388ff, pieces: ['pearl', 'mystic_crystal', 'raw_gem', 'star_shard'], title: 'Buscatesoros', trophy: { icon: '🪨', name: 'Trofeo Mineral' },
+    letter: ['🦫 Glover', 'He visto tus tesoros en el museo. Los he medido dos veces: son de verdad. Te he tallado un Trofeo Mineral. Ponlo donde le dé la luz.'] },
+  { id: 'cuisine',  icon: '🍳', name: 'Alta Cocina Onírica', color: 0xffb74d, pieces: ['dream_bread', 'golden_jam', 'golden_cake', 'grilled_fish'], title: 'Chef Onírico', trophy: { icon: '🍰', name: 'Trofeo de Cocina' },
+    letter: ['🐻 Oso Panadero', '¡Tu cocina está en el MUSEO! Toma este Trofeo de Cocina, socio. Y apunta: guardo una receta secreta de la familia. Te la daré el día que mi horno sueñe más grande. Palabra de oso.'] },
+  { id: 'overseas', icon: '🚢', name: 'Ultramar',            color: 0x26a69a, pieces: ['dream_spice', 'sky_compass', 'timeless_clock', 'edge_map'], title: 'Navegante del Borde', trophy: { icon: '⚓', name: 'Trofeo Náutico' },
+    letter: ['🦤 Salty Sam', 'Arrr… cuatro cosas de Ultramar en una vitrina. Te has ganado el Trofeo Náutico, grumete, y algo más: el secreto del horizonte. Una vez volé hasta el borde del mapa. Al otro lado no hay mar. Hay un escritorio, una lámpara encendida y alguien dormido sobre un teclado. Me pareció que sonreía. Creo… creo que eras tú.'] },
+  { id: 'curios',   icon: '🎁', name: 'Curiosidades',        color: 0xf06292, pieces: ['gift_box', 'merchant_crate', 'lottery_ticket', 'coffee'], title: 'Coleccionista del Sueño', trophy: null,
+    letter: ['🏛️ Ayuntamiento', '¡Ejem! La sala de Curiosidades está completa: una caja que nadie abrió, una carga del mercante, un boleto sin premio y un café de otro mundo. El municipio le nombra «Coleccionista del Sueño». No hay formulario para esto. Lo he inventado.'] },
+];
+const museumPieceInfo = (id) => ITEMS[id] ? { name: ITEMS[id].name, icon: ITEMS[id].icon } : (MUSEUM_EXTRA[id] || { name: id, icon: '❔' });
+const Museum = {
+  islands: [], sign: null, _sprites: [], _cols: [], _vis: {},
+  st() { const m = (GS.museum ||= {}); if (!Array.isArray(m.donated)) m.donated = []; if (m.donated.some(d => !d || typeof d !== 'object')) m.donated = m.donated.map(d => typeof d === 'string' ? { id: d, at: 0, day: 0, by: '' } : d).filter(d => d && d.id); if (!Array.isArray(m.trophies)) m.trophies = []; if (!Array.isArray(m.rewarded)) m.rewarded = []; return m; },
+  unlocked() { return GS.missions?.mayor?.status === 2; },   // Sec. 10.5: tras la misión del Mayor
+  has(id) { return this.st().donated.some(d => d.id === id); },
+  setOf(id) { return MUSEUM_SETS.find(s => s.pieces.includes(id)) || null; },
+  setDone(set) { return set.pieces.every(p => this.has(p)); },
+  doneCount() { return MUSEUM_SETS.filter(s => this.setDone(s)).length; },
+  complete() { return this.doneCount() === MUSEUM_SETS.length; },
+  owned(id) { return id === 'lottery_ticket' ? (GS.lottery?.tickets || []).length : Inventory.count(id); },
+  donorName() { const n = GS.meta?.profile?.displayName; return n && n !== 'Invitado' ? n : 'el Soñador'; },
+  /** Donación (lógica pura; la UI pide confirmación antes). No se recupera: es una donación. */
+  donate(id) {
+    if (!this.unlocked()) { showToast('🏛️ El museo abre tras la misión del Mayor', 'text-white'); return false; }
+    const set = this.setOf(id); if (!set) return false;
+    if (this.has(id)) { showToast('🏛️ Esa pieza ya está expuesta', 'text-white'); return false; }
+    if (this.owned(id) < 1) { showToast(`❌ No tienes ${museumPieceInfo(id).name}`, 'text-red-200'); return false; }
+    let num = null;
+    if (id === 'lottery_ticket') { const t = GS.lottery.tickets.pop(); num = t?.num ?? null; }   // el boleto deja de participar (el pozo no cambia)
+    else if (!Inventory.remove(id, 1)) return false;
+    const m = this.st(); m.donated.push({ id, at: Date.now(), day: GS.daily.dayCount, by: this.donorName(), ...(num != null ? { num } : {}) });
+    GS.stats.museumDonations = (GS.stats.museumDonations || 0) + 1;
+    showToast(`🏛️ ${museumPieceInfo(id).icon} ${museumPieceInfo(id).name} expuesta en el museo · «Donado por ${this.donorName()}»`, 'text-white'); playChime();
+    if (this.setDone(set)) this.reward(set);
+    this.refresh(); if (typeof Achievements !== 'undefined') Achievements.check();
+    SaveSystem.saveNow('museum:' + id); return true;
+  },
+  /** Premio del set (una sola vez): trofeo (mueble expuesto en casa) + título + carta/lore. Nunca capital. */
+  reward(set, { silent = false } = {}) {
+    const m = this.st(); if (m.rewarded.includes(set.id)) return false;
+    m.rewarded.push(set.id); if (set.trophy && !m.trophies.includes(set.id)) m.trophies.push(set.id);
+    const a = Titles.st; if (!a.titles.includes(set.title)) a.titles.push(set.title);
+    if (set.letter) addLetter(set.letter[0], set.letter[1]);
+    if (!silent) { showToast(`🏛️ ¡Sala «${set.name}» completa! ${set.trophy ? set.trophy.icon + ' ' + set.trophy.name + ' · ' : ''}título «${set.title}»`, 'text-amber-200'); spawnConfetti(player.position.clone().addScaledVector(player.userData.dir, 2), 30); }
+    if (typeof updateMailboxBadge === 'function') updateMailboxBadge();
+    return true;
+  },
+  open(focus = null) {
+    if (!this.unlocked()) { showToast('🐶 "¡Ejem! El museo abrirá cuando el ayuntamiento sea digital."', 'text-white'); return; }
+    openApp('🏛️ Museo del Sueño', '', (body) => {
+      const render = () => {
+        const m = this.st();
+        let html = `<div class="app-card p-3 mb-3 text-sm text-slate-600">🐶 <i>"¡Ejem! Todo pueblo digitalizado merece un museo."</i> Dona <b>1 unidad</b> de cada pieza: queda expuesta con una placa a tu nombre y <b>no se puede recuperar</b> (es una donación: decisión con peso). Salas completas: <b>${this.doneCount()}/${MUSEUM_SETS.length}</b>.</div>`;
+        html += MUSEUM_SETS.map(set => { const done = this.setDone(set); return `<div class="app-card p-3 mb-2 ${done ? 'owned' : ''}" ${focus === set.id ? 'style="border-color:#f59e0b"' : ''}><div class="flex items-center justify-between gap-2 mb-2"><div class="font-bold text-sm text-[#2b2b3d]">${set.icon} ${set.name}</div><div class="text-[11px] ${done ? 'text-emerald-700 font-bold' : 'text-slate-500'}">${done ? '✓ Completa' : `${set.pieces.filter(p => this.has(p)).length}/4`} · premio: ${set.trophy ? set.trophy.icon + ' ' + set.trophy.name + ' + ' : ''}título «${set.title}»</div></div><div class="grid grid-cols-2 sm:grid-cols-4 gap-2">` +
+          set.pieces.map(p => { const info = museumPieceInfo(p), d = m.donated.find(x => x.id === p), own = this.owned(p), val = ITEMS[p]?.sell || 0;
+            return `<div class="rounded-xl border-2 ${d ? 'border-emerald-300 bg-emerald-50' : 'border-slate-200'} p-2 text-center"><div class="text-2xl ${d ? '' : 'opacity-40'}">${info.icon}</div><div class="text-[11px] font-bold">${esc(info.name)}</div>${d ? `<div class="text-[10px] text-emerald-700">Donado por ${esc(d.by || this.donorName())}${d.day ? ` · día ${d.day}` : ''}</div>` : `<div class="text-[10px] text-slate-500">tienes ${own}${val ? ` · vale ${fmt(val)} $T` : ''}</div><button data-donate="${p}" class="btn-game px-2 py-1 text-[11px] mt-1 ${own > 0 ? 'bg-amber-200' : 'bg-slate-200 opacity-60'}" ${own > 0 ? '' : 'disabled'}>Donar</button>`}</div>`; }).join('') + `</div></div>`; }).join('');
+        body.innerHTML = html;
+        body.querySelectorAll('[data-donate]').forEach(b => b.onclick = async () => {
+          const id = b.dataset.donate, info = museumPieceInfo(id), val = ITEMS[id]?.sell || 0;
+          const ok = await confirmDialog({ title: `🏛️ Donar ${info.icon} ${info.name}`, text: `Quedará expuesta para siempre con una placa a tu nombre.\nNo se puede recuperar${val ? ` (en una tienda te darían unos ${fmt(val)} $T)` : ''}.${id === 'lottery_ticket' ? '\nEl boleto dejará de participar en el próximo sorteo.' : ''}`, okLabel: 'DONAR' });
+          if (ok) { this.donate(id); render(); }
+        });
+      };
+      render();
+    });
+  },
+  /** 3D: 5 «islas» (una por sala) con 4 pedestales; la pieza donada flota y gira encima (patrón de las frutas/pickups) */
+  build() {
+    if (this.islands.length) return;
+    const s = SITES.townhall, stone = mat(0xe0e0e0), offs = [[-0.34, -0.34], [0.34, -0.34], [-0.34, 0.34], [0.34, 0.34]];
+    MUSEUM_SETS.forEach((set, i) => {
+      const [x, z] = CFG.museumIslands[i] || [0, 3 + i];
+      const g = new THREE.Group();
+      g.add(cyl(0.95, 1.0, 0.12, mat(0x81c784), 0, 0.06, 0, 14));
+      g.add(cyl(0.95, 0.95, 0.04, glow(set.color, set.color, 0.25), 0, 0.13, 0, 14));
+      g.userData.slots = {};
+      set.pieces.forEach((p, k) => {
+        const [px, pz] = offs[k]; g.add(cyl(0.15, 0.19, 0.55, stone, px, 0.4, pz, 8));
+        const spr = new THREE.Sprite(new THREE.SpriteMaterial({ map: iconTexture(museumPieceInfo(p).icon), depthWrite: false })); spr.scale.setScalar(0.42); spr.position.set(px, 0.98, pz); spr.visible = false; g.add(spr);
+        spr.userData.base = 0.98; spr.userData.ph = i * 1.7 + k; g.userData.slots[p] = { spr, px, pz, plate: null }; this._sprites.push(spr);
+      });
+      const post = new THREE.Group(); post.add(cyl(0.04, 0.04, 0.9, mat(0x5d4037), 0, 0.45, 0, 5));
+      post.add(mesh(new THREE.PlaneGeometry(0.9, 0.24), new THREE.MeshBasicMaterial({ map: textTexture(`${set.icon} ${set.name}`, { w: 384, h: 96, bg: '#fffde7', color: '#2b2b3d', font: 'bold 38px Fredoka, Arial' }), side: THREE.DoubleSide }), 0, 0.95, 0, false));
+      post.position.set(0, 0, 0.98); g.add(post);
+      placeAtSite(g, s, x, z, Math.PI);   // giro π: placas y cartel miran a la plaza del ayuntamiento g.visible = false; scene.add(g);
+      g.userData.set = set.id; registerInteractable(g, { type: 'museum', set: set.id, label: `Museo · ${set.name}` });
+      this.islands.push(g);
+    });
+    const sg = new THREE.Group(); [-0.7, 0.7].forEach(px => sg.add(cyl(0.06, 0.06, 1.6, mat(0x5d4037), px, 0.8, 0, 6)));
+    sg.add(box(1.7, 0.5, 0.08, new THREE.MeshStandardMaterial({ map: textTexture('🏛️ MUSEO DEL SUEÑO', { w: 512, h: 128, bg: '#1e3a8a', color: '#ffe082', font: 'bold 50px Fredoka, Arial' }), roughness: 0.6 }), 0, 1.5, 0));
+    const [sx, sz] = CFG.museumSignSpot; placeAtSite(sg, s, sx, sz, Math.PI); sg.visible = false; scene.add(sg);
+    registerInteractable(sg, { type: 'museum', set: null, label: 'Museo del Sueño' }); this.sign = sg;
+  },
+  /** Re-aplica GS al mundo (idempotente): visibilidad, piezas flotantes, placas, trofeos, premios pendientes */
+  apply() {
+    this.build(); const on = this.unlocked(), m = this.st();
+    [...this.islands, this.sign].forEach(g => { if (g) g.visible = on; });
+    if (on && !this._cols.length) this.islands.forEach(g => { const c = { pos: g.position.clone(), r: 0.95 }; colliders.push(c); this._cols.push(c); });
+    if (on && !m.announced) { m.announced = true; if (CFG.museumAnnounceLetter) addLetter('🐶 Mayor Reginald', '¡Ejem! Todo pueblo digitalizado merece un museo. Los jardines del ayuntamiento ya tienen pedestales: done una pieza de cada colección y quedará expuesta con una placa a su nombre. Cinco salas, veinte piezas. Formulario 1-M (mecenazgo).'); }
+    MUSEUM_SETS.forEach(set => { if (this.setDone(set) && !m.rewarded.includes(set.id)) this.reward(set, { silent: true }); });   // partidas donde el set se completó antes de este código
+    this.refresh();
+  },
+  refresh() {
+    const m = this.st();
+    this.islands.forEach(g => {
+      const set = MUSEUM_SETS.find(s => s.id === g.userData.set);
+      Object.entries(g.userData.slots).forEach(([p, slot]) => {
+        const d = m.donated.find(x => x.id === p); slot.spr.visible = !!d;
+        if (d && !slot.plate) { slot.plate = mesh(new THREE.PlaneGeometry(0.3, 0.075), new THREE.MeshBasicMaterial({ map: textTexture(`Donado por ${d.by || this.donorName()}`, { w: 256, h: 64, bg: '#fff8e1', color: '#5d4037', font: 'bold 22px Fredoka, Arial', radius: 8 }) }), slot.px, 0.4, slot.pz + 0.2, false); slot.plate.userData.root = g; g.add(slot.plate); }
+      });
+      if (set?.trophy && this.setDone(set) && !g.userData.trophy) {   // trofeo dorado en el centro de la sala completa
+        const t = new THREE.Group(), gold = glow(0xffd54f, 0xffab00, 0.5);
+        t.add(cyl(0.14, 0.18, 0.12, gold, 0, 0.2, 0, 10)); t.add(cyl(0.03, 0.03, 0.22, gold, 0, 0.37, 0, 6)); t.add(cyl(0.16, 0.08, 0.2, gold, 0, 0.58, 0, 12));
+        t.position.y = 0.12; t.traverse(o => { if (o.isMesh) o.userData.root = g; }); g.add(t); g.userData.trophy = t;
+      }
+    });
+  },
+  update(t) { for (let i = 0; i < this._sprites.length; i++) { const s = this._sprites[i]; if (!s.visible) continue; s.position.y = s.userData.base + Math.sin(t * 1.8 + s.userData.ph) * 0.06; s.material.rotation = Math.sin(t * 0.9 + s.userData.ph) * 0.25; } },
+};
+function museumTrophiesHTML() {
+  const m = Museum.st(), list = MUSEUM_SETS.filter(s => s.trophy && m.trophies.includes(s.id));
+  return list.length ? `<div class="text-sm text-slate-600 mt-1">🏛️ Trofeos del museo: ${list.map(s => `${s.trophy.icon} ${s.trophy.name}`).join(' · ')}</div>` : '';
+}
+/* ---------- 🏆 LOGROS (Sec. 10.4): título equipable + premio menor (caja, consumible, pieza). NUNCA capital. ---------- */
+const ACH_CATS = { eco: '💰 Economía', social: '🧑‍🤝‍🧑 Social', craft: '🎣 Oficios', world: '🏗️ Mundo', risk: '🎲 Riesgo', story: '🌟 Historia' };
+const achStat = (k) => GS.stats?.[k] || 0;
+const achGot = (id) => (GS.stats?.obtained?.[id] | 0) > 0 || Inventory.has(id) || Museum.has(id);
+const ACH_SHOPKEEPERS = ['bear', 'sam', 'sombra', 'rocco', 'glover'];
+const ACHIEVEMENTS = [
+  { id: 'diez_mil',      cat: 'eco',    icon: '🪙', name: 'Diez mil sueños',      desc: 'Reúne 10.000 $TOKEN de capital.',                 prog: () => [Wallet.balance, 1e4], r: [['coffee', 2]] },
+  { id: 'primer_millon', cat: 'eco',    icon: '💰', name: 'Primer millón',        desc: 'Reúne 1.000.000 $TOKEN de capital.',              prog: () => [Wallet.balance, 1e6], r: [['golden_gift_box', 1]] },
+  { id: 'diez_millones', cat: 'eco',    icon: '🏦', name: 'Diez millones',        desc: 'Reúne 10.000.000 $TOKEN de capital.',             prog: () => [Wallet.balance, 1e7], r: [['golden_gift_box', 1]], fashion: true },
+  { id: 'manos_seda',    cat: 'eco',    icon: '🧤', name: 'Manos de seda',        desc: 'Vende 100 objetos a los vecinos.',                prog: () => [achStat('itemsSold'), 100], r: [['gift_box', 1]] },
+  { id: 'tiburon',       cat: 'eco',    icon: '🦈', name: 'Tiburón de la feria',  desc: 'Cierra 50 lotes con beneficio en la Feria del Tablón (versión offline de las «50 ofertas P2P»).', prog: () => [achStat('feriaWins'), 50], r: [['golden_gift_box', 1]] },
+  { id: 'rescate',       cat: 'eco',    icon: '🛟', name: 'Rescate evitado',      desc: `Pasa ${CFG.achFaintFreeDays} días oníricos sin desmayarte.`, prog: () => [Math.max(0, GS.daily.dayCount - (GS.stats.lastFaintDay | 0)), CFG.achFaintFreeDays], r: [['golden_cake', 1]] },
+  { id: 'club100m',      cat: 'eco',    icon: '💯', name: 'Club de los 100M',     desc: 'Post-juego del Final B: 100.000.000 $TOKEN.',     test: () => !!GS.postgame?.club100M || Titles.st.titles.includes('Club de los 100M'), r: [['golden_gift_box', 2]] },
+  { id: 'rompehielos',   cat: 'social', icon: '🤝', name: 'Rompehielos',          desc: 'Comercia al menos una vez con los 5 tenderos (Oso, Sam, Sombra, Rocco y Glover).', prog: () => [ACH_SHOPKEEPERS.filter(id => (GS.trust?.[id]?.trades | 0) > 0).length, 5], r: [['flower_bouquet', 2]] },
+  { id: 'amigo_pueblo',  cat: 'social', icon: '🧡', name: 'Amigo del pueblo',     desc: 'Todos los vecinos te consideran al menos Amigo (nivel 2).', prog: () => [TRUST_NPCS.filter(id => Trust.level(id) >= 2).length, 7], r: [['gift_box', 1]] },
+  { id: 'corazon',       cat: 'social', icon: '💜', name: 'Corazón del sueño',    desc: 'Los 7 vecinos en Aliado. Premio: aura legendaria asegurada + título dorado.', prog: () => [TRUST_NPCS.filter(id => Trust.level(id) >= 4).length, 7], r: [['golden_gift_box', 1]], gold: true, legendAura: true },
+  { id: 'filantropo',    cat: 'social', icon: '🎁', name: 'Filántropo',           desc: 'Haz 100 regalos a los vecinos.',                  prog: () => [achStat('giftsGiven'), 100], r: [['golden_gift_box', 1]] },
+  { id: 'mano_amiga',    cat: 'social', icon: '📋', name: 'Mano amiga',           desc: 'Completa 30 encargos de los vecinos.',            prog: () => [achStat('encargosDone'), 30], r: [['gift_box', 1], ['coffee', 1]] },
+  { id: 'pescador',      cat: 'craft',  icon: '🎣', name: 'Pescador del Sueño',   desc: 'Consigue los 3 peces… y la bota. 😄',             prog: () => [['fish', 'tropical_fish', 'golden_fish', 'old_boot'].filter(achGot).length, 4], r: [['gift_box', 1]] },
+  { id: 'pastelero',     cat: 'craft',  icon: '🧑‍🍳', name: 'Maestro pastelero', desc: 'Cocina 100 lotes en tu casa.',                    prog: () => [achStat('batchesCooked'), 100], r: [['golden_gift_box', 1]] },
+  { id: 'pico_plata',    cat: 'craft',  icon: '⛏️', name: 'Pico de plata',        desc: 'Mina 10 Gemas en Bruto.',                         prog: () => [achStat('gemsMined'), 10], r: [['gift_box', 1]] },
+  { id: 'mano_verde',    cat: 'craft',  icon: '🍋', name: 'Mano verde',           desc: 'Cosecha 100 Frutas Doradas.',                     prog: () => [achStat('fruitsHarvested'), 100], r: [['gift_box', 1]] },
+  { id: 'cazaestrellas', cat: 'craft',  icon: '🌠', name: 'Cazaestrellas',        desc: 'Recoge 20 Fragmentos de Estrella.',               prog: () => [achStat('starsCollected'), 20], r: [['gift_box', 1]] },
+  { id: 'osoexpress',    cat: 'craft',  icon: '📦', name: 'Repartidor de OsoExpress', desc: 'Sirve 10 pedidos del Horno.',                 prog: () => [achStat('ordersServed'), 10], r: [['coffee', 2]] },
+  { id: 'urbanista',     cat: 'world',  icon: '🏗️', name: 'Urbanista',            desc: 'Levanta 10 construcciones.',                     prog: () => [Math.max(achStat('built'), (GS.world.buildings || []).length), 10], r: [['gift_box', 1]] },
+  { id: 'villa',         cat: 'world',  icon: '🏡', name: 'Casa con vistas',      desc: 'Mejora tu casa a Villa.',                         test: () => (GS.house.level | 0) >= 2, r: [['coffee', 2]] },
+  { id: 'puente',        cat: 'world',  icon: '🌉', name: 'El Puente',            desc: 'Completa la Gran Obra de Glover.',                test: () => typeof Bridge !== 'undefined' && Bridge.done(), r: [['golden_gift_box', 1]] },
+  { id: 'siete_trabajos', cat: 'world', icon: '💼', name: 'Siete Trabajos Mayores', desc: 'Completa los 7 Trabajos Mayores del Acto 2.',  prog: () => [bigJobsDoneCount(), CFG.act2BigJobs], r: [['golden_gift_box', 1]] },
+  { id: 'ultramarino',   cat: 'world',  icon: '🧭', name: 'Ultramarino',          desc: 'Recibe 10 importaciones del mercante.',           prog: () => [achStat('importsReceived'), 10], r: [['gift_box', 1]] },
+  { id: 'mecenas',       cat: 'world',  icon: '🏛️', name: 'Mecenas',              desc: 'Dona tu primera pieza al Museo del Sueño.',       prog: () => [Museum.st().donated.length, 1], r: [['flower_bouquet', 2]] },
+  { id: 'museo',         cat: 'world',  icon: '🖼️', name: 'Museo completo',       desc: 'Completa las 5 salas del Museo del Sueño.',       prog: () => [Museum.doneCount(), MUSEUM_SETS.length], r: [['golden_gift_box', 2]], fashion: true },
+  { id: 'azar',          cat: 'risk',   icon: '🍀', name: 'El azar sonríe',       desc: 'Gana la Lotería del Sueño.',                      test: () => !!GS.lottery?.lastDraw?.winner || !!Achievements.st().track.lotteryWon, r: [['gift_box', 1]] },
+  { id: 'honrado',       cat: 'risk',   icon: '🕊️', name: 'Jugador honrado',      desc: `Deja de apostar tras perder ${CFG.achHonestLosses} seguidas. Saber parar también es ganar.`, secret: true, test: () => !!Achievements.st().track.honestDone, r: [['coffee', 1], ['flower_bouquet', 1]] },
+  { id: 'cuentas',       cat: 'risk',   icon: '🧾', name: 'Cuentas claras',       desc: 'Salda por completo una deuda (alquiler o Deuda Onírica).', test: () => !!Achievements.st().track.hadDebt && !(GS.debt > 0) && !(GS.housing?.rentDebt > 0) && !GS.housing?.sealed, r: [['gift_box', 1]] },
+  { id: 'vecino',        cat: 'story',  icon: '🏘️', name: 'Vecino de pleno derecho', desc: 'Completa las 7 misiones del Acto 1.',         prog: () => [missionsDoneCount(), CFG.act1Missions], r: [['gift_box', 1]] },
+  { id: 'billete',       cat: 'story',  icon: '🎫', name: 'Billete en mano',      desc: 'Compra el Billete del Despertar.',                test: () => (GS.awakening?.step | 0) >= 1 || !!GS.story?.ending || (GS.ngplus?.count | 0) > 0, r: [['golden_gift_box', 1]] },
+  { id: 'despertar',     cat: 'story',  icon: '☀️', name: 'El Despertar',         desc: 'Final A: despierta frente al portátil.',          test: () => GS.story?.ending === 'A' || (GS.ngplus?.runs || []).some(r => r.ending === 'A') || Titles.st.titles.includes('El Despertar'), r: [['gift_box', 1]] },
+  { id: 'eterno',        cat: 'story',  icon: '🌈', name: 'Soñador Eterno',       desc: 'Final B: quédate en el sueño.',                   test: () => GS.story?.ending === 'B' || (GS.ngplus?.runs || []).some(r => r.ending === 'B') || Titles.st.titles.includes('Soñador Eterno'), r: [['golden_gift_box', 1]] },
+  { id: 'dejavu',        cat: 'story',  icon: '🌙', name: 'Déjà vu',              desc: 'Empieza un Nuevo Sueño+.',                        test: () => (GS.ngplus?.count | 0) > 0, r: [['golden_gift_box', 1]] },
+];
+const ACH_BY_ID = Object.fromEntries(ACHIEVEMENTS.map(a => [a.id, a]));
+const Achievements = {
+  _busy: false, _queue: [], retro: 0,
+  st() { const a = (GS.achievements ||= {}); a.titles ||= []; a.unlocked ||= {}; a.claimed ||= {}; a.track ||= {}; return a; },
+  has(id) { return !!this.st().unlocked[id]; },
+  done(def) { try { if (def.test) return !!def.test(); const [c, n] = def.prog(); return c >= n; } catch (e) { return false; } },
+  count() { return Object.keys(this.st().unlocked).filter(id => ACH_BY_ID[id]).length; },
+  pendingRewards() { const a = this.st(); return ACHIEVEMENTS.filter(d => a.unlocked[d.id] && !a.claimed[d.id]).length; },
+  /** Evalúa todo lo pendiente (lo llaman los listeners de Wallet/Inventory/Trust, la liquidación y la carga) */
+  check({ silent = false } = {}) {
+    if (this._busy || !GS) return 0; this._busy = true; let n = 0;
+    try {
+      const a = this.st();
+      if (GS.debt > 0 || GS.housing?.rentDebt > 0) a.track.hadDebt = true;
+      if (GS.lottery?.lastDraw?.winner) a.track.lotteryWon = true;
+      for (const d of ACHIEVEMENTS) if (!a.unlocked[d.id] && this.done(d)) { this.unlock(d.id, { silent }); n++; }
+    } finally { this._busy = false; }
+    return n;
+  },
+  unlock(id, { silent = false } = {}) {
+    const d = ACH_BY_ID[id], a = this.st(); if (!d || a.unlocked[id]) return false;
+    a.unlocked[id] = { at: Date.now(), day: GS.daily?.dayCount | 0 };
+    if (!a.titles.includes(d.name)) a.titles.push(d.name);   // recompensa estándar: título equipable con el nombre del logro
+    if (d.gold) { a.goldTitles ||= []; if (!a.goldTitles.includes(d.name)) a.goldTitles.push(d.name); }
+    if (d.legendAura) { a.legendAura = true; if (typeof refreshAuraFromTrust === 'function') refreshAuraFromTrust(); }
+    if (silent || !SaveSystem.started) { this.retro++; }
+    else { this._queue.push(d); if (this._queue.length === 1) this._toastNext(); }
+    SaveSystem.save('ach:' + id); return true;
+  },
+  _toastNext() { const d = this._queue[0]; if (!d) return; showToast(`🏆 Logro desbloqueado: ${d.icon} «${d.name}» · premio en 📅 → 🏆`, 'text-amber-200'); playChime(); setTimeout(() => { this._queue.shift(); this._toastNext(); }, 1600); },
+  /** Recoge el premio menor (objetos / 1 prenda). Nunca capital. */
+  claim(id) {
+    const d = ACH_BY_ID[id], a = this.st(); if (!d || !a.unlocked[id] || a.claimed[id]) return false;
+    const items = d.r || [];
+    if (items.length && !Inventory.canAddMany(items)) { showToast('🎒 Haz hueco en la mochila para el premio', 'text-red-200'); return false; }
+    items.forEach(([iid, q]) => Inventory.add(iid, q, { silent: true }));
+    let extra = '';
+    if (d.fashion) { const p = achFashionPiece(id); extra = p ? ` + ${p.icon} ${p.name} (armario 🪞)` : ''; }
+    a.claimed[id] = Date.now();
+    showToast(`🏆 Premio de «${d.name}»: ${items.map(([iid, q]) => `${ITEMS[iid].icon}×${q}`).join(' ')}${extra}`, 'text-white'); playChime(); SaveSystem.saveNow('ach-claim:' + id); return true;
+  },
+  claimAll() { let n = 0; for (const d of ACHIEVEMENTS) if (this.has(d.id) && !this.st().claimed[d.id] && this.claim(d.id)) n++; return n; },
+  /** Lo que solo se puede juzgar al cerrar un día onírico: «Jugador honrado» (no volvió a apostar) */
+  onSettle() {
+    const a = this.st(), g = GS.stats?.gambling, D = GS.daily.dayCount, t = a.track;
+    if (g) {
+      if (t.honest && (g.rounds | 0) !== t.honest.rounds) t.honest = null;   // volvió a apostar: se desarma (y se rearma si sigue perdiendo)
+      if (!t.honest && (g.lossStreak | 0) >= CFG.achHonestLosses) t.honest = { rounds: g.rounds | 0, day: D };
+      else if (t.honest && D - t.honest.day >= CFG.achHonestDays) t.honestDone = true;
+    }
+    this.check();
+  },
+};
+function achFashionPiece(tag) {
+  const own = (GS.avatar.wardrobe ||= []), cand = AVATAR_PARTS.filter(p => p.origin === 'boutique' && !own.includes(p.key)); if (!cand.length) return null;
+  const p = cand[Math.floor(mulberry32(_hashStr(GS.meta.saveId + ':achfashion:' + tag))() * cand.length)]; own.push(p.key);
+  addLetter('🦔 Barnaby Jr. & Pip', `bro. ese logro es CONTENIDO. os hemos guardado un drop: ${p.icon} ${p.name}. ya está en tu armario 🪞.`); return p;
+}
+function achievementsHTML() {
+  const a = Achievements.st(), gold = a.goldTitles || [];
+  let html = `<div class="app-card p-3 mb-3"><div class="flex flex-wrap items-center justify-between gap-2"><div class="text-sm"><b>🏆 ${Achievements.count()}/${ACHIEVEMENTS.length}</b> logros · Título: <b class="${gold.includes(a.equippedTitle) ? 'text-amber-600' : 'text-[#2b2b3d]'}">${a.equippedTitle ? '«' + esc(a.equippedTitle) + '»' : 'ninguno'}</b></div>${Achievements.pendingRewards() ? `<button data-achall class="btn-game px-3 py-1.5 text-xs bg-emerald-300">🎁 Recoger todo (${Achievements.pendingRewards()})</button>` : ''}</div>
+    <div class="text-[11px] text-slate-500 mt-1">Cada logro da un <b>título equipable</b> y un premio menor (cajas, consumibles, prendas). Nunca $TOKEN: el dinero se gana en la economía.</div>
+    <div class="flex flex-wrap gap-1 mt-2">${a.titles.length ? [null, ...a.titles].map(t => `<button data-title="${t === null ? '' : esc(t)}" class="btn-game px-2 py-0.5 text-[10px] ${a.equippedTitle === t || (!a.equippedTitle && t === null) ? 'active' : 'bg-white'} ${t && gold.includes(t) ? 'text-amber-600' : ''}">${t === null ? 'Sin título' : (gold.includes(t) ? '✨ ' : '') + esc(t)}</button>`).join('') : '<span class="text-[11px] text-slate-400">Aún no tienes títulos.</span>'}</div></div>`;
+  html += Object.entries(ACH_CATS).map(([cat, label]) => `<div class="pixel text-[9px] text-slate-500 mt-3 mb-1">${label}</div><div class="grid grid-cols-1 sm:grid-cols-2 gap-2">` + ACHIEVEMENTS.filter(d => d.cat === cat).map(d => {
+    const u = a.unlocked[d.id], hidden = d.secret && !u, p = !hidden && d.prog ? (() => { try { return d.prog(); } catch (e) { return null; } })() : null;
+    const reward = (d.r || []).map(([id, q]) => `${ITEMS[id].icon}×${q}`).join(' ') + (d.fashion ? ' + 👗' : '') + (d.legendAura ? ' + ✨ aura' : '');
+    return `<div class="app-card p-2.5 flex items-center gap-2 ${u ? 'owned' : ''}"><div class="text-2xl ${u ? '' : 'opacity-40 grayscale'}">${hidden ? '❔' : d.icon}</div><div class="flex-1 min-w-0"><div class="text-sm font-bold ${d.gold && u ? 'text-amber-600' : 'text-[#2b2b3d]'}">${hidden ? 'Logro secreto' : esc(d.name)}</div><div class="text-[11px] text-slate-500 leading-snug">${hidden ? 'Hay cosas que solo se descubren haciéndolas… o dejando de hacerlas.' : esc(d.desc)}</div>${!u && p ? `<div class="h-1.5 mt-1 rounded-full bg-slate-200 overflow-hidden"><div class="h-full bg-amber-400" style="width:${Math.min(100, p[0] / p[1] * 100).toFixed(1)}%"></div></div><div class="text-[10px] text-slate-400">${fmt(Math.min(Math.floor(p[0]), p[1]))}/${fmt(p[1])}</div>` : ''}${hidden ? '' : `<div class="text-[10px] text-slate-500">Premio: ${reward}</div>`}</div>${u ? (a.claimed[d.id] ? '<span class="text-emerald-600 text-[11px] font-bold">✓</span>' : `<button data-achclaim="${d.id}" class="btn-game px-2 py-1 text-[11px] bg-emerald-300">Recoger</button>`) : ''}</div>`;
+  }).join('') + `</div>`).join('');
+  return html;
+}
+function achievementsBind(body, render) {
+  body.querySelectorAll('[data-achclaim]').forEach(b => b.onclick = () => { Achievements.claim(b.dataset.achclaim); render(); });
+  body.querySelector('[data-achall]')?.addEventListener('click', () => { Achievements.claimAll(); render(); });
+  body.querySelectorAll('[data-title]').forEach(b => b.onclick = () => { Titles.equip(b.dataset.title || null); render(); });
+}
+/* ---------- 🗓️ Calendario semanal (Sec. 10.8) dentro de la Carta de la Semana ---------- */
+function eventsCalendarHTML() {
+  const wd = Events.weekday(), L = GS.lottery, days = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+  const row = (on, icon, title, when, txt) => `<div class="app-card p-3 mb-2 flex items-start gap-3 ${on ? 'owned' : ''}"><div class="text-2xl">${icon}</div><div class="flex-1 min-w-0"><div class="font-bold text-sm text-[#2b2b3d]">${title} <span class="text-[11px] font-semibold ${on ? 'text-emerald-700' : 'text-slate-500'}">· ${on ? 'HOY' : when}</span></div><div class="text-[11px] text-slate-600 leading-snug">${txt}</div></div></div>`;
+  let html = `<div class="text-xs text-slate-500 mb-2">Citas semanales en <b>tiempo real</b> (hoy es ${days[wd]}). Todas tienen versión offline: nadie se las pierde por no tener cuenta. Nada se rompe si no vienes.</div>`;
+  html += row(Events.starNight(), '🌠', 'Noche de Estrellas', 'viernes', `Durante la noche onírica de un viernes real caen <b>${CFG.starFridayMin}–${CFG.starFridayMax} Fragmentos de Estrella</b> garantizados (los demás días, ${CFG.starMin}–${CFG.starMax}).`);
+  html += row(Events.fairDay(), '🎪', 'Feria del Sábado', 'sábado', `Los vecinos montan puestos en la aldea: −20% en algo, la Harina del Oso en oferta y stock raro de Ultramar. Distinta de la 📈 Feria del Tablón (lotes por categoría).${Events.fairDay() ? ' <button data-openfair class="btn-game px-2 py-0.5 text-[10px] bg-emerald-200 ml-1">Ver puestos</button>' : ''}`);
+  html += row(Events.lotteryDay() && Date.now() < (L.nextDrawAt || 0), '🎫', 'Sorteo de la Lotería', 'domingo 20:00', `Pozo acumulado: <b>${fmt(Math.floor(L.pool || 0))} $T</b> (cap ${fmt(CFG.lotteryPrizeCap)}) · tus boletos: ${(L.tickets || []).length} · próximo sorteo en <b>${fmtCountdown((L.nextDrawAt || nextSunday20()) - Date.now())}</b>. El resultado llega por carta al buzón.${L.lastDraw ? ` Último número: <b>${String(L.lastDraw.num).padStart(3, '0')}</b>.` : ''}`);
+  html += `<div class="text-[11px] text-slate-400">Cada día: encargos, tendencia, Oráculo, cosechas, cocina, barco. Lunes a domingo: Sello Semanal.</div>`;
+  return html;
+}
+function eventsCalendarBind(body) { body.querySelector('[data-openfair]')?.addEventListener('click', () => Fair.open()); }
+/* ---------- Botones de diálogo nuevos (los añade serviceBtns) ---------- */
+function v10ServiceBtns(npcId) {
+  const out = [];
+  if (npcId === 'mayor' && Museum.unlocked()) out.push(dialogButton('🏛️ Museo del Sueño', 'bg-amber-200 text-[#2b2b3d]', () => Museum.open()));
+  if (FAIR_NPC[npcId] && Events.fairDay()) out.push(dialogButton('🎪 Puestos de la Feria', 'bg-rose-200 text-[#2b2b3d]', () => Fair.open()));
+  return out;
+}
+/* ---------- Listeners (mismo patrón de envoltorio único que el Sello Semanal) ---------- */
+if (!Wallet.__achWrapped) {
+  const _a = Wallet.add.bind(Wallet), _s = Wallet.spend.bind(Wallet);
+  Wallet.add = function (...args) { const r = _a(...args); if (r > 0) Achievements.check(); return r; };
+  Wallet.spend = function (...args) { const r = _s(...args); if (r) Achievements.check(); return r; };
+  Wallet.__achWrapped = true;
+}
+if (!Inventory.__achWrapped) {
+  const _a = Inventory.add.bind(Inventory), _r = Inventory.remove.bind(Inventory);
+  Inventory.add = function (...args) { const r = _a(...args); if (r) Achievements.check(); return r; };
+  Inventory.remove = function (...args) { const r = _r(...args); if (r) Achievements.check(); return r; };
+  Inventory.__achWrapped = true;
+}
+if (!Trust.__achWrapped) {
+  const _a = Trust.add.bind(Trust), _g = Trust.addGift.bind(Trust);
+  Trust.add = function (...args) { const r = _a(...args); if (r > 0) Achievements.check(); return r; };
+  Trust.addGift = function (...args) { const r = _g(...args); if (r && !r.capped) GS.stats.giftsGiven = (GS.stats.giftsGiven || 0) + 1; Achievements.check(); return r; };   // «Filántropo»
+  Trust.__achWrapped = true;
+}
+if (!Needs.__achWrapped) { const _f = Needs.faint.bind(Needs); Needs.faint = function (...args) { GS.stats.lastFaintDay = GS.daily.dayCount; return _f(...args); }; Needs.__achWrapped = true; }   // «Rescate evitado»
+DailySystem.onSettle(() => Achievements.onSettle());
+{ const _um = UNLOCKS.mayor; UNLOCKS.mayor = () => { _um(); Museum.apply(); }; }   // el museo abre al completar la misión del Mayor (también al restaurar)
+{ const _b = Awakening.buildNGPlus.bind(Awakening); Awakening.buildNGPlus = (old) => { const f = _b(old); if (f.achievements) f.achievements.track = {}; return f; }; }   // NG+: los logros y títulos te siguen; los contadores internos, no
+/* ---------- Orquestación: carga, HUD, sesión, fotograma ---------- */
+let _v10Badge = null;
+/** Sec. 10.1: «El jugador que vuelve tras semanas recibe bienvenida, no factura» (el reloj onírico no avanzó: nada se ha roto) */
+let _welcomeBack = false;
+function welcomeBackGreeting(npcId) { if (!_welcomeBack || npcId !== 'bear') return ''; _welcomeBack = false; return '¡Mira quién volvió! El horno siguió encendido, ¿eh? Aquí nada se ha estropeado: el sueño te esperaba.'; }
+const V10 = {
+  apply() {
+    { const last = GS.meta?.lastSavedAt || 0; _welcomeBack = !!last && Date.now() - last >= CFG.welcomeBackDays * 86400000; }
+    if (GS.stats.lastFaintDay == null) GS.stats.lastFaintDay = GS.daily?.freeRescueUsed ? (GS.daily.dayCount | 0) : 0;   // partidas antiguas que ya se desmayaron: se cuenta desde hoy
+    Museum.apply(); Fair.apply(); Fair.st();
+    Achievements.check({ silent: true });   // retroactivo: lo que ya habías logrado se desbloquea al cargar (premios para recoger)
+    this.hud();
+  },
+  hud() {
+    const b = document.getElementById('btnWeekly'); if (!b) return;
+    const ev = Events.icon(), dot = (Weekly.pendingCount() + Achievements.pendingRewards()) > 0, key = ev + (dot ? '•' : '');
+    if (key === _v10Badge) return; _v10Badge = key;
+    b.innerHTML = `📅<span class="hidden md:inline"> Semana</span>${ev ? `<span class="ml-1">${ev}</span>` : ''}${dot ? '<span class="ml-1 inline-block w-2 h-2 rounded-full bg-red-500 align-middle"></span>' : ''}`;
+    b.title = `Semana, logros y eventos${ev === '🌠' ? ' · hoy: Noche de Estrellas' : ev === '🎪' ? ' · hoy: Feria del Sábado' : ev === '🎫' ? ' · hoy: sorteo de la lotería a las 20:00' : ''}`;
+  },
+  tick() { if (SaveSystem.started) { Achievements.check(); Fair.apply(); } this.hud(); },
+  sessionToasts() {
+    const msgs = [];
+    if (_welcomeBack) msgs.push(['🐻 "¡Mira quién volvió! El horno siguió encendido, ¿eh?" (habla con el Oso)', 'text-white']);
+    if (Achievements.retro > 0) msgs.push([`🏆 ${Achievements.retro} logro(s) desbloqueado(s) por lo que ya habías hecho: recoge los premios en 📅 → 🏆`, 'text-amber-200']);
+    Achievements.retro = 0;
+    if (Events.starNight()) msgs.push(['🌠 Es viernes: esta noche onírica hay Noche de Estrellas (5–8 fragmentos)', 'text-white']);
+    if (Events.fairDay()) msgs.push(['🎪 ¡Feria del Sábado! Los vecinos han montado puestos en la aldea', 'text-white']);
+    if (Events.lotteryDay() && Date.now() < (GS.lottery.nextDrawAt || 0)) msgs.push([`🎫 Hoy a las 20:00 se sortea la lotería · pozo ${fmt(Math.floor(GS.lottery.pool || 0))} $T`, 'text-white']);
+    msgs.forEach(([m, c], i) => setTimeout(() => showToast(m, c), 2400 + i * 1900));
+  },
+  update(dt, t) { Museum.update(t); },
+};
+{ const _os = Awakening.onSessionStart.bind(Awakening); Awakening.onSessionStart = (...a) => { const r = _os(...a); V10.sessionToasts(); return r; }; }
+setInterval(() => V10.tick(), 5000);
+/* =========================================================
    20. MENÚ DE ENTRADA → PLAY
    ========================================================= */
 const $ = (id) => document.getElementById(id);
@@ -5959,6 +6449,7 @@ function applyGameStateToWorld() {
   NPCS.forEach(n => { if (GS.bigJobs?.[n.id]?.status === 2) BIG_UNLOCKS[n.id](); });   // v0.8: Trabajos Mayores → sistemas + huellas 3D (idempotente)
   refreshNpcBubbles();
   Awakening.apply();   // v0.9: avión (luces), billete imperdible, efectos del Final B y post-juego (idempotente)
+  V10.apply();         // v1.0: museo (pedestales + piezas + trofeos), puestos de la feria, logros retroactivos, HUD del calendario
   if (Array.isArray(GS.player.dir) && GS.player.dir.length === 3) { player.userData.dir.fromArray(GS.player.dir).normalize(); if (Array.isArray(GS.player.fwd)) player.userData.fwd.fromArray(GS.player.fwd); }
   state.tokensShown = GS.economy.money; ui.tokenValue.textContent = state.tokensShown.toLocaleString('es-ES');
   refreshMissionUI();
@@ -5979,8 +6470,8 @@ deliverPendingFashion();   // v0.7: prendas del Sello Semanal que esperaban al a
 cam.dist = cam.tDist = 70; cam.pitch = cam.tPitch = 0.35; // vista desde el espacio mientras se lee el menú
 { const p = camPose(); applyLook(p.pos, p.target, p.up); }
 animate();
-// 🛠️ DEBUG (temporal, se eliminará en v1.0): permite inspeccionar y forzar el estado desde la consola F12
-window._dbg = { get GS() { return GS; }, AvatarParts: AVATAR_PARTS, AV_STYLES, AVATAR_SLOTS, buildAvatar, applyAvatar, avSanitize, avatarCombinations, Fitting, Boutique, INSIGNIAS, grantInsignia, deliverPendingFashion, grantRandomImport, grantSpecialPiece, maybeOpenCreator, refreshMissionUI, Inventory, Wallet, Needs, Production, Trust, Trend, Weather, openHousePanel, placedBuildings, settleDay, updateEmbargo, enterBuildMode, interactWith: (o) => interactWith(o), set clock(fictMs) { GS.daily.clockMs = fictMs; }, set hunger(v) { GS.needs.hunger = v; },
+// 🛠️ DEBUG · referencias internas para la consola: DBG.refs (siempre) y window._dbg (solo con ?debug=1 en la URL, v1.0)
+const DBG_REFS = { get GS() { return GS; }, AvatarParts: AVATAR_PARTS, AV_STYLES, AVATAR_SLOTS, buildAvatar, applyAvatar, avSanitize, avatarCombinations, Fitting, Boutique, INSIGNIAS, grantInsignia, deliverPendingFashion, grantRandomImport, grantSpecialPiece, maybeOpenCreator, refreshMissionUI, Inventory, Wallet, Needs, Production, Trust, Trend, Weather, openHousePanel, placedBuildings, settleDay, updateEmbargo, enterBuildMode, interactWith: (o) => interactWith(o), set clock(fictMs) { GS.daily.clockMs = fictMs; }, set hunger(v) { GS.needs.hunger = v; },
   /* v0.8 · El Comerciante */ BIG_JOBS, BIG_UNLOCKS, completeBigJob, bigJobState, bigJobReady, bigJobDialog, bigProps, act2State, BakeryOrders, Census, Bridge, Feria, Oracle, Climate, Imports, Viral, giveRumor, rumorFor, deliverEncargo, currentEncargo, importsOnCrate, buildCost, censusTaxMult, laptopProj, openLaptop, shopSellPrice };
 if (!SaveSystem.persistent) $('storageWarn').classList.remove('hidden');
 if (hadSave) {
@@ -6029,7 +6520,7 @@ function confirmDialog({ title, text, okLabel = 'ACEPTAR' }) {
 let settingsFromGame = false;
 function refreshSettingsInfo() {
   const m = GS.meta;
-  $('profileInfo').innerHTML = `Tipo: <b>${m.profile.type === PROFILE.GUEST ? 'Invitado (sin cuenta)' : 'Cuenta vinculada'}</b> · ID de partida: <code>${String(m.saveId).slice(0, 8)}</code><br>Creada ${timeAgo(m.createdAt)} · Tiempo jugado: ${Math.floor(m.playTimeSec / 60)} min`;
+  $('profileInfo').innerHTML = `${GS.achievements?.equippedTitle ? `🏷️ Título: <b>«${esc(GS.achievements.equippedTitle)}»</b><br>` : ''}Tipo: <b>${m.profile.type === PROFILE.GUEST ? 'Invitado (sin cuenta)' : 'Cuenta vinculada'}</b> · ID de partida: <code>${String(m.saveId).slice(0, 8)}</code><br>Creada ${timeAgo(m.createdAt)} · Tiempo jugado: ${Math.floor(m.playTimeSec / 60)} min`;
   $('saveInfo').innerHTML = `Almacenamiento: <b>${SaveSystem.persistent ? 'este navegador (local)' : '⚠️ solo memoria, no persistente'}</b><br>Último guardado: <b>${timeAgo(m.lastSavedAt)}</b> · Guardados: ${m.saveCount}<br>🪙 ${GS.economy.money.toLocaleString('es-ES')} $TOKEN · Misiones ${missionsDone()}/${NPCS.length} · Casa nivel ${GS.house.level} · Objetos: ${GS.purchases.owned.length}`;
 }
 function openSettings(fromGame) { if (fromGame && !canControl()) return; settingsFromGame = fromGame; if (fromGame) state.modalOpen = true; refreshSettingsInfo(); $('settingsModal').style.display = 'flex'; }
@@ -6048,6 +6539,7 @@ $('btnNewGame').onclick = async () => {
   const ok = await confirmDialog({ title: '¿Seguro que quieres comenzar una nueva partida?', text: 'Se perderá el progreso guardado en este navegador:\n🪙 ' + GS.economy.money.toLocaleString('es-ES') + ' $TOKEN · ' + missionsDone() + '/' + NPCS.length + ' misiones · casa nivel ' + GS.house.level, okLabel: 'NUEVA PARTIDA' });
   if (!ok) return; SaveSystem.reset(); location.reload();
 };
+{ const v = document.createElement('div'); v.className = 'text-[10px] text-slate-400 text-center mt-3'; v.textContent = `Micro World: AI Village · v${GAME_VERSION} «El Juego Completo» · guardado v${SAVE_VERSION}`; document.querySelector('#settingsModal .menu-card')?.append(v); }   // v1.0: etiqueta de versión
 // =====================================================================
 // DEBUG (B0.2b) - Herramientas de prueba. Uso: consola -> DBG.help()
 // Panel en pantalla: añadir ?debug=1 a la URL
@@ -6170,6 +6662,15 @@ const DBG = (() => {
       "DBG.choose('A'|'B', ui)   -> elige final (ui=false: solo lógica) · DBG.endingA() · DBG.endingB()",
       'DBG.ngplus()              -> (Final A si falta) y empieza Nuevo Sueño+ (recarga la página)',
       'DBG.mansion() · DBG.club() · DBG.postgame() -> post-juego del Final B (Mansión, Club de los 100M, panel)',
+      '--- v1.0 · El Juego Completo ---',
+      'DBG.achievements()        -> tabla de logros (estado, progreso, premio) · DBG.ach(id) desbloquea uno · DBG.achAll()',
+      "DBG.achClaim(id|'all')    -> recoge premios de logros (objetos/prendas, nunca $TOKEN)",
+      "DBG.museum() · DBG.museumKit(sala|'all') -> estado del museo / te da las piezas (y un boleto) · DBG.donate(id) · DBG.museumFill(sala)",
+      'DBG.events() · DBG.weekday(n|null) -> calendario de eventos / simula el día real (5 viernes, 6 sábado, 0 domingo; null = real)',
+      'DBG.fair()                -> abre la Feria del Sábado (con DBG.weekday(6)) · DBG.fairOffers() lista las ofertas de esta semana',
+      'DBG.welcomeBack()         -> simula volver tras ≥7 días: saludo especial del Oso (Sec. 10.1)',
+      "DBG.balance(capital, oficio, días) -> proyección 10K→40M por estrategia (dedicado/mixto/solo Oráculo) sin tocar tu partida",
+      'DBG.refs                  -> referencias internas (window._dbg solo existe con ?debug=1)',
       'IDs NPC: ' + NPC_IDS.join(', ')
     ].join('\n'));
   }
@@ -6262,7 +6763,7 @@ DBG.dock = () => { if (!GS.unlocks.ship) { console.warn('[DBG] Requiere la misi�
 DBG.importNow = () => { const id = importsOnCrate(); console.log('[DBG] Importación: ' + (id || 'ninguna (¿Rutas sin desbloquear o tope diario?)')); };
 DBG.viral = () => { const id = Trend.forDay(GS.daily.dayCount); console.log(`[DBG] Tendencia de hoy: ${id} · Agencia ${viralOn() ? 'activa' : 'inactiva'} · Rocco paga ${shopSellPrice('store', id)} $T (sell ${ITEMS[id].sell})`); };
 DBG.rumor = (npc = 'mayor') => { const r = giveRumor(npc); console.log('[DBG] Rumor (' + r.kind + '): ' + r.short); };
-DBG.premium = (npc = 'sam') => { if (!NPC_SOCIAL[npc]?.encargos?.length) { console.warn('[DBG] NPC sin encargos'); return; } const need = CFG.trustThresholds[2] - Trust.points(npc); if (need > 0) Trust.add(npc, need, 'debug'); const cur = currentEncargo(npc); Inventory.add(cur.q.item, cur.q.qty * CFG.premiumMult, { silent: true }); console.log(`[DBG] ${npc}: ${cur.q.qty * CFG.premiumMult}× ${cur.q.item} en la mochila · entrega con _dbg.deliverEncargo('${npc}', true) o desde el diálogo`); };
+DBG.premium = (npc = 'sam') => { if (!NPC_SOCIAL[npc]?.encargos?.length) { console.warn('[DBG] NPC sin encargos'); return; } const need = CFG.trustThresholds[2] - Trust.points(npc); if (need > 0) Trust.add(npc, need, 'debug'); const cur = currentEncargo(npc); Inventory.add(cur.q.item, cur.q.qty * CFG.premiumMult, { silent: true }); console.log(`[DBG] ${npc}: ${cur.q.qty * CFG.premiumMult}× ${cur.q.item} en la mochila · entrega con DBG.refs.deliverEncargo('${npc}', true) o desde el diálogo`); };
 DBG.economy = (capital = GS.economy.money) => {
   const avg = (a) => a.reduce((x, y) => x + y, 0) / a.length;
   const orders = avg(CFG.bakeryOrders.map(items => Math.round(items.reduce((a, [id, q]) => a + ITEMS[id].sell * q, 0) * CFG.bakeryOrderMult)));
@@ -6272,7 +6773,7 @@ DBG.economy = (capital = GS.economy.money) => {
     { sistema: '🐻 Pedidos del Horno (media)', dia: Math.round(orders) },
     { sistema: '🐶 Censo (ahorro de tasa)', dia: Math.round(capital * CFG.taxRatePct / 100 * CFG.censusTaxDiscount) },
     { sistema: '🦫 Puente (−15% construcción, puntual)', dia: 0 },
-    { sistema: '🐈‍⬛ Oráculo → Feria (60% capital)', dia: Math.round(stake * (eUp + eDn) / 2) },
+    { sistema: `🐈‍⬛ Oráculo → Feria (${Math.round(CFG.feriaStakeCapPct * 100)}% capital)`, dia: Math.round(stake * (eUp + eDn) / 2) },
     { sistema: '📰 Rumor real (sube) → Feria', dia: Math.round(stake * ((1 + CFG.feriaUpPct) * (1 - CFG.feriaCommission) - 1)) },
     { sistema: '🦎 Clima (lluvia ×2 frutas/jardín, tormenta, estrellas)', dia: Math.round(0.25 * 36 * ITEMS.golden_fruit.sell + 0.05 * 6.5 * ITEMS.star_shard.sell) },
     { sistema: `🦤 Importaciones (${CFG.importsPerDayCap}/día)`, dia: Math.round(imp) },
@@ -6314,7 +6815,39 @@ DBG.ngplus = () => { if (storyState().ending !== 'A') DBG.choose('A', false); re
 DBG.mansion = () => { if (storyState().ending !== 'B') DBG.choose('B', false); if ((GS.house.level | 0) < 2) DBG.house(2); GS.economy.money = Math.max(GS.economy.money, CFG.mansionCost); return Awakening.buyMansion(); };
 DBG.club = () => { if (storyState().ending !== 'B') DBG.choose('B', false); GS.economy.money = Math.max(GS.economy.money, CFG.club100M); state.tokensShown = GS.economy.money; return Awakening.checkClub(); };
 DBG.postgame = () => Awakening.openPostgame();
-Object.assign(window._dbg, { Awakening, toyPlane, monitorSun, FAREWELLS, DEJA_VU, buyDreamTicket, startAwakening, awakeningHasTicket, awakeningBtns, awakeningGreeting, awakeningChainHTML, act3MissionHUD, dejaVuGreeting, AuraFX, Titles, buildHouse, storyState, setPlaneLit });
+// ---- v1.0 · El Juego Completo (logros, museo, eventos, balance) ----
+DBG.achievements = () => { const a = Achievements.st(); console.table(ACHIEVEMENTS.map(d => { let p = ''; try { p = d.prog ? d.prog().map(x => Math.floor(x)).join('/') : (d.test() ? 'sí' : 'no'); } catch (e) {} return { id: d.id, cat: d.cat, nombre: d.name, progreso: p, logrado: !!a.unlocked[d.id], recogido: !!a.claimed[d.id], premio: (d.r || []).map(([i, q]) => i + '×' + q).join(' ') + (d.fashion ? ' +prenda' : '') }; })); console.log(`[DBG] ${Achievements.count()}/${ACHIEVEMENTS.length} logros · premios pendientes: ${Achievements.pendingRewards()}`); };
+DBG.ach = (id) => { if (!ACH_BY_ID[id]) { console.warn('[DBG] logros: ' + ACHIEVEMENTS.map(d => d.id).join(', ')); return false; } const ok = Achievements.unlock(id); DBG.save('debug_ach'); return ok; };
+DBG.achAll = () => { ACHIEVEMENTS.forEach(d => Achievements.unlock(d.id, { silent: true })); DBG.save('debug_ach_all'); console.log('[DBG] Todos los logros desbloqueados (premios en 📅 → 🏆)'); };
+DBG.achClaim = (id = 'all') => { const n = id === 'all' ? Achievements.claimAll() : (Achievements.claim(id) ? 1 : 0); console.log('[DBG] Premios recogidos: ' + n); return n; };
+DBG.museum = () => { const m = Museum.st(); console.table(MUSEUM_SETS.flatMap(set => set.pieces.map(p => ({ sala: set.name, pieza: p, donada: Museum.has(p), tienes: Museum.owned(p), completa: Museum.setDone(set), premiada: m.rewarded.includes(set.id) })))); console.log(`[DBG] Museo ${Museum.unlocked() ? 'abierto' : 'cerrado (misión del Mayor)'} · salas ${Museum.doneCount()}/${MUSEUM_SETS.length}`); };
+DBG.museumKit = (setId = 'all') => { const sets = setId === 'all' ? MUSEUM_SETS : MUSEUM_SETS.filter(s => s.id === setId); sets.forEach(set => set.pieces.forEach(p => { if (Museum.has(p) || Museum.owned(p) > 0) return; if (p === 'lottery_ticket') (GS.lottery.tickets ||= []).push({ num: Math.floor(Math.random() * 1000), day: GS.daily.dayCount }); else Inventory.add(p, 1, { silent: true }); })); DBG.save('debug_museumkit'); console.log('[DBG] Piezas del museo en la mochila: ' + sets.map(s => s.id).join(', ')); };
+DBG.donate = (id) => { if (!Museum.unlocked()) { GS.missions.mayor.status = 2; UNLOCKS.mayor(); } return Museum.donate(id); };
+DBG.museumFill = (setId) => { DBG.museumKit(setId || 'all'); (setId ? MUSEUM_SETS.filter(s => s.id === setId) : MUSEUM_SETS).forEach(set => set.pieces.forEach(p => { if (!Museum.has(p)) DBG.donate(p); })); DBG.museum(); };
+DBG.events = () => { const L = GS.lottery; console.table([{ hoy: Events.weekday(), forzado: Events._force, nocheEstrellas: Events.starNight(), feriaSabado: Events.fairDay(), domingoSorteo: Events.lotteryDay(), sorteoEn: fmtCountdown((L.nextDrawAt || 0) - Date.now()), pozo: Math.floor(L.pool || 0) }]); };
+DBG.weekday = (n = null) => { Events._force = n == null ? null : clamp(n | 0, 0, 6); Fair.apply(); _v10Badge = null; V10.hud(); DBG.events(); };
+DBG.fair = () => Fair.open();
+DBG.welcomeBack = () => { _welcomeBack = true; console.log('[DBG] El Oso te dará la bienvenida de «vuelta tras semanas» la próxima vez que hables con él'); };
+DBG.fairOffers = () => console.table(Fair.offers().map(o => ({ puesto: o.npc, objeto: o.id, base: Fair.base(o), feria: Fair.price(o), quedan: Fair.left(o), raro: !!o.rare })));
+DBG.balance = (capital = 10000, other = 4000, days = 60) => {
+  const strat = { dedicado: 1, mixto: 0.5, 'solo Oráculo': 0 }, rows = [], d0 = GS.daily.dayCount, rent = CFG.rentByLevel[2];
+  for (const [name, pr] of Object.entries(strat)) {
+    let C = capital; const hit = {};
+    for (let i = 1; i <= days && C < 4e7; i++) {
+      const d = d0 + i, info = mulberry32(_hashStr(GS.meta.saveId + ':bal:' + d))() < pr; C += other;
+      let cat, side; if (info) { cat = Feria.layout(d).up; side = 'up'; } else { const p = Oracle.pred(d); cat = p.cat; side = p.dir; }
+      const stake = Math.floor(C * CFG.feriaStakeCapPct), m = Feria.move(d, cat), r = side === 'up' ? m : -m;
+      C = C - stake + Math.floor(stake * (1 + r) * (1 - CFG.feriaCommission)); C -= Math.max(CFG.taxMin, Math.floor(C * CFG.taxRatePct / 100 * censusTaxMult())) + rent;
+      for (const t of [1e5, 1e6, 5e6, 4e7]) if (!hit[t] && C >= t) hit[t] = i;
+    }
+    rows.push({ estrategia: name, '100K': hit[1e5] ?? '—', '1M': hit[1e6] ?? '—', '5M': hit[5e6] ?? '—', '40M': hit[4e7] ?? '—', 'h (~15 min/día)': hit[4e7] ? (hit[4e7] * 0.25).toFixed(1) : '—' });
+  }
+  console.table(rows); console.log(`[DBG] Proyección desde ${fmt(capital)} $T con ${fmt(other)} $T/día de oficio · tope ${Math.round(CFG.feriaStakeCapPct * 100)}% · subida ${Math.round(CFG.feriaUpPct * 100)}% · bajada ${Math.round(CFG.feriaDownPct * 100)}% · tasa ${CFG.taxRatePct}% + alquiler Villa. No modifica la partida.`); return rows;
+};
+Object.assign(DBG_REFS, { V10, Events, Fair, Museum, MUSEUM_SETS, Achievements, ACHIEVEMENTS, eventsCalendarHTML, achievementsHTML, Coffee, Weekly });
+DBG.refs = DBG_REFS;
+if (/[?&]debug=1\b/.test(location.search)) window._dbg = DBG_REFS;   // v1.0: ya no es global por defecto
+Object.assign(DBG_REFS, { Awakening, toyPlane, monitorSun, FAREWELLS, DEJA_VU, buyDreamTicket, startAwakening, awakeningHasTicket, awakeningBtns, awakeningGreeting, awakeningChainHTML, act3MissionHUD, dejaVuGreeting, AuraFX, Titles, buildHouse, storyState, setPlaneLit });
 </script>
 </body>
 </html>
