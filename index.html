@@ -60,6 +60,8 @@
   /* v1.5 · Etapa 7 · pantalla de carga (CSS puro: se ve antes de que cargue el módulo) */
   #boot { position: fixed; inset: 0; z-index: 80; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; background: radial-gradient(ellipse at 50% 30%, #a9dcff, #6a8fd8 55%, #2f3a7a); transition: opacity .5s; font-family: 'Fredoka', system-ui, sans-serif; }
   #boot.hide { opacity: 0; pointer-events: none; }
+  body.menu-open #ui, body.menu-open #actionBtn, body.menu-open #joystick { opacity: 0 !important; pointer-events: none !important; }
+  #ui { transition: opacity .6s; }
   #boot .bplanet { width: 120px; height: 120px; border-radius: 50%; border: 4px solid #2b2b3d; background: radial-gradient(circle at 35% 30%, #9be27f 0 18%, transparent 19%), radial-gradient(circle at 68% 62%, #86d764 0 22%, transparent 23%), radial-gradient(circle at 30% 75%, #7ccf5a 0 12%, transparent 13%), radial-gradient(circle at 40% 35%, #7fe3e0, #2a8fd6 70%); box-shadow: 0 6px 0 #2b2b3d, 0 0 50px rgba(255,255,255,.45); animation: bspin 6s linear infinite; position: relative; }
   #boot .bplanet::after { content: ''; position: absolute; width: 46px; height: 16px; border-radius: 10px; background: #fff; border: 3px solid #2b2b3d; top: 14px; right: -26px; animation: floaty 2.4s ease-in-out infinite; }
   @keyframes bspin { to { transform: rotate(360deg); } }
@@ -124,7 +126,7 @@
   input.game, select.game { border: 3px solid #2b2b3d; border-radius: 12px; padding: 8px 10px; font-family: 'Fredoka'; font-weight: 600; background: #fff; }
 </style>
 </head>
-<body>
+<body class="menu-open">
 <div id="boot"><div class="bplanet"></div><div class="btxt">Soñando el mundo…</div><div class="bbar"><i id="bootBar"></i></div><div id="bootStep" class="bstep">CIELO</div></div>
 <script>setTimeout(function(){var b=document.getElementById('boot');if(b){var t=b.querySelector('.btxt');if(t)t.textContent='Tarda más de lo normal… revisa tu conexión y recarga';}},25000);</script>
 <!-- ================= MENÚ DE ENTRADA ================= -->
@@ -624,7 +626,7 @@ const CFG = {
     // Etapa 5 · personajes: contorno (grosor en u de objeto, radio mínimo de malla), rim, squash & stretch (muelle k/amortiguación)
     chars: { ink: 0x2b2b3d, outline: 0.022, minR: 0.075, rim: 0.16, rimNight: 0x9fb5ff, sqStart: -0.08, sqStop: 0.05, sqSplash: -0.15, sqK: 180, sqD: 14, sqWalk: 0.035, hideDist: 30 },
     // Etapa 7 · menú: cámara más cerca y desplazada a la derecha (escritorio), hora visual de mañana dorada mientras se lee
-    menu: { dist: 48, pitch: 0.25, dayT: 0.30, offset: 0.17, minW: 900, blendS: 1.2 },
+    menu: { dist: 48, distNarrow: 66, pitch: 0.25, dayT: 0.30, offset: 0.17, offsetY: 0.24, minW: 900, blendS: 1.2 },
     // QW13 · exposición según la hora
     exposure: { night: 0.95, day: 1.08, dusk: 0.05 },
     // Lluvia: gota con textura de trazo suave (antes cuadrados blancos)
@@ -2975,9 +2977,12 @@ function applyLook(pos, target, up) { camera.position.copy(pos); camera.up.copy(
 let _vo = '';
 /** v1.5 · Etapa 7: con el menú en escritorio, el planeta se ve en el hueco de la derecha (la tarjeta va a la izquierda) */
 function menuViewOffset(on) {
-  const M = CFG.gfx.menu, key = on && innerWidth >= M.minW ? innerWidth + 'x' + innerHeight : '';
+  const M = CFG.gfx.menu, wide = innerWidth >= M.minW, key = on ? innerWidth + 'x' + innerHeight + (wide ? 'w' : 'n') : '';
   if (key === _vo) return; _vo = key;
-  if (key) camera.setViewOffset(innerWidth, innerHeight, -innerWidth * M.offset, 0, innerWidth, innerHeight); else camera.clearViewOffset();
+  if (!key) { camera.clearViewOffset(); return; }
+  if (wide) camera.setViewOffset(innerWidth, innerHeight, -innerWidth * M.offset, 0, innerWidth, innerHeight);
+  else camera.setViewOffset(innerWidth, innerHeight, 0, innerHeight * M.offsetY, innerWidth, innerHeight);   // móvil: el planeta sube por encima de la hoja inferior
+  if (state.menuOpen) cam.tDist = wide ? M.dist : M.distNarrow;
 }
 function updateCamera(dt) {
   cam.refF = tangent(cam.refF, player.userData.dir); if (cam.refF.lengthSq() < 1e-6) cam.refF = frameAt(player.userData.dir, V_N).fwd;
@@ -4708,7 +4713,7 @@ function updateNPCs(dt, t) {
     const obj = npcObjs[n.id], u = obj.userData, b = u.bubble; const baseY = n.species === 'hedgehogs' ? 2.8 : 3.4;
     blink(obj);   // v1.5 · Etapa 5
     b.position.y = baseY + Math.sin(t * 3 + obj.position.x) * 0.15; b.material.rotation = Math.sin(t * 2) * 0.1;
-    b.scale.setScalar(clamp(cam.dist / 9, 1, 5)); // el "!" se ve desde lejos en modo planeta
+    b.scale.setScalar(clamp(cam.dist / 9, 1, 5)); b.visible = !state.menuOpen; // el "!" se ve desde lejos en modo planeta (v1.5: no en el menú)
     if (performance.now() < u.celebrateUntil) { obj.quaternion.multiply(_q.setFromAxisAngle(UP_Y, dt * 6)); obj.scale.y = 1 + Math.sin(t * 24) * 0.05; obj.position.copy(u.dir).multiplyScalar(heightAt(u.dir) + Math.abs(Math.sin(t * 12)) * 0.6); }
     else {
       if (player.position.distanceTo(obj.position) < 6) { const fwd = tangent(player.position.clone().sub(obj.position), u.up); if (fwd.lengthSq() > 0) obj.quaternion.slerp(quatFromFrame(frameAt(u.up, fwd)), Math.min(1, dt * 4)); }
@@ -6932,7 +6937,7 @@ const Awakening = {
       <button id="awNG" style="padding:14px 34px;border-radius:999px;background:#7e57c2;color:#fff;font:700 18px Fredoka,sans-serif;border:0;box-shadow:0 6px 24px #7e57c288;cursor:pointer">😴 Nuevo Sueño+</button></div>`;
     o.querySelector('#awNG').onclick = () => { o.querySelector('#awNG').disabled = true; storyFade('#ffffff', 1200, () => this.startNGPlus()); };
   },
-  resumeFinalA() { const m = document.getElementById('menu'); if (m) { m.classList.add('hide'); setTimeout(() => m.remove(), 700); } this.showDesk(); },
+  resumeFinalA() { const m = document.getElementById('menu'); if (m) { m.classList.add('hide'); setTimeout(() => m.remove(), 700); } document.body.classList.remove('menu-open'); this.showDesk(); },
   /* --- Final B: devolución, aura Soñador Eterno, post-juego --- */
   uiFinalB() {
     if (!this.chooseB()) return;
@@ -9580,7 +9585,7 @@ btnPlay.disabled = false; btnPlay.textContent = hadSave ? '▶ CONTINUAR' : '▶
 })();
 $('playSub').textContent = hadSave ? 'Partida de invitado guardada en este navegador' : 'Sin registro · empiezas como invitado · se guarda automáticamente';
 const startGameFromMenu = () => {
-  const menu = $('menu'); menu.classList.add('hide'); setTimeout(() => menu.remove(), 700);
+  const menu = $('menu'); menu.classList.add('hide'); setTimeout(() => menu.remove(), 700); document.body.classList.remove('menu-open');   // v1.5: el HUD aparece al empezar
   try { audioCtx ||= new (window.AudioContext || window.webkitAudioContext)(); audioCtx.resume(); } catch (e) {}
   playChime();
   SaveSystem.started = true; SaveSystem.saveNow(hadSave ? 'session-start' : 'new-game');
