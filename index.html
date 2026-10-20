@@ -581,8 +581,8 @@ const CFG = {
     // QW11 · viñeta CSS (opacidad en menú / en juego)
     vignette: { menu: 1, game: 0.5 },
     // Etapa 1 · entorno PMREM del cielo (med/alta): reflejo suave del cielo en todo · con él la hemisférica y el ambiente bajan (el entorno ya rellena)
-    env: { intensity: 0.6, planet: 0.35, water: 1.2, regenDay: 0.04, regenDusk: 0.05, regenUp: 0.12, minGapS: { med: 3, high: 1 }, ground: 0x6fae55, sunPow: 24, sunI: 0.6,
-      hemiDay: 0.55, hemiNight: 0.18, ambDay: 0.08, ambNight: 0.08, room: 0.04, roomI: 0.5, roomHemi: 0.35, roomAmb: 0.06 },
+    env: { intensity: 0.5, planet: 0.35, water: 1.2, warm: 0.4, warmCol: 0xfff0dc, regenDay: 0.04, regenDusk: 0.05, regenUp: 0.12, minGapS: { med: 3, high: 1 }, ground: 0x6fae55, sunPow: 24, sunI: 0.6,
+      hemiDay: 0.65, hemiNight: 0.18, ambDay: 0.1, ambNight: 0.09, room: 0.04, roomI: 0.5, roomHemi: 0.35, roomAmb: 0.06 },
     // Etapa 1 · AO horneado en el color del planeta bajo árboles, casas y construcciones (med/alta, coste 0 en juego)
     ao: { strength: 0.28, reach: 1.25, inner: 0.55, rebakeAng: 0.16 },
     // Etapa 1 · caja de sombra del sol según la distancia de cámara (cerca / media / Modo Planeta = todo el planeta)
@@ -1459,12 +1459,13 @@ const SkyEnv = (() => {
   if (!on) return api;
   const pmrem = new THREE.PMREMGenerator(renderer), U = sky.material.uniforms;
   const envMat = new THREE.ShaderMaterial({ side: THREE.BackSide, depthWrite: false,
-    uniforms: { topColor: U.topColor, midColor: U.midColor, sunDir: U.sunDir, sunCol: U.sunCol, uDay: U.uDay, uGround: { value: new THREE.Color(E.ground) }, uUp: { value: new THREE.Vector3(0, 1, 0) }, uSun: { value: new THREE.Vector2(E.sunPow, E.sunI) } },
+    uniforms: { topColor: U.topColor, midColor: U.midColor, sunDir: U.sunDir, sunCol: U.sunCol, uDay: U.uDay, uGround: { value: new THREE.Color(E.ground) }, uUp: { value: new THREE.Vector3(0, 1, 0) }, uSun: { value: new THREE.Vector2(E.sunPow, E.sunI) }, uWarm: { value: E.warm }, uWarmCol: { value: new THREE.Color(E.warmCol) } },
     vertexShader: `varying vec3 vPos; void main(){ vPos = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
-    fragmentShader: `uniform vec3 topColor, midColor, sunDir, sunCol, uGround, uUp; uniform float uDay; uniform vec2 uSun; varying vec3 vPos;
+    fragmentShader: `uniform vec3 topColor, midColor, sunDir, sunCol, uGround, uUp, uWarmCol; uniform float uDay, uWarm; uniform vec2 uSun; varying vec3 vPos;
       void main(){ vec3 d = normalize(vPos); float h = dot(d, uUp);
         vec3 c = h > 0.0 ? mix(midColor, topColor, pow(h, 0.55)) : mix(midColor, uGround * (0.3 + 0.7 * uDay), smoothstep(0.0, 0.3, -h));
         c += sunCol * pow(max(dot(d, sunDir), 0.0), uSun.x) * uSun.y * uDay;
+        c = mix(c, uWarmCol * dot(c, vec3(0.299, 0.587, 0.114)), uWarm);   // relleno más cálido (look AC): el azul del cielo no enfría las paredes
         gl_FragColor = vec4(pow(c, vec3(2.2)), 1.0); }` });   // el cielo pinta en sRGB: aquí se pasa a lineal (el PMREM trabaja en lineal)
   const envScene = new THREE.Scene(); envScene.add(new THREE.Mesh(new THREE.SphereGeometry(10, 32, 16), envMat));
   let rt = null, last = { day: -9, dusk: -9, t: -1e9 }; const lastUp = new THREE.Vector3(0, 0, 0);
