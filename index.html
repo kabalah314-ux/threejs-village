@@ -353,11 +353,11 @@ const CFG = {
   lotteryPrizeCap: 2000000,       // cap: 5% del objetivo (40M) — nunca regala el juego
   /* ===== v0.3 · RULETA DE RUNAS (Sec. 4.7) ===== */
   rouletteSymbols: 6,             // runas en la ruleta
-  roulettePayout: 5,              // paga 5× la apuesta (prob. 1/6 → esperanza −16,7%, visible en pantalla)
+  roulettePayout: 5.5,            // paga 5,5× la apuesta (prob. 1/6 → esperanza −8,3%, visible en pantalla) · v1.2: 5 → 5,5 (ventaja de la casa 16,7% → 8,3%; Spec tokenomics 2.3-A, Informe 3–10%)
   rouletteWarnPct: 0.2,           // Sombra advierte al apostar >20% del capital
   rouletteConfirmPct: 0.5,        // doble confirmación al apostar >50% del capital
   /* ===== v0.3 · DADOS DE SAM (Sec. 4.7) ===== */
-  diceHouseEdge: 0.02,            // comisión de la casa sobre el premio (esperanza −2%, visible en pantalla) · los avisos 20%/50% reutilizan los de la ruleta
+  diceHouseEdge: 0.04,            // comisión de la casa sobre el premio (esperanza −4%, visible en pantalla) · los avisos 20%/50% reutilizan los de la ruleta · v1.2: 0,02 → 0,04 (Spec tokenomics 2.3-A: dentro del 3–10% del Informe)
   /* ===== v0.2 · CONFIANZA (Sec. 3) — definidos ya; se USAN desde v0.2 ===== */
   trustThresholds: [10, 30, 70, 150],   // puntos para nivel 1/2/3/4
   tradePointsCapPerDay: 5,              // tope de puntos por comercio/NPC/día (Rocco: roccoTradeCapPerDay)
@@ -431,8 +431,8 @@ const CFG = {
   bridgePhases: [{ wood_log: 10 }, { stone: 10 }, { wood_log: 8, stone: 8 }, { stone: 6, raw_gem: 1 }, { wood_log: 6, stone: 6, raw_gem: 1 }],   // 🦫 5 fases = 5 días oníricos (1 fase/día) · troncos, piedras, gemas
   bridgeBuildDiscount: 0.15,      // 🦫 −15% en costes de construcción para siempre (al terminar el puente)
   oracleAccuracy: 0.70,           // 🐈‍⬛ el Oráculo acierta ~70% (se muestra en la UI: Pilar P5)
-  feriaUpPct: 0.50, feriaDownPct: 0.40, feriaFlatPct: 0.04,   // 📈 Feria del Tablón (diseño propio): cada día 1 categoría sube, 1 baja, el resto ±4% · v1.0: subida 0.45 → 0.50 (ver PASE DE BALANCE)
-  feriaCommission: 0.02, feriaStakeCapPct: 0.75, feriaMinStake: 100,   // comisión · tope de lotes por día (% del capital) · lote mínimo · v1.0: tope 0.70 → 0.75 (ver PASE DE BALANCE)
+  feriaUpPct: 0.30, feriaDownPct: 0.25, feriaFlatPct: 0.04,   // 📈 Feria del Tablón (diseño propio): cada día 1 categoría sube, 1 baja, el resto ±4% · v1.2: subida 0,50 → 0,30 y bajada 0,40 → 0,25 (Spec tokenomics 2.3-A: el rumor deja de ser +35%/día garantizado; la Feria pasa a ~11% de los ingresos)
+  feriaCommission: 0.03, feriaStakeCapPct: 0.40, feriaMinStake: 100,   // comisión · tope de lotes por día (% del capital) · lote mínimo · v1.2: comisión 2% → 3% (sumidero; sin información −3%) y tope 0,75 → 0,40 (limita el interés compuesto) · Spec tokenomics 2.3-A · tope absoluto: feriaStakeCapAbs
   mayorRumorChance: 0.3,          // 🐶 prob. diaria de rumor de mercado del Mayor (❤️ 3, Sec. 2.3) · diseño propio
   climateChances: { clear: 35, rain: 25, fog: 12, sun: 15, storm: 8, stars: 5 },   // 🦎 % por franja con el Climatizador ('stars' solo de tarde-noche)
   climateRainGardenMult: 2, climateRainFruitMult: 2, climateRainTropicalMult: 2,      // 🌧️ cosechas y jardín ×2, pesca +tropical
@@ -511,7 +511,34 @@ const CFG = {
     lampNight: 1.6, lampDay: 0.45, windowLightDay: 1.25, windowLightNight: 0.12,
     counterSlots: 8, shelfSlots: 6,   // objetos visibles en el mostrador / por balda
   },
-  /* ===== v1.0 · PASE DE BALANCE (Sec. 4.9 · 5.12 · 11.4) =====
+  /* ===== v1.2 · ECONOMÍA (Especificación de tokenomics v1.0 · Sec. 2.3 «Cambios de CFG» y 2.4 «Escalera de licencias») =====
+     Todas las cifras salen de la propuesta CFG_V11 de tokenomics/offline.py (Monte Carlo, 300 partidas por estrategia). */
+  feriaStakeCapAbs: 5000000,      // Spec 2.3-B: tope ABSOLUTO de los lotes del día (además del 40% del capital): la Feria deja de ser el motor del endgame
+  gambleMaxBetPct: 0.05, gambleMaxBetFloor: 5000,   // Spec 2.3-B: apuesta máx. POR TIRADA (ruleta y dados) = max(5% del saldo, 5.000 $T) · los avisos del 20%/50% se mantienen
+  debtCapDays: 3,                 // Spec 2.3-B: tope de la deuda (Sombra + alquiler) = 3 días de ingreso; el exceso lo condona Sombra (quiebra suave) [Informe: 2–3 días]
+  debtCapFloor: 1500, debtCapWindow: 3,   // offline.py: tope = debtCapDays × max(1.500, ingreso) · aquí ingreso = media de los últimos 3 días oníricos (sin Feria, azar ni devoluciones)
+  bankruptcyKeeps: true,          // Spec 2.3-B: la quiebra conserva casa, licencias y negocios (reinicio tipo Recettear) · Pan del Pobre y empleo municipal siguen igual
+  /* Licencias de Comerciante (Spec 2.4): L = precio (sumidero, una vez) · C = contratos/día con eficiencia 1 (sustituye al del rango anterior;
+     se reparte según rankSplit) · P / U = renta y mantenimiento diarios del negocio (se SUMAN con los de las licencias anteriores).
+     Rendimiento neto (P−U)/L: 33% · 27% · 27% · 26% · 26% · 25% · 20% al día. Textos y vecino que la firma: merchantInfo() (sección 19b-bis). */
+  merchantRanks: [
+    { id: 'puesto',     L: 6000,     C: 4200,    P: 2250,    U: 250 },      // 1 · Puesto del Sábado
+    { id: 'osoexpress', L: 30000,    C: 19500,   P: 9000,    U: 950 },      // 2 · Franquicia OsoExpress
+    { id: 'ultramar',   L: 100000,   C: 69000,   P: 30000,   U: 3200 },     // 3 · Rutas de Ultramar (Sam)
+    { id: 'lonja',      L: 350000,   C: 242000,  P: 100000,  U: 10600 },    // 4 · Lonja del Puerto
+    { id: 'galeria',    L: 1200000,  C: 820000,  P: 350000,  U: 36500 },    // 5 · Galería Onírica
+    { id: 'consorcio',  L: 4000000,  C: 2580000, P: 1100000, U: 115000 },   // 6 · Consorcio del Horizonte
+    { id: 'imperio',    L: 11000000, C: 6270000, P: 2450000, U: 255000 },   // 7 · Imperio del Sueño
+  ],
+  branchMax: 2, branchCostMult: 1.6,   // Spec 2.3-B: hasta 2 sucursales por licencia; la sucursal j cuesta L × 1,6^j y suma otra vez P y U [Informe: mejoras ×1,5–2]
+  insumosPct: 0.20,               // Spec 2.3-B: el 20% de cada contrato se gasta en insumos comprados a NPC (sumidero)
+  rankSplit: { pedidos: 0.40, encargos: 0.30, rutas: 0.30 },   // Spec 2.3-B: reparto de C entre el pedido OsoExpress, los encargos y las importaciones de Sam
+  rankEncargosPerDay: 7,          // implementación: el 30% de encargos se reparte entre los 7 encargos diarios posibles (uno por vecino); el 30% de rutas entre las importsPerDayCap cajas; el 40% va al único pedido del día
+  catchUpMult: 1.3, catchUpBelow: 0.5,   // Spec 2.3-B: «Viento a favor»: contratos ×1,3 si tu patrimonio (saldo + lotes + licencias) < 50% de la curva de referencia
+  catchUpCurve: [[0, 0], [2.7, 10000], [4.6, 100000], [6.8, 1000000], [8.5, 5000000], [10.2, 40000000]],   // Spec 2.3: horas jugadas en ESTE sueño → patrimonio esperado (log-lineal; lineal de 0 a 2,7 h; 40M después)
+  merchantReservePct: 0.25,       // Spec 2.4 (regla de compra del modelo, mixto): la UI sugiere comprar cuando el saldo cubre L × (1 + reserva)
+  econHistoryDays: 14,            // Spec Sec. 6 (telemetría mínima, local): ingresos y gastos por fuente de los últimos 14 días oníricos → DBG.econReport()
+  /* ===== v1.0 · PASE DE BALANCE (Sec. 4.9 · 5.12 · 11.4) · sustituido por el v1.2 de abajo; se conserva como historia =====
      Objetivo de la Guía: 10K → 40M en ~8 h (h2→h10) con gastos diarios. Un día onírico dura 20 min si no duermes y
      ~10 min si duermes cada noche (18:00 → 06:00); jugador de referencia: duerme la mitad de las noches → ~15 min/día
      → 8 h ≈ 32 días oníricos. Simulado en node con el código REAL (Feria, Oráculo, rumores, tasa 1%, alquiler Villa,
@@ -526,6 +553,31 @@ const CFG = {
      así que 10M era ~1 día de juego (trámite). 20M = la mitad del billete devuelto: comprarla con 40M retrasa el Club de
      los 100M ~3 días oníricos (ln 2 / 0,23) → decisión de orgullo real. El alquiler (5.000 $T/día) es de la Guía.
      Herramienta: DBG.feriaSim / DBG.economy / DBG.balance() en consola. */
+  /* ===== v1.2 · PASE DE BALANCE «Economía» (Especificación de tokenomics v1.0, Sec. 2) =====
+     Diagnóstico v1.0 (Monte Carlo offline.py con los números reales): la Feria daba el 99,7% de los ingresos; un rumor real
+     rendía +47% por lote → +35% del capital/día sin riesgo. El casual no llegaba nunca a 40M (0% en 40 h), el jugador de azar
+     quebraba en el 83% de las partidas y los sumideros solo destruían un 8–12% de lo ganado (objetivo 30–45%).
+     v1.2: Feria recortada (subida 0,30 · bajada 0,25 · comisión 3% · tope 40% del capital y 5M/día → rumor +10,4%/día, Oráculo
+     +5,5%/día, a ciegas −3%), apuestas con tope por tirada y menos ventaja de la casa (ruleta 8,3%, dados 4%), deuda con tope y
+     quiebra suave, y el motor nuevo: 7 Licencias de Comerciante (6K → 11M) que multiplican los 3 sistemas que ya existen
+     (pedido OsoExpress 40% · encargos 30% · rutas de Sam 30%), con renta pasiva, mantenimiento, sucursales ×1,6 e insumos 20%.
+     Un escalón nuevo cada ~50–70 min reales; cada licencia se recupera en 1,3–2,4 días oníricos.
+     Horas reales hasta 40M (p10 / p50 / p90, 300 partidas) · v1.0 → v1.2:
+       casual   > 40 (nunca)        → 15,1 / 17,9 / 21,5
+       mixto    9,3 / 11,2 / 13,4   →  8,6 / 10,2 / 11,7   (jugador de referencia de la Guía: ≈ 10 h)
+       dedicado 6,3 /  7,2 /  8,3   →  6,3 /  7,4 /  8,6   (p10 ≥ 6 h: ya no es trivial, hay que planificar licencias)
+       jugador  > 40 (6% llega)     → 10,7 / 12,3 / 14,5   (quiebra 83% → 0,3%, y se recupera el 100%)
+       población (35/40/15/10)  7,6 / 12,9 / > 40  →  7,7 / 11,4 / 19,4
+     Mixto v1.2, hitos p50: 10K 2,7 h · 100K 4,7 h · 1M 6,6 h · 5M 8,4 h · 40M 10,2 h (Guía: 1M h6, 5M h8). Bruto ~74,7M,
+     sumidero/fuente 0,40 (licencias 16,9M · insumos 7,5M · mantenimiento 3,0M · comisión Feria 1,2M · tasa 1,2M). Ninguna
+     fuente > 47% (negocios 38% · pedidos 20% · encargos 15% · rutas 15% · Feria 12%, mixto).
+     Sin cambio: tasa 1%, alquiler, interés de la deuda 3%, Oráculo 70%, Trabajos Mayores, lotería y Mansión (20M: con la renta
+     de las licencias el ingreso del endgame mixto es de varios M/día, así que comprarla sigue siendo una decisión de orgullo).
+     Comprobación con el CÓDIGO REAL (arnés de node, mismas estrategias, 300 partidas; los contratos del pedido y de las rutas
+     solo existen tras los Trabajos Mayores del Oso y de Sam, y nunca pasan del máximo diario): horas hasta 40M p10/p50/p90
+       casual 15,9 / 18,8 / 22,0 · mixto 9,1 / 10,6 / 12,0 · dedicado 6,8 / 7,7 / 8,9 · jugador 10,7 / 12,1 / 14,6
+       (mixto: 10K 2,8 h · 100K 4,9 · 1M 7,0 · 5M 8,7 · 40M 10,6; bruto 72,6M; sumidero/fuente 0,39; negocios 40%, Feria 12%).
+     En consola: DBG.econReport(días) · DBG.ranks(). */
 };
 /** Detección de dispositivo táctil → controles y calidad adaptados */
 const IS_MOBILE = matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window;
@@ -562,7 +614,7 @@ function defaultGameState() {
   return {
     version: SAVE_VERSION,
     meta: { saveId: uid(), profile: { type: PROFILE.GUEST, accountId: null, displayName: 'Invitado' }, createdAt: Date.now(), lastSavedAt: null, saveCount: 0, playTimeSec: 0, lastReason: '' },
-    economy: { money: 0, lifetimeEarned: 0, lifetimeSpent: 0, history: [] },   // history: últimas 40 operaciones { t, amount, label }
+    economy: { money: 0, lifetimeEarned: 0, lifetimeSpent: 0, history: [], days: [] },   // history: últimas 40 operaciones { t, amount, label } · v1.2 days: últimos CFG.econHistoryDays días { day, earned, spent, src: {fuente: $T}, snk: {sumidero: $T} }
     inventory: { capacity: 20, slots: [] },          // slots: [{ id, qty, dur?, num? }] · dur = durabilidad (herramientas) · num = nº de lotería
     shops: {},                                       // { [shopId]: { stock: { itemId: n }, restockAt } }
     world: { pickups: {} },                          // { [índiceDelPickup]: timestamp de reaparición }
@@ -580,7 +632,7 @@ function defaultGameState() {
     /* ===== v3 · DÍA ONÍRICO Y NECESIDADES (Guía Maestra Sec. 4 y 6) =====
        Convención de tiempos: el DÍA ONÍRICO solo avanza JUGANDO (daily.clockMs suma ms reales de partida).
        Los cooldowns de recursos/tiendas/frutas siguen siendo tiempo REAL (Date.now), como en v2. */
-     daily: { dayCount: 1, clockMs: 28800000 /* 08:00 */, lastSettleDay: 0, freeRescueUsed: false, restedUntil: 0, lastSettleAt: 0, charityDay: 0, lastCharges: [], today: { earned: 0, spent: 0 } },   // today: contabilidad del día en curso (resumen de la liquidación)
+     daily: { dayCount: 1, clockMs: 28800000 /* 08:00 */, lastSettleDay: 0, freeRescueUsed: false, restedUntil: 0, lastSettleAt: 0, charityDay: 0, lastCharges: [], today: { earned: 0, spent: 0, src: {}, snk: {} } },   // today: contabilidad del día en curso (resumen de la liquidación)
     needs: { hunger: 100, coffeeUntil: 0 },          // saciedad 0–100 (Sec. 4.3) · v1.0: coffeeUntil = fin del Café (timestamp real)
      housing: { rentDebt: 0, sealed: false, graceDaysLeft: 5, mailbox: [], mailboxUnread: 0, showcase: [], showcaseRevenue: 0, lastRentDay: 0, sealedBuildings: [], sealDebt: 0, unsealCount: 0 },
     debt: 0,                                         // Deuda Onírica de Sombra, interés diario (Sec. 4.7)
@@ -606,6 +658,8 @@ function defaultGameState() {
      ngplus: { count: 0, multiplier: 1, freshStart: false, dejaVu: {}, runs: [] },   // Nuevo Sueño+ (Sec. 10.7) · dejaVu: { npcId: true } ya saludado en este sueño · runs: finales anteriores
      postgame: { mansion: false, mansionAt: 0, club100M: false },   // v0.9 · post-juego del Final B (Sec. 10.7)
      municipal: { job: null },                        // v0.3 · empleo municipal activo (Sec. 4.8)
+     /* v1.2 · Licencias de Comerciante (Spec tokenomics 2.4): rank = nº de licencias compradas (0–7) · branches[k] = sucursales de la licencia k · invested = $T metidos en licencias y sucursales (cuenta como patrimonio para «Viento a favor») · runStartSec = meta.playTimeSec al empezar ESTE sueño (NG+) */
+     merchant: { rank: 0, branches: [0, 0, 0, 0, 0, 0, 0], invested: 0, bought: [], contracts: { day: 0, n: 0, net: 0 }, catchUpDays: 0, bankruptcies: 0, lastBankruptDay: 0, forgiven: 0, runStartSec: 0, runStartSet: false },
   };
 }
 const isObj = (v) => v && typeof v === 'object' && !Array.isArray(v);
@@ -683,21 +737,44 @@ const Wallet = {
   canAfford(n) { return GS.economy.money >= Math.max(0, Math.floor(n)); },
   _log(amount, label) { const h = GS.economy.history; h.unshift({ t: Date.now(), amount, label }); if (h.length > 40) h.length = 40; },
   /** Ingreso. Devuelve la cantidad añadida. */
-  add(n, label = 'Ingreso', { silent = false, noMult = false } = {}) {
+  add(n, label = 'Ingreso', { silent = false, noMult = false, src = null } = {}) {
     n = Math.max(0, Math.floor(n * (noMult ? 1 : (GS.ngplus?.multiplier || 1)))); if (!n) return 0;   // v0.9 · NG+: ×1.5 a las ganancias (noMult: devoluciones, apuestas, lotería)
-    GS.economy.money += n; GS.economy.lifetimeEarned += n; GS.daily.today.earned += n; this._log(n, label);
+    GS.economy.money += n; GS.economy.lifetimeEarned += n; GS.daily.today.earned += n; this._log(n, label); econTally('src', src || econSrcOf(label, 1), n);   // v1.2: ingresos por fuente (DBG.econReport)
     if (!silent) moneyToast(`+${n.toLocaleString('es-ES')} $TOKEN`, 'gain');
     SaveSystem.save('money+'); return n;
   },
   /** Gasto. Devuelve true si se pudo pagar; muestra error si no alcanza. */
-  spend(n, label = 'Gasto', { silent = false } = {}) {
+  spend(n, label = 'Gasto', { silent = false, snk = null } = {}) {
     n = Math.max(0, Math.floor(n));
     if (!this.canAfford(n)) { if (!silent) showToast('❌ No tienes suficientes $TOKEN', 'text-red-200'); return false; }
-    GS.economy.money -= n; GS.economy.lifetimeSpent += n; GS.daily.today.spent += n; this._log(-n, label);
+    GS.economy.money -= n; GS.economy.lifetimeSpent += n; GS.daily.today.spent += n; this._log(-n, label); if (n) econTally('snk', snk || econSrcOf(label, -1), n);   // v1.2: gastos por sumidero
     if (!silent && n) moneyToast(`-${n.toLocaleString('es-ES')} $TOKEN`, 'loss');
     SaveSystem.save('money-'); return true;
   },
 };
+/* v1.2 · Telemetría económica local (Spec tokenomics Sec. 6): cada movimiento de Wallet suma en su fuente o sumidero del día.
+   Solo contabilidad (no cambia el saldo). La liquidación guarda el día en GS.economy.days (ver econLogDay). */
+const ECON_SRC_RULES = [
+  [/^Contrato/, 'contratos'], [/^Negocios/, 'negocios'], [/^Pedido OsoExpress/, 'pedidos'], [/^Encargo/, 'encargos'], [/^Venta/, 'ventas'],
+  [/Ruleta|Dados|LOTER/i, 'azar'], [/^Feria/, 'feria'], [/Empleo Municipal/, 'red_seguridad'], [/Devoluci|Demolici/, 'devoluciones'],
+  [/Hucha/, 'escaparate'], [/Trabajo Mayor|Misi|Recompensa/, 'misiones'],
+];
+const ECON_SNK_RULES = [
+  [/^Licencia|^Sucursal/, 'licencias'], [/^Insumos/, 'insumos'], [/^Negocios: mantenimiento/, 'mantenimiento'], [/Alquiler|alquiler/, 'alquiler'],
+  [/Tasa/, 'tasa'], [/^Feria/, 'feria_lotes'], [/Ruleta|Dados|Loter|boleto/i, 'azar'], [/Deuda|Rescate|desellado/i, 'deuda'],
+  [/^Compra|Comprar|×\d/, 'compras'],
+];
+function econSrcOf(label = '', sign = 1) { const L = String(label); for (const [re, k] of (sign > 0 ? ECON_SRC_RULES : ECON_SNK_RULES)) if (re.test(L)) return k; return 'otros'; }
+function econTally(kind, key, n) { const t = GS.daily.today; const o = (t[kind] && typeof t[kind] === 'object') ? t[kind] : (t[kind] = {}); o[key] = (o[key] || 0) + n; }
+/** Ingreso «real» de un día (para el tope de deuda): sin la devolución de los lotes de la Feria, el azar ni las devoluciones */
+const ECON_NOT_INCOME = ['feria', 'azar', 'devoluciones'];
+function econIncomeOf(rec) { const src = rec?.src || {}; return Object.entries(src).reduce((a, [k, v]) => a + (ECON_NOT_INCOME.includes(k) ? 0 : v), 0); }
+/** Guarda el día que se liquida en GS.economy.days (lo llama settleDay después de todos los hooks) */
+function econLogDay(dayNum, today) {
+  const d = (GS.economy.days = Array.isArray(GS.economy.days) ? GS.economy.days : []);
+  d.push({ day: dayNum, earned: today.earned | 0, spent: today.spent | 0, src: { ...(today.src || {}) }, snk: { ...(today.snk || {}) } });
+  if (d.length > CFG.econHistoryDays) d.splice(0, d.length - CFG.econHistoryDays);
+}
 // Alias semánticos (misma fuente de verdad)
 const addMoney = (n, label, o) => Wallet.add(n, label, o), removeMoney = (n, label, o) => Wallet.spend(n, label, o), canAfford = (n) => Wallet.canAfford(n);
 /** Feedback visual de dinero (+/-), apilado y discreto */
@@ -1310,6 +1387,7 @@ function buildHouse(level) {
     if (wardrobeObj) { const k = interactables.indexOf(wardrobeObj); if (k >= 0) interactables.splice(k, 1); }
     registerInteractable(wd, { type: 'wardrobe', label: 'Armario 🪞 (probador)' }); wardrobeObj = wd;
   }
+  refreshMerchantSign(g);   // v1.2: cartel de las Licencias de Comerciante (si tienes alguna)
   placeAtSite(g, S_V, -6.5, -3.5, 0.5, -0.1); scene.add(g); house = g;
   houseCollider.pos.copy(g.position); houseCollider.r = [2.8, 3.3, 4.2, 5.0][level];
   if (GS.house.level !== level) { GS.house.level = level; SaveSystem.save('house'); }
@@ -2752,6 +2830,7 @@ function deliverEncargo(npcId, premium = false) {
   else { GS.encargos[npcId].done = true; GS.encargos[npcId].premium = premium; }
   GS.stats.encargosDone = (GS.stats.encargosDone || 0) + 1;   // v1.0: logro «Mano amiga»
   Wallet.add(tokens, `Encargo${premium ? ' premium' : ''}: ${npcById[npcId].name}`);
+  if (!cur.tutorial) Merchant.payContract('encargos');   // v1.2: 30% del contrato de tu licencia, repartido entre los encargos del día
   Trust.add(npcId, trust, premium ? 'encargo:premium' : 'encargo');
   if (premium) giveRumor(npcId);
   playChime(); const obj = npcObjs[npcId]; if (obj) spawnConfetti(obj.position.clone().addScaledVector(obj.userData.up, 2), 15);
@@ -2891,7 +2970,9 @@ function mountShop(body, items, kind, title) {
    ========================================================= */
 const rarityBadge = (r) => `<span class="text-[10px] font-bold px-1.5 py-0.5 rounded-full text-white" style="background:${RARITY[r].color}">${RARITY[r].name}</span>`;
 const fmt = (n) => n.toLocaleString('es-ES');
-const balanceBar = (extra = '') => `<div class="flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600 mb-3"><span>Saldo: <b class="text-amber-600">🪙 ${fmt(Wallet.balance)} $TOKEN</b></span><span>🎒 ${Inventory.usedSlots()}/${Inventory.capacity} slots</span>${extra}</div>`;
+const balanceBar = (extra = '') => `<div class="flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600 mb-3"><span>Saldo: <b class="text-amber-600">🪙 ${fmt(Wallet.balance)} $TOKEN</b></span><span>🎒 ${Inventory.usedSlots()}/${Inventory.capacity} slots</span>${extra}${windChip()}</div>`;
+/** v1.2 · «🍃 Viento a favor» (Spec tokenomics 2.3-B): aviso amable en las barras de saldo mientras los contratos pagan ×1,3 */
+function windChip() { try { return Merchant.catchUp().on ? `<span class="px-2 py-0.5 rounded-lg bg-emerald-100 text-emerald-700 text-xs font-bold" title="Tu patrimonio va por debajo de lo habitual: el sueño te empuja">🍃 Viento a favor · contratos ${multTxt(CFG.catchUpMult)}</span>` : ''; } catch (e) { return ''; } }
 function openShop(shopId) { const def = SHOPS[shopId]; swapApp(`${def.icon} ${def.name}`, '', (b) => mountItemShop(b, shopId)); }
 function mountItemShop(body, shopId) {
   const def = SHOPS[shopId]; let tab = 'buy';
@@ -3029,7 +3110,7 @@ function openUnlockedApp(app) {
   if (state.modalOpen) closeApp();
   if (app === 'bakery') openApp('🐻 ' + APP_TITLES.bakery, `<div class="flex justify-end mb-3"><button data-shop class="btn-game px-4 py-1.5 text-sm bg-amber-200">🛒 Comprar pasteles / vender frutas</button></div><div class="rounded-xl overflow-hidden border-[3px] border-[#2b2b3d]">${npcById.bear.mission.preview}</div>`, (b) => b.querySelector('[data-shop]').onclick = () => openShop('bear'));
   else if (app === 'board') openApp('🏛️ ' + APP_TITLES.board, '', (b) => { b.append(boardCanvas); const p = document.createElement('p'); p.className = 'text-xs text-slate-500 mt-3'; p.textContent = 'Leaderboard de holders y precio de $TOKEN actualizados cada segundo (simulación on-chain). Tu balance aparece en el ranking en tiempo real.'; b.append(p);
-    if (Feria.on()) { const bar = document.createElement('div'); bar.className = 'flex flex-wrap gap-2 justify-end mt-3'; bar.innerHTML = `<button data-feria class="btn-game px-4 py-1.5 text-sm bg-emerald-300">📈 Feria del Tablón (lotes)</button>${censusOn() ? '<button data-censo class="btn-game px-4 py-1.5 text-sm bg-blue-200">📊 Censo Digital</button>' : ''}`; bar.querySelector('[data-feria]').onclick = () => Feria.open(); const c = bar.querySelector('[data-censo]'); if (c) c.onclick = () => Census.open(); b.append(bar); } });   // v0.8: el Tablón se vuelve especulación jugable (Sec. 1.5)
+    if (Feria.on()) { const bar = document.createElement('div'); bar.className = 'flex flex-wrap gap-2 justify-end mt-3'; bar.innerHTML = `<button data-feria class="btn-game px-4 py-1.5 text-sm bg-emerald-300">📈 Feria del Tablón (lotes)</button>${Merchant.on() ? '<button data-registro class="btn-game px-4 py-1.5 text-sm bg-amber-200">📜 Registro de Comercio</button>' : ''}${censusOn() ? '<button data-censo class="btn-game px-4 py-1.5 text-sm bg-blue-200">📊 Censo Digital</button>' : ''}`; bar.querySelector('[data-feria]').onclick = () => Feria.open(); const c = bar.querySelector('[data-censo]'); if (c) c.onclick = () => Census.open(); const rg = bar.querySelector('[data-registro]'); if (rg) rg.onclick = () => Merchant.openPanel(); b.append(bar); } });   // v0.8: el Tablón se vuelve especulación jugable (Sec. 1.5)
   else if (app === 'shop') openApp('🦫 ' + APP_TITLES.shop, '', (b) => { const w = document.createElement('div'); mountShop(w, UPGRADES, 'build'); const bar = document.createElement('div'); bar.className = 'app-card p-3 mb-3 text-xs text-slate-600 flex items-center justify-between gap-2 flex-wrap'; bar.innerHTML = '<span>🏗️ Fuentes, farolas, molinos, bancos y jardines ahora se <b>construyen donde tú quieras</b> desde la Mochila.</span><button class="btn-game px-3 py-1.5 text-sm bg-emerald-300">🏗️ Abrir Construcción</button>'; bar.querySelector('button').onclick = () => openInventory(null, 'build'); b.append(bar, w); });
   else if (app === 'secret') openApp('🐈‍⬛ ' + APP_TITLES.secret, '', (b) => { const w = document.createElement('div'); mountShop(w, SKINS, 'skin'); const bar = document.createElement('div'); bar.className = 'flex justify-end mb-3'; bar.innerHTML = '<button class="btn-game px-4 py-1.5 text-sm bg-amber-200">🔮 Bazar Místico (objetos)</button>'; bar.firstChild.onclick = () => openShop('sombra'); b.append(bar, w); });
   else if (app === 'farm') openApp('🦎 ' + APP_TITLES.farm, '', (b) => { const render = () => { const ready = fruits.filter(f => f.userData.ready).length; const next = fruits.filter(f => !f.userData.ready).map(f => f.userData.respawnAt).sort()[0]; b.innerHTML = `<div class="text-sm text-slate-600 space-y-2"><div class="app-card p-4"><div class="font-bold text-lg text-[#2b2b3d]">🍋 Frutas maduras: ${ready} / ${fruits.length}</div><div>Cada fruta va a tu <b>🎒 mochila</b> (llevas ${Inventory.count('golden_fruit')}) y se vende por <b>${ITEMS.golden_fruit.sell} $TOKEN</b> en la Tienda de Rocco, la Panadería o el Bazar (⭐ paga extra). Acércate a los árboles dorados y pulsa E.</div><div class="text-xs text-slate-500 mt-1">Recompensa diaria — rebrotan cada ${CFG.fruitCooldown / 60000} min. ${next ? `Próxima cosecha en ${Math.max(0, Math.ceil((next - Date.now()) / 1000))}s` : ''}</div></div><div class="app-card p-4"><div class="font-bold text-[#2b2b3d]">🌦️ Pronóstico IA</div><div>Mañana: ☀️ 24 °C · Lluvia 12% · Viento 8 km/h · Cosecha óptima 09:00</div></div></div>`; }; liveApp(b, render); });
@@ -3132,7 +3213,8 @@ function settleDay() {
   DailySystem._hooks.forEach(h => { try { h(); } catch (e) { console.warn('[Daily]', e); } });
   // 2) Resumen económico del día que termina: contabilidad acumulada por Wallet (GS.daily.today), sin límite de operaciones
   const { earned, spent } = GS.daily.today;
-  GS.daily.today = { earned: 0, spent: 0 };
+  econLogDay(Math.max(1, GS.daily.dayCount - 1), GS.daily.today);   // v1.2: historial por fuente (DBG.econReport · tope de deuda)
+  GS.daily.today = { earned: 0, spent: 0, src: {}, snk: {} };
   GS.daily.lastSettleAt = Date.now();
   // 3) Resumen visual (no bloqueante: no interrumpe la partida)
   showDaySummary(Math.max(1, GS.daily.dayCount - 1), earned, spent);
@@ -3491,11 +3573,11 @@ function sendMilestoneLetter(id) {
 }
 /* =========================================================
    17e. LA RULETA DE RUNAS · Madame Sombra (Guía Sec. 4.7)
-   - Apuesta a 1 de 6 runas. Paga 5× (prob. 1/6 → esperanza −16,7%,
+   - Apuesta a 1 de 6 runas. Paga CFG.roulettePayout (5,5×; prob. 1/6 → esperanza −8,3% desde v1.2,
      SIEMPRE visible en pantalla: Pilar P5, simulación honesta).
    - El resultado se decide ANTES de la animación (azar real 1/6);
      el giro es teatro. Avisos: >20% del capital → advertencia;
-     >50% → doble confirmación. Sin límite duro (Sec. 4.7).
+     >50% → doble confirmación. v1.2: tope por tirada gambleMaxBet() (Spec tokenomics 2.3-B).
    ========================================================= */
 const ROULETTE_RUNES = [
   { icon: '🌙', name: 'Luna' }, { icon: '☀️', name: 'Sol' }, { icon: '⭐', name: 'Estrella' },
@@ -3503,6 +3585,11 @@ const ROULETTE_RUNES = [
 ];
 const Roulette = { sel: 0, spinning: false, armed: false, history: [] };   // history: últimas 5 tiradas de la sesión
 const rouletteStats = () => GS.stats.gambling ||= { rounds: 0, wagered: 0, won: 0, lossStreak: 0 };
+/** v1.2 · Tope POR TIRADA de ruleta y dados (Spec tokenomics 2.3-B): max(5% del saldo, 5.000 $T), sobre el saldo antes de apostar.
+    Con poco dinero uno aún puede arruinarse; con millones, ya no de una tirada. Los avisos del 20% / 50% siguen. */
+const gambleMaxBet = (bal = Wallet.balance) => Math.max(Math.floor(Math.max(0, bal) * CFG.gambleMaxBetPct), CFG.gambleMaxBetFloor);
+const pctTxt = (x, d = 1) => (Math.round(x * 100 * 10 ** d) / 10 ** d).toString().replace('.', ',') + '%';   // 0.0833 → «8,3%»
+const multTxt = (x) => String(x).replace('.', ',') + '×';
 function openRoulette() {
   Roulette.armed = false; Roulette.spinning = false;   // v0.3 (fix): si se cerró el modal a mitad de giro, no quedarse bloqueada
   openApp('🎰 Ruleta de Runas', '', (body) => {
@@ -3512,12 +3599,12 @@ function openRoulette() {
       if (debt > 0) html += `<div class="app-card p-3 mb-3" style="background:#f5f3ff"><div class="text-sm text-slate-700">🔮 Deuda con Sombra: <b class="text-purple-700">${fmt(debt)} $T</b> <span class="text-xs text-slate-500">(interés ${CFG.debtInterestPct}%/día onírico)</span></div><div class="flex gap-2 mt-2 items-center flex-wrap"><input id="rlDebtAmt" type="number" min="1" max="${debt}" class="game w-28 text-xs" placeholder="${debt}"><button data-paydebt class="btn-game px-3 py-1.5 text-xs bg-purple-300">🔮 Pagar</button><button data-paydebt-all class="btn-game px-3 py-1.5 text-xs bg-purple-300">Pagar todo</button></div></div>`;
       html += `<div class="app-card p-4 mb-3 text-center">
         <div class="grid grid-cols-6 gap-2 mb-3">` + ROULETTE_RUNES.map((r, i) => `<button data-rune="${i}" class="rounded-xl border-[3px] p-2 text-3xl ${Roulette.sel === i ? 'border-purple-500 bg-purple-100 scale-105' : 'border-slate-300 bg-white'}" style="box-shadow:0 3px 0 #2b2b3d" title="${r.name}">${r.icon}</button>`).join('') + `</div>
-        <div class="text-[11px] text-slate-500 leading-relaxed">Elige tu runa y apuesta. Si sale, ganas <b>5× tu apuesta</b>.<br>Probabilidad de acierto: <b>1/6 (16,7%)</b> · Esperanza matemática: <b class="text-red-500">−16,7% por tirada</b>.<br>Simulación local: el azar es real dentro del sueño; la casa (el velo) gana a la larga. 🔮</div></div>
+        <div class="text-[11px] text-slate-500 leading-relaxed">Elige tu runa y apuesta. Si sale, ganas <b>${multTxt(CFG.roulettePayout)} tu apuesta</b>.<br>Probabilidad de acierto: <b>1/${CFG.rouletteSymbols} (${pctTxt(1 / CFG.rouletteSymbols)})</b> · Esperanza matemática: <b class="text-red-500">−${pctTxt(1 - CFG.roulettePayout / CFG.rouletteSymbols)} por tirada</b>.<br>Tope por tirada: <b>${fmt(gambleMaxBet())} $T</b> (${pctTxt(CFG.gambleMaxBetPct, 0)} de tu saldo, mínimo ${fmt(CFG.gambleMaxBetFloor)}).<br>Simulación local: el azar es real dentro del sueño; la casa (el velo) gana a la larga. 🔮</div></div>
       <div class="app-card p-3 mb-3">
         <div class="flex flex-wrap gap-2 items-center">
           <input id="rlAmt" type="number" min="1" class="game w-28 text-sm" placeholder="Apuesta">
           ${[10, 50, 100].map(v => `<button data-quick="${v}" class="btn-game px-2 py-1.5 text-xs bg-slate-200">${v}</button>`).join('')}
-          <button data-quick="pct10" class="btn-game px-2 py-1.5 text-xs bg-slate-200">10% capital</button>
+          <button data-quick="pct10" class="btn-game px-2 py-1.5 text-xs bg-slate-200">10% capital</button><button data-quick="max" class="btn-game px-2 py-1.5 text-xs bg-slate-200">Tope</button>
           <button data-spin class="btn-game px-4 py-2 text-sm bg-purple-400 text-[#2b2b3d] ml-auto">🎰 GIRAR</button>
         </div>
         <div id="rlWarn" class="text-xs mt-2 min-h-[1.2em]"></div>
@@ -3531,6 +3618,7 @@ function openRoulette() {
         disarm();
         const amt = Math.floor(+amtInp.value) || 0, bal = Wallet.balance;
         if (amt > bal) warnEl.innerHTML = `<span class="text-red-600 font-bold">❌ No tienes tanto $TOKEN</span>`;
+        else if (amt > gambleMaxBet(bal)) warnEl.innerHTML = `<span class="text-red-600 font-bold">🔮 "El velo tiene sus normas, soñador: como mucho ${fmt(gambleMaxBet(bal))} $T por tirada." (tope: ${pctTxt(CFG.gambleMaxBetPct, 0)} de tu saldo o ${fmt(CFG.gambleMaxBetFloor)} $T)</span>`;
         else if (amt > 0 && amt > bal * CFG.rouletteConfirmPct) warnEl.innerHTML = `<span class="text-red-600 font-bold">🔮 "¿Seguro, soñador? He visto fortunas evaporarse en una tirada." (más del 50% de tu capital: pulsa GIRAR dos veces para confirmar)</span>`;
         else if (amt > 0 && amt > bal * CFG.rouletteWarnPct) warnEl.innerHTML = `<span class="text-amber-600 font-bold">🔮 "Los dados también soñaron anoche… y no contigo." (más del 20% de tu capital)</span>`;
         else warnEl.innerHTML = '';
@@ -3543,12 +3631,13 @@ function openRoulette() {
           x.classList.toggle('border-slate-300', !on); x.classList.toggle('bg-white', !on);
         });
       });
-      body.querySelectorAll('[data-quick]').forEach(b => b.onclick = () => { amtInp.value = b.dataset.quick === 'pct10' ? Math.max(1, Math.floor(Wallet.balance * 0.1)) : b.dataset.quick; updateWarn(); });
+      body.querySelectorAll('[data-quick]').forEach(b => b.onclick = () => { amtInp.value = b.dataset.quick === 'pct10' ? Math.max(1, Math.min(gambleMaxBet(), Math.floor(Wallet.balance * 0.1))) : b.dataset.quick === 'max' ? Math.min(gambleMaxBet(), Wallet.balance) : b.dataset.quick; updateWarn(); });
       amtInp.addEventListener('input', updateWarn);
       const pd = body.querySelector('[data-paydebt]'); if (pd) pd.onclick = () => { const el = body.querySelector('#rlDebtAmt'); const v = el && el.value ? clamp(Math.floor(+el.value), 1, GS.debt) : GS.debt; payDebt(v); render(); };
       const pda = body.querySelector('[data-paydebt-all]'); if (pda) pda.onclick = () => { payDebt(GS.debt); render(); };
       /** El giro: decide el resultado (azar justo), anima el frenado y liquida */
       const spin = (amount) => {
+        if (amount > gambleMaxBet()) { showToast(`🔮 "Como mucho ${fmt(gambleMaxBet())} $T por tirada, soñador. El velo no acepta más."`, 'text-red-200'); return; }   // v1.2: tope también en la lógica
         Roulette.spinning = true; disarm();
         if (!Wallet.spend(amount, 'Ruleta de Runas', { silent: true })) { Roulette.spinning = false; return; }
         const st2 = rouletteStats(); st2.rounds++; st2.wagered += amount;
@@ -3569,10 +3658,10 @@ function openRoulette() {
         const finish = () => {
           Roulette.spinning = false;
           btns.forEach((b, j) => { b.style.background = j === result ? (win ? '#86efac' : '#fca5a5') : '#fff'; b.style.transform = j === result ? 'scale(1.2)' : ''; });
-          Roulette.history.unshift({ rune: ROULETTE_RUNES[result].icon, win, amount: win ? amount * CFG.roulettePayout : amount });
+          Roulette.history.unshift({ rune: ROULETTE_RUNES[result].icon, win, amount: win ? Math.floor(amount * CFG.roulettePayout) : amount });
           if (Roulette.history.length > 5) Roulette.history.length = 5;
           if (win) {
-            const prize = amount * CFG.roulettePayout;
+            const prize = Math.floor(amount * CFG.roulettePayout);   // v1.2: 5,5× → redondeo a la baja
             st2.won += prize; st2.lossStreak = 0;
             Wallet.add(prize, `🎰 Ruleta: ¡${ROULETTE_RUNES[result].name}!`, { noMult: true });
             showToast(`🎉 ¡${ROULETTE_RUNES[result].icon} ${ROULETTE_RUNES[result].name}! +${fmt(prize)} $TOKEN`, 'text-yellow-200');
@@ -3592,6 +3681,7 @@ function openRoulette() {
         const amt = Math.floor(+amtInp.value) || 0, bal = Wallet.balance;
         if (amt <= 0) { showToast('❌ Elige una cantidad para apostar', 'text-red-200'); return; }
         if (amt > bal) { showToast('❌ No tienes suficiente $TOKEN', 'text-red-200'); return; }
+        if (amt > gambleMaxBet(bal)) { showToast(`🔮 "Como mucho ${fmt(gambleMaxBet(bal))} $T por tirada, soñador." (${pctTxt(CFG.gambleMaxBetPct, 0)} de tu saldo o ${fmt(CFG.gambleMaxBetFloor)} $T)`, 'text-red-200'); return; }
         if (amt > bal * CFG.rouletteConfirmPct && !Roulette.armed) {
           Roulette.armed = true; spinBtn.textContent = '⚠️ ¿SEGURO? PULSA DE NUEVO'; spinBtn.classList.remove('bg-purple-400'); spinBtn.classList.add('bg-red-400');
           return;
@@ -3607,8 +3697,9 @@ function openRoulette() {
    17f. LOS DADOS DE SAM (Guía Sec. 4.7)
    - Duelo cara a cara: 2d6 contra 2d6, gana la suma mayor.
      Empate → re-tirada automática GRATIS (misma apuesta).
-   - Al ganar cobras 2× tu apuesta menos el 2% de comisión
-     de la casa → esperanza −2% por ronda, visible (Pilar P5).
+   - Al ganar cobras 2× tu apuesta menos la comisión de la casa
+     (CFG.diceHouseEdge, 4% desde v1.2) → esperanza −4% por ronda, visible (Pilar P5).
+   - v1.2: tope por tirada gambleMaxBet() (Spec tokenomics 2.3-B).
    - El resultado se decide ANTES de la animación (azar real).
    - Avisos: >20% del capital → advertencia; >50% → doble
      confirmación (mismos umbrales que la ruleta).
@@ -3623,7 +3714,7 @@ function openDiceGame() {
       const st = rouletteStats();
       let html = balanceBar();
       html += `<div class="app-card p-4 mb-3">
-        <div class="text-center text-sm text-slate-600 mb-3">🦤 <i>"Arrr… ¿unos dados, grumete? Tú contra mí. El que sume más se lo lleva. La casa se queda un 2% del botín, que el ron no se paga solo."</i></div>
+        <div class="text-center text-sm text-slate-600 mb-3">🦤 <i>"Arrr… ¿unos dados, grumete? Tú contra mí. El que sume más se lo lleva. La casa se queda un ${pctTxt(CFG.diceHouseEdge, 0)} del botín, que el ron no se paga solo."</i></div>
         <div class="grid grid-cols-3 items-center text-center gap-2">
           <div><div class="pixel text-[9px] text-slate-500 mb-1">TÚ</div><div id="diceYou" class="text-5xl tracking-widest">⚀⚀</div><div id="sumYou" class="text-xs font-bold text-[#2b2b3d] mt-1 min-h-[1.2em]"></div></div>
           <div class="pixel text-lg text-[#2b2b3d]">VS</div>
@@ -3635,11 +3726,11 @@ function openDiceGame() {
         <div class="flex flex-wrap gap-2 items-center">
           <input id="dcAmt" type="number" min="1" class="game w-28 text-sm" placeholder="Apuesta">
           ${[10, 50, 100].map(v => `<button data-quick="${v}" class="btn-game px-2 py-1.5 text-xs bg-slate-200">${v}</button>`).join('')}
-          <button data-quick="pct10" class="btn-game px-2 py-1.5 text-xs bg-slate-200">10% capital</button>
+          <button data-quick="pct10" class="btn-game px-2 py-1.5 text-xs bg-slate-200">10% capital</button><button data-quick="max" class="btn-game px-2 py-1.5 text-xs bg-slate-200">Tope</button>
           <button data-roll class="btn-game px-4 py-2 text-sm bg-sky-400 text-[#2b2b3d] ml-auto">🎲 TIRAR</button>
         </div>
         <div id="dcWarn" class="text-xs mt-2 min-h-[1.2em]"></div>
-        <div class="text-[11px] text-slate-500 mt-2 leading-relaxed">Ganas si tu suma supera la de Sam: <b>50%</b> · Premio: <b>2× apuesta − 2% de comisión</b> · Empate: re-tirada gratis.<br>Esperanza matemática: <b class="text-red-500">−2% por ronda</b>. Simulación local: el azar es real dentro del sueño; la casa gana a la larga. ⚓</div>
+        <div class="text-[11px] text-slate-500 mt-2 leading-relaxed">Ganas si tu suma supera la de Sam: <b>50%</b> · Premio: <b>2× apuesta − ${pctTxt(CFG.diceHouseEdge, 0)} de comisión</b> · Empate: re-tirada gratis.<br>Esperanza matemática: <b class="text-red-500">−${pctTxt(CFG.diceHouseEdge, 0)} por ronda</b> · Tope por tirada: <b>${fmt(gambleMaxBet())} $T</b> (${pctTxt(CFG.gambleMaxBetPct, 0)} de tu saldo, mínimo ${fmt(CFG.gambleMaxBetFloor)}). Simulación local: el azar es real dentro del sueño; la casa gana a la larga. ⚓</div>
       </div>
       ${Dice.history.length ? `<div class="app-card p-3"><div class="text-xs font-bold text-slate-500 mb-1.5">ÚLTIMAS RONDAS</div><div class="flex gap-2 flex-wrap">${Dice.history.map(h => `<span class="text-xs px-2 py-1 rounded-lg font-bold ${h.win ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-600'}">${h.you}–${h.sam} ${h.win ? '+' + fmt(h.amount) : '−' + fmt(h.amount)}</span>`).join('')}</div></div>` : ''}
       ${st.rounds ? `<div class="text-[10px] text-slate-400 mt-2 text-center">Apuestas totales (ruleta + dados): ${st.rounds} · Apostado: ${fmt(st.wagered)} · Ganado: ${fmt(st.won)}</div>` : ''}`;
@@ -3650,17 +3741,19 @@ function openDiceGame() {
         disarm();
         const amt = Math.floor(+amtInp.value) || 0, bal = Wallet.balance;
         if (amt > bal) warnEl.innerHTML = `<span class="text-red-600 font-bold">❌ No tienes tanto $TOKEN</span>`;
+        else if (amt > gambleMaxBet(bal)) warnEl.innerHTML = `<span class="text-red-600 font-bold">🦤 "Arrr, en esta mesa no se apuesta más de ${fmt(gambleMaxBet(bal))} $T por tirada, grumete." (tope: ${pctTxt(CFG.gambleMaxBetPct, 0)} de tu saldo o ${fmt(CFG.gambleMaxBetFloor)} $T)</span>`;
         else if (amt > 0 && amt > bal * CFG.rouletteConfirmPct) warnEl.innerHTML = `<span class="text-red-600 font-bold">🦤 "¿Toda esa bolsa de una vez, grumete? El mar no perdona." (más del 50% de tu capital: pulsa TIRAR dos veces)</span>`;
         else if (amt > 0 && amt > bal * CFG.rouletteWarnPct) warnEl.innerHTML = `<span class="text-amber-600 font-bold">🦤 "Apuesta grande, grumete. Que los dados te sean propicios." (más del 20% de tu capital)</span>`;
         else warnEl.innerHTML = '';
       };
-      body.querySelectorAll('[data-quick]').forEach(b => b.onclick = () => { amtInp.value = b.dataset.quick === 'pct10' ? Math.max(1, Math.floor(Wallet.balance * 0.1)) : b.dataset.quick; updateWarn(); });
+      body.querySelectorAll('[data-quick]').forEach(b => b.onclick = () => { amtInp.value = b.dataset.quick === 'pct10' ? Math.max(1, Math.min(gambleMaxBet(), Math.floor(Wallet.balance * 0.1))) : b.dataset.quick === 'max' ? Math.min(gambleMaxBet(), Wallet.balance) : b.dataset.quick; updateWarn(); });
       amtInp.addEventListener('input', updateWarn);
       /** La tirada: decide el resultado (azar justo), anima los dados y liquida */
       const roll = (amount, freeRoll = false) => {
         Dice.rolling = true; disarm();
         const st2 = rouletteStats();
         if (!freeRoll) {
+          if (amount > gambleMaxBet()) { Dice.rolling = false; showToast(`🦤 "Como mucho ${fmt(gambleMaxBet())} $T por tirada, grumete."`, 'text-red-200'); return; }   // v1.2: tope también en la lógica
           if (!Wallet.spend(amount, 'Dados con Sam', { silent: true })) { Dice.rolling = false; return; }
           st2.rounds++; st2.wagered += amount;
         }
@@ -3700,7 +3793,7 @@ function openDiceGame() {
           const prize = Math.floor(amount * 2 * (1 - CFG.diceHouseEdge));
           st2.won += prize; st2.lossStreak = 0;
           Wallet.add(prize, '🎲 Dados: victoria contra Sam', { noMult: true });
-          if (elMsg) elMsg.textContent = `🦤 "Arrr… el mar te sonríe, grumete. Toma tu botín (−2% para la casa)."`;
+          if (elMsg) elMsg.textContent = `🦤 "Arrr… el mar te sonríe, grumete. Toma tu botín (−${pctTxt(CFG.diceHouseEdge, 0)} para la casa)."`;
           showToast(`🎉 ¡${sumYou} contra ${sumSam}! +${fmt(prize)} $TOKEN`, 'text-yellow-200');
           playChime(); spawnConfetti(player.position.clone().addScaledVector(player.userData.dir, 2), 20);
         } else {
@@ -3717,6 +3810,7 @@ function openDiceGame() {
         const amt = Math.floor(+amtInp.value) || 0, bal = Wallet.balance;
         if (amt <= 0) { showToast('❌ Elige una cantidad para apostar', 'text-red-200'); return; }
         if (amt > bal) { showToast('❌ No tienes suficiente $TOKEN', 'text-red-200'); return; }
+        if (amt > gambleMaxBet(bal)) { showToast(`🦤 "Arrr, como mucho ${fmt(gambleMaxBet(bal))} $T por tirada, grumete." (${pctTxt(CFG.gambleMaxBetPct, 0)} de tu saldo o ${fmt(CFG.gambleMaxBetFloor)} $T)`, 'text-red-200'); return; }
         if (amt > bal * CFG.rouletteConfirmPct && !Dice.armed) {
           Dice.armed = true; rollBtn.textContent = '⚠️ ¿SEGURO? PULSA DE NUEVO'; rollBtn.classList.remove('bg-sky-400'); rollBtn.classList.add('bg-red-400');
           return;
@@ -5093,6 +5187,7 @@ function act2ServiceBtns(npcId) {
   if (npcId === 'bear' && bigJobDone('bear')) B('📦 Pedido OsoExpress', 'bg-orange-200', () => BakeryOrders.open());
   if (npcId === 'mayor' && bigJobDone('mayor')) B('📊 Censo Digital', 'bg-blue-200', () => Census.open());
   if (npcId === 'mayor' && Feria.on()) B('📈 Feria del Tablón', 'bg-emerald-200', () => Feria.open());
+  if (npcId === 'mayor' && Merchant.on()) B('📜 Registro de Comercio', 'bg-amber-200', () => Merchant.openPanel());   // v1.2: Licencias de Comerciante
   if (npcId === 'glover' && bigJobDone('glover')) B(Bridge.done() ? '🌉 Puente del Horizonte' : '🌉 Donar a la Gran Obra', 'bg-amber-200', () => Bridge.open());
   if (npcId === 'sombra' && bigJobDone('sombra')) B('🔮 El Oráculo', 'bg-purple-200', () => Oracle.open());
   if (npcId === 'dax' && bigJobDone('dax')) B('🌦️ Climatizador', 'bg-sky-200', () => Climate.open());
@@ -5212,7 +5307,7 @@ const BakeryOrders = {
     if (this.missing(o).length) { showToast('❌ Te faltan productos para el pedido', 'text-red-200'); return false; }
     o.items.forEach(([id, q]) => Inventory.remove(id, q));
     const s = act2State().orders; s.done = true; s.served = (s.served | 0) + 1; GS.stats.ordersServed = (GS.stats.ordersServed || 0) + 1;
-    Wallet.add(o.pay, 'Pedido OsoExpress'); Trust.add('bear', CFG.bakeryOrderTrust, 'order');
+    Wallet.add(o.pay, 'Pedido OsoExpress'); Trust.add('bear', CFG.bakeryOrderTrust, 'order'); Merchant.payContract('pedidos');   /* v1.2: 40% del contrato de tu licencia */
     playChime(); showToast('🐻 "¡Pedido servido! ¡Los clientes van a llorar de felicidad!"', 'text-white'); SaveSystem.saveNow('oso-order'); return true;
   },
   open() {
@@ -5334,12 +5429,13 @@ const Feria = {
   move(day, cat) { const l = this.layout(day); if (cat === l.up) return CFG.feriaUpPct; if (cat === l.down) return -CFG.feriaDownPct; return (mulberry32(_hashStr(GS.meta.saveId + ':ff:' + day + ':' + cat))() * 2 - 1) * CFG.feriaFlatPct; },
   lots() { const f = act2State().feria; if (!Array.isArray(f.lots)) f.lots = []; return f.lots; },
   stakedToday() { const d = GS.daily.dayCount; return this.lots().filter(l => l.day === d).reduce((a, l) => a + l.stake, 0); },
-  capLeft() { return Math.max(0, Math.floor((Wallet.balance + this.stakedToday()) * CFG.feriaStakeCapPct) - this.stakedToday()); },
+  capDay() { return Math.min(Math.floor((Wallet.balance + this.stakedToday()) * CFG.feriaStakeCapPct), CFG.feriaStakeCapAbs); },   // v1.2: 40% del capital y como mucho 5M al día (Spec tokenomics 2.3)
+  capLeft() { return Math.max(0, this.capDay() - this.stakedToday()); },
   buy(cat, side, amount) {
     if (!this.on()) { showToast('📈 La Feria del Tablón abre en el Acto 2', 'text-white'); return false; }
     amount = Math.floor(+amount || 0); if (!FERIA_CATS.includes(cat) || !['up', 'down'].includes(side)) return false;
     if (amount < CFG.feriaMinStake) { showToast(`📈 Lote mínimo: ${fmt(CFG.feriaMinStake)} $T`, 'text-red-200'); return false; }
-    if (amount > this.capLeft()) { showToast(`🐶 "¡Ejem! El reglamento limita los lotes al ${Math.round(CFG.feriaStakeCapPct * 100)}% de su capital por día."`, 'text-red-200'); return false; }
+    if (amount > this.capLeft()) { showToast(`🐶 "¡Ejem! El reglamento limita los lotes al ${Math.round(CFG.feriaStakeCapPct * 100)}% de su capital por día, y nunca más de ${fmt(CFG.feriaStakeCapAbs)} $T. Formulario 40-L." (hoy le quedan ${fmt(this.capLeft())} $T)`, 'text-red-200'); return false; }
     if (!Wallet.spend(amount, `Feria: lote ${side === 'up' ? 'al alza' : 'a la baja'} · ${CATEGORIES[cat].name}`)) return false;
     this.lots().push({ day: GS.daily.dayCount, cat, side, stake: amount }); SaveSystem.saveNow('feria-buy');
     showToast(`📈 Lote de ${fmt(amount)} $T ${side === 'up' ? 'al alza' : 'a la baja'} en ${catLabel(cat)} · se liquida a medianoche`, 'text-white'); return true;
@@ -5368,7 +5464,7 @@ const Feria = {
         html += `<div class="app-card p-3 mb-3"><div class="font-bold text-sm mb-2">Comprar lote para mañana</div><div class="flex flex-wrap gap-1 mb-2">${FERIA_CATS.map(c => `<button data-cat="${c}" class="btn-game px-2 py-1 text-[11px] ${cat === c ? 'active' : 'bg-white'}">${catLabel(c)}</button>`).join('')}</div>
           <div class="flex flex-wrap gap-2 items-center"><button data-side="up" class="btn-game px-3 py-1 text-xs ${side === 'up' ? 'active' : 'bg-white'}">📈 Al alza</button><button data-side="down" class="btn-game px-3 py-1 text-xs ${side === 'down' ? 'active' : 'bg-white'}">📉 A la baja</button>
           <input data-amt type="number" min="${CFG.feriaMinStake}" max="${cap}" placeholder="${fmt(Math.min(cap, Math.max(CFG.feriaMinStake, Math.floor(cap / 2))))}" class="game w-28 text-xs"><button data-pct="0.25" class="btn-game px-2 py-1 text-[11px] bg-white">25%</button><button data-pct="1" class="btn-game px-2 py-1 text-[11px] bg-white">Máx</button><button data-buy class="btn-game px-3 py-1.5 text-xs bg-emerald-300">Comprar lote</button></div>
-          <div class="text-[11px] text-slate-500 mt-1">Disponible hoy: <b>${fmt(cap)} $T</b> (tope ${Math.round(CFG.feriaStakeCapPct * 100)}% del capital/día) · mín. ${fmt(CFG.feriaMinStake)} · comisión ${Math.round(CFG.feriaCommission * 100)}% · pago = lote × (1 ± movimiento de mañana).</div></div>`;
+          <div class="text-[11px] text-slate-500 mt-1">Disponible hoy: <b>${fmt(cap)} $T</b> (tope ${Math.round(CFG.feriaStakeCapPct * 100)}% del capital/día, máx. ${fmt(CFG.feriaStakeCapAbs)} $T) · mín. ${fmt(CFG.feriaMinStake)} · comisión ${Math.round(CFG.feriaCommission * 100)}% · pago = lote × (1 ± movimiento de mañana).</div></div>`;
         html += `<div class="app-card p-3"><div class="font-bold text-sm mb-1">Tus lotes de hoy</div>${mine.length ? mine.map(l => `<div class="text-xs py-0.5">${catLabel(l.cat)} ${l.side === 'up' ? '📈 al alza' : '📉 a la baja'} · <b>${fmt(l.stake)} $T</b></div>`).join('') : '<div class="text-xs text-slate-500">Ninguno.</div>'}${act2State().feria.lastResult ? `<div class="text-[11px] text-slate-500 mt-1">Última liquidación (día ${act2State().feria.lastResult.day}): ${fmt(act2State().feria.lastResult.staked)} → ${fmt(act2State().feria.lastResult.back)} $T</div>` : ''}
           <div class="text-[10px] text-slate-400 mt-1">⚠️ Simulación de mercado (Pilar P5). Puedes perder hasta un ${Math.round(Math.max(CFG.feriaUpPct, CFG.feriaDownPct) * 100)}% del lote. “Los mercados también sueñan, soñador.”</div></div>`;
         body.innerHTML = html;
@@ -5486,6 +5582,7 @@ function importsOnCrate() {
   if (im.count >= CFG.importsPerDayCap) { showToast(`🚢 Hoy ya llegaron ${CFG.importsPerDayCap} importaciones de Ultramar: más mañana`, 'text-white'); return null; }
   const id = rollImport(); if (!Inventory.add(id, 1, { silent: true })) { showToast('🎒 Sin hueco: la importación vuelve al barco', 'text-red-200'); return null; }
   im.count++; im.total = (im.total | 0) + 1; GS.stats.importsReceived = (GS.stats.importsReceived || 0) + 1;
+  Merchant.payContract('rutas');   // v1.2: 30% del contrato de tu licencia, repartido entre las cajas del día
   showToast(`🚢 De Ultramar: ${itemLabel(id)} (se vende por ${fmt(ITEMS[id].sell)} $T)`, 'text-amber-200'); SaveSystem.save('import'); return id;
 }
 const Imports = {
@@ -5550,6 +5647,205 @@ DailySystem.onSettle(() => {
   const rl = act2State().rumors.log; if (Array.isArray(rl)) act2State().rumors.log = rl.filter(r => r.day >= D);
   if (typeof updateMailboxBadge === 'function') updateMailboxBadge();
 });
+
+/* =========================================================
+   19b-bis. v1.2 · LICENCIAS DE COMERCIANTE · el motor de ingresos del Acto 2
+   (Especificación de tokenomics v1.0, Sec. 2.3–2.4 · números en CFG.merchantRanks y vecinos)
+   - 7 licencias en escalera, se firman en el 📜 Registro de Comercio del ayuntamiento (Mayor y Tablón).
+   - Cada licencia fija el valor diario de CONTRATOS C (sustituye al del rango anterior), que se cobra al usar los
+     3 sistemas que ya existen: 40% en el pedido OsoExpress del día, 30% repartido entre los 7 encargos, 30% entre
+     las cajas de Ultramar de Sam. Al cobrar, el 20% se va en insumos comprados a NPC (sumidero).
+   - Cada licencia deja además un NEGOCIO: renta P y mantenimiento U en la liquidación de medianoche (se suman).
+   - Sucursales: hasta 2 por licencia, la j-ésima cuesta L × 1,6^j y suma otra vez P y U.
+   - 🍃 Viento a favor: si tu patrimonio va por debajo del 50% de la curva de referencia, contratos ×1,3 (bonus, no castigo).
+   - Quiebra suave: si la deuda supera debtCapDays días de ingreso, Sombra condona el exceso; conservas casa, licencias y negocios.
+   - Todo el dinero va por Wallet; el estado vive en GS.merchant (defaults en defaultGameState, se restaura en Merchant.apply).
+   ========================================================= */
+/** Textos de cada licencia (voces de la Sec. 2): quién la firma contigo y qué dice. Función (no const) para poder usarla al construir la casa. */
+function merchantInfo(id) {
+  return ({
+    puesto:     { name: 'Puesto del Sábado',       icon: '🎪', npc: 'mayor',     perk: 'Tu propio puesto en la Feria del Sábado: el primer paso de cualquier imperio.', line: '¡Ejem! Formulario 31-P: licencia de venta ambulante. Este ayuntamiento celebra su espíritu emprendedor. Por triplicado.' },
+    osoexpress: { name: 'Franquicia OsoExpress',   icon: '🐻', npc: 'bear',      perk: 'Franquicia del Horno: el pedido del día vale mucho más.', line: '¡Socio! Con la franquicia, cada pedido del Horno es medio tuyo. ¡Los clientes van a llorar de felicidad!' },
+    ultramar:   { name: 'Rutas de Ultramar',       icon: '🦤', npc: 'sam',       perk: 'Participación en el flete: cada caja del muelle trae tu parte.', line: 'Arrr, grumete. Con licencia de ruta, cada caja que atraca lleva tu nombre. El horizonte también cobra fletes.' },
+    lonja:      { name: 'Lonja del Puerto',        icon: '🐟', npc: 'sam',       perk: 'Encargos premium a escala de puerto: más volumen, más margen.', line: 'La lonja huele a sal y a dinero, grumete. A mí me gustan las dos cosas.' },
+    galeria:    { name: 'Galería Onírica',         icon: '🖼️', npc: 'hedgehogs', perk: 'Escaparate y Boutique a lo grande: lo viral, en tu galería.', line: 'bro. galería onírica. esto es contenido. (Pip dice que pongamos luces de neón. Barnaby dice que sí.)' },
+    consorcio:  { name: 'Consorcio del Horizonte', icon: '🌉', npc: 'glover',    perk: 'Socio de la Gran Obra: el puente también es negocio.', line: 'Un consorcio necesita planos. Los he medido dos veces. Aceptable. Casi milimétrico.' },
+    imperio:    { name: 'Imperio del Sueño',       icon: '👑', npc: 'sombra',    perk: 'El endgame: tu nombre en cada transacción del sueño.', line: 'Un imperio dentro de un sueño, soñador. Mmm… cuidado con lo que construyes donde no se puede despertar.' },
+  })[id] || { name: id, icon: '📜', npc: 'mayor', perk: '', line: '' };
+}
+const MERCHANT_KIND = { pedidos: '📦 pedido OsoExpress', encargos: '📋 encargo', rutas: '🚢 caja de Ultramar' };
+function merchantState() {
+  const m = (GS.merchant && typeof GS.merchant === 'object') ? GS.merchant : (GS.merchant = {});
+  const n = CFG.merchantRanks.length;
+  m.rank = clamp(m.rank | 0, 0, n);
+  if (!Array.isArray(m.branches)) m.branches = [];
+  for (let k = 0; k < n; k++) m.branches[k] = k < m.rank ? clamp(m.branches[k] | 0, 0, CFG.branchMax) : 0;
+  m.branches.length = n;
+  m.invested = Math.max(0, +m.invested || 0); if (!Array.isArray(m.bought)) m.bought = [];
+  if (!m.contracts || typeof m.contracts !== 'object') m.contracts = { day: 0, n: 0, net: 0 };
+  for (const k of ['catchUpDays', 'bankruptcies', 'lastBankruptDay', 'forgiven', 'runStartSec']) m[k] = Math.max(0, +m[k] || 0);
+  return m;
+}
+/** Curva de referencia (Spec 2.3): patrimonio esperado a las h horas jugadas en este sueño (lineal hasta el 1er punto, log-lineal después) */
+function refNetWorth(h) {
+  const c = CFG.catchUpCurve; if (!(h > 0)) return 0;
+  if (h <= c[1][0]) return c[1][1] * h / c[1][0];
+  for (let i = 1; i < c.length - 1; i++) { const [h0, v0] = c[i], [h1, v1] = c[i + 1]; if (h <= h1) return v0 * Math.pow(v1 / v0, (h - h0) / (h1 - h0)); }
+  return c[c.length - 1][1];
+}
+const Merchant = {
+  on() { return !!GS.story?.act1Done; },   // el Registro abre con el Acto 2
+  st: merchantState,
+  ranks() { return CFG.merchantRanks; },
+  cur() { const m = merchantState(); return m.rank > 0 ? CFG.merchantRanks[m.rank - 1] : null; },
+  next() { return CFG.merchantRanks[merchantState().rank] || null; },
+  hours() { const m = merchantState(); return Math.max(0, ((GS.meta.playTimeSec || 0) - m.runStartSec) / 3600); },
+  netWorth() { return Math.floor(Wallet.balance + feriaOpenStake() + merchantState().invested); },
+  /** 🍃 Viento a favor: ¿el patrimonio va por debajo de catchUpBelow × curva de referencia? (solo tiene efecto con alguna licencia) */
+  catchUp() { const h = this.hours(), ref = refNetWorth(h), nw = this.netWorth(); return { on: merchantState().rank > 0 && nw < CFG.catchUpBelow * ref, h, ref: Math.floor(ref), nw, mult: CFG.catchUpMult }; },
+  /** Pago bruto de UN evento de contrato del rango actual (antes de insumos) */
+  share(kind) {
+    const r = this.cur(); if (!r || !CFG.rankSplit[kind]) return 0;
+    const per = kind === 'encargos' ? CFG.rankEncargosPerDay : kind === 'rutas' ? CFG.importsPerDayCap : 1;
+    return Math.round(r.C * CFG.rankSplit[kind] / per * (this.catchUp().on ? CFG.catchUpMult : 1));
+  },
+  passive() { const m = merchantState(); return CFG.merchantRanks.slice(0, m.rank).reduce((a, r, k) => a + r.P * (1 + m.branches[k]), 0); },
+  upkeep() { const m = merchantState(); return CFG.merchantRanks.slice(0, m.rank).reduce((a, r, k) => a + r.U * (1 + m.branches[k]), 0); },
+  branchCost(k) { const m = merchantState(), r = CFG.merchantRanks[k]; return r ? Math.round(r.L * Math.pow(CFG.branchCostMult, (m.branches[k] | 0) + 1)) : Infinity; },
+  /** Cobro de un contrato (lo llaman BakeryOrders.deliver, deliverEncargo e importsOnCrate). Devuelve el neto. */
+  payContract(kind) {
+    const r = this.cur(); if (!r) return 0;
+    const info = merchantInfo(r.id), wind = this.catchUp().on, gross = this.share(kind); if (!gross) return 0;
+    const got = Wallet.add(gross, `Contrato ${info.name}: ${MERCHANT_KIND[kind] || kind}`, { silent: true, src: 'contrato_' + kind });
+    const ins = Math.floor(got * CFG.insumosPct); if (ins) Wallet.spend(ins, `Insumos del contrato (${MERCHANT_KIND[kind] || kind})`, { silent: true, snk: 'insumos' });
+    const m = merchantState(), c = m.contracts, D = GS.daily.dayCount; if (c.day !== D) { c.day = D; c.n = 0; c.net = 0; } c.n++; c.net += got - ins;
+    moneyToast(`+${fmt(got - ins)} $T 📜`, 'gain');
+    showToast(`📜 Contrato ${info.icon} ${info.name}: +${fmt(got)} $T (insumos −${fmt(ins)})${wind ? ` · 🍃 Viento a favor ${multTxt(CFG.catchUpMult)}` : ''}`, 'text-amber-200');
+    return got - ins;
+  },
+  buy() {
+    if (!this.on()) { showToast('🐶 "¡Ejem! El Registro de Comercio abre para residentes del Acto 2. Resida, tribute, participe."', 'text-white'); return false; }
+    const m = merchantState(), r = this.next(); if (!r) { showToast('👑 Ya tienes las 7 licencias del sueño', 'text-white'); return false; }
+    const info = merchantInfo(r.id);
+    if (!Wallet.canAfford(r.L)) { showToast(`🐶 "¡Ejem! La licencia «${info.name}» cuesta ${fmt(r.L)} $T. Este ayuntamiento no fía."`, 'text-red-200'); return false; }
+    if (!Wallet.spend(r.L, `Licencia: ${info.name}`, { snk: 'licencias' })) return false;
+    m.rank++; m.invested += r.L; m.bought.push({ rank: m.rank, id: r.id, day: GS.daily.dayCount, at: Date.now() }); if (m.bought.length > 30) m.bought.splice(0, m.bought.length - 30);
+    refreshMerchantSign(); playChime(); try { spawnConfetti(player.position.clone().addScaledVector(player.userData.dir, 2), 30); } catch (e) {}
+    const n = npcById[info.npc];
+    showToast(`📜 ${info.icon} ¡Licencia «${info.name}» firmada! ${n ? n.emoji + ' ' : ''}"${info.line}"`, 'text-white');
+    addLetter('🏛️ Registro de Comercio', `¡Ejem! Este ayuntamiento certifica su licencia nº ${m.rank}: «${info.name}».\nContratos: ${fmt(r.C)} $T/día repartidos entre el pedido del Oso, los encargos y las cajas de Ultramar (el ${pctTxt(CFG.insumosPct, 0)} se va en insumos).\nNegocio: +${fmt(r.P)} $T de renta y −${fmt(r.U)} $T de mantenimiento cada medianoche.\nFormulario 31-P sellado. Que conste en acta.`);
+    if (typeof updateMailboxBadge === 'function') updateMailboxBadge();
+    SaveSystem.saveNow('licencia:' + r.id); return true;
+  },
+  buyBranch(k) {
+    const m = merchantState(), r = CFG.merchantRanks[k]; k = k | 0;
+    if (!r || k >= m.rank) { showToast('🐶 "¡Ejem! Primero la licencia, luego la sucursal. Es el orden natural de las cosas."', 'text-red-200'); return false; }
+    if (m.branches[k] >= CFG.branchMax) { showToast(`🏬 Esa licencia ya tiene ${CFG.branchMax} sucursales (máximo)`, 'text-white'); return false; }
+    const cost = this.branchCost(k), info = merchantInfo(r.id);
+    if (!Wallet.spend(cost, `Sucursal: ${info.name}`, { snk: 'licencias' })) return false;
+    m.branches[k]++; m.invested += cost; refreshMerchantSign(); playChime();
+    showToast(`🏬 Sucursal ${m.branches[k]}/${CFG.branchMax} de ${info.icon} ${info.name}: +${fmt(r.P)} renta · −${fmt(r.U)} mantenimiento al día`, 'text-white');
+    SaveSystem.saveNow('sucursal:' + r.id); return true;
+  },
+  /** Tope de la deuda (Spec 2.3-B): debtCapDays × max(debtCapFloor, ingreso medio de los últimos debtCapWindow días, incluido el que se liquida) */
+  debtCap() {
+    const prev = (Array.isArray(GS.economy.days) ? GS.economy.days : []).slice(-(CFG.debtCapWindow - 1));
+    const inc = [...prev.map(econIncomeOf), econIncomeOf(GS.daily.today)], avg = inc.reduce((a, b) => a + b, 0) / inc.length;
+    return Math.round(CFG.debtCapDays * Math.max(CFG.debtCapFloor, avg));
+  },
+  /** Quiebra suave: Sombra condona lo que pase del tope (primero su deuda, luego la de alquiler). Devuelve lo condonado. */
+  checkDebtCap(ch = (GS.daily.lastCharges ||= [])) {
+    const total = (GS.debt || 0) + (GS.housing.rentDebt || 0), cap = this.debtCap(); if (total <= cap) return 0;
+    let excess = total - cap; const fromS = Math.min(excess, GS.debt || 0); GS.debt -= fromS; excess -= fromS;
+    const fromR = Math.min(excess, GS.housing.rentDebt || 0); GS.housing.rentDebt -= fromR; const forgiven = fromS + fromR;
+    const m = merchantState(); m.bankruptcies++; m.lastBankruptDay = GS.daily.dayCount; m.forgiven += forgiven;
+    if (!CFG.bankruptcyKeeps) { m.rank = 0; m.branches = m.branches.map(() => 0); m.invested = 0; refreshMerchantSign(); }
+    if (typeof updateEmbargo === 'function') updateEmbargo();
+    if ((GS.housing.rentDebt || 0) <= 0 && GS.housing.sealed && typeof tryUnsealHouse === 'function') tryUnsealHouse();
+    addLetter('🔮 M. Sombra', `Mmm… tu deuda pasaba de lo que un soñador puede devolver en ${CFG.debtCapDays} días, y el sueño no es un pozo sin fondo. He condonado ${fmt(forgiven)} $T. Te queda una deuda de ${fmt((GS.debt || 0) + (GS.housing.rentDebt || 0))} $T.\n${CFG.bankruptcyKeeps ? 'Conservas tu casa, tus licencias y tus negocios: lo que construiste sigue siendo tuyo. ' : ''}Empieza otra vez desde aquí. Y la próxima vez… apuesta menos, soñador.`);
+    ch.push({ label: '⚖️ Quiebra suave: Sombra condona', note: `−${fmt(forgiven)} de deuda` });
+    if (typeof updateMailboxBadge === 'function') updateMailboxBadge();
+    return forgiven;
+  },
+  /** Hook de la liquidación (registrado después de facturas, escaparate y Acto 2): renta, mantenimiento, resumen y tope de deuda */
+  settle() {
+    const m = merchantState(), ch = (GS.daily.lastCharges ||= []), D = GS.daily.dayCount;
+    if (m.rank > 0) {
+      const c = m.contracts; if (c.day === D - 1 && c.n) ch.push({ label: `📜 Contratos del día (${c.n})`, note: `+${fmt(c.net)} neto` });
+      const P = this.passive(), U = this.upkeep(), br = m.branches.reduce((a, b) => a + b, 0);
+      const got = Wallet.add(P, 'Negocios: renta del día', { silent: true, src: 'negocios' });
+      ch.push({ label: `🏪 Negocios (${m.rank} licencia${m.rank > 1 ? 's' : ''}${br ? ` + ${br} sucursal${br > 1 ? 'es' : ''}` : ''})`, note: `+${fmt(got)}` });
+      if (Wallet.spend(U, 'Negocios: mantenimiento', { silent: true, snk: 'mantenimiento' })) ch.push({ label: '🧰 Mantenimiento de negocios', amount: -U });
+      else { GS.debt += U; ch.push({ label: '🧰 Mantenimiento IMPAGADO → deuda Sombra', note: `+${fmt(U)}` }); }
+      const cu = this.catchUp(); if (cu.on) { m.catchUpDays++; ch.push({ label: '🍃 Viento a favor', note: `contratos ${multTxt(CFG.catchUpMult)}` }); }
+    }
+    this.checkDebtCap(ch);
+  },
+  /** Restauración idempotente (applyGameStateToWorld) */
+  apply() {
+    const m = merchantState();
+    if (!m.runStartSet) {   // partidas anteriores a v1.2: en NG+ se estima el inicio de este sueño (≈15 min por día onírico vivido)
+      m.runStartSet = true;
+      m.runStartSec = (GS.ngplus?.count | 0) > 0 ? Math.max(0, (GS.meta.playTimeSec || 0) - (GS.daily.dayCount | 0) * 900) : 0;
+    }
+    refreshMerchantSign();
+  },
+  /** 📜 Panel del Registro de Comercio (ayuntamiento) */
+  openPanel() {
+    openApp('📜 Registro de Comercio · Ayuntamiento', '', (body) => {
+      const render = () => {
+        const m = merchantState(), R = CFG.merchantRanks, cur = this.cur(), next = this.next(), cu = this.catchUp();
+        const chip = (t, cls = 'bg-slate-100') => `<span class="px-2 py-1 rounded-lg ${cls}">${t}</span>`;
+        let html = balanceBar(`<span>📜 Licencias: <b>${m.rank}/${R.length}</b></span>`);
+        html += `<div class="app-card p-3 mb-3 text-sm text-slate-600"><b class="text-[#2b2b3d]">🐶 Mayor Reginald:</b> “${!this.on() ? '¡Ejem! El Registro de Comercio atiende a residentes de pleno derecho. Termine sus asuntos con los vecinos (Acto 1) y vuelva con el 114-C.' : m.rank === 0 ? '¡Ejem! Bienvenido al Registro de Comercio. Una licencia convierte su esfuerzo en negocio OFICIAL: más pago por cada pedido, encargo e importación, y una renta cada medianoche. Formulario 31-P, por triplicado.' : m.rank < R.length ? '¡Ejem! Su expediente mercantil luce impecable. Este ayuntamiento le recuerda que la siguiente licencia está a una firma de distancia.' : 'Que conste en acta: el Imperio del Sueño está registrado a su nombre. Este ayuntamiento… se inclina.'}”</div>`;
+        if (cu.on) html += `<div class="app-card p-3 mb-3 text-xs text-slate-700" style="background:#ecfdf5"><b class="text-emerald-700">🍃 Viento a favor:</b> tus contratos pagan <b>${multTxt(CFG.catchUpMult)}</b> mientras tu patrimonio (${fmt(cu.nw)} $T) esté por debajo de la mitad de lo habitual a estas alturas del sueño (${fmt(cu.ref)} $T a las ${cu.h.toFixed(1).replace('.', ',')} h). Un empujón del sueño para que nadie se quede atrás.</div>`;
+        if (cur) {
+          const ci = merchantInfo(cur.id), P = this.passive(), U = this.upkeep();
+          const ch = (on, txt, off) => `<div class="flex justify-between gap-2 py-0.5"><span>${txt}</span><b class="${on ? 'text-emerald-600' : 'text-slate-400'}">${on ? '' : off}</b></div>`;
+          html += `<div class="app-card p-3 mb-3"><div class="font-bold text-sm mb-1">${ci.icon} Rango ${m.rank} · ${esc(ci.name)}</div>
+            <div class="text-xs text-slate-600">Contratos: <b>${fmt(cur.C)} $T/día</b> si sirves todo (−${pctTxt(CFG.insumosPct, 0)} de insumos al cobrar)</div>
+            <div class="text-xs mt-1">${ch(bigJobDone('bear'), `📦 Pedido OsoExpress: <b>+${fmt(this.share('pedidos'))} $T</b> por el pedido del día`, '🔒 tras el Trabajo Mayor del Oso')}${ch(true, `📋 Encargos: <b>+${fmt(this.share('encargos'))} $T</b> por cada encargo (hasta ${CFG.rankEncargosPerDay} al día)`, '')}${ch(importsOn(), `🚢 Rutas: <b>+${fmt(this.share('rutas'))} $T</b> por cada caja de Ultramar (hasta ${CFG.importsPerDayCap})`, '🔒 tras el Trabajo Mayor de Sam')}</div>
+            <div class="flex flex-wrap gap-1 mt-2 text-[11px]">${chip(`🏪 Renta +${fmt(P)}/día`, 'bg-emerald-50')}${chip(`🧰 Mantenimiento −${fmt(U)}/día`, 'bg-red-50')}${chip(`= <b>${fmt(P - U)}</b> $T netos cada medianoche`)}</div></div>`;
+        }
+        if (this.on()) {
+          if (next) {
+            const ni = merchantInfo(next.id), want = Math.round(next.L * (1 + CFG.merchantReservePct)), pr = Math.min(100, Math.floor(Wallet.balance / want * 100));
+            html += `<div class="app-card p-3 mb-3"><div class="font-bold text-sm mb-1">🎯 Siguiente meta: ${ni.icon} ${esc(ni.name)} · ${fmt(next.L)} $T</div><div class="h-3 rounded-full bg-slate-200 overflow-hidden"><div class="h-3 bg-amber-400" style="width:${pr}%"></div></div><div class="text-[11px] text-slate-500 mt-1">Consejo del Registro: fírmala cuando tengas <b>${fmt(want)} $T</b> (el precio + ${pctTxt(CFG.merchantReservePct, 0)} de colchón para alquiler y tasa). Se recupera en ~${Math.max(1, Math.round(next.L / Math.max(1, next.C * 0.8 * (1 - CFG.insumosPct) + next.P - next.U - (cur ? cur.C * 0.8 * (1 - CFG.insumosPct) : 0))))} días oníricos.</div></div>`;
+          } else html += `<div class="app-card p-3 mb-3 text-sm text-amber-700 font-bold">👑 Escalera completa. Te quedan las sucursales… y el billete.</div>`;
+        }
+        html += R.map((r, k) => {
+          const i = merchantInfo(r.id), n = npcById[i.npc], owned = k < m.rank, isNext = k === m.rank, br = m.branches[k] | 0, bc = this.branchCost(k);
+          const act = owned ? `<span class="text-emerald-600 font-bold text-xs">✓ Tuya</span>${br < CFG.branchMax ? `<button data-branch="${k}" class="btn-game px-2 py-1 text-[11px] ${Wallet.canAfford(bc) ? 'bg-sky-200' : 'bg-slate-200 opacity-60'}">🏬 Sucursal ${br + 1}/${CFG.branchMax} · ${fmt(bc)} $T</button>` : `<span class="text-[11px] text-slate-500">🏬 ${br}/${CFG.branchMax} sucursales</span>`}`
+            : isNext && this.on() ? `<button data-buy class="btn-game px-3 py-1.5 text-xs ${Wallet.canAfford(r.L) ? 'bg-amber-300' : 'bg-slate-200 opacity-60'}">📜 Firmar licencia · ${fmt(r.L)} $T</button>` : `<span class="text-[11px] text-slate-400">🔒 ${this.on() ? 'primero la licencia anterior' : 'abre con el Acto 2'}</span>`;
+          return `<div class="app-card p-3 mb-2 ${owned ? 'bg-emerald-50' : ''}"><div class="flex items-center gap-2"><span class="text-2xl">${i.icon}</span><div class="flex-1 min-w-0"><div class="font-bold text-sm">${k + 1} · ${esc(i.name)}</div><div class="text-[11px] text-slate-500">${esc(i.perk)}</div></div><b class="text-xs text-amber-600 whitespace-nowrap">${fmt(r.L)} $T</b></div>
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-1 mt-2 text-[11px]">${chip(`📜 Contratos ${fmt(r.C)}/día`)}${chip(`🏪 Renta +${fmt(r.P)}`)}${chip(`🧰 −${fmt(r.U)}/día`)}${chip(`📈 rinde ${pctTxt((r.P - r.U) / r.L, 0)}/día`)}</div>
+            <div class="text-[11px] text-slate-600 mt-1">${n ? n.emoji : '📜'} <i>“${esc(i.line)}”</i></div><div class="flex flex-wrap items-center justify-end gap-2 mt-2">${act}</div></div>`;
+        }).join('');
+        html += `<div class="text-[10px] text-slate-400 mt-2 leading-relaxed">Valores de diseño de la economía del sueño (simulación local, Pilar P5). Comprar una licencia sustituye el valor de contratos del rango anterior; la renta y el mantenimiento de todos tus negocios se suman. ⚖️ Si alguna vez la deuda supera ${CFG.debtCapDays} días de tus ingresos, Sombra condona el exceso y conservas casa, licencias y negocios. Feria del Tablón: lotes hasta el ${pctTxt(CFG.feriaStakeCapPct, 0)} del capital y ${fmt(CFG.feriaStakeCapAbs)} $T al día.</div>`;
+        body.innerHTML = html;
+        const b = body.querySelector('[data-buy]'); if (b) b.onclick = () => { if (this.buy()) render(); };
+        body.querySelectorAll('[data-branch]').forEach(x => x.onclick = () => { if (this.buyBranch(+x.dataset.branch)) render(); });
+      };
+      render();
+    });
+  },
+};
+DailySystem.onSettle(() => Merchant.settle());   // después de facturas (v0.3), escaparate (v0.5) y Acto 2 (Feria, Oráculo…)
+/** Cartel del comerciante junto a la casa (cambio permanente del mundo): aparece con la 1ª licencia y mejora con cada rango */
+function refreshMerchantSign(g = house) {
+  try {
+    if (!g) return; if (g.userData.merchantSign) { g.remove(g.userData.merchantSign); g.userData.merchantSign = null; }
+    const rank = Math.min(CFG.merchantRanks.length, GS.merchant?.rank | 0); if (!rank) return;
+    const info = merchantInfo(CFG.merchantRanks[rank - 1].id), lv = clamp(GS.house?.level | 0, 0, 3), tier = rank >= 7 ? 3 : rank >= 5 ? 2 : rank >= 3 ? 1 : 0;
+    const s = new THREE.Group(), pos = [[-1.5, 2.5], [-1.9, 3.2], [-2.5, 4.7], [-2.5, 4.7]][lv];
+    const wood = [0x8d6e63, 0x6d4c41, 0xb8860b, 0x4a148c][tier], bg = ['#fff7e6', '#e0f7fa', '#fff8e1', '#ede7f6'][tier], col = ['#5d4037', '#006064', '#b8860b', '#4a148c'][tier];
+    s.add(cyl(0.06, 0.07, 1.7, mat(wood), 0, 0.85, 0, 6));
+    s.add(box(1.7, 0.5, 0.07, new THREE.MeshStandardMaterial({ map: textTexture(`${info.icon} ${info.name}`, { bg, color: col, font: 'bold 40px Fredoka, Arial' }), roughness: 0.6 }), 0, 1.6, 0.04));
+    for (let i = 0; i < rank; i++) s.add(sphere(0.06, glow(0xffd54f, 0xffab00, 0.9), -0.54 + i * 0.18, 1.95, 0.04, 6));   // una estrella por licencia
+    if (tier >= 2) s.add(box(1.85, 0.08, 0.5, mat(tier >= 3 ? 0x7e57c2 : 0xd4af37), 0, 1.92, 0.15));   // toldo dorado / violeta
+    s.position.set(pos[0], 0, pos[1]); s.rotation.y = 0.35; s.userData.rank = rank; s.userData.tier = tier; g.add(s); g.userData.merchantSign = s;
+  } catch (e) { console.warn('[Merchant] cartel', e); }
+}
 
 /* =========================================================
    19c. v0.9 · EL DESPERTAR (Guía Maestra Sec. 1.6, 2.10, 5.10, 7.5, 10.7)
@@ -5717,11 +6013,12 @@ const Awakening = {
     ['El Despertar', 'Déjà vu'].forEach(t => { if (!fresh.achievements.titles.includes(t)) fresh.achievements.titles.push(t); });   // Sec. 10.4: logros de Historia → títulos
     if (old.weekly) fresh.weekly = { ...fresh.weekly, ...clone(old.weekly) };   // la Carta de la Semana es del calendario real, no del sueño
     const ng = old.ngplus || {}, count = (ng.count | 0) + 1;
-    fresh.ngplus = { count, multiplier: CFG.ngplusMultiplier, freshStart: true, dejaVu: {}, runs: [...(Array.isArray(ng.runs) ? ng.runs : []), { n: count, ending: old.story?.ending || 'A', day: old.daily?.dayCount | 0, earned: Math.floor(old.economy?.lifetimeEarned || 0), at: Date.now() }].slice(-20) };
+    fresh.ngplus = { count, multiplier: CFG.ngplusMultiplier, freshStart: true, dejaVu: {}, runs: [...(Array.isArray(ng.runs) ? ng.runs : []), { n: count, ending: old.story?.ending || 'A', day: old.daily?.dayCount | 0, earned: Math.floor(old.economy?.lifetimeEarned || 0), rank: old.merchant?.rank | 0, at: Date.now() }].slice(-20) };
     const suit = AVATAR_PARTS.find(p => p.origin === 'special' && p.id === 'awake_suit'), pj = AVATAR_PARTS.find(p => p.origin === 'special' && p.id === 'pajama');
     [suit, pj].forEach(p => { if (p && !fresh.avatar.wardrobe.includes(p.key)) fresh.avatar.wardrobe.push(p.key); });
     if (pj) fresh.avatar[pj.slot] = pj.idx;   // te vuelves a dormir… en pijama
     fresh.story.creatorPending = false;
+    fresh.merchant.runStartSec = Math.floor(old.meta?.playTimeSec || 0); fresh.merchant.runStartSet = true;   // v1.2: las licencias se resetean como el resto de la economía (Sec. 10.7); «Viento a favor» mide las horas de ESTE sueño
     return fresh;
   },
   startNGPlus() {
@@ -6046,7 +6343,7 @@ function awakeningChainHTML() {
    Nota: la 🎪 Feria del Sábado (puestos de los vecinos, ofertas de tienda) NO es la
    📈 Feria del Tablón de la v0.8 (especulación por categorías): conviven sin tocarse.
    ========================================================= */
-const GAME_VERSION = '1.0';
+const GAME_VERSION = '1.2';
 /* ---------- 🗓️ EVENTOS: calendario REAL → flags que leen los sistemas existentes (Sec. 10.10) ---------- */
 const Events = {
   _force: null,   // DBG.weekday(n): simula el día de la semana real (0 = domingo … 6 = sábado)
@@ -6950,6 +7247,7 @@ function applyGameStateToWorld() {
   NPCS.forEach(n => { if (GS.bigJobs?.[n.id]?.status === 2) BIG_UNLOCKS[n.id](); });   // v0.8: Trabajos Mayores → sistemas + huellas 3D (idempotente)
   refreshNpcBubbles();
   Awakening.apply();   // v0.9: avión (luces), billete imperdible, efectos del Final B y post-juego (idempotente)
+  Merchant.apply();    // v1.2: Licencias de Comerciante (normaliza GS.merchant, inicio de este sueño en NG+, cartel de la casa)
   V10.apply();         // v1.0: museo (pedestales + piezas + trofeos), puestos de la feria, logros retroactivos, HUD del calendario
   if (Array.isArray(GS.player.dir) && GS.player.dir.length === 3) { player.userData.dir.fromArray(GS.player.dir).normalize(); if (Array.isArray(GS.player.fwd)) player.userData.fwd.fromArray(GS.player.fwd); }
   state.tokensShown = GS.economy.money; ui.tokenValue.textContent = state.tokensShown.toLocaleString('es-ES');
@@ -7040,7 +7338,7 @@ $('btnNewGame').onclick = async () => {
   const ok = await confirmDialog({ title: '¿Seguro que quieres comenzar una nueva partida?', text: 'Se perderá el progreso guardado en este navegador:\n🪙 ' + GS.economy.money.toLocaleString('es-ES') + ' $TOKEN · ' + missionsDone() + '/' + NPCS.length + ' misiones · casa nivel ' + GS.house.level, okLabel: 'NUEVA PARTIDA' });
   if (!ok) return; SaveSystem.reset(); location.reload();
 };
-{ const v = document.createElement('div'); v.className = 'text-[10px] text-slate-400 text-center mt-3'; v.textContent = `CrossIA · Micro World: AI Village · v${GAME_VERSION} «El Juego Completo» · guardado v${SAVE_VERSION}`; document.querySelector('#settingsModal .menu-card')?.append(v); }   // v1.0: etiqueta de versión
+{ const v = document.createElement('div'); v.className = 'text-[10px] text-slate-400 text-center mt-3'; v.textContent = `CrossIA · Micro World: AI Village · v${GAME_VERSION} «Economía» · guardado v${SAVE_VERSION}`; document.querySelector('#settingsModal .menu-card')?.append(v); }   // v1.0: etiqueta de versión
 // =====================================================================
 // DEBUG (B0.2b) - Herramientas de prueba. Uso: consola -> DBG.help()
 // Panel en pantalla: añadir ?debug=1 a la URL
@@ -7170,11 +7468,15 @@ const DBG = (() => {
       'DBG.events() · DBG.weekday(n|null) -> calendario de eventos / simula el día real (5 viernes, 6 sábado, 0 domingo; null = real)',
       'DBG.fair()                -> abre la Feria del Sábado (con DBG.weekday(6)) · DBG.fairOffers() lista las ofertas de esta semana',
       'DBG.welcomeBack()         -> simula volver tras ≥7 días: saludo especial del Oso (Sec. 10.1)',
-      "DBG.balance(capital, oficio, días) -> proyección 10K→40M por estrategia (dedicado/mixto/solo Oráculo) sin tocar tu partida",
+      "DBG.balance(capital, oficio, días) -> proyección v1.0 SOLO con la Feria (sin licencias) sin tocar tu partida · para v1.2 usa DBG.econReport / DBG.ranks",
       '--- v1.1 · Interior de la casa ---',
       'DBG.enterHouse(nivel?)    -> entra en tu casa (nivel 0-3 opcional, vía DBG.house) · DBG.exitHouse() -> sale por la puerta',
       "DBG.enterShop()           -> entra en la tienda de prueba (layout 'shop', base de las tiendas online del Anexo D)",
       "DBG.interior()            -> muebles interactuables · DBG.interiorGo('sleep'|'kitchen'|'wardrobe'|'mail'|'pc'|'showcase'|'trophies'|'safe'|'piggy'|'lava'|'exit')",
+      '--- v1.2 · Economía (Licencias de Comerciante) ---',
+      'DBG.ranks()               -> tabla de las 7 licencias (tuya, sucursales, L/C/P/U, rendimiento) + Viento a favor y tope de deuda',
+      'DBG.rank(n)               -> fija el rango 0-7 sin pagar (cuenta como invertido) · Merchant.openPanel() abre el Registro de Comercio',
+      'DBG.econReport(días)      -> ingresos por fuente y gastos por sumidero de los últimos N días oníricos (GS.economy.days)',
       'DBG.refs                  -> referencias internas (window._dbg solo existe con ?debug=1)',
       'IDs NPC: ' + NPC_IDS.join(', ')
     ].join('\n'));
@@ -7255,7 +7557,7 @@ DBG.oracle = (n = 10) => { let hits = 0; const rows = []; for (let d = GS.daily.
 DBG.feriaSim = (capital = 10000, days = 30, mode = 'oraculo') => {
   let C = capital; const out = []; const d0 = GS.daily.dayCount;
   for (let d = d0 + 1; d <= d0 + days; d++) {
-    const stake = Math.floor(C * CFG.feriaStakeCapPct); let cat, side;
+    const stake = Math.min(Math.floor(C * CFG.feriaStakeCapPct), CFG.feriaStakeCapAbs); let cat, side;
     if (mode === 'rumor') { cat = Feria.layout(d).up; side = 'up'; } else if (mode === 'azar') { const r = mulberry32(d * 31)(); cat = FERIA_CATS[Math.floor(r * 5)]; side = 'up'; } else { const p = Oracle.pred(d); cat = p.cat; side = p.dir; }
     const m = Feria.move(d, cat), r = side === 'up' ? m : -m; C = C - stake + Math.floor(stake * (1 + r) * (1 - CFG.feriaCommission));
     C -= Math.max(CFG.taxMin, Math.floor(C * CFG.taxRatePct / 100 * censusTaxMult())); out.push(C);
@@ -7273,7 +7575,7 @@ DBG.economy = (capital = GS.economy.money) => {
   const avg = (a) => a.reduce((x, y) => x + y, 0) / a.length;
   const orders = avg(CFG.bakeryOrders.map(items => Math.round(items.reduce((a, [id, q]) => a + ITEMS[id].sell * q, 0) * CFG.bakeryOrderMult)));
   const tot = CFG.importLoot.reduce((a, e) => a + e[1], 0), imp = CFG.importLoot.reduce((a, [id, w]) => a + ITEMS[id].sell * w / tot, 0) * CFG.importsPerDayCap;
-  const stake = capital * CFG.feriaStakeCapPct, eUp = (1 + CFG.oracleAccuracy * CFG.feriaUpPct - (1 - CFG.oracleAccuracy) * CFG.feriaDownPct / 4) * (1 - CFG.feriaCommission) - 1, eDn = (1 + CFG.oracleAccuracy * CFG.feriaDownPct - (1 - CFG.oracleAccuracy) * CFG.feriaUpPct / 4) * (1 - CFG.feriaCommission) - 1;
+  const stake = Math.min(capital * CFG.feriaStakeCapPct, CFG.feriaStakeCapAbs), eUp = (1 + CFG.oracleAccuracy * CFG.feriaUpPct - (1 - CFG.oracleAccuracy) * CFG.feriaDownPct / 4) * (1 - CFG.feriaCommission) - 1, eDn = (1 + CFG.oracleAccuracy * CFG.feriaDownPct - (1 - CFG.oracleAccuracy) * CFG.feriaUpPct / 4) * (1 - CFG.feriaCommission) - 1;
   const rows = [
     { sistema: '🐻 Pedidos del Horno (media)', dia: Math.round(orders) },
     { sistema: '🐶 Censo (ahorro de tasa)', dia: Math.round(capital * CFG.taxRatePct / 100 * CFG.censusTaxDiscount) },
@@ -7341,7 +7643,7 @@ DBG.balance = (capital = 10000, other = 4000, days = 60) => {
     for (let i = 1; i <= days && C < 4e7; i++) {
       const d = d0 + i, info = mulberry32(_hashStr(GS.meta.saveId + ':bal:' + d))() < pr; C += other;
       let cat, side; if (info) { cat = Feria.layout(d).up; side = 'up'; } else { const p = Oracle.pred(d); cat = p.cat; side = p.dir; }
-      const stake = Math.floor(C * CFG.feriaStakeCapPct), m = Feria.move(d, cat), r = side === 'up' ? m : -m;
+      const stake = Math.min(Math.floor(C * CFG.feriaStakeCapPct), CFG.feriaStakeCapAbs), m = Feria.move(d, cat), r = side === 'up' ? m : -m;
       C = C - stake + Math.floor(stake * (1 + r) * (1 - CFG.feriaCommission)); C -= Math.max(CFG.taxMin, Math.floor(C * CFG.taxRatePct / 100 * censusTaxMult())) + rent;
       for (const t of [1e5, 1e6, 5e6, 4e7]) if (!hit[t] && C >= t) hit[t] = i;
     }
@@ -7350,6 +7652,32 @@ DBG.balance = (capital = 10000, other = 4000, days = 60) => {
   console.table(rows); console.log(`[DBG] Proyección desde ${fmt(capital)} $T con ${fmt(other)} $T/día de oficio · tope ${Math.round(CFG.feriaStakeCapPct * 100)}% · subida ${Math.round(CFG.feriaUpPct * 100)}% · bajada ${Math.round(CFG.feriaDownPct * 100)}% · tasa ${CFG.taxRatePct}% + alquiler Villa. No modifica la partida.`); return rows;
 };
 Object.assign(DBG_REFS, { V10, Events, Fair, Museum, MUSEUM_SETS, Achievements, ACHIEVEMENTS, eventsCalendarHTML, achievementsHTML, Coffee, Weekly });
+/* v1.2 · Economía: Licencias de Comerciante, topes y telemetría por fuente */
+Object.assign(DBG_REFS, { Merchant, merchantState, merchantInfo, refNetWorth, refreshMerchantSign, gambleMaxBet, econSrcOf, econIncomeOf, econLogDay });
+DBG.ranks = () => {
+  const m = merchantState(), cu = Merchant.catchUp();
+  console.table(CFG.merchantRanks.map((r, k) => ({ rango: k + 1, licencia: merchantInfo(r.id).name, tuya: k < m.rank, sucursales: m.branches[k] | 0, L: r.L, C: r.C, P: r.P, U: r.U, 'rinde/día': ((r.P - r.U) / r.L * 100).toFixed(0) + '%', 'sig. sucursal': k < m.rank && m.branches[k] < CFG.branchMax ? Merchant.branchCost(k) : '—' })));
+  console.log(`[DBG] Rango ${m.rank}/${CFG.merchantRanks.length} · invertido ${fmt(m.invested)} · renta ${fmt(Merchant.passive())} − mant. ${fmt(Merchant.upkeep())} /día · contrato: pedido ${fmt(Merchant.share('pedidos'))} · encargo ${fmt(Merchant.share('encargos'))} · caja ${fmt(Merchant.share('rutas'))} · ` +
+    `Viento a favor ${cu.on ? 'SÍ' : 'no'} (patrimonio ${fmt(cu.nw)} vs ${CFG.catchUpBelow} × ${fmt(cu.ref)} a las ${cu.h.toFixed(2)} h) · tope de deuda ${fmt(Merchant.debtCap())} · quiebras ${m.bankruptcies} (condonado ${fmt(m.forgiven)})`);
+  return m;
+};
+DBG.rank = (n = 1) => {
+  const m = merchantState(); m.rank = clamp(n | 0, 0, CFG.merchantRanks.length); m.branches = m.branches.map((b, k) => k < m.rank ? b : 0);
+  m.invested = CFG.merchantRanks.slice(0, m.rank).reduce((a, r, k) => { let x = a + r.L; for (let j = 1; j <= m.branches[k]; j++) x += Math.round(r.L * Math.pow(CFG.branchCostMult, j)); return x; }, 0);
+  refreshMerchantSign(); DBG.save('debug_rank'); console.log(`[DBG] Rango de comerciante = ${m.rank} (${m.rank ? merchantInfo(CFG.merchantRanks[m.rank - 1].id).name : 'sin licencia'}) · invertido ${fmt(m.invested)}`); return m.rank;
+};
+DBG.econReport = (n = 7) => {
+  const days = (Array.isArray(GS.economy.days) ? GS.economy.days : []).slice(-Math.max(1, n | 0));
+  if (!days.length) { console.log('[DBG] Aún no hay días liquidados en GS.economy.days (se guardan desde v1.2). Prueba DBG.day(1).'); return null; }
+  const src = {}, snk = {}; days.forEach(d => { for (const [k, v] of Object.entries(d.src || {})) src[k] = (src[k] || 0) + v; for (const [k, v] of Object.entries(d.snk || {})) snk[k] = (snk[k] || 0) + v; });
+  const T = Object.values(src).reduce((a, b) => a + b, 0), S = Object.values(snk).reduce((a, b) => a + b, 0), N = days.length;
+  console.table(Object.entries(src).sort((a, b) => b[1] - a[1]).map(([k, v]) => ({ fuente: k, total: v, 'por día': Math.round(v / N), cuota: (v / T * 100).toFixed(1) + '%' })));
+  console.table(Object.entries(snk).sort((a, b) => b[1] - a[1]).map(([k, v]) => ({ sumidero: k, total: v, 'por día': Math.round(v / N), 'sobre ingresos': (v / Math.max(1, T) * 100).toFixed(1) + '%' })));
+  console.table(days.map(d => ({ dia: d.day, ingresos: d.earned, gastos: d.spent, neto: d.earned - d.spent, 'ingreso real': econIncomeOf(d) })));
+  const feria = (src.feria || 0) - (snk.feria_lotes || 0), azar = (src.azar || 0) - (snk.azar || 0), top = Object.entries(src).filter(([k]) => !ECON_NOT_INCOME.includes(k)).sort((a, b) => b[1] - a[1])[0];
+  console.log(`[DBG] Últimos ${N} días: ingresos ${fmt(T)} · gastos ${fmt(S)} · neto ${fmt(T - S)} · Feria neta ${fmt(feria)} · azar neto ${fmt(azar)} · fuente mayor (sin Feria/azar) ${top ? top[0] + ' ' + (top[1] / T * 100).toFixed(0) + '%' : '—'} · (las líneas «feria» y «azar» son devoluciones/premios brutos: compáralas con sus sumideros)`);
+  return { days: N, src, snk, net: T - S, feria, azar };
+};
 DBG.refs = DBG_REFS;
 if (/[?&]debug=1\b/.test(location.search)) window._dbg = DBG_REFS;   // v1.0: ya no es global por defecto
 /* v1.1 · Interior caminable de la casa (Sec. 6.9 Fase 2) */
