@@ -8473,7 +8473,7 @@ function awakeningChainHTML() {
    Nota: la 🎪 Feria del Sábado (puestos de los vecinos, ofertas de tienda) NO es la
    📈 Feria del Tablón de la v0.8 (especulación por categorías): conviven sin tocarse.
    ========================================================= */
-const GAME_VERSION = '3.1.2', GAME_TAG = 'Móvil a pantalla completa';
+const GAME_VERSION = '3.2', GAME_TAG = 'La Lonja del Sueño';
 /* ---------- 🗓️ EVENTOS: calendario REAL → flags que leen los sistemas existentes (Sec. 10.10) ---------- */
 const Events = {
   _force: null,   // DBG.weekday(n): simula el día de la semana real (0 = domingo … 6 = sábado)
@@ -11411,8 +11411,8 @@ const NetWorld = {
       const plots = NetEco.plotsOf(zone), T = Object.values(CFG.net.shops).find(s => s.zone === zone);
       if (real) plots.forEach((_, i) => {   // v2.4 · en la Red real, cada parcela es una tienda de jugador (o está libre)
         const [x, z, rot] = netPlotPos(zone, i), sh = (RealWorld.shops[zone] || [])[i], mine = sh && sh.owner === Online.me?.id, RT = RealShops.TIERS[Object.keys(RealShops.TIERS).find(k => RealShops.TIERS[k].zone === zone)] || RealShops.TIERS.puesto;
-        const o2 = { text: sh ? (mine ? `★ ${sh.name}` : sh.name).toUpperCase().slice(0, 22) : `SE ALQUILA · ${fmt(RT.cost)} $T`, free: !sh, mine, items: sh ? (sh.preview || []).slice(0, IS_MOBILE ? 3 : 5) : [], tags: !IS_MOBILE, color: sh ? NET_ORIGINS[sh.profile]?.color : 0xb0bec5, gold: zone === 'dorado', plot: i };
-        P.push({ type: zone === 'mercadillo' ? 'stall' : 'storefront', x, z, rot, o: o2, act: 'plot', plot: i, label: sh ? (mine ? `⭐ Entrar en tu tienda` : `🏪 ${sh.name} · de ${sh.who}`) : `🏷️ Parcela libre: abre aquí tu ${RT.name} (${fmt(RT.cost)} $T de tu Aduana)`, range: 1.3 });
+        const o2 = { text: sh ? (mine ? `★ ${sh.name}` : sh.name).toUpperCase().slice(0, 22) : `SE ALQUILA · ${fmt(RT.cost)} $T`, free: !sh, mine, items: sh ? (sh.preview || []).slice(0, IS_MOBILE ? 3 : 5) : [], tags: !IS_MOBILE, color: sh ? (sh.house ? 0xffca28 : NET_ORIGINS[sh.profile]?.color) : 0xb0bec5, gold: zone === 'dorado', plot: i };
+        P.push({ type: zone === 'mercadillo' ? 'stall' : 'storefront', x, z, rot, o: o2, act: 'plot', plot: i, label: sh ? (mine ? `⭐ Entrar en tu tienda` : sh.house ? `🏛️ ${sh.name} · tienda de la casa (siempre abierta)` : `🏪 ${sh.name} · de ${sh.who}`) : `🏷️ Parcela libre: abre aquí tu ${RT.name} (${fmt(RT.cost)} $T de tu Aduana)`, range: 1.3 });
       });
       else plots.forEach((owner, i) => {
         const [x, z, rot] = netPlotPos(zone, i), mine = owner === 'P', free = owner === null, sh = Net.st().shop;
@@ -12223,10 +12223,9 @@ const RealMarket = {
           ${tabRows.map((row, ri) => `<div class="flex flex-wrap gap-1 ${ri ? 'mb-2' : 'mb-1'}">${row.map(([k, l]) => `<button data-tab="${k}" class="btn-game px-3 py-1.5 text-xs ${this.tab === k ? 'bg-[#fff6c2]' : 'bg-white'}">${l}</button>`).join('')}</div>`).join('')}`;
         if (this.tab === 'market') {
           html += `<div class="flex flex-wrap gap-1 mb-2"><button data-f="-1" class="btn-game px-2 py-0.5 text-[11px] ${this.filter < 0 ? 'bg-[#fff6c2]' : 'bg-white'}">Todos</button>${NET_ORIGINS.map((o, i) => `<button data-f="${i}" class="btn-game px-2 py-0.5 text-[11px] ${this.filter === i ? 'bg-[#fff6c2]' : 'bg-white'}">${o.icon}</button>`).join('')}<button data-f="8" title="Objetos de la isla" class="btn-game px-2 py-0.5 text-[11px] ${this.filter === 8 ? 'bg-[#fff6c2]' : 'bg-white'}">🏝️ Isla</button></div>
-            ${this.decreeHTML(D.decree)}<div class="text-[11px] text-slate-500 mb-1">Comprar = pagas al mejor vendedor. Vender = cobras del mejor comprador (−${pctTxt(this.fee())}). Si nadie cruza, tu orden queda en el Tablón. «Media 7 d» = precio medio de lo vendido esta semana.</div>` +
+            ${this.decreeHTML(D.decree)}${this.houseHTML(D)}<div class="text-[11px] text-slate-500 mb-1"><b>Comprar 1</b> = al mejor vendedor (un jugador o la Lonja). <b>Vender 1</b> = al mejor comprador (−${pctTxt(this.fee())} de comisión). ✏️ = tu orden a tu precio: espera en el Tablón hasta que alguien la cruce. «Media 7 d» = precio medio de lo vendido esta semana.</div>` +
             (Number.isInteger(Online.featured()) ? `<div class="app-card p-2 mb-2 text-[11px] bg-amber-50">🏆 Evento de la semana: <b>${NET_ORIGINS[Online.featured()].icon} ${NET_ORIGINS[Online.featured()].name}</b> · sus objetos se venden sin comisión en el Tablón.</div>` : '');
-          html += D.items.filter(x => this.filter < 0 || x.p === this.filter).map(x => `<div class="app-card p-2 mb-1.5 flex items-center gap-2 text-xs"><div class="flex-1 min-w-0"><b>${this.name(x.id)}</b> <span class="text-slate-400">NV${x.t}${x.p === me.profile ? ' · tuyo' : x.p === 8 ? ' · 🏝️ isla' : ''}</span>${x.p === Online.featured() ? ' <span class="px-1 rounded bg-amber-200 text-[10px] font-bold">0 % esta semana</span>' : ''}<div class="text-slate-500">Venden ${x.ask ? `<b class="text-emerald-700">${fmt(x.ask)}</b> (${x.askQ})` : '—'} · Compran ${x.bid ? `<b class="text-sky-700">${fmt(x.bid)}</b> (${x.bidQ})` : '—'} · Último ${x.last ? fmt(x.last) : '—'} · Media 7 d ${x.avg7 ? `<b>${fmt(x.avg7)}</b>` : '—'} · 24 h: ${x.vol}</div></div>
-            <button data-buy="${x.id}" class="btn-game px-2 py-1 text-[11px] bg-emerald-200">Comprar</button><button data-sell="${x.id}" class="btn-game px-2 py-1 text-[11px] bg-sky-200" ${D.stock[x.id] ? '' : 'disabled style="opacity:.45"'}>Vender</button></div>`).join('');
+          html += D.items.filter(x => this.filter < 0 || x.p === this.filter).map(x => this.itemRow(x, D, me)).join('');   // v3.2 · K2
         } else if (this.tab === 'aduana') {
           const left = Math.max(0, 50000 - D.coinsToday), own = [...mine.mats.map(m => m[0]), mine.jewel[0]];
           html += `<div class="sec-h">$TOKEN</div><div class="app-card p-3 mb-2 text-xs">Hoy puedes ingresar <b>${fmt(left)} $T</b> más.<div class="flex gap-1 mt-2"><input data-coins type="number" min="1" placeholder="Cantidad" class="game flex-1 text-xs px-2 py-1"><button data-dc class="btn-game px-2 py-1 text-[11px] bg-emerald-200">Ingresar ⬆</button><button data-wc class="btn-game px-2 py-1 text-[11px] bg-sky-200">Retirar ⬇</button></div></div>
@@ -12253,7 +12252,7 @@ const RealMarket = {
           html += await RealTrade.auctionsHTML(D);
         } else {
           html += `<div class="sec-h">Abiertas</div>` + (D.mine.map(o => `<div class="app-card p-2 mb-1.5 flex items-center gap-2 text-xs"><div class="flex-1">${o.side === 'buy' ? '🟢 Compra' : '🔵 Venta'} <b>${this.name(o.item)}</b> · ${o.rem}/${o.qty} a ${fmt(o.price)} $T</div><button data-cancel="${o.id}" class="btn-game px-2 py-1 text-[11px] bg-rose-200">Cancelar</button></div>`).join('') || '<div class="text-xs text-slate-400">Ninguna.</div>') +
-            `<div class="sec-h">Tus últimas operaciones</div>` + (D.trades.map(t => `<div class="text-xs py-1 border-b border-slate-100">${t.side === 'buy' ? '🟢 Compraste' : '🔵 Vendiste'} ${t.qty}× ${this.name(t.item)} a ${fmt(t.price)} $T · ${new Date(t.at).toLocaleString('es-ES')}</div>`).join('') || '<div class="text-xs text-slate-400">Todavía ninguna.</div>');
+            `<div class="sec-h">Tus últimas operaciones</div>` + (D.trades.map(t => `<div class="text-xs py-1 border-b border-slate-100">${t.side === 'buy' ? '🟢 Compraste' : '🔵 Vendiste'} ${t.qty}× ${this.name(t.item)} a ${fmt(t.price)} $T${t.house ? (t.side === 'buy' ? ' · de la 🏛️ Lonja' : ' · a la 🏛️ Lonja') : ''} · ${new Date(t.at).toLocaleString('es-ES')}</div>`).join('') || '<div class="text-xs text-slate-400">Todavía ninguna.</div>');
         }
         body.innerHTML = html;
         const q$ = (s) => body.querySelectorAll(s), run = async (fn) => { if (this.busy) return; this.busy = true; let m; try { m = await fn(); Online.push(true).catch(() => {}); } catch (e) { m = '❌ ' + e.message; } this.busy = false; render(m); };
@@ -12269,6 +12268,9 @@ const RealMarket = {
         q$('[data-tab]').forEach(b => b.onclick = () => { this.tab = b.dataset.tab; render(); });
         q$('[data-f]').forEach(b => b.onclick = () => { this.filter = +b.dataset.f; render(); });
         q$('[data-buy]').forEach(b => b.onclick = () => this.orderForm(body, 'buy', b.dataset.buy, D, render));
+        q$('[data-qb]').forEach(b => b.onclick = () => run(() => this.quick('buy', b.dataset.qb)));   // v3.2 · K2: Comprar 1 / Vender 1 al mejor precio de ahora
+        q$('[data-qs]').forEach(b => b.onclick = () => run(() => this.quick('sell', b.dataset.qs)));
+        const hs = body.querySelector('[data-hseen]'); if (hs) hs.onclick = () => { GS.realLonjaSeen = 1; SaveSystem.save('lonja-guide'); render(); };
         q$('[data-sell]').forEach(b => b.onclick = () => this.orderForm(body, 'sell', b.dataset.sell, D, render));
         q$('[data-cancel]').forEach(b => b.onclick = () => run(async () => { await this.rpc('crossia_order_cancel', { p_id: +b.dataset.cancel }); return '✓ Orden cancelada: lo apartado vuelve a tu Aduana'; }));
         const coinsIn = () => Math.floor(+(body.querySelector('[data-coins]')?.value || 0));
@@ -12287,6 +12289,31 @@ const RealMarket = {
       };
       render();
     });
+  },
+  /** v3.2 · K2 · 🏛️ La Lonja del Sueño: la guía la primera vez y, después, una línea con lo que te queda por venderle hoy */
+  houseHTML(D) {
+    const H = D.house; if (!H) return '';
+    if (!GS.realLonjaSeen) return `<div class="app-card p-3 mb-2 text-xs bg-amber-50 leading-relaxed"><b class="text-sm">🏛️ La Lonja del Sueño</b><div class="mt-1">Es el proveedor de la casa (importaciones de Ultramar): siempre vende y compra los 40 objetos de la Red, así que puedes comerciar desde el primer minuto.</div>
+      <ul class="mt-1 list-disc pl-4 space-y-0.5"><li><b>Comprar 1</b> compra al mejor precio que haya, de un jugador o de la Lonja. <b>Vender 1</b> vende al mejor comprador.</li><li>La Lonja vende un ${Math.round((H.margin || 0.15) * 100)} % por encima de su precio y compra un ${Math.round((H.margin || 0.15) * 100)} % por debajo: comprar y volver a vender enseguida pierde dinero.</li>
+      <li>Si le compráis mucho un objeto, su precio sube; si le vendéis mucho, baja. Poco a poco vuelve a su sitio.</li><li>Si un jugador pone mejor precio, vende él antes que la Lonja. Cuando hay mucho comercio entre jugadores, la Lonja se aparta.</li>
+      <li>A la Lonja le puedes vender hasta <b>${fmt(H.cap)} $T al día</b>${H.cap < 10000 ? ' (las cuentas de menos de 3 días, menos)' : ''}.</li><li>También hay dos tiendas de la casa: la Lonja del Sueño en El Paseo y el Bazar de Ultramar en El Mercadillo.</li></ul>
+      <button data-hseen class="btn-game px-3 py-1 text-[11px] bg-white mt-2">Entendido</button></div>`;
+    return `<div class="app-card p-2 mb-2 text-[11px] text-amber-900 bg-amber-50">🏛️ <b>Lonja del Sueño</b>: vende a +${Math.round((H.margin || 0.15) * 100)} % y compra a −${Math.round((H.margin || 0.15) * 100)} % de su precio. Hoy puedes venderle <b>${fmt(H.left)} $T</b> más (de ${fmt(H.cap)}).</div>`;
+  },
+  /** una fila del mercado: lo del Tablón, lo de la Lonja y los botones */
+  itemRow(x, D, me) {
+    const have = D.stock[x.id] || 0, rate = x.p === Online.featured() ? 0 : this.fee(), net = x.bid ? x.bid - Math.floor(x.bid * rate) : 0;
+    return `<div class="app-card p-2 mb-1.5 text-xs"><div class="flex items-center gap-2"><div class="flex-1 min-w-0"><b>${this.name(x.id)}</b> <span class="text-slate-400">NV${x.t}${x.p === me.profile ? ' · tuyo' : x.p === 8 ? ' · 🏝️ isla' : ''}${have ? ` · tienes ${have}` : ''}</span>${x.p === Online.featured() ? ' <span class="px-1 rounded bg-amber-200 text-[10px] font-bold">0 % esta semana</span>' : ''}</div><span class="text-[10px] text-slate-400">${x.vol} en 24 h</span></div>
+      <div class="text-slate-500 mt-0.5">Venden ${x.ask ? `<b class="text-emerald-700">${fmt(x.ask)}</b> (${x.askQ})` : '—'} · Compran ${x.bid ? `<b class="text-sky-700">${fmt(x.bid)}</b> (${x.bidQ})` : '—'} · Último ${x.last ? fmt(x.last) : '—'} · Media 7 d ${x.avg7 ? `<b>${fmt(x.avg7)}</b>` : '—'}</div>` +
+      (x.hAsk || x.hBid ? `<div class="text-[11px] text-amber-800 mt-0.5">🏛️ Lonja: vende a <b>${x.hAsk ? fmt(x.hAsk) : '—'}</b> · compra a <b>${x.hBid ? fmt(x.hBid) : '—'}</b></div>` : x.p < 8 ? '<div class="text-[11px] text-slate-400 mt-0.5">🏛️ La Lonja se aparta: ya hay jugadores comerciando con este objeto</div>' : '') +
+      `<div class="flex flex-wrap gap-1 mt-1.5"><button data-qb="${x.id}" class="btn-game px-2 py-1 text-[11px] bg-emerald-300" ${x.ask ? '' : 'disabled style="opacity:.45"'}>Comprar 1${x.ask ? ` · ${fmt(x.ask)} $T` : ''}</button><button data-qs="${x.id}" class="btn-game px-2 py-1 text-[11px] bg-sky-300" ${have && x.bid ? '' : 'disabled style="opacity:.45"'} title="Cobras el precio menos la comisión">Vender 1${x.bid ? ` · ${fmt(net)} $T` : ''}</button>
+      <button data-buy="${x.id}" class="btn-game px-2 py-1 text-[11px] bg-white" title="Publicar una orden de compra a tu precio">✏️ Compra</button><button data-sell="${x.id}" class="btn-game px-2 py-1 text-[11px] bg-white" ${have ? '' : 'disabled style="opacity:.45"'} title="Publicar una orden de venta a tu precio">✏️ Venta</button></div></div>`;
+  },
+  /** Comprar 1 / Vender 1: al mejor precio que haya ahora; lo que no se pueda no se queda en el Tablón */
+  async quick(side, id) {
+    const r = await this.rpc('crossia_quick', { p_side: side, p_item: id, p_qty: 1 }), price = +r.price, fee = side === 'sell' ? Math.floor(price * (+r.feeRate || 0)) : 0;
+    playChime();
+    return side === 'buy' ? `✓ Compraste 1× ${this.name(id)} a ${fmt(price)} $T · está en tu Aduana` : `✓ Vendiste 1× ${this.name(id)} por ${fmt(price - fee)} $T${fee ? ` (${fmt(price)} − ${fmt(fee)} de comisión)` : ''}`;
   },
   depRow(id, cap, D, when) {
     const used = D.depToday[id] || 0, have = Inventory.count(id), can = Math.min(have, cap - used);
@@ -12707,7 +12734,7 @@ const Guilds = {
           let G; try { G = await this.rpc('crossia_guild', { p_profile: p }); } catch (e) { body.innerHTML = `<div class="app-card p-3 text-sm">❌ ${esc(e.message)}</div>`; return; }
           h += `<div class="sec-h">En el Tablón</div>` + ((G.asks || []).map(a => this.row(`<b>${RealMarket.name(a.item)}</b> · desde <b>${fmt(a.price)} $T</b> <span class="text-slate-400">(${a.qty} a la venta)</span>`, `<button data-gb class="btn-game px-2 py-1 text-[11px] bg-emerald-200">Ver en el Tablón</button>`)).join('') || '<div class="text-xs text-slate-400 mb-2">Nadie vende en el Tablón.</div>');
           h += `<div class="sec-h">En los puestos</div>` + ((G.stalls || []).map(s => this.row(`<b>${RealMarket.name(s.item)}</b> · <b>${fmt(s.price)} $T</b> · quedan ${s.qty}<div class="text-slate-500">${esc(s.who)}${s.bot ? ' (Comerciante del Sueño)' : ''}</div>`, `<button data-gs="${s.owner}" data-gi="${s.item}" data-gp="${s.price}" class="btn-game px-2 py-1 text-[11px] bg-emerald-200">Comprar 1</button>`)).join('') || '<div class="text-xs text-slate-400 mb-2">Ningún puesto los tiene ahora.</div>');
-          h += `<div class="sec-h">En las tiendas</div>` + ((G.shops || []).map(s => this.row(`<b>${RealMarket.name(s.item)}</b> · <b>${fmt(s.price)} $T</b> · quedan ${s.qty}<div class="text-slate-500">${esc(s.shop)} · de ${esc(s.who)}</div>`, `<button data-gt="${s.owner}" class="btn-game px-2 py-1 text-[11px] bg-amber-200">Ir a su tienda</button>`)).join('') || '<div class="text-xs text-slate-400 mb-2">Ninguna tienda los tiene ahora.</div>');
+          h += `<div class="sec-h">En las tiendas</div>` + ((G.shops || []).map(s => this.row(`<b>${RealMarket.name(s.item)}</b> · <b>${fmt(s.price)} $T</b> · quedan ${s.qty}<div class="text-slate-500">${esc(s.shop)} · ${s.house ? 'de la casa' : `de ${esc(s.who)}`}</div>`, `<button data-gt="${s.owner}" class="btn-game px-2 py-1 text-[11px] bg-amber-200">Ir a su tienda</button>`)).join('') || '<div class="text-xs text-slate-400 mb-2">Ninguna tienda los tiene ahora.</div>');
           body.innerHTML = h;
           body.querySelectorAll('[data-gb]').forEach(b => b.onclick = () => { closeApp(); RealMarket.filter = p; setTimeout(() => RealMarket.open('market'), 30); });
           body.querySelectorAll('[data-gt]').forEach(b => b.onclick = () => { closeApp(); setTimeout(() => Promise.resolve(RealShops.visit(b.dataset.gt)).catch(() => {}), 30); });
@@ -12978,7 +13005,7 @@ const RealShops = {
   async listHTML(zone = null) {
     const L = await this.rpc('crossia_shops', { p_zone: zone });
     if (!L.length) return '<div class="app-card p-3 text-xs text-slate-500">Todavía no hay tiendas de jugadores. ¡Sé el primero en abrir una!</div>';
-    return L.map(s => `<div class="app-card p-2 mb-1.5 flex items-center gap-2 text-xs"><span class="text-2xl">${this.TIERS[s.tier].icon}</span><div class="flex-1"><b>${esc(s.name)}</b> · ${NET_ORIGINS[s.profile]?.icon || ''} ${esc(s.who)}<div class="text-slate-500">${NET_ZONES[s.zone]?.name || s.zone} · ${s.items} artículo(s)${s.min ? ` · solo clientes con ${fmt(s.min)}+ $T` : ''}${s.sealed ? ' · <b class="text-purple-700">🔒 sellada</b>' : s.away ? ' · 🛎️ atiende el dependiente' : ' · 🙋 el dueño está'}</div></div><button data-visit="${s.owner}" class="btn-game px-2 py-1 text-[11px] bg-emerald-200">Entrar</button></div>`).join('');
+    return L.map(s => `<div class="app-card p-2 mb-1.5 flex items-center gap-2 text-xs"><span class="text-2xl">${s.house ? '🏛️' : this.TIERS[s.tier].icon}</span><div class="flex-1"><b>${esc(s.name)}</b> · ${s.house ? '<span class="text-amber-800">tienda de la casa</span>' : `${NET_ORIGINS[s.profile]?.icon || ''} ${esc(s.who)}`}<div class="text-slate-500">${NET_ZONES[s.zone]?.name || s.zone} · ${s.items} artículo(s)${s.min ? ` · solo clientes con ${fmt(s.min)}+ $T` : ''}${s.house ? ' · 🏛️ siempre abierta' : s.sealed ? ' · <b class="text-purple-700">🔒 sellada</b>' : s.away ? ' · 🛎️ atiende el dependiente' : ' · 🙋 el dueño está'}</div></div><button data-visit="${s.owner}" class="btn-game px-2 py-1 text-[11px] bg-emerald-200">Entrar</button></div>`).join('');
   },
   /** Entrar en una tienda */
   visit(owner) {
@@ -12990,7 +13017,7 @@ const RealShops = {
         const T = this.TIERS[S.tier], mine = S.owner === Online.me.id;
         setAppTitle(`${T.icon} ${S.name}`);
         body.innerHTML = (msg ? `<div class="app-card p-2 mb-2 text-xs ${/^❌/.test(msg) ? 'bg-red-50' : 'bg-emerald-50'}">${msg}</div>` : '') +
-          `<div class="app-card p-3 mb-2 text-xs" style="background:linear-gradient(180deg,#${(NET_ORIGINS[S.profile]?.color || 0xffffff).toString(16).padStart(6, '0')}22,#fff)"><b class="text-sm">${esc(S.name)}</b> · ${T.name} de ${NET_ORIGINS[S.profile]?.icon || ''} ${esc(S.who)}<br>${NET_ZONES[S.zone]?.name || ''}${S.min ? ` · 💎 solo clientes con ${fmt(S.min)}+ $T en la Aduana` : ''} · pagas desde tu Aduana${this.attendHTML(S, mine)}</div>` +
+          `<div class="app-card p-3 mb-2 text-xs" style="background:linear-gradient(180deg,#${(S.house ? 0xffca28 : NET_ORIGINS[S.profile]?.color || 0xffffff).toString(16).padStart(6, '0')}22,#fff)"><b class="text-sm">${esc(S.name)}</b> · ${S.house ? '🏛️ tienda de la casa, con mercancía de la Lonja del Sueño' : `${T.name} de ${NET_ORIGINS[S.profile]?.icon || ''} ${esc(S.who)}`}<br>${NET_ZONES[S.zone]?.name || ''}${S.min ? ` · 💎 solo clientes con ${fmt(S.min)}+ $T en la Aduana` : ''} · pagas desde tu Aduana${this.attendHTML(S, mine)}</div>` +
           (S.items.filter(i => i.qty > 0).map(i => `<div class="app-card p-2 mb-1.5 flex items-center gap-2 text-xs"><div class="flex-1"><b>${RealMarket.name(i.item)}</b> · quedan ${i.qty}<div class="text-slate-500">${fmt(i.price)} $T/u</div></div>${mine ? '<span class="text-slate-400">tuya</span>' : S.sealed ? '<span class="text-purple-700">🔒</span>' : `<input data-q="${i.item}" type="number" min="1" max="${i.qty}" value="1" class="game w-12 text-xs px-1 py-1"><button data-b="${i.item}" data-p="${i.price}" class="btn-game px-2 py-1 text-[11px] bg-emerald-200">Comprar</button>`}</div>`).join('') || '<div class="app-card p-3 text-xs text-slate-500">El escaparate está vacío.</div>');
         body.querySelectorAll('input').forEach(x => x.onkeydown = (e) => e.stopPropagation());
         body.querySelectorAll('[data-b]').forEach(b => b.onclick = async () => { const id = b.dataset.b, q = Math.floor(+body.querySelector(`[data-q="${id}"]`).value || 0);
@@ -13003,6 +13030,7 @@ const RealShops = {
   attendHTML(S, mine = false) {
     if (S.sealed) return `<div class="mt-1.5 p-1.5 rounded-lg bg-purple-50 text-purple-800 font-semibold">🔒 Sellada por impago: ${mine ? 'no vende hasta que pagues la cuota' : `no vende hasta que ${esc(S.who)} pague la cuota`} (${S.sealedDays}/${S.sealLimit || this.SEAL_DAYS} días; al ${S.sealLimit || this.SEAL_DAYS}.º la parcela vuelve al barrio)</div>`;
     if (mine) return '';
+    if (S.house) return '<div class="mt-1">🏛️ Siempre abierta: se repone sola cada poco</div>';   // v3.2 · K2
     return `<div class="mt-1">${S.away ? `🛎️ Te atiende su dependiente: ${esc(S.who)} no está ahora mismo` : `🙋 ${esc(S.who)} está en la tienda`}</div>`;
   },
   LOG: { open: ['🏪', 'Licencia', -1], rent: ['💸', 'Cuotas', -1], sealed: ['🔒', 'Sellada por impago', 0], debt_paid: ['✓', 'Cuota pendiente pagada', -1], transfer: ['🔁', 'Traspaso (90 % de la licencia anterior)', 1], revoked: ['🔮', 'Tienda perdida por impago', 0] },
