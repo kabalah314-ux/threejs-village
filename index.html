@@ -2,7 +2,15 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#2f3a7a">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="CrossIA">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-180.png">
 <title>CrossIA — Micro World: AI Village</title>
 <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -392,6 +400,22 @@ body.mobile .zone-banner { top: 70px; font-size: 13px; padding: 6px 14px; }
   #settingsModal .step > .font-bold, .step > .font-bold { font-family: var(--f-disp); font-weight: 600; display: flex; align-items: center; gap: 8px; }
   #settingsModal, #confirmModal { background: rgba(18,16,46,.5) !important; }
   @media (prefers-reduced-motion: reduce) { .hub-t, .btn-game { transition: none; } }
+  /* v3.1.2 · K1 · móvil: la página no se mueve, no rebota ni hace zoom; el HUD queda fuera de la muesca y de la barra de gestos,
+     y arriba hay una franja libre (doble toque: ver u ocultar el navegador) */
+  html, body { width: 100%; height: 100%; height: 100dvh; overscroll-behavior: none; touch-action: manipulation; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+  body { position: fixed; inset: 0; }
+  body.mobile { --hud-shift: calc(24px + env(safe-area-inset-top, 0px)); -webkit-tap-highlight-color: transparent; -webkit-touch-callout: none; }
+  body.mobile #ui { top: env(safe-area-inset-top, 0px); right: env(safe-area-inset-right, 0px); bottom: env(safe-area-inset-bottom, 0px); left: env(safe-area-inset-left, 0px); }
+  body.mobile #hudTop { padding-top: 36px; }
+  body.mobile #joystick { left: calc(22px + env(safe-area-inset-left, 0px)); bottom: calc(26px + env(safe-area-inset-bottom, 0px)); }
+  body.mobile #actionBtn { right: calc(22px + env(safe-area-inset-right, 0px)); bottom: calc(34px + env(safe-area-inset-bottom, 0px)); }
+  body.mobile #saveIndicator { right: calc(12px + env(safe-area-inset-right, 0px)); bottom: calc(132px + env(safe-area-inset-bottom, 0px)); }
+  body.mobile #netModeBadge { bottom: calc(14px + env(safe-area-inset-bottom, 0px)); }
+  body.mobile #netChat { left: calc(12px + env(safe-area-inset-left, 0px)) !important; bottom: calc(12px + env(safe-area-inset-bottom, 0px)) !important; }
+  body.mobile .zone-banner { top: calc(70px + var(--hud-shift)); }
+  body.mobile .money-toast { top: calc(96px + var(--hud-shift)); }
+  @media (max-width: 899px) { body.mobile #menu { padding: calc(8px + env(safe-area-inset-top, 0px)) calc(8px + env(safe-area-inset-right, 0px)) calc(8px + env(safe-area-inset-bottom, 0px)) calc(8px + env(safe-area-inset-left, 0px)) !important; } }
+  .fs-tip { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(158px + env(safe-area-inset-bottom, 0px)); z-index: 45; width: min(340px, calc(100vw - 24px)); padding: 10px 12px; display: flex; gap: 10px; align-items: center; font: 600 13px/1.35 Fredoka, sans-serif; color: #2b2b3d; }
 </style>
 
 <canvas id="scene"></canvas>
@@ -982,6 +1006,51 @@ const CFG = {
 /** Detección de dispositivo táctil → controles y calidad adaptados */
 const IS_MOBILE = matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window;
 if (IS_MOBILE) document.body.classList.add('mobile');
+/* ===== v3.1.2 · K1 · MÓVIL: JUEGO FIJO Y PANTALLA COMPLETA. Sin zoom (viewport + touch-action; en el iPhone, además, se cancelan
+   los gestos de pellizco de Safari y los toques de dos dedos que no son del juego), página fija, pantalla completa al tocar Jugar
+   (Android: si el navegador la quita, el siguiente toque en el juego la pide otra vez) y doble toque en la franja de arriba para
+   ver u ocultar el navegador. En el iPhone la pantalla completa de verdad es abrir el juego desde el icono de inicio. ===== */
+const MobileFS = {
+  BAND: 34,   // alto de la franja de arriba (px, por debajo de la muesca) donde el doble toque saca o mete el navegador
+  want: false, left: false, lastTap: 0,
+  ios: /iP(hone|od|ad)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1),
+  standalone() { try { return navigator.standalone === true || matchMedia('(display-mode: standalone)').matches || matchMedia('(display-mode: fullscreen)').matches; } catch (e) { return false; } },
+  can() { const d = document, el = d.documentElement; return !!((d.fullscreenEnabled || d.webkitFullscreenEnabled) && (el.requestFullscreen || el.webkitRequestFullscreen)); },
+  on() { return !!(document.fullscreenElement || document.webkitFullscreenElement); },
+  /** ¿ya se enseñó este aviso? (y lo marca) */
+  seen(k) { try { if (localStorage.getItem('crossia.' + k)) return true; localStorage.setItem('crossia.' + k, '1'); } catch (e) {} return false; },
+  /** pantalla completa (tiene que llamarse desde un toque) */
+  enter() {
+    if (!IS_MOBILE || this.on()) return false;
+    if (!this.can()) { this.iosTip(); return false; }
+    const el = document.documentElement; this.left = false; this.want = false;
+    try { Promise.resolve(el.requestFullscreen ? el.requestFullscreen({ navigationUI: 'hide' }) : el.webkitRequestFullscreen()).then(() => { if (!this.seen('fsTip')) showToast('👆👆 Doble toque arriba para ver el navegador', 'text-white'); }).catch(() => {}); } catch (e) {}
+    return true;
+  },
+  exit() { const d = document; this.left = true; this.want = false; try { Promise.resolve(d.exitFullscreen ? d.exitFullscreen() : d.webkitExitFullscreen?.()).catch(() => {}); } catch (e) {} },
+  toggle() { if (this.on()) this.exit(); else this.enter(); },
+  /** iPhone en Safari: cómo tenerlo a pantalla completa (una vez, o cuando se pide con el doble toque) */
+  iosTip(force = false) {
+    if (!this.ios || this.standalone() || document.querySelector('.fs-tip') || (!force && this.seen('iosTip'))) return;
+    const d = document.createElement('div'); d.className = 'fs-tip panel pop-in';
+    d.innerHTML = '<span style="font-size:24px">📲</span><span style="flex:1">Para jugar a pantalla completa en el iPhone: toca <b>Compartir</b> y luego <b>«Añadir a pantalla de inicio»</b>, y ábrelo desde el icono.</span><button class="btn-game px-2.5 py-1 text-xs bg-white">Vale</button>';
+    d.querySelector('button').onclick = () => d.remove(); document.body.appendChild(d); setTimeout(() => d.remove(), 14000);
+  },
+  /** ¿el toque cae en la franja de arriba y no en un botón? */
+  inBand(e) { const top = document.getElementById('ui')?.getBoundingClientRect().top || 0; return e.clientY <= top + this.BAND && !e.target?.closest?.('button, a, input, select, textarea, summary, [role="button"], .clickable, .fs-tip'); },
+  tap(e) { if (e.pointerType === 'mouse' || !this.inBand(e)) return false; const now = e.timeStamp || performance.now(); if (now - this.lastTap < 400) { this.lastTap = 0; if (this.can()) this.toggle(); else this.iosTip(true); return true; } this.lastTap = now; return false; },
+  init() {
+    if (!IS_MOBILE) return;
+    const stop = (e) => { if (e.cancelable) e.preventDefault(); }, scene = document.getElementById('scene');
+    ['gesturestart', 'gesturechange', 'gestureend'].forEach(ev => document.addEventListener(ev, stop, { passive: false }));   // Safari no hace caso de user-scalable=no
+    document.addEventListener('touchmove', (e) => { if (e.touches.length > 1 && e.target !== scene) stop(e); }, { passive: false });   // dos dedos fuera del juego: sin zoom
+    document.addEventListener('pointerup', (e) => this.tap(e), true);
+    const fc = () => { if (!this.on() && !this.left) this.want = true; };   // la quitó el navegador (gesto de volver): el siguiente toque la pide otra vez
+    document.addEventListener('fullscreenchange', fc); document.addEventListener('webkitfullscreenchange', fc);
+    scene?.addEventListener('pointerup', () => { if (this.want && !document.body.classList.contains('menu-open')) this.enter(); });
+  },
+};
+MobileFS.init();
 document.getElementById('ctrlDesktop').classList.toggle('hidden', IS_MOBILE);
 document.getElementById('ctrlMobile').classList.toggle('hidden', !IS_MOBILE);
 /** Estado de EJECUCIÓN (no persistente): cámara, teclas, modales, animaciones. El progreso vive en GS. */
@@ -4993,7 +5062,7 @@ function showDaySummary(dayNum, earned, spent) {
   const lines = charges.length ? `<div class="text-[11px] text-slate-600 mt-2 space-y-0.5 text-left">${charges.map(c => `<div class="flex justify-between gap-6"><span>${c.label}</span><span class="font-bold ${c.amount < 0 ? 'text-red-500' : 'text-slate-500'}">${c.amount < 0 ? '−' + fmt(-c.amount) : (c.note || '—')}</span></div>`).join('')}</div>` : '';
   const el = document.createElement('div');
   el.className = 'pop-in';
-  el.style.cssText = 'position:fixed;top:70px;left:50%;transform:translateX(-50%);z-index:26;pointer-events:none;max-width:92vw';
+  el.style.cssText = 'position:fixed;top:calc(70px + var(--hud-shift, 0px));left:50%;transform:translateX(-50%);z-index:26;pointer-events:none;max-width:92vw';
   el.innerHTML = `<div class="panel px-5 py-3 text-center">
     <div class="pixel text-[9px] text-slate-500">🌙 FIN DEL DÍA ${dayNum}</div>
     ${lines}
@@ -8404,7 +8473,7 @@ function awakeningChainHTML() {
    Nota: la 🎪 Feria del Sábado (puestos de los vecinos, ofertas de tienda) NO es la
    📈 Feria del Tablón de la v0.8 (especulación por categorías): conviven sin tocarse.
    ========================================================= */
-const GAME_VERSION = '3.1.1', GAME_TAG = 'La Plaza: ocio y anuncios';
+const GAME_VERSION = '3.1.2', GAME_TAG = 'Móvil a pantalla completa';
 /* ---------- 🗓️ EVENTOS: calendario REAL → flags que leen los sistemas existentes (Sec. 10.10) ---------- */
 const Events = {
   _force: null,   // DBG.weekday(n): simula el día de la semana real (0 = domingo … 6 = sábado)
@@ -12440,8 +12509,8 @@ const StarCatch = {
     if (this.run) return;
     const ov = document.createElement('div'); ov.style.cssText = 'position:fixed;inset:0;z-index:90;background:linear-gradient(#120a2a,#3b2d6b);touch-action:none;user-select:none';
     const cv = document.createElement('canvas'), hud = document.createElement('div'), quit = document.createElement('button'), ctx = cv.getContext('2d'); ov.appendChild(cv); ov.appendChild(hud); ov.appendChild(quit); document.body.appendChild(ov);
-    quit.textContent = '✕'; quit.title = 'Salir'; quit.dataset.scQuit = '1'; quit.style.cssText = 'position:absolute;top:8px;right:10px;width:38px;height:38px;border-radius:999px;border:0;background:rgba(255,255,255,.18);color:#fff;font:700 18px Fredoka,Arial;cursor:pointer';
-    hud.style.cssText = 'position:absolute;top:10px;left:0;right:0;display:flex;justify-content:center;gap:16px;color:#fff;font:700 18px Fredoka,Arial;pointer-events:none';
+    quit.textContent = '✕'; quit.title = 'Salir'; quit.dataset.scQuit = '1'; quit.style.cssText = 'position:absolute;top:calc(8px + env(safe-area-inset-top, 0px));right:calc(10px + env(safe-area-inset-right, 0px));width:38px;height:38px;border-radius:999px;border:0;background:rgba(255,255,255,.18);color:#fff;font:700 18px Fredoka,Arial;cursor:pointer';
+    hud.style.cssText = 'position:absolute;top:calc(10px + env(safe-area-inset-top, 0px));left:0;right:0;display:flex;justify-content:center;gap:16px;color:#fff;font:700 18px Fredoka,Arial;pointer-events:none';
     const dpr = Math.min(2, devicePixelRatio || 1), W = innerWidth, H = innerHeight; cv.width = W * dpr; cv.height = H * dpr; cv.style.cssText = 'width:100%;height:100%'; ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     const g = this.newGame(W, H), keys = {}; state.modalOpen = true; state.overlayGame = true;
     const onKey = (e) => { if (!this.run) return; e.stopImmediatePropagation(); if (['ArrowLeft', 'ArrowRight', 'KeyA', 'KeyD', 'Escape', 'Space'].includes(e.code)) { e.preventDefault(); keys[e.code] = e.type === 'keydown'; if (e.code === 'Escape' && e.type === 'keydown') g.t = 0.0001; } };
@@ -13673,7 +13742,7 @@ const startGameFromMenu = () => {
     Profiles.ensure(() => maybeOpenCreator((wasCreator) => { if (wasCreator && !hadSave) showToast('🐻 "¡Eh, eh! ¿Estás bien? ¡Por fin llegó el humano de la laptop!"', 'text-white'); setTimeout(welcome, wasCreator && !hadSave ? 2200 : 0); }));   // v1.6: antes, el perfil (y su intro) · sin creador pendiente → welcome al momento
   }, 2600);
 };
-btnPlay.onclick = () => (storyState().ending === 'A' ? Awakening.resumeFinalA() : storyState().prologueDone ? startGameFromMenu() : showPrologue(startGameFromMenu));   // v0.9: un Final A sin cerrar vuelve a los créditos → NG+
+btnPlay.onclick = () => { MobileFS.enter(); return (storyState().ending === 'A' ? Awakening.resumeFinalA() : storyState().prologueDone ? startGameFromMenu() : showPrologue(startGameFromMenu)); };   // v3.1.2 · K1: en el móvil, pantalla completa al empezar   // v0.9: un Final A sin cerrar vuelve a los créditos → NG+
 
 // ---- Guardado periódico de seguridad y al salir / ocultar la pestaña ----
 setInterval(() => SaveSystem.saveNow('periodic'), 30000);
@@ -14073,7 +14142,7 @@ DBG.refs = DBG_REFS;
 if (/[?&]debug=1\b/.test(location.search)) window._dbg = DBG_REFS;   // v1.0: ya no es global por defecto
 /* v1.1 · Interior caminable de la casa (Sec. 6.9 Fase 2) */
 /** v1.5 · capturas: DBG.tp(x, z) lleva al jugador a (x, z) del pueblo · DBG.view(dist, pitch, yaw) fija la cámara · DBG.shot('B'|'C'|'D'|'G'|'H') prepara la escena del protocolo */
-DBG.g = { World, WGEO, WorldFX, TRAVEL_POSTS, Island, Voyage, TRIBE, ship, state, IconStudio, ItemArt, itemIcon, PhGlyph, startDialog, openInventory, openHousePanel, addLetter, endDialog, openShop, openGiftPicker, openEncargo, acceptCourier, refreshMissionUI, SeasonDecor, Snow, claimSeasonGift, seasonNow, openWeeklyPanel, openRoulette, Weather, Decorate, SyncGuard, Online, RealShops, RealMarket, RealRequests, RealTrade, NightMarket, Guilds, NET_SECTIONS, Stage, PlazaGames, StarCatch, PriceGuess, WishFountain, NoticeBoard, Metrics, Presence, Emotes, NetStatus, PeerCard, NetChat, Gather, Mining, npcObjs, interactables, colliders, SITES, NPCS, CFG, get house() { return house; }, scene, renderer, camera, cam, sky, water, atmo, clouds, PostFX, SkyEnv, PlanetAO, WATER_U, POST_U, Gather, Studio, ToolAnim, Profiles, Hub, Decor, Fitting, player, Interiors };   // v1.5: referencias gráficas para depurar
+DBG.g = { World, WGEO, WorldFX, TRAVEL_POSTS, Island, Voyage, TRIBE, ship, state, IconStudio, ItemArt, itemIcon, PhGlyph, startDialog, openInventory, openHousePanel, addLetter, endDialog, openShop, openGiftPicker, openEncargo, acceptCourier, refreshMissionUI, SeasonDecor, Snow, claimSeasonGift, seasonNow, openWeeklyPanel, openRoulette, Weather, Decorate, SyncGuard, Online, RealShops, RealMarket, RealRequests, RealTrade, NightMarket, Guilds, NET_SECTIONS, MobileFS, Stage, PlazaGames, StarCatch, PriceGuess, WishFountain, NoticeBoard, Metrics, Presence, Emotes, NetStatus, PeerCard, NetChat, Gather, Mining, npcObjs, interactables, colliders, SITES, NPCS, CFG, get house() { return house; }, scene, renderer, camera, cam, sky, water, atmo, clouds, PostFX, SkyEnv, PlanetAO, WATER_U, POST_U, Gather, Studio, ToolAnim, Profiles, Hub, Decor, Fitting, player, Interiors };   // v1.5: referencias gráficas para depurar
 DBG.post = (v = !PostFX.active) => { PostFX.active = !!v; POST_U.uPost.value = v ? 1 : 0; return PostFX.active; };
 DBG.env = (v = !SkyEnv.enabled) => SkyEnv.setEnabled(v);
 DBG.ao = (v = true) => { if (!PlanetAO.on) return false; if (v) PlanetAO.bake(); else { const c = planet.geometry.attributes.color; PlanetAO.reset(); c.needsUpdate = true; } return v; };
