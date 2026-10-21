@@ -6923,6 +6923,7 @@ function animate() {
     GS.daily.clockMs += dt * 1000 * DAY_SCALE;                 // v0.1: el reloj onírico solo avanza jugando
     if (GS.daily.clockMs >= DAY_MS) { GS.daily.clockMs -= DAY_MS; GS.daily.dayCount++; if (typeof settleDay === 'function') settleDay(); SaveSystem.save('new-day'); }
   }
+  if (state.overlayGame) return;   // v3.1.1: un minijuego a pantalla completa tapa el mundo: no se dibuja
   sky.position.copy(camera.position); PostFX.render(Interiors.active ? Interiors.scene : scene, camera);   // v1.5 · Etapa 2: bloom + gradación (med/alta)   // v1.1: dentro no se dibuja el planeta
 }
 window.addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); GFX.resize(); });   // v1.4: GFX.resize (pixel ratio por nivel + resolución dinámica)
@@ -8403,7 +8404,7 @@ function awakeningChainHTML() {
    Nota: la 🎪 Feria del Sábado (puestos de los vecinos, ofertas de tienda) NO es la
    📈 Feria del Tablón de la v0.8 (especulación por categorías): conviven sin tocarse.
    ========================================================= */
-const GAME_VERSION = '3.1', GAME_TAG = 'Las secciones de la Red';
+const GAME_VERSION = '3.1.1', GAME_TAG = 'La Plaza: ocio y anuncios';
 /* ---------- 🗓️ EVENTOS: calendario REAL → flags que leen los sistemas existentes (Sec. 10.10) ---------- */
 const Events = {
   _force: null,   // DBG.weekday(n): simula el día de la semana real (0 = domingo … 6 = sábado)
@@ -11218,6 +11219,19 @@ function netFurniture(type, g, o) {
       const r = netFurniture('stall', g, { ...o, color: 0x8e24aa, free: !!o.closed }); g.add(sphere(0.16, glow(0xffe082, 0xffb300, o.closed ? 0.2 : 1.8), 1.45, 2.2, 0.62, 8)); return r;
     }
     case 'lantern': { g.add(cyl(0.05, 0.07, 2.3, mat(0x263238), 0, 1.15, 0, 6)); g.add(sphere(0.24, glow(0xe1bee7, 0xab47bc, 1.8), 0, 2.4, 0, 8)); return [0.3, 0.3]; }
+    case 'stage': {   // v3.1.1 · 🎤 escenario de la Plaza (conciertos, sorteo, perfil destacado y cierre de temporada)
+      const w = o.w ?? 5, d = o.d ?? 2.8, back = -d / 2; g.add(box(w, 0.6, d, mat(0x5d4037), 0, 0.3, 0)); g.add(box(w, 0.08, d, mat(0x8d6e63), 0, 0.64, 0)); g.add(box(w, 3.2, 0.2, mat(0x311b92), 0, 2.2, back + 0.1));
+      [-w / 2 + 0.35, w / 2 - 0.35].forEach(x => { g.add(box(0.5, 1.1, 0.5, mat(0x263238), x, 1.2, back + 0.5)); g.add(sphere(0.16, glow(0xffffff, 0xce93d8, 1.2), x, 1.3, back + 0.77, 8)); });
+      const s = netSign(o.text ?? '🎤 ESCENARIO', w - 0.6, 0.6, '#311b92', '#ffe082', 'bold 40px Fredoka, Arial'); s.position.set(0, 3.3, back + 0.22); g.add(s);
+      for (let k = 0; k < 6; k++) g.add(sphere(0.09, glow(0xfff59d, 0xffd54f, o.live ? 2.2 : 0.8), -w / 2 + 0.4 + k * (w - 0.8) / 5, 3.85, back + 0.25, 6));
+      if (o.live) [[-0.9, '🎶'], [0.9, o.icon || '🎤']].forEach(([x, e]) => { const spr = new THREE.Sprite(netIconMat(e)); spr.scale.setScalar(0.8); spr.position.set(x, 1.9, 0); g.add(spr); });
+      return [w, d];
+    }
+    case 'note_board': {   // 📌 tablón de anuncios de los jugadores
+      const wood = mat(0x8d6e63); [-1.25, 1.25].forEach(x => g.add(box(0.14, 2.6, 0.14, wood, x, 1.3, 0))); g.add(box(2.7, 1.6, 0.12, mat(0xd7a86e), 0, 1.75, 0));
+      const cols = [0xfff59d, 0xb3e5fc, 0xf8bbd0, 0xc8e6c9]; for (let k = 0; k < Math.min(6, o.n ?? 4); k++) { const n = box(0.5, 0.42, 0.02, mat(cols[k % 4]), -0.9 + (k % 3) * 0.9, 2.1 - Math.floor(k / 3) * 0.6, 0.08); n.rotation.z = k % 2 ? 0.08 : -0.06; g.add(n); }
+      const s = netSign('📌 TABLÓN DE ANUNCIOS', 2.6, 0.38, '#fff8e1', '#4e342e', 'bold 34px Fredoka, Arial'); s.position.set(0, 2.78, 0.08); g.add(s); return [2.8, 0.4];
+    }
     case 'bot_proxy': {   // 🤝 marca invisible que sigue al bot más cercano (para hablar/truecar con él)
       const hit = box(1.0, 2.0, 1.0, new THREE.MeshBasicMaterial({ visible: false }), 0, 1.0, 0); hit.castShadow = false; g.add(hit);
       const tag = new THREE.Sprite(new THREE.SpriteMaterial({ map: textTexture(' ', { w: 384, h: 96 }), depthTest: false, transparent: true })); tag.scale.set(2.2, 0.55, 1); tag.position.y = 2.55; tag.renderOrder = 12; g.add(tag); g.userData.tag = tag;
@@ -11268,7 +11282,7 @@ const NetWorld = {
     return Interiors.switchTo('net', { zone, spawn: arrive, fade: '#1a1033' });
   },
   _walkSpawn(zone, from) {
-    if (zone === 'plaza') return from === 'mercadillo' ? [12.6, 0] : from === 'paseo' ? [-12.6, 0] : from === 'dorado' ? [0, -9.4] : from === 'puerto' ? [-12.4, 9] : from === 'oficios' ? [12.4, 7.5] : from === 'nocturno' ? [12.4, -6.5] : from === 'galeria' ? [-9.2, -6.0] : NET_ZONES.plaza.spawn;
+    if (zone === 'plaza') return from === 'mercadillo' ? [12.6, 0] : from === 'paseo' ? [-12.6, 0] : from === 'dorado' ? [0, -9.4] : from === 'puerto' ? [-12.4, 9] : from === 'oficios' ? [12.4, 7.5] : from === 'nocturno' ? [12.4, -6.5] : from === 'galeria' ? (this.real() ? [-11.4, -6.4] : [-9.2, -6.0]) : NET_ZONES.plaza.spawn;
     if (zone === 'mercadillo') return [-17.6, 0]; if (zone === 'paseo') return [17.6, 0]; if (NET_SECTIONS[zone]) return NET_ZONES[zone].spawn; return [0, 6.8];
   },
   /** Despertar: la consigna pasa la aduana (2 %) y vuelves al PC de casa */
@@ -11293,11 +11307,15 @@ const NetWorld = {
     const A = { wake: () => this.wake(), tram: () => NetUI.tram(), tablon: () => real ? RealMarket.open('market') : NetUI.tablon(), subastas: () => real ? RealMarket.open('subastas') : NetUI.auctions(), aduana: () => real ? RealMarket.open('aduana') : NetUI.aduana(), contratos: () => real ? RealMarket.open('contratos') : NetUI.contracts(), pedidos: () => real ? RealRequests.open() : NetUI.requests(), origen: () => NetUI.originCard(),
       rstall: (obj) => RealWorld.openStall(obj.userData.netPlot),
       importar: () => real ? RealRequests.open() : NetUI.requests(), guild: (obj) => Guilds.open(obj.userData.netPlot), night: () => NightMarket.open(),   // v3.1 · C6
+      stage: () => Stage.open(), notes: () => NoticeBoard.open(), games: () => PlazaGames.open(), fountain: () => WishFountain.open(),   // v3.1.1 · C5
       walk: (obj) => this.go(obj.userData.netTo), plot: (obj) => this.openPlot(zone, obj.userData.netPlot), bot: (obj) => { if (obj.userData.peerId) { PeerCard.openId(obj.userData.peerId); return; } const i = obj.userData.botIdx; if (i !== undefined && i !== null) NetUI.barter(i); }, gate: () => this.go('dorado') };
     if (zone === 'plaza') {
       const lines = real ? RealWorld.boardLines() : []; if (W && !real) { const mv = []; for (let m = 0; m < 32; m++) { const h = W.hist, a = h.length > 1 ? h[h.length - 2][m] : W.price[m]; mv.push([m, W.price[m] / Math.max(0.01, a) - 1]); } mv.sort((a, b) => Math.abs(b[1]) - Math.abs(a[1])); mv.slice(0, 6).forEach(([m, g]) => lines.push({ t: `${netItem(m).name}: ${fmt(Math.round(W.price[m]))} $T (${g >= 0 ? '+' : ''}${(g * 100).toFixed(1)} %)`, up: g >= 0 })); }
       P.push(
-        { type: 'fountain_big', x: 0, z: 0 },
+        { type: 'fountain_big', x: 0, z: 0, act: 'fountain', label: '⛲ Fuente de los deseos: echa $T y pide un deseo', range: 1.6 },   // v3.1.1 · C5
+        { type: 'stage', x: 10.4, z: 3.4, o: Stage.piece(), act: 'stage', label: Stage.label(), range: 1.6 },
+        { type: 'note_board', x: -6.0, z: -2.4, o: { n: 5 }, act: 'notes', label: '📌 Tablón de anuncios: Compro · Vendo · Busco', range: 1.3 },
+        { type: 'kiosk', x: 6.0, z: -2.4, o: { text: 'JUEGOS', color: 0xb39ddb, icon: '🎮' }, act: 'games', label: '🎮 Minijuegos: Atrapa estrellas y Adivina el precio', range: 1.2 },
         { type: 'net_board', x: 0, z: -10.6, o: { lines }, act: 'tablon', label: real ? '📋 Tablón real: órdenes de compra y venta entre jugadores' : '📋 Tablón de Ofertas (comprar y vender)', range: 1.6 },
         { type: 'facade', x: -9.2, z: -9.0, o: { w: 6, text: 'CASA DE SUBASTAS', color: 0xfce4ec, roof: 0xad1457, icon: '🔨', dome: true }, act: 'walk', to: 'galeria', label: '🚶 Entrar en la Galería de Subastas', range: 1.4 },   // v3.1 · C6
         { type: 'facade', x: 9.2, z: -9.0, o: { w: 6, text: 'OFICINA DE CONTRATOS', color: 0xe8f5e9, roof: 0x2e7d32, icon: '📜' }, act: 'contratos', label: '📜 Oficina de Contratos', range: 1.4 },
@@ -11417,7 +11435,8 @@ const NetWorld = {
   },
   _frame(dt, t) {
     const R = this.rt, I = Interiors; if (!R || !I.active?.def?.net) return;
-    if (!R.ready) { R.ready = true; R.proxy = I.interactables.find(o => o.userData.interact.act === 'bot') || null; }
+    if (!R.ready) { R.ready = true; R.proxy = I.interactables.find(o => o.userData.interact.act === 'bot') || null; R.stage = I.interactables.find(o => o.userData.interact.act === 'stage') || null; }
+    if (R.stage && (R.stT = (R.stT || 0) + dt) > 15) { R.stT = 0; R.stage.userData.interact.label = Stage.label(); }   // v3.1.1: la etiqueta del escenario dice lo que hay ahora
     const boxes = I.boxes, inBox = (x, z) => boxes.some(o => Math.abs(x - o.x) < o.hx + 0.45 && Math.abs(z - o.z) < o.hz + 0.45);
     const [w, d] = I.active.def.size, hw = w / 2 - 1.2, hd = d / 2 - 1.2, zone = R.zone;
     let best = null, bd = 2.6;
@@ -12298,6 +12317,261 @@ const RealRequests = {
     return `📦 ¡Pedido entregado a ${who}! +${fmt(got)} $T${q.kind === 'diario' ? ` · +${CFG.net.realReq.d.trust} confianza` : ''}`;
   },
   open() { if (!Online.me) { Account.open(); return; } RealMarket.open('pedidos'); },
+};
+
+/* ===== v3.1.1 · C5 · LA PLAZA: PUNTO DE ENCUENTRO Y OCIO. Escenario con eventos, minijuegos con premio y tope diario, fuente de
+   los deseos (sumidero con probabilidades a la vista) y tablón de anuncios de los jugadores. Horario: hora de España en la Red real
+   (igual para todos) y la del dispositivo en la demo, como la Lotería. ===== */
+CFG.plaza = {
+  stage: { showAt: 19, showMin: 30, drawMin: 30, featuredWeekday: 1, attendPrize: 150, starMult: 2 },   // función diaria 19:00–19:30 (un día concierto de los Cantantes, al siguiente teatro de los Actores) · sorteo el domingo a la hora de la Lotería · perfil destacado los lunes
+  games: { cap: 600, starTime: 60, starPrize: 4, gold: 3, cloud: -2, rounds: 5, pricePrize: 40 },   // tope diario de premios (los dos juegos juntos)
+  fountain: { daily: 10, throws: [   // devuelve de media un 23–36 % en objetos (precio de tienda): es un sumidero, con las probabilidades a la vista
+    { cost: 25, odds: [['nada', 0.45], ['comun', 0.42], ['pococomun', 0.12], ['deseo', 0.01]] },
+    { cost: 150, odds: [['nada', 0.30], ['comun', 0.15], ['pococomun', 0.35], ['raro', 0.17], ['deseo', 0.03]] },
+    { cost: 600, odds: [['nada', 0.15], ['raro', 0.45], ['epico', 0.30], ['grandeseo', 0.10]] },
+  ], pools: { comun: ['croissant', 'cupcake', 'dream_bread', 'coffee', 'seashell', 'dream_butterfly', 'flower_bouquet'], pococomun: ['strawberry_cake', 'firefly_jar', 'tropical_fish', 'dream_sap', 'wing_dust', 'old_coin', 'dream_spice'],
+    raro: ['golden_fruit', 'pearl', 'fossil', 'golden_fish', 'spice_stew', 'golden_cake'], epico: ['mystic_crystal', 'raw_gem', 'star_shard', 'rainbow_butterfly'] } },
+};
+/** estado diario de la Plaza: premios de los minijuegos, deseos y recuerdos del escenario (se reinicia cada día de la Plaza) */
+function plazaSt() { const d = Stage.clock().date, p = (GS.plaza ||= { day: d, earned: 0, wishes: 0, bestStars: 0, attended: {} }); if (p.day !== d) Object.assign(p, { day: d, earned: 0, wishes: 0, attended: {} }); p.attended ||= {}; return p; }
+
+/** 🎤 Escenario: lo que pasa ahora y lo próximo (función diaria, sorteo semanal, perfil destacado y cierre de temporada) */
+const Stage = {
+  now: () => new Date(),   // reloj (los tests lo cambian)
+  _fmt: null,
+  /** hora de la Plaza: la de España en la Red real (igual para todos) y la del dispositivo en la demo */
+  clock() {
+    const t = this.now(), real = NetWorld.real(); let y, mo, d, h, m, wd;
+    if (real) { const F = (this._fmt ||= new Intl.DateTimeFormat('en-US', { timeZone: 'Europe/Madrid', hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', weekday: 'short' }));
+      const P = Object.fromEntries(F.formatToParts(t).map(x => [x.type, x.value])); y = +P.year; mo = +P.month; d = +P.day; h = +P.hour % 24; m = +P.minute; wd = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(P.weekday); }
+    else { y = t.getFullYear(); mo = t.getMonth() + 1; d = t.getDate(); h = t.getHours(); m = t.getMinutes(); wd = Events._force ?? t.getDay(); }
+    return { h, m, wd, real, date: `${y}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}`, dn: Math.floor(Date.UTC(y, mo - 1, d) / 864e5) };
+  },
+  myProfile() { return NetWorld.real() ? Online.me?.profile : Net.origin(); },
+  featured() { if (!NetWorld.real()) return null; const f = Online.featured?.(); return Number.isInteger(f) ? NET_ORIGINS[f] : null; },   // el perfil destacado es de la temporada real
+  seasonEnds() { const s = Online.season?.season; return NetWorld.real() && s?.ends ? Date.parse(s.ends) : null; },
+  /** la función del día: un día concierto de los Cantantes y al siguiente, teatro de los Actores */
+  show(k = this.clock()) { const star = k.dn % 2 ? 4 : 5;
+    return star === 5 ? { id: 'concierto', icon: '🎤', title: 'Concierto de los Cantantes', detail: 'Los Cantantes de la Red suben al escenario. ¡Baila con ellos!', star, emote: 'dance' }
+      : { id: 'teatro', icon: '🎭', title: 'Función de los Actores', detail: 'Los Actores y Actrices de la Red estrenan obra corta. ¡Aplaude al final!', star, emote: 'clap' }; },
+  state() {
+    const C = CFG.plaza.stage, k = this.clock(), min = k.h * 60 + k.m, F = this.featured(), ends = this.seasonEnds(), now = Date.now() + (Online.season?._skew || 0);
+    const show = this.show(k), tomorrow = this.show({ dn: k.dn + 1 });
+    const draw = { id: 'sorteo', icon: '🎟️', title: 'Sorteo semanal de la Lotería', detail: 'El Alcalde canta los números de la Lotería Municipal.' };
+    const feat = F ? { id: 'destacado', icon: '🏆', title: `Perfil destacado: ${F.icon} ${F.name}`, detail: 'Presentación del perfil de la semana: sus objetos van sin comisión en el Tablón.' } : null;
+    const close = ends && ends > now && ends - now < 864e5 ? { id: 'cierre', icon: '🏁', title: 'Cierre de temporada', detail: `La temporada acaba en ${fmtCountdown(ends - now).replace(/ \d+s$/, '')}: se reparten los títulos del ranking.` } : null;
+    let live = null;
+    if (min >= C.showAt * 60 && min < C.showAt * 60 + C.showMin) live = show;
+    else if (k.wd === CFG.lotteryWeekday && min >= CFG.lotteryHour * 60 && min < CFG.lotteryHour * 60 + C.drawMin) live = draw;
+    else if (close) live = close;
+    else if (feat && k.wd === C.featuredWeekday) live = feat;
+    const toShow = C.showAt * 60 - min, toDraw = ((CFG.lotteryWeekday - k.wd + 7) % 7) * 1440 + CFG.lotteryHour * 60 - min;
+    const nexts = [toShow > 0 ? { ...show, in: toShow } : { ...tomorrow, in: toShow + 1440 }, { ...draw, in: toDraw > 0 ? toDraw : toDraw + 7 * 1440 }];
+    if (feat && k.wd !== C.featuredWeekday) nexts.push({ ...feat, in: ((C.featuredWeekday - k.wd + 7) % 7) * 1440 - min });
+    const next = nexts.filter(e => !live || e.id !== live.id || e.in > C.showMin).sort((a, b) => a.in - b.in)[0] || null;
+    return { live, next, clock: k };
+  },
+  inTxt(mins) { const h = Math.floor(mins / 60), m = mins % 60; return h >= 24 ? `${Math.floor(h / 24)} d ${h % 24} h` : h ? `${h} h ${m} min` : `${m} min`; },
+  /** cómo se ve en la Plaza (cartel y lo que hay encima) */
+  piece() { const S = this.state(); return { text: S.live ? `${S.live.icon} EN DIRECTO` : '🎤 ESCENARIO', live: !!S.live, icon: S.live?.star !== undefined ? NET_ORIGINS[S.live.star].icon : S.live?.icon }; },
+  label() { const S = this.state(); return S.live ? `${S.live.icon} En directo: ${S.live.title}` : `🎤 Escenario · próximo: ${S.next ? `${S.next.title} (en ${this.inTxt(S.next.in)})` : '—'}`; },
+  prize(ev) { const C = CFG.plaza.stage; return C.attendPrize * (ev?.star !== undefined && ev.star === this.myProfile() ? C.starMult : 1); },
+  attend() {
+    const S = this.state(), p = plazaSt(); if (!S.live) throw new Error('Ahora no hay nada en el escenario');
+    if (p.attended[S.live.id]) throw new Error('Ya tienes el recuerdo de este evento');
+    p.attended[S.live.id] = 1; const star = S.live.star !== undefined && S.live.star === this.myProfile();
+    const got = Wallet.add(this.prize(S.live), `Plaza: ${S.live.title}`, { src: 'plaza' }); SaveSystem.saveNow('plaza-stage'); playChime();
+    return star ? `${S.live.icon} ¡Actuaste en «${S.live.title}»! El público te ovaciona: +${fmt(got)} $T` : `🎟️ ¡Estuviste en «${S.live.title}»! +${fmt(got)} $T de recuerdo`;
+  },
+  open() {
+    if (NetWorld.real() && !Online.season && Online.me) Promise.resolve(Online.loadSeason?.()).catch(() => null);   // el perfil destacado y el cierre salen de la temporada
+    openApp('🎤 Escenario de la Plaza', '', (body) => {
+      const render = (msg = '') => {
+        const S = this.state(), C = CFG.plaza.stage, p = plazaSt(), got = S.live && p.attended[S.live.id], F = this.featured(), mine = S.live?.star !== undefined && S.live.star === this.myProfile();
+        let h = (msg ? `<div class="app-card p-2 mb-2 text-xs ${/^❌/.test(msg) ? 'bg-red-50' : 'bg-emerald-50'}">${msg}</div>` : '');
+        h += S.live ? `<div class="app-card p-3 mb-2 text-sm bg-amber-50"><div class="font-bold">${S.live.icon} En directo: ${S.live.title}</div><div class="text-xs text-slate-600 mt-0.5">${S.live.detail}${mine ? ' <b>Es tu perfil: súbete y actúa (premio doble).</b>' : ''}</div>
+          <div class="flex flex-wrap gap-2 mt-2">${S.live.emote ? `<button data-semote class="btn-game px-3 py-1.5 text-xs bg-pink-200">${Emotes.LIST[S.live.emote][0]} ${Emotes.LIST[S.live.emote][1]}</button>` : ''}${S.live.id === 'sorteo' ? `<button data-slot class="btn-game px-3 py-1.5 text-xs bg-yellow-200">🎫 Ver la Lotería</button>` : ''}<button data-sgo class="btn-game px-3 py-1.5 text-xs ${got ? 'bg-slate-200 opacity-60' : 'bg-emerald-300'}" ${got ? 'disabled' : ''}>${got ? '✓ Recuerdo recogido' : `${mine ? '🎤 Actuar' : '🎟️ Recoger el recuerdo'} (+${fmt(this.prize(S.live))} $T)`}</button></div></div>`
+          : `<div class="app-card p-3 mb-2 text-sm text-slate-600">Ahora no hay nada en el escenario.${S.next ? ` Próximo: <b>${S.next.icon} ${S.next.title}</b> dentro de <b>${this.inTxt(S.next.in)}</b>.` : ''}</div>`;
+        h += `<div class="sec-h">Programa (${S.clock.real ? 'hora de España, igual para todos' : 'hora de tu dispositivo'})</div><div class="app-card p-3 text-xs leading-relaxed">🎤 <b>Concierto de los Cantantes</b> y 🎭 <b>Función de los Actores</b>: un día cada uno, de ${C.showAt}:00 a ${C.showAt}:${String(C.showMin).padStart(2, '0')}<br>🎟️ <b>Sorteo semanal</b> de la Lotería: el domingo a las ${CFG.lotteryHour}:00` +
+          (S.clock.real ? `<br>🏆 <b>Perfil destacado</b>: se presenta los lunes${F ? ` (esta semana, ${F.icon} ${F.name})` : ''}<br>🏁 <b>Cierre de temporada</b>: el último día de cada temporada` : '') +
+          `<br><span class="text-slate-500">Si estás en la Plaza durante un evento, te llevas un recuerdo de ${fmt(C.attendPrize)} $T (uno por evento y día). Si la función es de tu perfil, actúas y cobras el doble.</span></div>`;
+        body.innerHTML = h;
+        const b = (sel, fn) => { const el = body.querySelector(sel); if (el) el.onclick = fn; };
+        b('[data-semote]', () => { closeApp(); Emotes.play(S.live.emote); });
+        b('[data-slot]', () => { closeApp(); setTimeout(() => openLottery(), 30); });
+        b('[data-sgo]', () => { let m; try { m = this.attend(); } catch (e) { m = '❌ ' + e.message; } render(m); });
+      };
+      render();
+    });
+  },
+};
+
+/** 🎮 Minijuegos rápidos de la Plaza: premio en $T con tope diario (los dos juegos juntos) */
+const PlazaGames = {
+  left() { return Math.max(0, CFG.plaza.games.cap - plazaSt().earned); },
+  pay(amount, label) { const a = Math.min(Math.max(0, Math.floor(amount)), this.left()); if (!a) return 0; const got = Wallet.add(a, label, { src: 'plaza' }); plazaSt().earned += a; SaveSystem.saveNow('plaza-game'); return got; },
+  open() {
+    openApp('🎮 Minijuegos de la Plaza', '', (body) => {
+      const p = plazaSt(), C = CFG.plaza.games;
+      body.innerHTML = `<div class="app-card p-2.5 mb-2 text-[11px] text-slate-600">Juegos de uno o dos minutos con premio en $T. Hoy llevas <b>${fmt(p.earned)}/${fmt(C.cap)} $T</b> de premios${this.left() ? '' : ' (tope alcanzado: puedes jugar, pero ya sin premio)'}.</div>
+        <div class="hub-grid"><button class="hub-t" data-gstar>${uiChip('⭐')}<div class="tx"><div class="ti">Atrapa estrellas</div><div class="de">${C.starTime} s · ${C.starPrize} $T por estrella · las doradas valen ${C.gold} · cuidado con las nubes${p.bestStars ? ` · tu récord: ${p.bestStars}` : ''}</div></div></button>
+        <button class="hub-t" data-gprice>${uiChip('🏷️')}<div class="tx"><div class="ti">Adivina el precio</div><div class="de">${C.rounds} objetos · ${C.pricePrize} $T por acierto · con los precios ${NetWorld.real() ? 'reales del Tablón' : 'del Tablón de la demo'}</div></div></button></div>`;
+      body.querySelector('[data-gstar]').onclick = () => { closeApp(); setTimeout(() => StarCatch.start(), 40); };
+      body.querySelector('[data-gprice]').onclick = () => PriceGuess.open();
+    });
+  },
+};
+
+/** ⭐ Atrapa estrellas: un minuto recogiendo estrellas con una cesta (ratón, dedo o flechas) */
+const StarCatch = {
+  run: null,
+  newGame(w = 360, h = 640) { return { w, h, t: CFG.plaza.games.starTime, x: w / 2, score: 0, caught: 0, items: [], spawn: 0.3, over: false }; },
+  /** un paso de la partida (puro: se prueba sin pantalla) */
+  step(g, dt, rnd = Math.random) {
+    if (g.over) return g; const C = CFG.plaza.games; g.t -= dt; if (g.t <= 0) { g.t = 0; g.over = true; return g; }
+    const fast = 1 + (C.starTime - g.t) / C.starTime;
+    g.spawn -= dt; if (g.spawn <= 0) { g.spawn = 0.55 / fast; const r = rnd(); g.items.push({ x: 20 + rnd() * (g.w - 40), y: -20, v: (120 + rnd() * 120) * fast, k: r < 0.1 ? 'gold' : r < 0.22 ? 'cloud' : 'star' }); }
+    const by = g.h - 60, bw = Math.max(70, g.w * 0.18);
+    g.items = g.items.filter(it => { it.y += it.v * dt; if (it.y >= by - 12 && it.y <= by + 22 && Math.abs(it.x - g.x) < bw / 2) { g.score = Math.max(0, g.score + (it.k === 'gold' ? C.gold : it.k === 'cloud' ? C.cloud : 1)); if (it.k !== 'cloud') g.caught++; return false; } return it.y < g.h + 30; });
+    return g;
+  },
+  finish(g) { const p = plazaSt(), best = g.score > (p.bestStars || 0); if (best) p.bestStars = g.score; const got = PlazaGames.pay(g.score * CFG.plaza.games.starPrize, 'Plaza: Atrapa estrellas'); return { got, best }; },
+  start() {
+    if (this.run) return;
+    const ov = document.createElement('div'); ov.style.cssText = 'position:fixed;inset:0;z-index:90;background:linear-gradient(#120a2a,#3b2d6b);touch-action:none;user-select:none';
+    const cv = document.createElement('canvas'), hud = document.createElement('div'), quit = document.createElement('button'), ctx = cv.getContext('2d'); ov.appendChild(cv); ov.appendChild(hud); ov.appendChild(quit); document.body.appendChild(ov);
+    quit.textContent = '✕'; quit.title = 'Salir'; quit.dataset.scQuit = '1'; quit.style.cssText = 'position:absolute;top:8px;right:10px;width:38px;height:38px;border-radius:999px;border:0;background:rgba(255,255,255,.18);color:#fff;font:700 18px Fredoka,Arial;cursor:pointer';
+    hud.style.cssText = 'position:absolute;top:10px;left:0;right:0;display:flex;justify-content:center;gap:16px;color:#fff;font:700 18px Fredoka,Arial;pointer-events:none';
+    const dpr = Math.min(2, devicePixelRatio || 1), W = innerWidth, H = innerHeight; cv.width = W * dpr; cv.height = H * dpr; cv.style.cssText = 'width:100%;height:100%'; ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const g = this.newGame(W, H), keys = {}; state.modalOpen = true; state.overlayGame = true;
+    const onKey = (e) => { if (!this.run) return; e.stopImmediatePropagation(); if (['ArrowLeft', 'ArrowRight', 'KeyA', 'KeyD', 'Escape', 'Space'].includes(e.code)) { e.preventDefault(); keys[e.code] = e.type === 'keydown'; if (e.code === 'Escape' && e.type === 'keydown') g.t = 0.0001; } };
+    const onMove = (e) => { const t = e.touches ? e.touches[0] : e; if (t) g.x = Math.max(20, Math.min(W - 20, t.clientX)); }; quit.onclick = (e) => { e.stopPropagation(); g.t = 0.0001; };
+    addEventListener('keydown', onKey, true); addEventListener('keyup', onKey, true); ov.addEventListener('pointermove', onMove); ov.addEventListener('touchmove', onMove, { passive: true });
+    let last = performance.now();
+    const draw = () => {
+      ctx.clearRect(0, 0, W, H); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      g.items.forEach(it => { ctx.font = `${it.k === 'gold' ? 34 : 28}px serif`; ctx.fillText(it.k === 'gold' ? '🌟' : it.k === 'cloud' ? '☁️' : '⭐', it.x, it.y); });
+      const by = H - 60, bw = Math.max(70, W * 0.18); ctx.fillStyle = '#ffca28'; ctx.beginPath(); if (ctx.roundRect) ctx.roundRect(g.x - bw / 2, by, bw, 26, 10); else ctx.rect(g.x - bw / 2, by, bw, 26); ctx.fill(); ctx.font = '26px serif'; ctx.fillText('🧺', g.x, by - 6);
+      hud.innerHTML = `<span>⭐ ${g.score}</span><span>⏱️ ${Math.ceil(g.t)} s</span><span style="opacity:.7;font-size:13px;align-self:center">${IS_MOBILE ? 'mueve el dedo' : 'ratón o flechas · Esc para salir'}</span>`;
+    };
+    const end = () => {
+      removeEventListener('keydown', onKey, true); removeEventListener('keyup', onKey, true); this.run = null;
+      const r = this.finish(g); ov.innerHTML = `<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center"><div class="app-card p-5 text-center" style="min-width:260px"><div class="text-4xl mb-2">⭐</div><div class="font-bold text-lg">${g.score} estrellas${r.best ? ' · ¡récord!' : ''}</div><div class="text-sm text-slate-600 mt-1">${r.got ? `+${fmt(r.got)} $T` : PlazaGames.left() ? 'Sin premio esta vez' : 'Ya llegaste al tope de premios de hoy'}</div><div class="flex gap-2 justify-center mt-3"><button data-again class="btn-game px-3 py-1.5 text-sm bg-emerald-300">Otra vez</button><button data-out class="btn-game px-3 py-1.5 text-sm bg-white">Volver a la Plaza</button></div></div></div>`;
+      const close = (again) => { removeEventListener('keydown', onEnd, true); ov.remove(); if (again) this.start(); else { state.modalOpen = false; state.overlayGame = false; } };
+      const onEnd = (e) => { e.stopImmediatePropagation(); if (e.code === 'Escape' || e.code === 'Enter') { e.preventDefault(); close(e.code === 'Enter'); } };   // Esc vuelve a la Plaza · Intro, otra vez
+      addEventListener('keydown', onEnd, true); ov.querySelector('[data-again]').onclick = () => close(true); ov.querySelector('[data-out]').onclick = () => close(false);
+    };
+    const loop = (now) => { if (!this.run) return; const dt = Math.min(0.25, Math.max(0, (now - last) / 1000)); last = now; const sp = W * 0.9; if (keys.ArrowLeft || keys.KeyA) g.x = Math.max(20, g.x - sp * dt); if (keys.ArrowRight || keys.KeyD) g.x = Math.min(W - 20, g.x + sp * dt);
+      for (let k = dt; k > 1e-6 && !g.over; k -= 0.05) this.step(g, Math.min(0.05, k));   // en pasos de 50 ms: el minuto dura un minuto aunque el móvil vaya lento
+      draw(); if (g.over) { end(); return; } requestAnimationFrame(loop); };
+    this.run = g; requestAnimationFrame(loop);
+  },
+};
+
+/** 🏷️ Adivina el precio: 5 objetos con 4 precios a elegir (precios reales del Tablón en la Red real) */
+const PriceGuess = {
+  pool() {
+    if (NetWorld.real()) return (RealMarket.data?.items || NET_MATS.slice(0, 32).map(id => ({ id, p: 0, t: 1 }))).filter(x => x.p < 8 && (x.t || 1) <= 4).map(x => ({ id: x.id, price: RealTrade.estRef(x.id) })).filter(x => x.price > 0);
+    const W = NetEco.W; return NET_MATS.slice(0, 32).map((id, m) => ({ id, price: Math.max(1, Math.round(W ? W.price[m] : netBase(m) * 5)) }));
+  },
+  question(rnd = Math.random) {
+    const P = this.pool(), q = P[Math.floor(rnd() * P.length)], mults = [0.55, 0.75, 1.35, 1.7].sort(() => rnd() - 0.5).slice(0, 3);
+    const opts = [q.price, ...mults.map(m => Math.max(1, Math.round(q.price * m)))].filter((v, i, a) => a.indexOf(v) === i);
+    while (opts.length < 4) opts.push(Math.max(...opts) + Math.max(1, Math.round(q.price * 0.4)));
+    return { id: q.id, price: q.price, opts: opts.sort(() => rnd() - 0.5) };
+  },
+  async open() {
+    if (NetWorld.real() && !RealMarket.data) await RealMarket.load().catch(() => null);
+    const C = CFG.plaza.games, G = { n: 0, ok: 0, q: this.question(), last: '' };
+    openApp('🏷️ Adivina el precio', '', (body) => {
+      const render = () => {
+        if (G.n >= C.rounds) { const got = PlazaGames.pay(G.ok * C.pricePrize, 'Plaza: Adivina el precio');
+          body.innerHTML = `<div class="app-card p-5 text-center"><div class="text-4xl mb-2">🏷️</div><div class="font-bold text-lg">${G.ok}/${C.rounds} aciertos</div><div class="text-sm text-slate-600 mt-1">${got ? `+${fmt(got)} $T` : PlazaGames.left() ? 'Sin premio esta vez' : 'Ya llegaste al tope de premios de hoy'}</div><button data-again class="btn-game px-3 py-1.5 text-sm bg-emerald-300 mt-3">Otra partida</button></div>`;
+          body.querySelector('[data-again]').onclick = () => { Object.assign(G, { n: 0, ok: 0, q: this.question(), last: '' }); render(); }; return; }
+        const it = ITEMS[G.q.id];
+        body.innerHTML = (G.last ? `<div class="app-card p-2 mb-2 text-xs ${/^✓/.test(G.last) ? 'bg-emerald-50' : 'bg-red-50'}">${G.last}</div>` : '') + `<div class="text-[11px] text-slate-500 mb-1">Objeto ${G.n + 1} de ${C.rounds} · aciertos: ${G.ok}</div>
+          <div class="app-card p-4 mb-2 text-center"><div class="flex justify-center mb-1">${itemIcon(G.q.id, 56)}</div><div class="font-bold">${it ? `${it.icon} ${it.name}` : G.q.id}</div><div class="text-xs text-slate-500">¿A cuánto se vende en el Tablón?</div></div>
+          <div class="grid grid-cols-2 gap-2">${G.q.opts.map(v => `<button data-pg="${v}" class="btn-game px-3 py-2 text-sm bg-white">${fmt(v)} $T</button>`).join('')}</div>`;
+        body.querySelectorAll('[data-pg]').forEach(b => b.onclick = () => { const v = +b.dataset.pg, right = v === G.q.price; if (right) G.ok++; G.last = right ? `✓ ¡Exacto! ${fmt(G.q.price)} $T` : `✗ Era ${fmt(G.q.price)} $T`; G.n++; G.q = this.question(); render(); });
+      };
+      render();
+    });
+  },
+};
+
+/** ⛲ Fuente de los deseos: un sumidero de $T con las probabilidades a la vista */
+const WishFountain = {
+  NAMES: { nada: 'Nada (la fuente sonríe)', comun: 'Objeto común', pococomun: 'Objeto poco común', raro: 'Objeto raro', epico: 'Objeto épico', deseo: 'Un deseo (mejora pequeña)', grandeseo: 'Un gran deseo (épico + suerte)' },
+  /** valor medio (precio de tienda) de lo que devuelve un tiro */
+  ev(tier) { const F = CFG.plaza.fountain, avg = (k) => { const L = F.pools[k === 'grandeseo' ? 'epico' : k]; return L ? L.reduce((a, id) => a + (ITEMS[id]?.sell || 0), 0) / L.length : 0; }; return Math.round(F.throws[tier].odds.reduce((a, [k, p]) => a + p * avg(k), 0)); },
+  roll(tier, rnd = Math.random) { const T = CFG.plaza.fountain.throws[tier]; let x = rnd(); for (const [k, p] of T.odds) { if ((x -= p) < 0) return k; } return T.odds[T.odds.length - 1][0]; },
+  give(id) { if (Inventory.canAddMany([[id, 1]])) { Inventory.add(id, 1, { silent: true }); return `${ITEMS[id].icon} ${ITEMS[id].name}`; } const v = ITEMS[id].sell || 0; if (v) Wallet.add(v, 'Fuente de los deseos (mochila llena)', { silent: true, noMult: true }); return `${ITEMS[id].icon} ${ITEMS[id].name} (mochila llena: te lo cambia por ${fmt(v)} $T)`; },
+  throwCoin(tier, rnd = Math.random) {
+    const F = CFG.plaza.fountain, T = F.throws[tier], p = plazaSt(); if (!T) throw new Error('Moneda no valida');
+    if (p.wishes >= F.daily) throw new Error(`La fuente descansa: como mucho ${F.daily} deseos al día`);
+    if (!Wallet.spend(T.cost, 'Fuente de los deseos', { silent: true, snk: 'fuente' })) throw new Error('No tienes $TOKEN suficientes');
+    p.wishes++; const k = this.roll(tier, rnd), pick = (pool) => F.pools[pool][Math.floor(rnd() * F.pools[pool].length)]; let msg;
+    if (k === 'nada') msg = '💧 Plof. La fuente sonríe… y nada más. Quizá la próxima.';
+    else if (k === 'deseo') { if (!(state.buff && state.buff.until > Date.now() && state.buff.mult >= 1.3)) applyBuff(1.3, 300, '⛲ Deseo cumplido: velocidad +30 % durante 5 min'); Util.luckUntil = Math.max(Util.luckUntil, Date.now()) + 10 * 60000; msg = '✨ ¡Deseo cumplido! Velocidad +30 % 5 min y más suerte pescando y con el detector 10 min.'; }
+    else if (k === 'grandeseo') { Util.luckUntil = Math.max(Util.luckUntil, Date.now()) + 30 * 60000; msg = `🌠 ¡Gran deseo! ${this.give(pick('epico'))} y suerte durante 30 min.`; }
+    else msg = `🎁 La fuente te devuelve: ${this.give(pick(k))}`;
+    SaveSystem.saveNow('plaza-fountain'); if (k !== 'nada') playChime(); else playBeep(523, 0.06, 'sine');
+    return { k, msg };
+  },
+  open() {
+    openApp('⛲ Fuente de los deseos', '', (body) => {
+      const render = (msg = '') => {
+        const F = CFG.plaza.fountain, p = plazaSt(), pct = (x) => `${Math.round(x * 100)} %`;
+        body.innerHTML = (msg ? `<div class="app-card p-2 mb-2 text-xs ${/^❌/.test(msg) ? 'bg-red-50' : 'bg-sky-50'}">${msg}</div>` : '') + `<div class="app-card p-2.5 mb-2 text-[11px] text-slate-600">Echa una moneda y pide un deseo. Casi siempre se queda con ella: es la fuente de los sueños, no un banco. Las probabilidades están a la vista. Hoy: <b>${p.wishes}/${F.daily}</b> deseos.</div>` +
+          F.throws.map((T, i) => `<div class="app-card p-3 mb-2 text-xs"><div class="flex items-center gap-2"><b class="text-sm flex-1">${['🪙', '💰', '💎'][i]} ${fmt(T.cost)} $T</b><button data-wish="${i}" class="btn-game px-3 py-1.5 text-xs bg-sky-300" ${p.wishes >= F.daily ? 'disabled' : ''}>Echar</button></div><div class="text-slate-500 mt-1">${T.odds.map(([k, x]) => `${this.NAMES[k]} <b>${pct(x)}</b>`).join(' · ')}</div><div class="text-[10px] text-slate-400 mt-0.5">De media te devuelve ≈ ${fmt(this.ev(i))} $T en objetos (precio de tienda).</div></div>`).join('');
+        body.querySelectorAll('[data-wish]').forEach(b => b.onclick = () => { let m; try { m = this.throwCoin(+b.dataset.wish).msg; } catch (e) { m = '❌ ' + e.message; } render(m); });
+      };
+      render();
+    });
+  },
+};
+
+/** 📌 Tablón de anuncios: notas de «Compro», «Vendo» o «Busco» (3 activas, 48 h, texto filtrado, enlace a su puesto) */
+const NoticeBoard = {
+  rpc: (fn, a) => RealMarket.rpc(fn, a),
+  KINDS: { compro: ['🛒', 'Compro', 'bg-emerald-100'], vendo: ['🏷️', 'Vendo', 'bg-amber-100'], busco: ['🔎', 'Busco', 'bg-sky-100'] },
+  /** demo: notas de los bots (cambian cada día del sueño) */
+  demoNotes() {
+    const W = NetEco.W; if (!W) return [];
+    const r = netRngOf((Net.st().seed || 'red') + ':notes:' + GS.daily.dayCount), out = [], kinds = ['compro', 'vendo', 'busco'];
+    for (let k = 0; k < 5; k++) { const b = NetEco.S[Math.floor(r() * NetEco.S.length)], m = Math.floor(r() * 32), kind = kinds[Math.floor(r() * 3)], it = ITEMS[NET_MATS[m]], p = Math.round(W.price[m]);
+      out.push({ id: 'd' + k, kind, item: it.id, who: b.name, profile: b.origin, text: kind === 'compro' ? `Compro ${it.name}, pago hasta ${fmt(Math.round(p * 1.1))} $T` : kind === 'vendo' ? `Vendo ${it.name} a ${fmt(Math.round(p * 0.95))} $T, tengo de sobra` : `Busco ${it.name} para un pedido. ¿Alguien?`, bot: true }); }
+    return out;
+  },
+  card(n) {
+    const K = this.KINDS[n.kind] || this.KINDS.busco;
+    return `<div class="app-card p-2.5 mb-1.5 text-xs"><div class="flex items-center gap-2"><span class="px-1.5 py-0.5 rounded ${K[2]} text-[10px] font-bold">${K[0]} ${K[1]}</span><b class="flex-1 min-w-0">${NET_ORIGINS[n.profile]?.icon || ''} ${esc(String(n.who || '¿?'))}${n.bot ? ' <span class="text-slate-400">(bot)</span>' : ''}</b>${n.item ? itemIcon(n.item, 18) : ''}</div><div class="mt-1">${esc(String(n.text || ''))}</div>` +
+      (n.bot ? '' : `<div class="flex flex-wrap gap-1.5 mt-1.5">${n.mine ? `<button data-nrm="${n.id}" class="btn-game px-2 py-0.5 text-[11px] bg-white">Quitar</button><span class="text-[10px] text-slate-400 self-center">caduca en ${fmtCountdown(Date.parse(n.ends) - Date.now()).replace(/ \d+s$/, '')}</span>` : `${n.stall ? `<button data-nst="${n.owner}" class="btn-game px-2 py-0.5 text-[11px] bg-emerald-200">🧺 Su puesto</button>` : ''}${n.shop ? `<button data-nsh="${n.owner}" class="btn-game px-2 py-0.5 text-[11px] bg-amber-200">🏪 Su tienda</button>` : ''}<button data-npc="${n.owner}" class="btn-game px-2 py-0.5 text-[11px] bg-white">👤 Ficha</button>`}</div>`) + `</div>`;
+  },
+  open() {
+    openApp('📌 Tablón de anuncios', '', (body) => {
+      const render = async (msg = '') => {
+        let h = msg ? `<div class="app-card p-2 mb-2 text-xs ${/^❌/.test(msg) ? 'bg-red-50' : 'bg-emerald-50'}">${msg}</div>` : '';
+        if (!NetWorld.real()) { body.innerHTML = h + `<div class="app-card p-2.5 mb-2 text-[11px] text-slate-600">🤖 <b>Modo demo</b> · estas notas las dejan los bots. En la Red real, cada jugador puede tener 3 notas de «Compro», «Vendo» o «Busco» durante 48 h.</div>` + (this.demoNotes().map(n => this.card(n)).join('') || '<div class="text-xs text-slate-400">Hoy no hay notas.</div>'); return; }
+        body.innerHTML = h + `<div class="app-card p-3 text-sm text-slate-500">Leyendo el tablón…</div>`;
+        let L; try { L = await this.rpc('crossia_notes', {}); } catch (e) { body.innerHTML = `<div class="app-card p-3 text-sm">❌ ${esc(e.message)}</div>`; return; }
+        if (!RealMarket.data) await RealMarket.load().catch(() => null);
+        const mine = (L || []).filter(n => n.mine), others = (L || []).filter(n => !n.mine);
+        h += `<div class="sec-h">Deja una nota (${mine.length}/3 · duran 48 h)</div><div class="app-card p-3 mb-2 text-xs"><div class="flex flex-wrap gap-1 items-center"><select data-nk class="game text-xs px-1 py-1">${Object.entries(this.KINDS).map(([k, v]) => `<option value="${k}">${v[0]} ${v[1]}</option>`).join('')}</select><select data-ni class="game text-xs px-1 py-1 min-w-0"><option value="">(sin objeto)</option>${RealTrade.opts(null)}</select></div>
+          <div class="flex gap-1 mt-1.5"><input data-nt maxlength="120" placeholder="Ej.: Compro 5 Especias Raras, pago bien" class="game flex-1 min-w-0 text-xs px-2 py-1"><button data-npost class="btn-game px-2 py-1 text-[11px] bg-emerald-300" ${mine.length >= 3 ? 'disabled' : ''}>Publicar</button></div></div>`;
+        h += mine.length ? `<div class="sec-h">Tus notas</div>` + mine.map(n => this.card(n)).join('') : '';
+        h += `<div class="sec-h">Notas de la Red (${others.length})</div>` + (others.map(n => this.card(n)).join('') || '<div class="text-xs text-slate-400 mb-2">Todavía no hay notas. ¡Deja la primera!</div>');
+        body.innerHTML = h; body.querySelectorAll('input').forEach(i => i.onkeydown = (e) => e.stopPropagation());
+        const v = (sel) => body.querySelector(sel)?.value, run = async (fn) => { let m; try { m = await fn(); } catch (e) { m = '❌ ' + e.message; } render(m); };
+        const post = body.querySelector('[data-npost]'); if (post) post.onclick = () => run(async () => { await this.rpc('crossia_note_post', { p_kind: v('[data-nk]'), p_text: v('[data-nt]') || '', p_item: v('[data-ni]') || null }); return '📌 Nota publicada: la verán todos durante 48 h'; });
+        body.querySelectorAll('[data-nrm]').forEach(b => b.onclick = () => run(async () => { await this.rpc('crossia_note_remove', { p_id: +b.dataset.nrm }); return '✓ Nota quitada'; }));
+        body.querySelectorAll('[data-nst]').forEach(b => b.onclick = () => { closeApp(); setTimeout(() => { if (!RealWorld.openStallOf(b.dataset.nst)) PeerCard.openId(b.dataset.nst); }, 30); });
+        body.querySelectorAll('[data-nsh]').forEach(b => b.onclick = () => { closeApp(); setTimeout(() => Promise.resolve(RealShops.visit(b.dataset.nsh)).catch(() => {}), 30); });
+        body.querySelectorAll('[data-npc]').forEach(b => b.onclick = () => { closeApp(); setTimeout(() => PeerCard.openId(b.dataset.npc), 30); });
+      };
+      render();
+    });
+  },
 };
 
 /* ===== v3.1 · C6 · SECCIONES DETRÁS DE PUERTAS: Puerto de Ultramar, Galería de Subastas, Barrio de los Oficios y Mercado nocturno ===== */
@@ -13799,7 +14073,7 @@ DBG.refs = DBG_REFS;
 if (/[?&]debug=1\b/.test(location.search)) window._dbg = DBG_REFS;   // v1.0: ya no es global por defecto
 /* v1.1 · Interior caminable de la casa (Sec. 6.9 Fase 2) */
 /** v1.5 · capturas: DBG.tp(x, z) lleva al jugador a (x, z) del pueblo · DBG.view(dist, pitch, yaw) fija la cámara · DBG.shot('B'|'C'|'D'|'G'|'H') prepara la escena del protocolo */
-DBG.g = { World, WGEO, WorldFX, TRAVEL_POSTS, Island, Voyage, TRIBE, ship, state, IconStudio, ItemArt, itemIcon, PhGlyph, startDialog, openInventory, openHousePanel, addLetter, endDialog, openShop, openGiftPicker, openEncargo, acceptCourier, refreshMissionUI, SeasonDecor, Snow, claimSeasonGift, seasonNow, openWeeklyPanel, openRoulette, Weather, Decorate, SyncGuard, Online, RealShops, RealMarket, RealRequests, RealTrade, NightMarket, Guilds, NET_SECTIONS, Metrics, Presence, Emotes, NetStatus, PeerCard, NetChat, Gather, Mining, npcObjs, interactables, colliders, SITES, NPCS, CFG, get house() { return house; }, scene, renderer, camera, cam, sky, water, atmo, clouds, PostFX, SkyEnv, PlanetAO, WATER_U, POST_U, Gather, Studio, ToolAnim, Profiles, Hub, Decor, Fitting, player, Interiors };   // v1.5: referencias gráficas para depurar
+DBG.g = { World, WGEO, WorldFX, TRAVEL_POSTS, Island, Voyage, TRIBE, ship, state, IconStudio, ItemArt, itemIcon, PhGlyph, startDialog, openInventory, openHousePanel, addLetter, endDialog, openShop, openGiftPicker, openEncargo, acceptCourier, refreshMissionUI, SeasonDecor, Snow, claimSeasonGift, seasonNow, openWeeklyPanel, openRoulette, Weather, Decorate, SyncGuard, Online, RealShops, RealMarket, RealRequests, RealTrade, NightMarket, Guilds, NET_SECTIONS, Stage, PlazaGames, StarCatch, PriceGuess, WishFountain, NoticeBoard, Metrics, Presence, Emotes, NetStatus, PeerCard, NetChat, Gather, Mining, npcObjs, interactables, colliders, SITES, NPCS, CFG, get house() { return house; }, scene, renderer, camera, cam, sky, water, atmo, clouds, PostFX, SkyEnv, PlanetAO, WATER_U, POST_U, Gather, Studio, ToolAnim, Profiles, Hub, Decor, Fitting, player, Interiors };   // v1.5: referencias gráficas para depurar
 DBG.post = (v = !PostFX.active) => { PostFX.active = !!v; POST_U.uPost.value = v ? 1 : 0; return PostFX.active; };
 DBG.env = (v = !SkyEnv.enabled) => SkyEnv.setEnabled(v);
 DBG.ao = (v = true) => { if (!PlanetAO.on) return false; if (v) PlanetAO.bake(); else { const c = planet.geometry.attributes.color; PlanetAO.reset(); c.needsUpdate = true; } return v; };
