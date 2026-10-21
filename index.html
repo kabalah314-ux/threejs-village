@@ -853,11 +853,11 @@ const CFG = {
     rain: { size: 0.075, alpha: 0.7, color: 0xaecbff },
     // Red del Sueño: cielo de sueño, estrellas, falda de suelo y fachadas de fondo
     dream: {
-      sky: { top: 0x8f7fd6, mid: 0xffc9b8, bot: 0xffe0c8 }, skyDorado: { top: 0x2c1d5c, mid: 0xffb38a, bot: 0x5a3a7a },
+      sky: { top: 0x8f7fd6, mid: 0xffc9b8, bot: 0xffe0c8 }, skyDorado: { top: 0x2c1d5c, mid: 0xffb38a, bot: 0x5a3a7a }, skyNight: { top: 0x05030f, mid: 0x2a1650, bot: 0x120a24 },   // v3.1: Mercado nocturno
       stars: 240, starSize: 2.2, starAlpha: 0.8, fog: [38, 120], skirt: 140,
       rows: [{ off: 2.2, h: [3.5, 7], w: [2.6, 4.6], d: [2.2, 3.2] }, { off: 7.5, h: [7, 14], w: [3.6, 6.4], d: [3, 5] }],   // fila baja + fila alta (Baja: solo la 1.ª)
       gap: 3.2,                   // calles abiertas frente a los arcos y puertas (centro de cada lado)
-      colors: [0xffd6e7, 0xd7c8ff, 0xc8f0ff, 0xfff1c8, 0xd2f5e3, 0xffdcc8, 0xe8d6ff], doradoColors: [0x5b3f8f, 0x7a4fa8, 0x3f2f78, 0x9a6ad0, 0xffd27a],
+      colors: [0xffd6e7, 0xd7c8ff, 0xc8f0ff, 0xfff1c8, 0xd2f5e3, 0xffdcc8, 0xe8d6ff], doradoColors: [0x5b3f8f, 0x7a4fa8, 0x3f2f78, 0x9a6ad0, 0xffd27a], nightColors: [0x2b1d4a, 0x3a2a5e, 0x1f1640, 0x4a2f6e, 0x231a3d],
       roof: 0.78, windowGlow: 0.55,   // tejado = color × 0,78 · brillo de las ventanas
     },
     // Red del Sueño: cámara (sobre CFG.interior): las zonas no caben enteras → se encaja el 62 % y el objetivo va más hacia el jugador
@@ -937,7 +937,7 @@ const CFG = {
      (población pequeña, ticks intradía, visual); todo lo demás es la cifra de la Spec. */
   net: {
     bots: 80, botsRange: [50, 100], warmupDays: 10, ticksPerDay: 4,   // demo: 50–100 comerciantes bot (Doc 13) · 10 días de rodaje al crear el mundo · 4 rondas del Tablón al día (00, 06, 12, 18 h)
-    avatars: { plaza: 22, mercadillo: 16, paseo: 14, dorado: 8 },      // demo: avatares visibles por zona (instanciados)
+    avatars: { plaza: 22, mercadillo: 16, paseo: 14, dorado: 8, puerto: 10, galeria: 8, oficios: 14, nocturno: 6 },      // demo: avatares visibles por zona (instanciados)
     // online.py classes → 4 estrategias de bot: [peso, prob. de conexión, esfuerzo, prob. de arbitrar]
     classes: { casual: [0.40, 0.55, 0.6, 0.3], trader: [0.25, 0.85, 1.0, 1.0], shopkeeper: [0.20, 0.90, 1.2, 0.7], hoarder: [0.15, 0.80, 1.0, 0.5] },
     base: [12, 18, 30, 45], jewelBase: 400,                            // Spec 3.2: precio base de los 4 nativos y de la joya
@@ -8403,7 +8403,7 @@ function awakeningChainHTML() {
    Nota: la 🎪 Feria del Sábado (puestos de los vecinos, ofertas de tienda) NO es la
    📈 Feria del Tablón de la v0.8 (especulación por categorías): conviven sin tocarse.
    ========================================================= */
-const GAME_VERSION = '3.0.3', GAME_TAG = 'Trueque, contratos y subastas';
+const GAME_VERSION = '3.1', GAME_TAG = 'Las secciones de la Red';
 /* ---------- 🗓️ EVENTOS: calendario REAL → flags que leen los sistemas existentes (Sec. 10.10) ---------- */
 const Events = {
   _force: null,   // DBG.weekday(n): simula el día de la semana real (0 = domingo … 6 = sábado)
@@ -9100,7 +9100,7 @@ const DREAM_WIN = (() => {
 function dreamRng(str) { let h = 2166136261; for (let i = 0; i < str.length; i++) h = Math.imul(h ^ str.charCodeAt(i), 16777619); return () => { h += 0x6D2B79F5; let t = h; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
 const WALL_PIECES = new Set(['door', 'painting', 'sign']);   // v1.4: piezas que cuelgan de una pared (se ocultan con ella)
 function buildDreamSurroundings(S, root, def) {
-  const D = CFG.gfx.dream, dorado = def.netZone === 'dorado', SK = dorado ? D.skyDorado : D.sky, [w, d] = def.size, hw = w / 2, hd = d / 2;
+  const D = CFG.gfx.dream, dorado = def.netZone === 'dorado', night = !!def.night, SK = dorado ? D.skyDorado : night ? D.skyNight : D.sky, [w, d] = def.size, hw = w / 2, hd = d / 2;
   // cielo de gradiente lavanda → melocotón (sigue a la cámara en _frame)
   const dome = new THREE.Mesh(new THREE.SphereGeometry(150, 32, 16), new THREE.ShaderMaterial({
     side: THREE.BackSide, depthWrite: false, fog: false,
@@ -9117,7 +9117,7 @@ function buildDreamSurroundings(S, root, def) {
   const skirt = new THREE.Mesh(new THREE.CircleGeometry(D.skirt, 48).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ color: new THREE.Color(def.skirtColor ?? 0xc9b8e8), roughness: 1 }));
   skirt.position.y = -0.205; skirt.raycast = () => {}; root.add(skirt);
   // fachadas de fondo en el perímetro (calles abiertas en el centro de cada lado: arcos, puertas y el tranvía)
-  const rng = dreamRng('dream:' + (def.netZone || def.title)), cols = dorado ? D.doradoColors : D.colors, rows = D.rows.slice(0, GFX.T.backdrop);
+  const rng = dreamRng('dream:' + (def.netZone || def.title)), cols = dorado ? D.doradoColors : night ? D.nightColors : D.colors, rows = D.rows.slice(0, GFX.T.backdrop);
   const sides = [{ nx: 0, nz: -1, len: w, off: hd }, { nx: 0, nz: 1, len: w, off: hd }, { nx: -1, nz: 0, len: d, off: hw }, { nx: 1, nz: 0, len: d, off: hw }], out = [];
   const bodyMat = new THREE.MeshStandardMaterial({ map: DREAM_WIN.map, emissiveMap: DREAM_WIN.emi, emissive: 0xffd59a, emissiveIntensity: D.windowGlow, roughness: 0.9 });
   const roofMat = new THREE.MeshStandardMaterial({ roughness: 0.8 }), geo = new THREE.BoxGeometry(1, 1, 1).translate(0, 0.5, 0);
@@ -9346,7 +9346,7 @@ const Interiors = {
   _frame(dt, t) {
     const C = CFG.interior, day = state.dayAmt ?? 1, L = this._lights; if (!L) return;
     const skyU = sky.material.uniforms; this.panes.forEach(p => { p.material.emissive.copy(skyU.midColor.value).lerp(skyU.topColor.value, 0.35); });
-    if (this.active?.def.outdoor) { L.win.intensity = 1.05; L.hemi.intensity = 0.7; L.amb.intensity = 0.3; }   // v1.3: la Red del Sueño siempre tiene luz de sueño
+    if (this.active?.def.outdoor) { const k = this.active.def.night ? 0.62 : 1; L.win.intensity = 1.05 * k; L.hemi.intensity = 0.7 * k; L.amb.intensity = 0.3 * k; }   // v1.3: la Red del Sueño siempre tiene luz de sueño · v3.1: menos en el Mercado nocturno
     else { L.win.intensity = lerp(C.windowLightNight, C.windowLightDay, day); L.win.color.copy(sun.color); L.hemi.intensity = lerp(0.3, 0.55, day); L.amb.intensity = lerp(0.16, 0.24, day); }
     const lampK = lerp(C.lampNight, C.lampDay, day); this.lamps.forEach(l => { if (!(this._lava && l.light === this._lava.light)) l.light.intensity = l.base * lampK; });
     if (this._lava) { const on = !!this.houseState().lavaOn, lv = this._lava; lv.light.intensity = on ? lv.base : 0; lv.glass.material.emissiveIntensity = on ? 0.35 + Math.sin(t * 1.3) * 0.1 : 0.02; lv.blobs.forEach((b, i) => { b.visible = on; b.position.y = 1.07 + Math.sin(t * (0.6 + i * 0.23) + i * 2) * 0.18; }); }
@@ -10791,6 +10791,7 @@ const Net = {
   buyState() { const st = this.st(), d = this.today(); if (st.buy.day !== d) st.buy = { day: d, per: {} }; return st.buy; },
   placeOrder(side, m, price, qty) {
     const st = this.st(), C = CFG.net; if (!this.on()) return { ok: false, why: 'La Red no está activa' };
+    if (side === 'b' && (st.nightDebt || 0) > 0) return { ok: false, why: NightMarket.debtWhy(st.nightDebt) };   // v3.1 · C6
     m = m | 0; price = netRound(Math.max(0, +price || 0)); qty = Math.floor(+qty || 0);
     if (m < 0 || m >= 32) return { ok: false, why: 'Las joyas van a la Casa de Subastas' };
     if (price < 1 || qty < 1) return { ok: false, why: 'Precio y cantidad deben ser ≥ 1' };
@@ -10891,6 +10892,7 @@ const Net = {
   postContract(m, q, pay, days) {
     const st = this.st(), C = CFG.net; m = m | 0; q = Math.floor(q); pay = Math.floor(pay); days = clamp(Math.floor(days) || 1, 1, 7);
     if (!this.on() || m < 0 || m >= 32 || q < 1 || pay < 1) return { ok: false, why: 'Contrato inválido' };
+    if ((st.nightDebt || 0) > 0) return { ok: false, why: NightMarket.debtWhy(st.nightDebt) };   // v3.1 · C6
     if (st.contracts.length >= 4) return { ok: false, why: 'Máximo 4 contratos abiertos' };
     const esc = Math.ceil(pay * (1 + C.contractFee));
     if (!Wallet.spend(esc, `Red: contrato (pago bloqueado + 2 %)`, { silent: true, snk: 'demo-net' })) return { ok: false, why: `Necesitas ${fmt(esc)} $T en depósito` };
@@ -10922,6 +10924,7 @@ const Net = {
   /* ---------- 🔨 Casa de Subastas (joyas · 5 % al vendedor · 24 h = 1 día onírico, puja automática) ---------- */
   bid(lotId, max) {
     const W = this.W(), lot = W?.auc.find(a => a.id === lotId); if (!lot) return { ok: false, why: 'Lote cerrado' };
+    if ((this.st().nightDebt || 0) > 0) return { ok: false, why: NightMarket.debtWhy(this.st().nightDebt) };   // v3.1 · C6
     if (lot.s === 'P') return { ok: false, why: 'Es tu propio lote' };
     max = Math.floor(max); const min = Math.ceil(Math.max(lot.res, lot.pb) * (lot.pb ? 1 + CFG.net.auction.minStep : 1)); if (max < min) return { ok: false, why: `Puja mínima ${fmt(min)} $T` };
     const extra = max - (lot.pb | 0); if (!Wallet.spend(extra, 'Red: puja en subasta (depósito)', { silent: true, snk: 'demo-net' })) return { ok: false, why: 'No tienes $TOKEN para el depósito' };
@@ -11097,6 +11100,10 @@ const NET_ZONES = {
   mercadillo: { name: 'El Mercadillo',           icon: '⛺', size: [40, 17], spawn: [-16.5, 0] },
   paseo:      { name: 'El Paseo',                icon: '🏪', size: [40, 18], spawn: [16.5, 0] },
   dorado:     { name: 'Distrito Dorado',         icon: '💎', size: [30, 18], spawn: [0, 6.8] },
+  puerto:     { name: 'Puerto de Ultramar',      icon: '⚓', size: [32, 18], spawn: [13.4, 0] },     // v3.1 · C6: secciones detrás de puertas
+  galeria:    { name: 'Galería de Subastas',     icon: '🔨', size: [26, 18], spawn: [0, 6.6] },
+  oficios:    { name: 'Barrio de los Oficios',   icon: '🧰', size: [44, 18], spawn: [-19.4, 0] },
+  nocturno:   { name: 'Mercado Nocturno',        icon: '🌙', size: [30, 18], spawn: [-12.4, 0] },
 };
 /** Posición de cada parcela (x, z, giro): el frente mira a la calle */
 function netPlotPos(zone, i) {
@@ -11188,6 +11195,29 @@ function netFurniture(type, g, o) {
       const m = mat(0xffca28, { metalness: 0.5, roughness: 0.35 }); [-2.6, 2.6].forEach(x => g.add(box(0.4, 3.6, 0.4, m, x, 1.8, 0))); g.add(box(5.6, 0.35, 0.3, m, 0, 3.4, 0));
       const s = netSign(o.text ?? '💎 DISTRITO DORADO', 4.6, 0.55, '#311b92', '#ffe082', 'bold 34px Fredoka, Arial'); s.position.set(0, 2.85, 0.25); g.add(s); return [0, 0];
     }
+    case 'water_strip': {   // v3.1 · ⚓ el mar del Puerto de Ultramar (no se pisa)
+      const w = o.w ?? 30, d = o.d ?? 3; g.add(box(w, 0.1, d, glow(0x4fc3f7, 0x0277bd, 0.25, { transparent: true, opacity: 0.92 }), 0, 0.02, 0));
+      for (let k = 0; k < 6; k++) g.add(box(w * 0.12, 0.02, 0.08, glow(0xe1f5fe, 0x81d4fa, 0.8), -w * 0.4 + k * w * 0.16, 0.09, -d * 0.2 + (k % 3) * d * 0.2));
+      return [w, d];
+    }
+    case 'ship': {   // ⛵ el velero de Sam
+      const wood = mat(0x6d4c41); g.add(box(5.2, 1.1, 1.8, wood, 0, 0.35, 0)); g.add(box(4.8, 0.12, 1.6, mat(0xa1887f), 0, 0.95, 0)); g.add(box(1.2, 0.8, 1.2, mat(0xfff3e0), -1.4, 1.4, 0));
+      g.add(cyl(0.08, 0.1, 4.2, mat(0x5d4037), 0.4, 3.0, 0, 6)); g.add(box(0.06, 2.4, 1.7, mat(0xfffde7), 0.55, 3.2, 0));
+      const s = netSign(o.text ?? '⛵ VELERO', 2.6, 0.4, '#e0f7fa', '#004d40', 'bold 36px Fredoka, Arial'); s.position.set(0, 1.3, 0.92); g.add(s); return [5.2, 1.8];
+    }
+    case 'pedestal': {   // 🔨 pedestal de la Galería de Subastas con el lote encima
+      g.add(cyl(0.42, 0.52, 1.0, mat(0xede7f6, { flatShading: true }), 0, 0.5, 0, 10)); g.add(cyl(0.58, 0.58, 0.12, mat(0xffca28, { metalness: 0.45, roughness: 0.4 }), 0, 1.06, 0, 16));
+      if (o.lot) interiorItemSprites(g, [{ id: o.lot.id, price: o.lot.price }], 0, 0, 1.14, 0, { tags: true, scale: 0.6 });
+      else { const s = netSign('LIBRE', 0.9, 0.3, '#f3e5f5', '#6a1b9a', 'bold 40px Fredoka, Arial', 256, 96); s.position.set(0, 0.7, 0.53); g.add(s); }
+      return [1.2, 1.2];
+    }
+    case 'guild': {   // 🧰 la calle de un perfil en el Barrio de los Oficios (puesto con su color, su icono y lo más barato)
+      const r = netFurniture('stall', g, o); if (o.icon) { const spr = new THREE.Sprite(netIconMat(o.icon)); spr.scale.setScalar(0.95); spr.position.set(0, 3.35, 0); g.add(spr); } return r;
+    }
+    case 'night_stall': {   // 🌙 puesto del Mercado nocturno (toldo oscuro y un farolillo)
+      const r = netFurniture('stall', g, { ...o, color: 0x8e24aa, free: !!o.closed }); g.add(sphere(0.16, glow(0xffe082, 0xffb300, o.closed ? 0.2 : 1.8), 1.45, 2.2, 0.62, 8)); return r;
+    }
+    case 'lantern': { g.add(cyl(0.05, 0.07, 2.3, mat(0x263238), 0, 1.15, 0, 6)); g.add(sphere(0.24, glow(0xe1bee7, 0xab47bc, 1.8), 0, 2.4, 0, 8)); return [0.3, 0.3]; }
     case 'bot_proxy': {   // 🤝 marca invisible que sigue al bot más cercano (para hablar/truecar con él)
       const hit = box(1.0, 2.0, 1.0, new THREE.MeshBasicMaterial({ visible: false }), 0, 1.0, 0); hit.castShadow = false; g.add(hit);
       const tag = new THREE.Sprite(new THREE.SpriteMaterial({ map: textTexture(' ', { w: 384, h: 96 }), depthTest: false, transparent: true })); tag.scale.set(2.2, 0.55, 1); tag.position.y = 2.55; tag.renderOrder = 12; g.add(tag); g.userData.tag = tag;
@@ -11210,7 +11240,7 @@ const NetWorld = {
     if (!Online.me) { Account.open(); return false; }
     if (!Number.isInteger(Net.origin())) { Profiles.ensure(() => this.enterReal(zone)); return false; }
     showToast('🌍 Entrando en la Red real…', 'text-white');
-    await RealWorld.prefetch().catch(() => {});
+    await RealWorld.prefetch(zone).catch(() => {});
     return this.enter(zone, { mode: 'real' });
   },
   inside() { return !!Interiors.active?.def?.net; },
@@ -11234,12 +11264,12 @@ const NetWorld = {
     if (zone === 'dorado' && !Net.doradoOk()) { showToast(`💎 El portero del Distrito Dorado: "Aura ${CFG.net.dorado.aura}+ o ${fmt(CFG.net.dorado.netWorth)} $T de patrimonio. Lo siento, normas del sueño."`, 'text-amber-200'); return false; }
     if (tram) { if (!Wallet.spend(CFG.net.tram, 'Red: billete de tranvía', { silent: true, snk: 'demo-net' })) return false; NetEco.snk('tranvia', CFG.net.tram); playBeep(784, 0.08, 'triangle'); }
     const from = this.zone(), arrive = tram ? NET_ZONES[zone].spawn : this._walkSpawn(zone, from);
-    if (this.real()) { RealWorld.prefetch().catch(() => {}).then(() => Interiors.switchTo('net', { zone, spawn: arrive, fade: '#1a1033' })); return true; }   // v2.4: datos frescos del servidor antes de dibujar el barrio
+    if (this.real()) { RealWorld.prefetch(zone).catch(() => {}).then(() => Interiors.switchTo('net', { zone, spawn: arrive, fade: '#1a1033' })); return true; }   // v2.4: datos frescos del servidor antes de dibujar el barrio
     return Interiors.switchTo('net', { zone, spawn: arrive, fade: '#1a1033' });
   },
   _walkSpawn(zone, from) {
-    if (zone === 'plaza') return from === 'mercadillo' ? [12.6, 0] : from === 'paseo' ? [-12.6, 0] : from === 'dorado' ? [0, -9.4] : NET_ZONES.plaza.spawn;
-    if (zone === 'mercadillo') return [-17.6, 0]; if (zone === 'paseo') return [17.6, 0]; return [0, 6.8];
+    if (zone === 'plaza') return from === 'mercadillo' ? [12.6, 0] : from === 'paseo' ? [-12.6, 0] : from === 'dorado' ? [0, -9.4] : from === 'puerto' ? [-12.4, 9] : from === 'oficios' ? [12.4, 7.5] : from === 'nocturno' ? [12.4, -6.5] : from === 'galeria' ? [-9.2, -6.0] : NET_ZONES.plaza.spawn;
+    if (zone === 'mercadillo') return [-17.6, 0]; if (zone === 'paseo') return [17.6, 0]; if (NET_SECTIONS[zone]) return NET_ZONES[zone].spawn; return [0, 6.8];
   },
   /** Despertar: la consigna pasa la aduana (2 %) y vuelves al PC de casa */
   wake() {
@@ -11262,13 +11292,14 @@ const NetWorld = {
     const real = this.real(), soon = (what) => showToast(`${what}: en la Red real llega con las secciones nuevas. Aquí, de momento, el Tablón, la Aduana, los puestos y las tiendas.`, 'text-white');
     const A = { wake: () => this.wake(), tram: () => NetUI.tram(), tablon: () => real ? RealMarket.open('market') : NetUI.tablon(), subastas: () => real ? RealMarket.open('subastas') : NetUI.auctions(), aduana: () => real ? RealMarket.open('aduana') : NetUI.aduana(), contratos: () => real ? RealMarket.open('contratos') : NetUI.contracts(), pedidos: () => real ? RealRequests.open() : NetUI.requests(), origen: () => NetUI.originCard(),
       rstall: (obj) => RealWorld.openStall(obj.userData.netPlot),
+      importar: () => real ? RealRequests.open() : NetUI.requests(), guild: (obj) => Guilds.open(obj.userData.netPlot), night: () => NightMarket.open(),   // v3.1 · C6
       walk: (obj) => this.go(obj.userData.netTo), plot: (obj) => this.openPlot(zone, obj.userData.netPlot), bot: (obj) => { if (obj.userData.peerId) { PeerCard.openId(obj.userData.peerId); return; } const i = obj.userData.botIdx; if (i !== undefined && i !== null) NetUI.barter(i); }, gate: () => this.go('dorado') };
     if (zone === 'plaza') {
       const lines = real ? RealWorld.boardLines() : []; if (W && !real) { const mv = []; for (let m = 0; m < 32; m++) { const h = W.hist, a = h.length > 1 ? h[h.length - 2][m] : W.price[m]; mv.push([m, W.price[m] / Math.max(0.01, a) - 1]); } mv.sort((a, b) => Math.abs(b[1]) - Math.abs(a[1])); mv.slice(0, 6).forEach(([m, g]) => lines.push({ t: `${netItem(m).name}: ${fmt(Math.round(W.price[m]))} $T (${g >= 0 ? '+' : ''}${(g * 100).toFixed(1)} %)`, up: g >= 0 })); }
       P.push(
         { type: 'fountain_big', x: 0, z: 0 },
         { type: 'net_board', x: 0, z: -10.6, o: { lines }, act: 'tablon', label: real ? '📋 Tablón real: órdenes de compra y venta entre jugadores' : '📋 Tablón de Ofertas (comprar y vender)', range: 1.6 },
-        { type: 'facade', x: -9.2, z: -9.0, o: { w: 6, text: 'CASA DE SUBASTAS', color: 0xfce4ec, roof: 0xad1457, icon: '🔨', dome: true }, act: 'subastas', label: '🔨 Casa de Subastas (joyas)', range: 1.4 },
+        { type: 'facade', x: -9.2, z: -9.0, o: { w: 6, text: 'CASA DE SUBASTAS', color: 0xfce4ec, roof: 0xad1457, icon: '🔨', dome: true }, act: 'walk', to: 'galeria', label: '🚶 Entrar en la Galería de Subastas', range: 1.4 },   // v3.1 · C6
         { type: 'facade', x: 9.2, z: -9.0, o: { w: 6, text: 'OFICINA DE CONTRATOS', color: 0xe8f5e9, roof: 0x2e7d32, icon: '📜' }, act: 'contratos', label: '📜 Oficina de Contratos', range: 1.4 },
         { type: 'facade', x: -12.4, z: 3.6, rot: Math.PI / 2, o: { w: 5, h: 3.6, text: 'ADUANA', color: 0xe3f2fd, roof: 0x1565c0, icon: '🛃' }, act: 'aduana', label: real ? '🛃 Aduana real: ingresar y retirar $T y objetos' : '🛃 Aduana (traer lo comprado a tu sueño)', range: 1.4 },
         { type: 'kiosk', x: 6.2, z: 5.6, rot: -0.5, o: { text: 'PEDIDOS', color: 0xffcc80, icon: '📦' }, act: 'pedidos', label: '📦 Pedidos de Ultramar de tus vecinos' },
@@ -11278,12 +11309,17 @@ const NetWorld = {
         { type: 'arch', x: 14.2, z: 0, rot: -Math.PI / 2, o: { text: '⛺ EL MERCADILLO →', color: 0xffab91 }, act: 'walk', label: '🚶 Caminar a El Mercadillo', solid: false, range: 1.6, to: 'mercadillo' },
         { type: 'arch', x: -14.2, z: 0, rot: Math.PI / 2, o: { text: '← EL PASEO 🏪', color: 0x90caf9 }, act: 'walk', label: '🚶 Caminar a El Paseo', solid: false, range: 1.6, to: 'paseo' },
         { type: 'gate', x: 0, z: -12.6, o: { text: Net.doradoOk() ? '💎 DISTRITO DORADO ↑' : `💎 DORADO · aura ${CFG.net.dorado.aura}+ o 1M` }, act: 'gate', label: Net.doradoOk() ? '🚶 Entrar al Distrito Dorado' : `🔒 Distrito Dorado (aura ${CFG.net.dorado.aura}+ o ${fmt(CFG.net.dorado.netWorth)} $T)`, solid: false, range: 1.6 },
+        { type: 'arch', x: -14.2, z: 9.0, rot: Math.PI / 2, o: { text: '← ⚓ PUERTO', color: 0x80cbc4 }, act: 'walk', label: '🚶 Caminar al Puerto de Ultramar', solid: false, range: 1.6, to: 'puerto' },   // v3.1 · C6
+        { type: 'arch', x: 14.2, z: 7.5, rot: -Math.PI / 2, o: { text: '🧰 OFICIOS →', color: 0xffe082 }, act: 'walk', label: '🚶 Caminar al Barrio de los Oficios', solid: false, range: 1.6, to: 'oficios' },
+        { type: 'arch', x: 14.2, z: -6.5, rot: -Math.PI / 2, o: { text: '🌙 NOCTURNO →', color: 0x9575cd }, act: 'walk', label: `🚶 Caminar al Mercado nocturno (abre de ${CFG.netNight.open}:00 a 0${CFG.netNight.close}:00)`, solid: false, range: 1.6, to: 'nocturno' },
       );
       if (real) RealWorld.STALL_SPOTS.forEach(([x, z, rot], i) => {   // v2.4 · puestos gratis de jugadores (5 objetos cada uno)
         const st = RealWorld.stalls[i], mine = st && st.owner === Online.me?.id;
         P.push({ type: 'stall', x, z, rot, plot: i, o: { text: st ? (mine ? '★ TU PUESTO' : st.who.toUpperCase()) : 'PUESTO LIBRE', free: !st, mine, items: st ? st.items.map(e => ({ id: e.item, price: e.price })).slice(0, IS_MOBILE ? 3 : 4) : [], tags: !IS_MOBILE, color: st ? NET_ORIGINS[st.profile]?.color : 0xb0bec5 },
           act: 'rstall', label: st ? (mine ? '★ Tu puesto gratis' : `🧺 Puesto de ${st.who}${st.bot ? ' (Comerciante del Sueño)' : ''}`) : '🧺 Puesto libre: pon aquí hasta 5 objetos gratis', range: 1.3 });
       });
+    } else if (NET_SECTIONS[zone]) {   // v3.1 · C6: Puerto de Ultramar, Galería de Subastas, Barrio de los Oficios y Mercado nocturno
+      P.push(...NET_SECTIONS[zone](real));
     } else {
       const plots = NetEco.plotsOf(zone), T = Object.values(CFG.net.shops).find(s => s.zone === zone);
       if (real) plots.forEach((_, i) => {   // v2.4 · en la Red real, cada parcela es una tienda de jugador (o está libre)
@@ -11306,10 +11342,10 @@ const NetWorld = {
     P.forEach(p => { if (p.to || p.plot !== undefined) { p.o = { ...(p.o || {}), netTo: p.to, plot: p.plot ?? p.o?.plot }; } });
     const spawn = o.spawn || Z.spawn;
     return {
-      title: `${Z.icon} ${Z.name} · ${real ? 'Red real' : 'Red del Sueño (demo)'}`, size: [w, d], wallH: 3, spawn, exitZone: false, outdoor: true, net: true, netZone: zone, real,
-      groundTex: () => zone === 'dorado' ? netGroundTexture('#4a3b6b', '#6a5594', '#ffd54f') : zone === 'plaza' ? netGroundTexture('#c9b8e8', '#b39ddb', '#e1bee7') : netGroundTexture('#d7ccc8', '#bcaaa4', '#ffe0b2'),
-      palette: { wall: 0xffffff, trim: 0xffffff, floor: ['#c9b8e8', '#b39ddb'], void: zone === 'dorado' ? 0x1a0f33 : 0x2a1f4d },
-      windows: {}, cam: CFG.gfx.netCam, skirtColor: zone === 'dorado' ? 0x4a3b6b : zone === 'plaza' ? 0xc9b8e8 : 0xd7ccc8,   // v1.4: cámara 3/4 encajada · falda del color del suelo
+      title: `${Z.icon} ${Z.name} · ${real ? 'Red real' : 'Red del Sueño (demo)'}`, size: [w, d], wallH: 3, spawn, exitZone: false, outdoor: true, net: true, netZone: zone, real, night: zone === 'nocturno',
+      groundTex: () => zone === 'dorado' ? netGroundTexture('#4a3b6b', '#6a5594', '#ffd54f') : zone === 'plaza' ? netGroundTexture('#c9b8e8', '#b39ddb', '#e1bee7') : zone === 'nocturno' ? netGroundTexture('#3d2f5c', '#4e3b75', '#2f2448') : zone === 'galeria' ? netGroundTexture('#f3e5f5', '#e1bee7', '#fce4ec') : zone === 'puerto' ? netGroundTexture('#bcaaa4', '#a1887f', '#d7ccc8') : zone === 'oficios' ? netGroundTexture('#ffe0b2', '#ffcc80', '#fff3e0') : netGroundTexture('#d7ccc8', '#bcaaa4', '#ffe0b2'),
+      palette: { wall: 0xffffff, trim: 0xffffff, floor: ['#c9b8e8', '#b39ddb'], void: zone === 'dorado' ? 0x1a0f33 : zone === 'nocturno' ? 0x07040f : 0x2a1f4d },
+      windows: {}, cam: CFG.gfx.netCam, skirtColor: zone === 'dorado' ? 0x4a3b6b : zone === 'plaza' ? 0xc9b8e8 : zone === 'nocturno' ? 0x2f2448 : zone === 'galeria' ? 0xe1bee7 : zone === 'puerto' ? 0x4fc3f7 : zone === 'oficios' ? 0xffe0b2 : 0xd7ccc8,   // v1.4: cámara 3/4 encajada · falda del color del suelo
       pieces: P, actions: A, onBuild: (root, def) => this._buildBots(root, def), onFrame: (dt, t) => this._frame(dt, t), onHudExit: () => this.wake(),
       welcome: real ? `${Z.icon} ${Z.name} · 🌍 Red real: jugadores de verdad (y Comerciantes del Sueño si hay poca gente)` : `${Z.icon} ${Z.name} · 🤖 Modo demo: los demás comerciantes son bots · solo $TOKEN del juego`,
     };
@@ -11342,7 +11378,7 @@ const NetWorld = {
   _buildBots(root, def) {
     const W = NetEco.W, zone = def.netZone; if (!W) return;
     const r = netRngOf(W.seed + ':avatars:' + W.day + ':' + zone), on = NetEco.S.filter(s => NetEco.logged(s.i));
-    const keepers = [], plots = zone !== 'plaza' && !def.real ? NetEco.plotsOf(zone) : [];
+    const keepers = [], plots = zone !== 'plaza' && !def.real && CFG.net.plots[zone] ? NetEco.plotsOf(zone) : [];
     plots.forEach((owner, i) => { if (owner !== null && owner !== 'P') keepers.push({ s: NetEco.S[owner], plot: i }); });
     const pool = netShuffle(on.filter(s => !keepers.some(k => k.s.i === s.i)), r), n = Math.min(CFG.net.avatars[zone] || 12, keepers.length + pool.length);
     const list = [...keepers.slice(0, n), ...pool.slice(0, Math.max(0, n - keepers.length)).map(s => ({ s, plot: null }))];
@@ -11672,6 +11708,7 @@ Object.assign(Net, {
   /** Comprar en la tienda de un bot (comisión de licencia la paga el tendero; lo comprado va a la Aduana) */
   buyFromBotShop(i, m, qty) {
     const W = NetEco.W, b = W?.bots[i]; if (!b) return { ok: false, why: 'Tienda cerrada' };
+    if ((this.st().nightDebt || 0) > 0) return { ok: false, why: NightMarket.debtWhy(this.st().nightDebt) };   // v3.1 · C6
     const e = NetEco.botShelf(i).find(x => x.m === m); qty = Math.floor(qty); if (!e || qty < 1) return { ok: false, why: 'No lo vende' };
     if (qty > e.qty) return { ok: false, why: `Solo le quedan ${e.qty}` };
     const val = e.price * qty, T = NetEco._tier(b.sh) || CFG.net.shops.puesto, fee = val * T.fee;
@@ -12223,18 +12260,31 @@ const RealRequests = {
     const due = q.kind === 'diario' ? 'vence hoy' : q.kind === 'raro' ? (q.left > 1 ? `quedan ${q.left} días` : 'vence hoy') : 'vence el domingo';
     return `<div class="app-card p-3 mb-2 text-xs"><div class="font-bold">${n?.emoji || '📦'} ${n?.name || q.npc} · ${title}</div><div class="text-[11px] text-slate-600 italic my-1">"${esc(this.text(q))}"</div>${Object.entries(q.need).map(([id, k]) => `<span class="mr-2 ${((S.stock || {})[id] || 0) >= k ? 'text-emerald-600' : 'text-red-500'}">${itemIcon(id, 18)} ${Math.min((S.stock || {})[id] || 0, k)}/${k}</span>`).join('')}<div class="mt-1">Pago <b>${fmt(this.pay(q, S.rew))} $T</b>${q.kind === 'diario' ? ` + ${CFG.net.realReq.d.trust} confianza` : ''} · ${due}</div>` +
       (sealed ? `<div class="mt-1 text-purple-700">🔒 Tu tienda está sellada: paga la cuota para aceptar el Pedido legendario.</div>` : short.length ? `<div class="mt-1 text-red-600">Te faltan en la Aduana: ${short.map(([id, k]) => `${k}× ${this.name(id)}`).join(', ')}</div>` : '') +
-      `<div class="flex flex-wrap gap-2 mt-1.5"><button data-rq="${q.rid}" class="btn-game px-2 py-1 text-[11px] ${off ? 'bg-slate-200 opacity-60' : 'bg-orange-300'}" ${off ? 'disabled' : ''}>Entregar desde la Aduana</button>${short.length ? `<button data-rqm="${netOrig(NET_M[short[0][0]])}" class="btn-game px-2 py-1 text-[11px] bg-white">🔎 Buscar en el Tablón</button>` : ''}</div></div>`;
+      `<div class="flex flex-wrap gap-2 mt-1.5"><button data-rq="${q.rid}" class="btn-game px-2 py-1 text-[11px] ${off ? 'bg-slate-200 opacity-60' : 'bg-orange-300'}" ${off ? 'disabled' : ''}>Entregar desde la Aduana</button>${short.length ? `<button data-rqm="${netOrig(NET_M[short[0][0]])}" class="btn-game px-2 py-1 text-[11px] bg-white">🔎 Buscar en el Tablón</button>` : ''}${this.samBtn(q, S, short)}</div></div>`;
   },
   name: (id) => ITEMS[id] ? `${ITEMS[id].icon} ${ITEMS[id].name}` : id,
+  /** v3.1 · ⚓ lo que cuesta que Sam traiga lo que falta (null si no puede: joyas, más de lo que le queda hoy o tienda sellada) */
+  samCost(short, S) {
+    const units = short.reduce((a, [, k]) => a + k, 0); if (!short.length || units > (S.samLeft ?? 0) || short.some(([id]) => ITEMS[id]?.jewel)) return null;
+    return short.reduce((a, [id, k]) => a + Math.ceil((S.refs?.[id] || RealTrade.estRef(id)) * 2) * k, 0);
+  },
+  samBtn(q, S, short) { const c = this.samCost(short, S); return c === null || (q.kind === 'semanal' && S.sealed) ? '' : `<button data-rqsam="${q.rid}" class="btn-game px-2 py-1 text-[11px] bg-sky-200">🚢 Que lo traiga Sam (${fmt(c)} $T)</button>`; },
+  async samImport(rid) {
+    const S = this.S, q = this.active(S, Online.me.id).find(x => x.rid === rid); if (!q) throw new Error('Ese pedido ya no está');
+    const short = this.short(q, S.stock), c = this.samCost(short, S); if (c === null) throw new Error(`Sam trae como mucho ${S.samLeft ?? 0} unidad(es) más hoy, y nunca joyas`);
+    let paid = 0; for (const [id, k] of short) { const r = await this.rpc('crossia_sam_import', { p_item: id, p_qty: k }); paid += r?.cost || 0; }
+    return `🚢 Sam trae ${short.map(([id, k]) => `${k}× ${this.name(id)}`).join(', ')} a tu Aduana (−${fmt(paid)} $T). ¡Ya puedes entregar el pedido!`;
+  },
   async html() {
     const S = this.S = await this.rpc('crossia_requests_done', {}), me = Online.me, list = this.active(S, me.id), W = CFG.net.realReq.w;
-    let h = `<div class="app-card p-2.5 mb-2 text-[11px] text-slate-600">Tus vecinos piden objetos de <b>otros perfiles</b>. En la Red real se entregan <b>desde tu Aduana</b>: cómpralos en el Tablón, en los puestos de la Plaza o en las tiendas (y no los saques a la mochila). Recompensas del Decreto de esta semana: <b>×${String(+S.rew || 1).replace('.', ',')}</b>${GS.stats?.realReqDone ? ` · entregados: ${GS.stats.realReqDone}` : ''}.</div>`;
+    let h = (S.debt > 0 ? `<div class="app-card p-2.5 mb-2 text-[11px] bg-purple-50 text-purple-800">🚨 ${NightMarket.debtWhy(S.debt)}</div>` : '') + `<div class="app-card p-2.5 mb-2 text-[11px] text-slate-600">🚢 Sam te trae hoy hasta <b>${S.samLeft ?? 0}</b> unidad(es) de lo que te falte, al doble del precio de referencia. Tus vecinos piden objetos de <b>otros perfiles</b>. En la Red real se entregan <b>desde tu Aduana</b>: cómpralos en el Tablón, en los puestos de la Plaza o en las tiendas (y no los saques a la mochila). Recompensas del Decreto de esta semana: <b>×${String(+S.rew || 1).replace('.', ',')}</b>${GS.stats?.realReqDone ? ` · entregados: ${GS.stats.realReqDone}` : ''}.</div>`;
     h += list.map(q => this.card(q, S)).join('') || '<div class="app-card p-3 mb-2 text-xs text-slate-500">Hoy ya no queda ningún pedido por entregar. Vuelve mañana.</div>';
     if (!(S.rank >= 2)) h += `<div class="app-card p-3 mb-2 text-xs bg-slate-50 text-slate-500">🔒 <b>Pedido legendario semanal</b>: se lo encargan a los dueños de un Local o una Boutique de la Red real (${W.units[0]}–${W.units[1]} objetos y una joya de otro perfil · ${fmt(W.lo)}–${fmt(W.hi)} $T). <button data-tab="myshop" class="btn-game px-2 py-0.5 text-[11px] bg-white ml-1">🏬 Mi tienda</button></div>`;
     return h;
   },
   bind(body, run, render) {
     body.querySelectorAll('[data-rq]').forEach(b => b.onclick = () => run(() => this.deliver(b.dataset.rq)));
+    body.querySelectorAll('[data-rqsam]').forEach(b => b.onclick = () => run(() => this.samImport(b.dataset.rqsam)));
     body.querySelectorAll('[data-rqm]').forEach(b => b.onclick = () => { RealMarket.filter = +b.dataset.rqm; RealMarket.tab = 'market'; render(); });
   },
   async deliver(rid) {
@@ -12248,6 +12298,171 @@ const RealRequests = {
     return `📦 ¡Pedido entregado a ${who}! +${fmt(got)} $T${q.kind === 'diario' ? ` · +${CFG.net.realReq.d.trust} confianza` : ''}`;
   },
   open() { if (!Online.me) { Account.open(); return; } RealMarket.open('pedidos'); },
+};
+
+/* ===== v3.1 · C6 · SECCIONES DETRÁS DE PUERTAS: Puerto de Ultramar, Galería de Subastas, Barrio de los Oficios y Mercado nocturno ===== */
+CFG.netNight = { open: 21, close: 3, keep: [0.40, 0.60], risk: 0.12, fineMult: 5, perOffer: 2, perNight: 8, offers: 8 };   // C6: precio = 40–60 % del medio · 12 % de redada · multa 5× el precio medio (va al fondo) · topes por noche
+const NET_SECTIONS = {
+  puerto: (real) => [
+    { type: 'water_strip', x: 0, z: -7.4, o: { w: 32, d: 3.4 } },
+    { type: 'ship', x: -7, z: -7.3, o: { text: '⛵ EL VELERO DE SAM' }, solid: false },
+    { type: 'facade', x: 7.5, z: -3.8, o: { w: 6, text: 'CAPITANÍA DE SAM', color: 0xe0f2f1, roof: 0x00695c, icon: '🚢' }, act: 'importar', label: real ? '🚢 Importaciones de Sam: lo que te falta para un pedido (2 al día)' : '🚢 Importaciones de Sam (pedidos de Ultramar)', range: 1.4 },
+    { type: 'kiosk', x: -2.4, z: 2.6, rot: 0.3, o: { text: 'PEDIDOS', color: 0xffcc80, icon: '📦' }, act: 'pedidos', label: '📦 Pedidos de Ultramar de tus vecinos' },
+    { type: 'kiosk', x: 3.2, z: 2.6, rot: -0.3, o: { text: 'LEGENDARIOS', color: 0xffe082, icon: '🏆' }, act: 'pedidos', label: '🏆 Pedido legendario semanal (dueños de Local o Boutique)' },
+    { type: 'arch', x: 15.2, z: 0, rot: -Math.PI / 2, o: { text: 'PLAZA MAYOR 🏛️ →', color: 0xffcc80 }, act: 'walk', to: 'plaza', label: '🚶 Volver a la Plaza Mayor', solid: false, range: 1.6 },
+  ],
+  galeria: (real) => {
+    const lots = real ? (RealWorld.lots || []).map(a => ({ id: a.item, price: a.price || a.reserve, qty: a.qty })) : (NetEco.W?.auc || []).map(a => ({ id: NET_MATS[a.m], price: Math.max(a.res, a.pb || 0), qty: 1 }));
+    return [
+      { type: 'facade', x: 0, z: -6.4, o: { w: 7, text: 'SALA DE PUJAS', color: 0xfce4ec, roof: 0xad1457, icon: '🔨', dome: true }, act: 'subastas', label: '🔨 Sala de pujas: lotes, pujas y subastar lo tuyo', range: 1.4 },
+      ...[[-8, -1.5], [-4, -1.5], [4, -1.5], [8, -1.5], [-6, 2.8], [6, 2.8]].map(([x, z], i) => { const L = lots[i] || null;
+        return { type: 'pedestal', x, z, o: { lot: L }, act: 'subastas', label: L ? `🔨 ${L.qty > 1 ? L.qty + '× ' : ''}${ITEMS[L.id]?.name || L.id} · va por ${fmt(L.price)} $T` : '🔨 Pedestal libre: subasta aquí una joya o un objeto de nivel 4', range: 1.2 }; }),
+      { type: 'arch', x: 0, z: 8.4, rot: Math.PI, o: { text: 'PLAZA MAYOR 🏛️', color: 0xf48fb1 }, act: 'walk', to: 'plaza', label: '🚶 Volver a la Plaza Mayor', solid: false, range: 1.6 },
+    ];
+  },
+  oficios: (real) => [
+    ...NET_ORIGINS.map((o, i) => { const row = i < 4 ? 0 : 1, best = Guilds.best(i, real);
+      return { type: 'guild', x: -15 + (i % 4) * 10, z: row ? 5.2 : -5.2, rot: row ? Math.PI : 0, plot: i, o: { text: o.name.toUpperCase(), icon: o.icon, color: o.color, items: best.slice(0, IS_MOBILE ? 2 : 3).map(b => ({ id: b.item, price: b.price })), tags: true },
+        act: 'guild', label: `${o.icon} Calle de ${o.name}: quién vende sus objetos${best.length ? ` (desde ${fmt(best[0].price)} $T)` : ''}`, range: 1.4 }; }),
+    { type: 'arch', x: -21.2, z: 0, rot: Math.PI / 2, o: { text: '← PLAZA MAYOR 🏛️', color: 0xffcc80 }, act: 'walk', to: 'plaza', label: '🚶 Volver a la Plaza Mayor', solid: false, range: 1.6 },
+  ],
+  nocturno: (real) => {
+    const S = NightMarket.peek(real), open = !!S?.open, offers = open ? (S.offers || []) : [], risk = Math.round(CFG.netNight.risk * 100);
+    return [
+      ...[-10.5, -3.5, 3.5, 10.5].map((x, k) => { const its = offers.slice(k * 2, k * 2 + 2);
+        return { type: 'night_stall', x, z: -4.4, o: { text: open ? 'OFERTAS DE LA NOCHE' : `CERRADO · ABRE A LAS ${CFG.netNight.open}:00`, items: its.map(f => ({ id: f.item, price: f.price })), tags: !IS_MOBILE, closed: !open },
+          act: 'night', label: open ? `🌙 Puesto nocturno: ${its.map(f => ITEMS[f.item]?.name).filter(Boolean).join(' y ') || 'ofertas'} (riesgo de redada ${risk} %)` : `🌙 Mercado nocturno: abre de ${CFG.netNight.open}:00 a 0${CFG.netNight.close}:00`, range: 1.3 }; }),
+      { type: 'kiosk', x: 0, z: 5.6, rot: Math.PI, o: { text: 'PATRULLA', color: 0x7e57c2, icon: '🚨' }, act: 'night', label: `🚨 Patrulla del Sueño: riesgo de redada ${risk} % · multas` },
+      ...[[-13, -7.5], [-6.5, 7.5], [6.5, 7.5], [13, -7.5], [0, -7.6]].map(([x, z]) => ({ type: 'lantern', x, z })),
+      { type: 'arch', x: -14.2, z: 0, rot: Math.PI / 2, o: { text: '← PLAZA MAYOR 🏛️', color: 0x9575cd }, act: 'walk', to: 'plaza', label: '🚶 Volver a la Plaza Mayor', solid: false, range: 1.6 },
+    ];
+  },
+};
+
+/** 🧰 Barrio de los Oficios: quién vende los objetos de cada perfil (puestos, tiendas y Tablón; en la demo, las tiendas de los bots) */
+const Guilds = {
+  rpc: (fn, a) => RealMarket.rpc(fn, a),
+  demoOffers(p) {
+    const W = NetEco.W, out = []; if (!W) return out;
+    ['mercadillo', 'paseo', 'dorado'].forEach(zone => NetEco.plotsOf(zone).forEach((owner, plot) => { if (owner === null || owner === 'P') return;
+      NetEco.botShelf(owner).forEach(e => { if (e.m < 32 && netOrig(e.m) === p && e.qty > 0) out.push({ zone, plot, owner, who: NetEco.S[owner].name, item: NET_MATS[e.m], m: e.m, price: Math.round(e.price), qty: e.qty }); }); }));
+    return out.sort((a, b) => a.price - b.price);
+  },
+  /** lo más barato de cada perfil para el puesto 3D (un precio por objeto) */
+  best(p, real) {
+    if (real) return (RealWorld.guilds || {})[p] || [];
+    const seen = new Set(); return this.demoOffers(p).filter(o => !seen.has(o.item) && seen.add(o.item)).slice(0, 3);
+  },
+  row: (inner, btn) => `<div class="app-card p-2 mb-1.5 flex items-center gap-2 text-xs"><div class="flex-1 min-w-0">${inner}</div>${btn}</div>`,
+  open(p) {
+    const o = NET_ORIGINS[p]; if (!o) return;
+    openApp(`${o.icon} Calle de ${o.name}`, '', (body) => {
+      const render = async (msg = '') => {
+        body.innerHTML = `<div class="app-card p-3 text-sm text-slate-500">Mirando los puestos…</div>`;
+        let h = (msg ? `<div class="app-card p-2 mb-2 text-xs ${/^❌/.test(msg) ? 'bg-red-50' : 'bg-emerald-50'}">${msg}</div>` : '') + `<div class="app-card p-2.5 mb-2 text-[11px] text-slate-600">${o.tag}. Aquí ves quién vende sus objetos ahora mismo, del más barato al más caro.</div>`;
+        if (NetWorld.real()) {
+          let G; try { G = await this.rpc('crossia_guild', { p_profile: p }); } catch (e) { body.innerHTML = `<div class="app-card p-3 text-sm">❌ ${esc(e.message)}</div>`; return; }
+          h += `<div class="sec-h">En el Tablón</div>` + ((G.asks || []).map(a => this.row(`<b>${RealMarket.name(a.item)}</b> · desde <b>${fmt(a.price)} $T</b> <span class="text-slate-400">(${a.qty} a la venta)</span>`, `<button data-gb class="btn-game px-2 py-1 text-[11px] bg-emerald-200">Ver en el Tablón</button>`)).join('') || '<div class="text-xs text-slate-400 mb-2">Nadie vende en el Tablón.</div>');
+          h += `<div class="sec-h">En los puestos</div>` + ((G.stalls || []).map(s => this.row(`<b>${RealMarket.name(s.item)}</b> · <b>${fmt(s.price)} $T</b> · quedan ${s.qty}<div class="text-slate-500">${esc(s.who)}${s.bot ? ' (Comerciante del Sueño)' : ''}</div>`, `<button data-gs="${s.owner}" data-gi="${s.item}" data-gp="${s.price}" class="btn-game px-2 py-1 text-[11px] bg-emerald-200">Comprar 1</button>`)).join('') || '<div class="text-xs text-slate-400 mb-2">Ningún puesto los tiene ahora.</div>');
+          h += `<div class="sec-h">En las tiendas</div>` + ((G.shops || []).map(s => this.row(`<b>${RealMarket.name(s.item)}</b> · <b>${fmt(s.price)} $T</b> · quedan ${s.qty}<div class="text-slate-500">${esc(s.shop)} · de ${esc(s.who)}</div>`, `<button data-gt="${s.owner}" class="btn-game px-2 py-1 text-[11px] bg-amber-200">Ir a su tienda</button>`)).join('') || '<div class="text-xs text-slate-400 mb-2">Ninguna tienda los tiene ahora.</div>');
+          body.innerHTML = h;
+          body.querySelectorAll('[data-gb]').forEach(b => b.onclick = () => { closeApp(); RealMarket.filter = p; setTimeout(() => RealMarket.open('market'), 30); });
+          body.querySelectorAll('[data-gt]').forEach(b => b.onclick = () => { closeApp(); setTimeout(() => Promise.resolve(RealShops.visit(b.dataset.gt)).catch(() => {}), 30); });
+          body.querySelectorAll('[data-gs]').forEach(b => b.onclick = async () => { try { const r = await this.rpc('crossia_stall_buy', { p_owner: b.dataset.gs, p_item: b.dataset.gi, p_qty: 1, p_price: +b.dataset.gp }); playChime(); Online.push(true).catch(() => {}); render(`✓ Compraste 1× ${RealMarket.name(b.dataset.gi)} por ${fmt(r.cost)} $T · está en tu Aduana`); } catch (e) { render('❌ ' + e.message); } });
+        } else {
+          const L = this.demoOffers(p);
+          h += `<div class="app-card p-2 mb-2 text-[11px] text-slate-600">🤖 <b>Modo demo</b> · los vendedores son bots</div>` + (L.slice(0, 30).map(x => this.row(`<b>${itemIcon(x.item, 18)} ${ITEMS[x.item]?.name || x.item}</b> · <b>${fmt(x.price)} $T</b> · quedan ${x.qty}<div class="text-slate-500">tienda de ${esc(x.who)} · ${NET_ZONES[x.zone].name}</div>`, `<button data-gd="${x.owner}" data-gm="${x.m}" class="btn-game px-2 py-1 text-[11px] bg-emerald-200">Comprar 1</button>`)).join('') || '<div class="text-xs text-slate-400">Hoy ningún bot los vende.</div>');
+          body.innerHTML = h;
+          body.querySelectorAll('[data-gd]').forEach(b => b.onclick = () => { const r = Net.buyFromBotShop(+b.dataset.gd, +b.dataset.gm, 1); render(r.ok ? `✓ Comprado: va a la consigna de la Aduana (${fmt(Math.round(r.val))} $T)` : '❌ ' + r.why); });
+        }
+      };
+      render();
+    });
+  },
+};
+
+/** 🌙 Mercado nocturno y la Patrulla del Sueño: de 21:00 a 03:00 (en el online, hora de España; en la demo, el reloj del sueño) */
+const NightMarket = {
+  S: null,
+  rpc: (fn, a) => RealMarket.rpc(fn, a),
+  debtWhy: (d) => `Tienes una multa pendiente de la Patrulla del Sueño (${fmt(d)} $T): págala en el Mercado nocturno para volver a comprar en la Red`,
+  hour() { return Math.floor((GS.daily.clockMs || 0) / 3600000) % 24; },
+  demoOpen() { const h = this.hour(), C = CFG.netNight; return h >= C.open || h < C.close; },
+  demoKey() { return this.hour() < CFG.netNight.close ? GS.daily.dayCount - 1 : GS.daily.dayCount; },
+  demoState() { const st = Net.st(), key = this.demoKey(); if (!st.night || st.night.key !== key) st.night = { key, by: {}, n: 0 }; return st.night; },
+  demoOffers() {
+    const W = NetEco.W, C = CFG.netNight; if (!W) return [];
+    const key = this.demoKey(), r = netRngOf((Net.st().seed || 'red') + ':night:' + key), ms = [], st = this.demoState();
+    while (ms.length < C.offers) { const m = Math.floor(r() * 32); if (!ms.includes(m)) ms.push(m); }
+    return ms.map(m => { const keep = C.keep[0] + Math.floor(r() * 21) / 100, ref = Math.max(1, Math.round(W.price[m])), id = NET_MATS[m]; return { item: id, m, disc: 1 - keep, ref, price: Math.max(1, Math.round(ref * keep)), mine: st.by[id] || 0 }; });
+  },
+  demo() { const C = CFG.netNight, st = Net.st(), open = this.demoOpen(); return { demo: true, open, risk: C.risk, fineMult: C.fineMult, perOffer: C.perOffer, perNight: C.perNight, offers: open ? this.demoOffers() : [], bought: this.demoState().n, debt: st.nightDebt || 0, coins: GS.economy.money, log: (st.nightLog || []).slice(0, 8) }; },
+  /** lo que se dibuja en 3D (sin esperar al servidor) */
+  peek(real) { return real ? RealWorld.night : this.demo(); },
+  async load() { return (this.S = NetWorld.real() ? await this.rpc('crossia_night_market', {}) : this.demo()); },
+  /** comprar: en el online el servidor tira la redada; en la demo, aquí */
+  async buy(item, q) {
+    q = Math.max(1, Math.floor(q || 1));
+    if (NetWorld.real()) {
+      const r = await this.rpc('crossia_night_buy', { p_item: item, p_qty: q }); Online.push(true).catch(() => {});
+      if (r.raided) { playBeep(220, 0.35, 'square'); return `🚨 ¡Redada! La Patrulla del Sueño te pilla: pierdes ${q}× ${RealMarket.name(item)} y pagas ${fmt(r.fine)} $T de multa${r.debt ? `. Te falta saldo: debes ${fmt(r.debt)} $T y no puedes comprar en la Red hasta pagarlo` : ''}.`; }
+      playChime(); return `🌙 Compraste ${q}× ${RealMarket.name(item)} por ${fmt(r.cost)} $T. Está en tu Aduana.`;
+    }
+    const C = CFG.netNight, st = Net.st(), ns = this.demoState(), f = this.demoOffers().find(x => x.item === item);
+    if ((st.nightDebt || 0) > 0) throw new Error(this.debtWhy(st.nightDebt));
+    if (!this.demoOpen()) throw new Error(`El Mercado nocturno está cerrado: abre de ${C.open}:00 a 0${C.close}:00 (hora del sueño)`);
+    if (!f) throw new Error('Esta noche nadie vende eso aquí');
+    if ((ns.by[item] || 0) + q > C.perOffer) throw new Error(`De cada oferta, como mucho ${C.perOffer} por noche`);
+    if (ns.n + q > C.perNight) throw new Error(`Como mucho ${C.perNight} compras por noche`);
+    const cost = f.price * q; if (!Wallet.spend(cost, 'Red: Mercado nocturno', { silent: true, snk: 'demo-net' })) throw new Error('No tienes $TOKEN suficientes');
+    NetEco.W && NetEco.snk('mercado_nocturno', cost); ns.by[item] = (ns.by[item] || 0) + q; ns.n += q;
+    const raid = Math.random() < C.risk, log = (st.nightLog ||= []);
+    if (raid) {
+      const fine = f.ref * C.fineMult * q, pay = Math.min(fine, GS.economy.money); if (pay > 0) Wallet.spend(pay, 'Red: multa de la Patrulla del Sueño', { silent: true, snk: 'demo-net' });
+      NetEco.W && NetEco.snk('redadas', pay); if (fine > pay) st.nightDebt = (st.nightDebt || 0) + (fine - pay);
+      log.unshift({ item, qty: q, price: f.price, raided: true, fine, at: Date.now() }); log.length = Math.min(log.length, 12); SaveSystem.saveNow('net-night'); playBeep(220, 0.35, 'square');
+      return `🚨 ¡Redada! La Patrulla del Sueño te pilla: pierdes ${q}× ${ITEMS[item].name} y pagas ${fmt(fine)} $T de multa${st.nightDebt ? `. Debes ${fmt(st.nightDebt)} $T: no puedes comprar en la Red hasta pagarlo` : ''}.`;
+    }
+    Net.stashAdd(item, q, { fee: true, value: f.price }); log.unshift({ item, qty: q, price: f.price, raided: false, fine: 0, at: Date.now() }); log.length = Math.min(log.length, 12); SaveSystem.saveNow('net-night'); playChime();
+    return `🌙 Compraste ${q}× ${ITEMS[item].name} por ${fmt(cost)} $T. Va a la consigna de la Aduana.`;
+  },
+  async payFine() {
+    if (NetWorld.real()) { const r = await this.rpc('crossia_fine_pay', {}); return r.debt ? `✓ Pagaste ${fmt(r.paid)} $T. Aún debes ${fmt(r.debt)} $T.` : `✓ Multa pagada (${fmt(r.paid)} $T). Ya puedes volver a comprar en la Red.`; }
+    const st = Net.st(), d = st.nightDebt || 0, pay = Math.min(d, GS.economy.money); if (pay <= 0) throw new Error('No tienes $TOKEN para pagar la multa');
+    Wallet.spend(pay, 'Red: multa de la Patrulla del Sueño', { silent: true, snk: 'demo-net' }); NetEco.W && NetEco.snk('redadas', pay); st.nightDebt = d - pay; SaveSystem.saveNow('net-fine');
+    return st.nightDebt ? `✓ Pagaste ${fmt(pay)} $T. Aún debes ${fmt(st.nightDebt)} $T.` : `✓ Multa pagada (${fmt(pay)} $T). Ya puedes volver a comprar en la Red.`;
+  },
+  /** cuánto falta para que abra (para el cartel) */
+  untilOpen(S) {
+    if (S.demo) { const C = CFG.netNight, ms = GS.daily.clockMs % 86400000, t = C.open * 3600000; return t - ms; }
+    return Date.parse(S.opens) - Date.now();
+  },
+  html(S) {
+    const C = CFG.netNight, real = !S.demo, risk = Math.round((S.risk ?? C.risk) * 100), mult = S.fineMult ?? C.fineMult, name = (id) => ITEMS[id] ? `${ITEMS[id].icon} ${ITEMS[id].name}` : id;
+    let h = `<div class="app-card p-2.5 mb-2 text-[11px] bg-purple-50 text-purple-900">🚨 <b>Riesgo de redada: ${risk} %</b> en cada compra. Si te pilla la Patrulla del Sueño, pierdes el objeto y pagas una multa de <b>${mult} veces su precio medio</b>. Si no te llega el saldo, queda como deuda y no puedes comprar en la Red hasta pagarla. Las multas van al fondo de los Comerciantes del Sueño.</div>`;
+    if (S.debt > 0) h += `<div class="app-card p-3 mb-2 text-xs bg-red-50"><b>Debes ${fmt(S.debt)} $T</b> a la Patrulla del Sueño.<button data-nfine class="btn-game px-2 py-1 text-[11px] bg-rose-300 ml-2">Pagar ${real ? 'desde la Aduana' : 'la multa'}</button></div>`;
+    if (!S.open) { const ms = Math.max(0, this.untilOpen(S)); h += `<div class="app-card p-4 mb-2 text-sm text-center">🌙 Ahora está cerrado. Abre de <b>${C.open}:00 a 0${C.close}:00</b> ${real ? '(hora de España, igual para todos)' : '(hora del sueño)'}${ms ? ` · abre en <b>${real ? fmtCountdown(ms).replace(/ \d+s$/, '') : `${Math.floor(ms / 3600000)} h`}</b>` : ''}.</div>`; return h; }
+    h += `<div class="text-[11px] text-slate-500 mb-1">Esta noche llevas <b>${S.bought}/${S.perNight ?? C.perNight}</b> compras · como mucho ${S.perOffer ?? C.perOffer} de cada oferta · ${real ? `en la Aduana tienes ${fmt(S.coins)} $T` : `tienes ${fmt(GS.economy.money)} $T`}.</div>`;
+    h += (S.offers || []).map(f => { const left = Math.max(0, (S.perOffer ?? C.perOffer) - (f.mine || 0)), keep = Math.round(f.price / Math.max(1, f.ref) * 100);
+      return `<div class="app-card p-2.5 mb-1.5 text-xs"><div class="flex items-center gap-2"><span class="shrink-0">${itemIcon(f.item, 24)}</span><div class="flex-1 min-w-0"><b>${name(f.item)}</b> <span class="px-1 rounded bg-purple-200 text-[10px] font-bold">${keep} % del precio medio</span><div class="text-slate-500"><b class="text-emerald-700">${fmt(f.price)} $T</b> · precio medio ${fmt(f.ref)} $T · multa si te pillan: <b class="text-red-600">${fmt(f.ref * mult)} $T</b></div></div>` +
+        (left ? `<button data-nbuy="${f.item}" class="btn-game px-2 py-1 text-[11px] bg-purple-300">Comprar 1</button>` : `<span class="text-[10px] text-slate-400">ya compraste ${f.mine}</span>`) + `</div></div>`; }).join('');
+    if ((S.log || []).length) h += `<div class="sec-h">Tus últimas compras</div>` + S.log.map(l => `<div class="text-xs py-1 border-b border-slate-100">${l.raided ? '🚨 Redada' : '✓'} ${l.qty}× ${name(l.item)} por ${fmt(l.price * l.qty)} $T${l.raided ? ` · multa ${fmt(l.fine)} $T` : ''}</div>`).join('');
+    return h;
+  },
+  open() {
+    openApp('🌙 Mercado nocturno', '', (body) => {
+      const render = async (msg = '') => {
+        body.innerHTML = `<div class="app-card p-3 text-sm text-slate-500">Mirando entre las sombras…</div>`;
+        let S; try { S = await this.load(); } catch (e) { body.innerHTML = `<div class="app-card p-3 text-sm">❌ ${esc(e.message)}</div>`; return; }
+        if (NetWorld.real()) RealWorld.night = S;
+        body.innerHTML = (msg ? `<div class="app-card p-2 mb-2 text-xs ${/^(❌|🚨)/.test(msg) ? 'bg-red-50' : 'bg-emerald-50'}">${msg}</div>` : '') + this.html(S);
+        const run = async (fn) => { let m; try { m = await fn(); } catch (e) { m = '❌ ' + e.message; } render(m); };
+        body.querySelectorAll('[data-nbuy]').forEach(b => b.onclick = () => run(() => this.buy(b.dataset.nbuy, 1)));
+        const pf = body.querySelector('[data-nfine]'); if (pf) pf.onclick = () => run(() => this.payFine());
+      };
+      render();
+    });
+  },
 };
 
 /* ===== v3.0.3 · 🤝📜🔨 TRATOS ENTRE JUGADORES REALES (H6, 2/2): trueque, contratos y subastas. Todo sale de la Aduana y queda
@@ -12569,9 +12784,11 @@ const RealWorld = {
   STALL_SPOTS: [[-9, -5.4, 0], [-5.3, -5.4, 0], [5.3, -5.4, 0], [9, -5.4, 0], [-9, 8.4, Math.PI], [9, 8.4, Math.PI]],
   shops: {}, stalls: [], at: 0,
   rpc: (fn, args = {}) => RealMarket.rpc(fn, args),
-  async prefetch() {
+  lots: [], guilds: {}, night: null,
+  async prefetch(zone = null) {
     if (!Online.me) return;
-    const [L, S] = await Promise.all([this.rpc('crossia_shops', { p_zone: null }).catch(() => []), this.rpc('crossia_stalls', { p_limit: 12 }).catch(() => []), RealMarket.load().catch(() => null)]);
+    const extra = zone === 'galeria' ? this.rpc('crossia_auctions', {}).then(A => { this.lots = A?.open || []; }) : zone === 'oficios' ? this.rpc('crossia_guilds', {}).then(G => { this.guilds = G || {}; }) : zone === 'nocturno' ? this.rpc('crossia_night_market', {}).then(N => { this.night = N; }) : null;   // v3.1 · C6
+    const [L, S] = await Promise.all([this.rpc('crossia_shops', { p_zone: null }).catch(() => []), this.rpc('crossia_stalls', { p_limit: 12 }).catch(() => []), RealMarket.load().catch(() => null), extra ? extra.catch(() => null) : null]);
     this.shops = {}; (L || []).forEach(s => { (this.shops[s.zone] ||= []).push(s); });
     const mine = (S || []).find(x => x.owner === Online.me.id), rest = (S || []).filter(x => x.owner !== Online.me.id);
     this.stalls = (mine ? [mine, ...rest] : rest).slice(0, this.STALL_SPOTS.length); this.at = Date.now();
@@ -13582,7 +13799,7 @@ DBG.refs = DBG_REFS;
 if (/[?&]debug=1\b/.test(location.search)) window._dbg = DBG_REFS;   // v1.0: ya no es global por defecto
 /* v1.1 · Interior caminable de la casa (Sec. 6.9 Fase 2) */
 /** v1.5 · capturas: DBG.tp(x, z) lleva al jugador a (x, z) del pueblo · DBG.view(dist, pitch, yaw) fija la cámara · DBG.shot('B'|'C'|'D'|'G'|'H') prepara la escena del protocolo */
-DBG.g = { World, WGEO, WorldFX, TRAVEL_POSTS, Island, Voyage, TRIBE, ship, state, IconStudio, ItemArt, itemIcon, PhGlyph, startDialog, openInventory, openHousePanel, addLetter, endDialog, openShop, openGiftPicker, openEncargo, acceptCourier, refreshMissionUI, SeasonDecor, Snow, claimSeasonGift, seasonNow, openWeeklyPanel, openRoulette, Weather, Decorate, SyncGuard, Online, RealShops, RealMarket, RealRequests, RealTrade, Metrics, Presence, Emotes, NetStatus, PeerCard, NetChat, Gather, Mining, npcObjs, interactables, colliders, SITES, NPCS, CFG, get house() { return house; }, scene, renderer, camera, cam, sky, water, atmo, clouds, PostFX, SkyEnv, PlanetAO, WATER_U, POST_U, Gather, Studio, ToolAnim, Profiles, Hub, Decor, Fitting, player, Interiors };   // v1.5: referencias gráficas para depurar
+DBG.g = { World, WGEO, WorldFX, TRAVEL_POSTS, Island, Voyage, TRIBE, ship, state, IconStudio, ItemArt, itemIcon, PhGlyph, startDialog, openInventory, openHousePanel, addLetter, endDialog, openShop, openGiftPicker, openEncargo, acceptCourier, refreshMissionUI, SeasonDecor, Snow, claimSeasonGift, seasonNow, openWeeklyPanel, openRoulette, Weather, Decorate, SyncGuard, Online, RealShops, RealMarket, RealRequests, RealTrade, NightMarket, Guilds, NET_SECTIONS, Metrics, Presence, Emotes, NetStatus, PeerCard, NetChat, Gather, Mining, npcObjs, interactables, colliders, SITES, NPCS, CFG, get house() { return house; }, scene, renderer, camera, cam, sky, water, atmo, clouds, PostFX, SkyEnv, PlanetAO, WATER_U, POST_U, Gather, Studio, ToolAnim, Profiles, Hub, Decor, Fitting, player, Interiors };   // v1.5: referencias gráficas para depurar
 DBG.post = (v = !PostFX.active) => { PostFX.active = !!v; POST_U.uPost.value = v ? 1 : 0; return PostFX.active; };
 DBG.env = (v = !SkyEnv.enabled) => SkyEnv.setEnabled(v);
 DBG.ao = (v = true) => { if (!PlanetAO.on) return false; if (v) PlanetAO.bake(); else { const c = planet.geometry.attributes.color; PlanetAO.reset(); c.needsUpdate = true; } return v; };
